@@ -1,0 +1,479 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum PaymentType {
+  CASH
+  CREDIT
+  TRANSFER
+  CARD
+}
+
+enum OrderStatus {
+  DRAFT
+  APPROVED
+  IN_PRODUCTION
+  DELIVERED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+  RESERVE
+  RELEASE
+}
+
+model Role {
+  id    BigInt @id @default(autoincrement())
+  code  String @unique
+  name  String
+  users User[]
+}
+
+model Company {
+  id            BigInt        @id @default(autoincrement())
+  name          String
+  legalId       String?       @map("legal_id")
+  phone         String?
+  email         String?
+  address       String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  users         User[]
+  regions       Region[]
+  inventory     Inventory?
+  clients       Client[]
+  recipes       Recipe[]
+  products         Product[]
+  orders           Order[]
+  productionOrders ProductionOrder[]
+  suppliers        Supplier[]
+  companyConfig    CompanyConfig?
+
+  @@map("companies")
+}
+
+model CompanyConfig {
+  id             BigInt   @id @default(autoincrement())
+  companyId      BigInt   @unique @map("company_id")
+  taxPercentage  Decimal  @default(13.0) @db.Decimal(5, 2) @map("tax_percentage")
+  currency       String   @default("CRC")
+  pricingMode    String   @default("standard") @map("pricing_mode")
+  allowBackorder Boolean  @default(false) @map("allow_backorder")
+  settingsJson   Json?    @map("settings_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_configs")
+}
+
+model User {
+  id           BigInt     @id @default(autoincrement())
+  companyId    BigInt?    @map("company_id")
+  roleId       BigInt?    @map("role_id")
+  fullName     String     @map("full_name")
+  email        String?
+  username     String     @unique
+  passwordHash String     @map("password_hash")
+  phone        String?
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  company      Company?   @relation(fields: [companyId], references: [id])
+  role         Role?      @relation(fields: [roleId], references: [id])
+  orders       Order[]    @relation("order_user")
+  approvals    Order[]    @relation("order_approver")
+
+  @@map("users")
+}
+
+model Region {
+  id        BigInt   @id @default(autoincrement())
+  companyId BigInt   @map("company_id")
+  name      String
+  routeCode String?  @map("route_code")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  clients   Client[]
+
+  @@unique([companyId, name])
+  @@map("regions")
+}
+
+model Client {
+  id             BigInt          @id @default(autoincrement())
+  companyId      BigInt          @map("company_id")
+  regionId       BigInt?         @map("region_id")
+  code           String?
+  name           String
+  legalId        String?         @map("legal_id")
+  documentType   String?         @map("document_type")
+  emailBilling   String?         @map("email_billing")
+  emailCourtesy  String?         @map("email_courtesy")
+  phone          String?
+  address        String?
+  province       String?
+  canton         String?
+  district       String?
+  paymentType    PaymentType     @default(CASH) @map("payment_type")
+  paymentDays    Int?            @map("payment_days")
+  creditLimit    Decimal         @default(0) @db.Decimal(14, 2) @map("credit_limit")
+  creditBalance  Decimal         @default(0) @db.Decimal(14, 2) @map("credit_balance")
+  visitAt        DateTime?       @map("visit_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  region         Region?         @relation(fields: [regionId], references: [id])
+  contacts       ClientContact[]
+  references     ClientReference[]
+  orders         Order[]
+  invoices       Invoice[]
+
+  @@unique([companyId, code])
+  @@map("clients")
+}
+
+model ClientContact {
+  id        BigInt   @id @default(autoincrement())
+  clientId  BigInt   @map("client_id")
+  name      String
+  role      String?
+  email     String?
+  phone     String?
+  mobile    String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_contacts")
+}
+
+model ClientReference {
+  id         BigInt   @id @default(autoincrement())
+  clientId   BigInt   @map("client_id")
+  name       String
+  contact    String?
+  phone1     String?  @map("phone_1")
+  phone2     String?  @map("phone_2")
+  termDays   Int?     @map("term_days")
+  amount     Decimal? @db.Decimal(14, 2)
+  approved   Boolean  @default(false)
+  approvedBy String?  @map("approved_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_references")
+}
+
+model Inventory {
+  id        BigInt     @id @default(autoincrement())
+  companyId BigInt     @unique @map("company_id")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  categories Category[]
+
+  @@map("inventories")
+}
+
+model Category {
+  id           BigInt    @id @default(autoincrement())
+  inventoryId  BigInt    @map("inventory_id")
+  name         String
+  categoryType String    @default("PT") @map("category_type")
+  sortOrder    Int       @default(0) @map("sort_order")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  inventory    Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  products     Product[]
+
+  @@unique([inventoryId, name])
+  @@map("categories")
+}
+
+model Recipe {
+  id              BigInt             @id @default(autoincrement())
+  companyId       BigInt             @map("company_id")
+  code            String?
+  name            String
+  isActive        Boolean            @default(true) @map("is_active")
+  recipeType      String?            @map("recipe_type")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  company          Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ingredients      RecipeIngredient[]
+  products         Product[]
+  productionOrders ProductionOrder[]
+  productionItems  ProductionItem[]
+
+  @@unique([companyId, code])
+  @@map("recipes")
+}
+
+model Product {
+  id               BigInt            @id @default(autoincrement())
+  companyId        BigInt            @map("company_id")
+  categoryId       BigInt?           @map("category_id")
+  recipeId         BigInt?           @map("recipe_id")
+  code             String?
+  name             String
+  description      String?
+  unit             String            @default("KG")
+  currency         String            @default("CRC")
+  price            Decimal?          @db.Decimal(14, 2)
+  quantity         Decimal           @default(0) @db.Decimal(14, 3)
+  reservedQuantity Decimal           @default(0) @db.Decimal(14, 3) @map("reserved_quantity")
+  taxExempt        Boolean           @default(false) @map("tax_exempt")
+  inCatalog        Boolean           @default(false) @map("in_catalog")
+  netContent       Decimal           @default(0) @db.Decimal(14, 3) @map("net_content")
+  conversionFactor Decimal           @default(1) @db.Decimal(14, 6) @map("conversion_factor")
+  minStock         Decimal?          @db.Decimal(14, 3) @map("min_stock")
+  maxStock         Decimal?          @db.Decimal(14, 3) @map("max_stock")
+  standbyStock     Decimal           @default(0) @db.Decimal(14, 3) @map("standby_stock")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category         Category?         @relation(fields: [categoryId], references: [id])
+  recipe           Recipe?           @relation(fields: [recipeId], references: [id])
+  competitors      ProductCompetitor[]
+  lotes            Lot[]
+  stockMovements   StockMovement[]
+  orderItems       OrderItem[]
+  recipeIngredients RecipeIngredient[]
+  supplierLinks    ProductSupplier[]
+  productionItems  ProductionItem[]
+
+  @@unique([companyId, code])
+  @@map("products")
+}
+
+model ProductCompetitor {
+  id         BigInt   @id @default(autoincrement())
+  productId   BigInt  @map("product_id")
+  name       String
+  netContent Decimal? @db.Decimal(14, 3) @map("net_content")
+  price      Decimal? @db.Decimal(14, 2)
+  ordinal    Int      @default(1)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_competitors")
+}
+
+model Supplier {
+  id        BigInt            @id @default(autoincrement())
+  companyId BigInt            @map("company_id")
+  name      String
+  email     String?
+  phone     String?
+  country   String?
+  note      String?
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  company   Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  products  ProductSupplier[]
+  lots      Lot[]
+
+  @@unique([companyId, name])
+  @@map("suppliers")
+}
+
+model ProductSupplier {
+  productId  BigInt   @map("product_id")
+  supplierId BigInt   @map("supplier_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@id([productId, supplierId])
+  @@map("product_suppliers")
+}
+
+model Lot {
+  id             BigInt          @id @default(autoincrement())
+  productId      BigInt          @map("product_id")
+  supplierId     BigInt?         @map("supplier_id")
+  invoiceNumber  String?         @map("invoice_number")
+  lotNumber      String?         @map("lot_number")
+  productionDate DateTime?       @map("production_date")
+  expirationDate DateTime?       @map("expiration_date")
+  entryDate      DateTime?       @map("entry_date")
+  quantity       Decimal         @db.Decimal(14, 3)
+  casNumber      String?         @map("cas_number")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
+  stockMovements StockMovement[]
+
+  @@map("lots")
+}
+
+model StockMovement {
+  id           BigInt            @id @default(autoincrement())
+  productId     BigInt           @map("product_id")
+  lotId        BigInt?           @map("lot_id")
+  movementType StockMovementType @map("movement_type")
+  quantity     Decimal           @db.Decimal(14, 3)
+  sourceType   String?           @map("source_type")
+  sourceId     BigInt?           @map("source_id")
+  note         String?
+  createdAt    DateTime          @default(now()) @map("created_at")
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lot          Lot?              @relation(fields: [lotId], references: [id])
+
+  @@map("stock_movements")
+}
+
+model Order {
+  id            BigInt       @id @default(autoincrement())
+  companyId      BigInt      @map("company_id")
+  clientId      BigInt?      @map("client_id")
+  userId        BigInt?      @map("user_id")
+  approvedById  BigInt?      @map("approved_by_id")
+  receiptNumber String?      @map("receipt_number")
+  invoiceNumber String?      @map("invoice_number")
+  notes         String?
+  responsible   String?
+  approved      Boolean      @default(false)
+  approvedAt    DateTime?    @map("approved_at")
+  isCash        Boolean      @default(false) @map("is_cash")
+  downPayment   Decimal      @default(0) @db.Decimal(14, 2) @map("down_payment")
+  total         Decimal      @default(0) @db.Decimal(14, 2)
+  otherCosts    Decimal      @default(0) @db.Decimal(14, 2) @map("other_costs")
+  transport     String?
+  status        OrderStatus  @default(DRAFT)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  company       Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client        Client?      @relation(fields: [clientId], references: [id])
+  user          User?        @relation("order_user", fields: [userId], references: [id])
+  approvedBy    User?        @relation("order_approver", fields: [approvedById], references: [id])
+  items         OrderItem[]
+  invoices      Invoice[]
+  productionOrders ProductionOrder[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id              BigInt   @id @default(autoincrement())
+  orderId         BigInt   @map("order_id")
+  productId       BigInt   @map("product_id")
+  quantity        Decimal  @db.Decimal(14, 3)
+  unitPrice       Decimal  @default(0) @db.Decimal(14, 2) @map("unit_price")
+  discountPercent Decimal  @default(0) @db.Decimal(8, 2) @map("discount_percent")
+  discountAmount  Decimal  @default(0) @db.Decimal(14, 2) @map("discount_amount")
+  totalDiscount   Decimal  @default(0) @db.Decimal(14, 2) @map("total_discount")
+  approved        Boolean  @default(false)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Invoice {
+  id        BigInt        @id @default(autoincrement())
+  clientId  BigInt        @map("client_id")
+  orderId   BigInt?       @map("order_id")
+  number    String        @unique
+  amount    Decimal       @default(0) @db.Decimal(14, 2)
+  status    InvoiceStatus @default(PENDING)
+  issuedAt  DateTime      @default(now()) @map("issued_at")
+  dueAt     DateTime?     @map("due_at")
+  paidAt    DateTime?     @map("paid_at")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  client    Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  order     Order?        @relation(fields: [orderId], references: [id])
+  payments  Payment[]
+
+  @@map("invoices")
+}
+
+model Payment {
+  id            BigInt      @id @default(autoincrement())
+  invoiceId      BigInt     @map("invoice_id")
+  amount        Decimal     @db.Decimal(14, 2)
+  paymentMethod PaymentType @map("payment_method")
+  reference     String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  invoice       Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model RecipeIngredient {
+  id         BigInt   @id @default(autoincrement())
+  recipeId   BigInt   @map("recipe_id")
+  productId  BigInt   @map("product_id")
+  quantity   Decimal  @db.Decimal(14, 3)
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@unique([recipeId, productId])
+  @@map("recipe_ingredients")
+}
+
+model ProductionOrder {
+  id           BigInt           @id @default(autoincrement())
+  companyId     BigInt          @map("company_id")
+  orderId      BigInt?          @map("order_id")
+  recipeId     BigInt?          @map("recipe_id")
+  quantity     Decimal          @db.Decimal(14, 3)
+  status       OrderStatus      @default(DRAFT)
+  priority     Int              @default(0)
+  responsible  String?
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  company      Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  order        Order?           @relation(fields: [orderId], references: [id])
+  recipe       Recipe?          @relation(fields: [recipeId], references: [id])
+  items        ProductionItem[]
+
+  @@map("production_orders")
+}
+
+model ProductionItem {
+  id                 BigInt          @id @default(autoincrement())
+  productionOrderId  BigInt          @map("production_order_id")
+  productId          BigInt          @map("product_id")
+  recipeId           BigInt?         @map("recipe_id")
+  plannedQuantity    Decimal         @db.Decimal(14, 3) @map("planned_quantity")
+  consumedQuantity   Decimal         @default(0) @db.Decimal(14, 3) @map("consumed_quantity")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+  productionOrder    ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  product            Product         @relation(fields: [productId], references: [id])
+  recipe             Recipe?         @relation(fields: [recipeId], references: [id])
+
+  @@map("production_items")
+}

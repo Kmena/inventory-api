@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track_sys - Acciones recomendadas</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --line: #334155;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .container {
+      width: min(1100px, 92%);
+      margin: 0 auto;
+      padding: 32px 0 60px;
+    }
+
+    .hero, .card {
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.25);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    h1, h2, h3 { margin-top: 0; }
+    h1 { font-size: 2rem; margin-bottom: 10px; }
+    h2 { font-size: 1.35rem; margin-bottom: 14px; }
+    h3 { font-size: 1rem; margin-bottom: 10px; color: #cbd5e1; }
+
+    p, li { color: var(--text); }
+    .muted { color: var(--muted); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      padding: 22px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: .85rem;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      border: 1px solid transparent;
+    }
+
+    .ok { background: rgba(34, 197, 94, .12); color: #86efac; border-color: rgba(34,197,94,.3); }
+    .warn { background: rgba(245, 158, 11, .12); color: #fcd34d; border-color: rgba(245,158,11,.3); }
+    .danger { background: rgba(239, 68, 68, .12); color: #fca5a5; border-color: rgba(239,68,68,.3); }
+
+    ul { padding-left: 20px; }
+    code {
+      background: #0b1220;
+      border: 1px solid #243041;
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #bfdbfe;
+    }
+
+    .timeline {
+      border-left: 3px solid var(--accent);
+      padding-left: 18px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .step {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      position: relative;
+    }
+
+    .step::before {
+      content: "";
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      position: absolute;
+      left: -26px;
+      top: 20px;
+      box-shadow: 0 0 0 4px rgba(34,197,94,.15);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 12px;
+      margin-top: 10px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: #0b1220; }
+    tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+
+    .footer {
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: .95rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>Track_sys - acciones recomendadas y ruta viable</h1>
+      <p class="muted">Documento de trabajo para modernizar <code>Track_sys legacy</code> con foco en seguridad, migración a SQL y adopción de Docker sin hacer una reescritura kamikaze.</p>
+      <div>
+        <span class="badge warn">Situación actual: backend acoplado</span>
+        <span class="badge danger">Riesgo: passwords en texto plano</span>
+        <span class="badge ok">Destino recomendado: PostgreSQL + Docker</span>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Hallazgos clave</h2>
+        <ul>
+          <li>Uso de MongoDB con conexiones repetidas por modelo.</li>
+          <li>Configuración hardcodeada en DB, puerto y URLs del front-end.</li>
+          <li>Rutas grandes con lógica de negocio mezclada.</li>
+          <li>Contraseñas sin hash en el flujo de usuarios.</li>
+          <li>Modelo con referencias manuales tipo <code>next</code>, <code>before</code>, <code>last</code>.</li>
+          <li>Falta de base sólida para contenedorización limpia.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Recomendación principal</h2>
+        <p>Migrar gradualmente el núcleo transaccional a <strong>PostgreSQL</strong> y preparar una base de despliegue con <strong>Docker</strong>.</p>
+        <ul>
+          <li>No hacer migración total en un solo paso.</li>
+          <li>Migrar primero el core comercial.</li>
+          <li>Refactorizar backend por capas mientras se migra.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Tecnología sugerida</h2>
+        <ul>
+          <li><strong>Base de datos:</strong> PostgreSQL</li>
+          <li><strong>ORM / migraciones:</strong> Prisma</li>
+          <li><strong>Contenedores:</strong> Docker + Docker Compose</li>
+          <li><strong>Hash de contraseñas:</strong> bcrypt</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="card" style="margin-bottom:24px;">
+      <h2>Acciones recomendadas</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Prioridad</th>
+            <th>Acción</th>
+            <th>Motivo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Crítica</td>
+            <td>Hashear contraseñas con <code>bcrypt</code></td>
+            <td>Evita almacenar credenciales en texto plano. Sí, eso había que hacerlo ayer.</td>
+          </tr>
+          <tr>
+            <td>Crítica</td>
+            <td>Centralizar conexión de base de datos</td>
+            <td>Reduce duplicación, facilita ambientes y mejora mantenibilidad.</td>
+          </tr>
+          <tr>
+            <td>Crítica</td>
+            <td>Mover URLs, puertos y credenciales a variables de entorno</td>
+            <td>Permite dockerizar y desplegar sin editar código por ambiente.</td>
+          </tr>
+          <tr>
+            <td>Alta</td>
+            <td>Crear o recuperar <code>package.json</code></td>
+            <td>Sin eso, Docker y CI/CD quedan cojos.</td>
+          </tr>
+          <tr>
+            <td>Alta</td>
+            <td>Diseñar esquema SQL para core del negocio</td>
+            <td>El dominio actual es altamente relacional.</td>
+          </tr>
+          <tr>
+            <td>Alta</td>
+            <td>Separar backend en <code>routes</code>, <code>services</code>, <code>repositories</code></td>
+            <td>Reduce acoplamiento y facilita la migración progresiva.</td>
+          </tr>
+          <tr>
+            <td>Media</td>
+            <td>Agregar validaciones, logs y pruebas básicas</td>
+            <td>Ayuda a evitar regresiones durante la transición.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" style="margin-bottom:24px;">
+      <h2>Ruta viable</h2>
+      <div class="timeline">
+        <div class="step">
+          <h3>Fase 0 - Higiene mínima</h3>
+          <p>Corregir seguridad y configuración: <code>.env</code>, conexión DB única, quitar IPs hardcodeadas y arreglar contraseñas.</p>
+        </div>
+        <div class="step">
+          <h3>Fase 1 - Docker para desarrollo</h3>
+          <p>Levantar <code>app</code> + <code>postgres</code> con volúmenes para datos, uploads e imágenes.</p>
+        </div>
+        <div class="step">
+          <h3>Fase 2 - Esquema SQL inicial</h3>
+          <p>Modelar empresas, usuarios, clientes, productos, pedidos, detalle, facturas y pagos.</p>
+        </div>
+        <div class="step">
+          <h3>Fase 3 - Migración del core comercial</h3>
+          <p>Mover primero usuarios, empresas, clientes, inventario y pedidos. Ahí está el valor real.</p>
+        </div>
+        <div class="step">
+          <h3>Fase 4 - Refactor del backend</h3>
+          <p>Reorganizar código en capas para que la base de datos no esté pegada con cinta a las rutas HTTP.</p>
+        </div>
+        <div class="step">
+          <h3>Fase 5 - Producción</h3>
+          <p>Backups, endurecimiento de secretos, reverse proxy y despliegue controlado.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Entregables incluidos en esta carpeta</h2>
+        <ul>
+          <li><code>docs/resumen.md</code></li>
+          <li><code>plan/roadmap_migracion.md</code></li>
+          <li><code>sql/schema_inicial_postgresql.sql</code></li>
+          <li><code>docker/docker-compose.dev.yml</code></li>
+          <li><code>docker/Dockerfile.example</code></li>
+          <li><code>config/.env.example</code></li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Ruta más pragmática</h2>
+        <p>La vía más sana es crear una nueva capa o módulo para el core comercial usando PostgreSQL y mantener temporalmente Mongo solo donde todavía no se haya migrado.</p>
+        <p>O sea: modernizar con criterio, no con fe ciega y café recalentado.</p>
+      </article>
+    </section>
+
+    <p class="footer">Documento generado como apoyo de análisis técnico y planificación de modernización.</p>
+  </div>
+</body>
+</html>

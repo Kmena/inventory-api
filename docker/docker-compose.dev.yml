@@ -1,0 +1,35 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.example
+    ports:
+      - "2500:2500"
+    environment:
+      PORT: 2500
+      NODE_ENV: development
+      DATABASE_URL: postgresql://tracksys:tracksys@db:5432/tracksys
+      APP_BASE_URL: http://localhost:2500
+      CORS_ORIGIN: http://localhost:2500
+    depends_on:
+      - db
+    volumes:
+      - ../:/app
+      - uploads_data:/app/back_end/Top_end/uploads
+      - images_data:/app/front_end/assets/img
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tracksys
+      POSTGRES_USER: tracksys
+      POSTGRES_PASSWORD: tracksys
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  uploads_data:
+  images_data:

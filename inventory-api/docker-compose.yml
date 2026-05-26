@@ -1,0 +1,30 @@
+services:
+  app:
+    build: .
+    ports:
+      - "2500:2500"
+    environment:
+      PORT: 2500
+      NODE_ENV: development
+      DATABASE_URL: postgresql://tracksys:tracksys@db:5432/tracksys?schema=public
+      CORS_ORIGIN: http://localhost:2500
+      BCRYPT_ROUNDS: 12
+    depends_on:
+      - db
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tracksys
+      POSTGRES_USER: tracksys
+      POSTGRES_PASSWORD: tracksys
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
