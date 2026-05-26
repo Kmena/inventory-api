@@ -4,6 +4,26 @@ Todos los cambios relevantes de este proyecto se documentan en este archivo.
 
 El formato se inspira en Keep a Changelog y el versionado sigue Semantic Versioning.
 
+## [0.1.1] - 2026-05-26
+
+### Added
+- frontend demo mínimo servido desde `inventory-api/src/public`
+- pantalla de login sencilla para redirección al flujo de bodega
+- página de bodega para listar productos existentes
+- importación de productos desde Excel en la interfaz de bodega
+- preview de filas importables con selección manual por producto
+- endpoint `POST /api/products/import` para creación y actualización masiva de productos
+
+### Changed
+- la carga masiva de productos ahora puede trabajar por `id` único y pedir confirmación antes de actualizar existentes
+- la importación desde frontend ahora se envía en chunks para evitar requests demasiado grandes y dejar mejor control a futuro
+- se actualizó la memoria operativa de la sesión con el nuevo flujo de frontend e importación
+- se ajustó el nombre visible del servidor a `Inventory API`
+
+### Notes
+- el seed sigue siendo útil para credenciales y datos demo, pero el flujo objetivo de productos ya empezó a migrar hacia carga por Excel desde bodega
+- `docker compose down` conserva la base de datos mientras no se use `-v`
+
 ## [0.1.0] - 2026-05-26
 
 ### Added
