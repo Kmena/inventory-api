@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventory API | Productos</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  </head>
+  <body>
+    <main class="page-layout">
+      <section class="card">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Bodega</p>
+            <h1>Productos disponibles</h1>
+            <p id="welcome-message" class="muted"></p>
+          </div>
+          <button id="logout-button" class="secondary-button" type="button">Cerrar sesión</button>
+        </header>
+
+        <section class="import-panel">
+          <div>
+            <h2>Importar productos desde Excel</h2>
+            <p class="muted">Use el archivo de productos para previsualizar filas, seleccionar cuáles subir y decidir si actualiza productos con ID ya existente.</p>
+          </div>
+
+          <div class="import-actions">
+            <input id="excel-file" type="file" accept=".xlsx,.xls" />
+            <button id="import-button" type="button" disabled>Subir seleccionados</button>
+          </div>
+
+          <p id="import-message" class="message" aria-live="polite"></p>
+          <p id="import-progress" class="message" aria-live="polite"></p>
+
+          <div class="table-wrapper hidden" id="import-preview-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Seleccionar</th>
+                  <th>Acción</th>
+                  <th>ID</th>
+                  <th>Nombre</th>
+                  <th>Código</th>
+                  <th>Precio</th>
+                  <th>Existencias</th>
+                  <th>Familia</th>
+                </tr>
+              </thead>
+              <tbody id="import-preview-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <p id="products-message" class="message" aria-live="polite"></p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Unidad</th>
+                <th>Precio</th>
+                <th>Cantidad</th>
+                <th>Reservado</th>
+              </tr>
+            </thead>
+            <tbody id="products-body">
+              <tr>
+                <td colspan="7" class="empty-state">Cargando productos...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="/warehouse/products.js"></script>
+  </body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventory API | Login</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="auth-layout">
+      <section class="card auth-card">
+        <div>
+          <p class="eyebrow">Inventory API</p>
+          <h1>Login de bodega</h1>
+          <p class="muted">Ingrese las credenciales de <strong>bodega</strong> para ver el inventario de productos.</p>
+        </div>
+
+        <form id="login-form" class="stack-lg">
+          <label class="field">
+            <span>Usuario</span>
+            <input type="text" name="username" placeholder="bodega" required />
+          </label>
+
+          <label class="field">
+            <span>Contraseña</span>
+            <input type="password" name="password" placeholder="••••••••" required />
+          </label>
+
+          <button id="login-button" type="submit">Entrar</button>
+          <p id="login-message" class="message" aria-live="polite"></p>
+        </form>
+
+        <div class="hint-box">
+          <p><strong>Demo:</strong> usuario <code>bodega</code> / contraseña <code>bodega123</code></p>
+        </div>
+      </section>
+    </main>
+
+    <script src="/login.js"></script>
+  </body>
+</html>
