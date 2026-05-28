@@ -1,5 +1,9 @@
 const prisma = require('../lib/prisma');
 
+function transaction(work) {
+  return prisma.$transaction(work);
+}
+
 function findAllProducts() {
   return prisma.product.findMany({
     orderBy: { id: 'asc' },
@@ -11,6 +15,13 @@ function findProductById(id) {
   return prisma.product.findUnique({
     where: { id },
     include: { category: true, recipe: true, supplierLinks: { include: { supplier: true } } },
+  });
+}
+
+function findProductsByIds(ids) {
+  return prisma.product.findMany({
+    where: { id: { in: ids } },
+    include: { category: true },
   });
 }
 
@@ -26,4 +37,12 @@ function deleteProduct(id) {
   return prisma.product.delete({ where: { id } });
 }
 
-module.exports = { findAllProducts, findProductById, createProduct, updateProduct, deleteProduct };
+module.exports = {
+  transaction,
+  findAllProducts,
+  findProductById,
+  findProductsByIds,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+};

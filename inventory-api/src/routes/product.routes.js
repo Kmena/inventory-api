@@ -4,7 +4,7 @@ const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
-const { createProductSchema, updateProductSchema } = require('../schemas/product.schema');
+const { createProductSchema, updateProductSchema, importProductsSchema } = require('../schemas/product.schema');
 const productService = require('../services/product.service');
 
 const router = express.Router();
@@ -20,6 +20,14 @@ router.get('/:id', authorize('admin', 'sales', 'warehouse'), async (req, res, ne
 
 router.post('/', authorize('admin', 'warehouse'), validate(createProductSchema), async (req, res, next) => {
   try { return res.status(201).json(await productService.createProduct(req.body)); } catch (error) { return next(error); }
+});
+
+router.post('/import', authorize('admin', 'warehouse'), validate(importProductsSchema), async (req, res, next) => {
+  try {
+    return res.status(200).json(await productService.importProducts(req.body.rows, req.auth));
+  } catch (error) {
+    return next(error);
+  }
 });
 
 router.put('/:id', authorize('admin', 'warehouse'), validate(updateProductSchema), async (req, res, next) => {

@@ -183,6 +183,12 @@ Generadas por el seed:
 
 Estas sirven para probar login y permisos por rol.
 
+Importante:
+
+- el proyecto todavía usa `seed` para poblar datos demo de prueba
+- en la versión final no se pretende depender de datos iniciales cargados por seed para productos
+- el flujo objetivo para productos ya empezó a moverse hacia carga desde Excel en la interfaz de bodega
+
 ---
 
 ## CRUDs y módulos ya implementados
@@ -288,6 +294,110 @@ Estas reglas no deberían olvidarse en la siguiente sesión:
 
 ---
 
+## Frontend demo ya implementado
+
+Ya existe una primera parte de frontend mínima dentro del backend en:
+
+```text
+inventory-api/src/public/
+```
+
+### Flujo demo ya activo
+
+- `GET /` muestra un login sencillo
+- al hacer login con `bodega / bodega123`
+- si el rol autenticado es `warehouse`
+- redirige a:
+
+```text
+/warehouse/products.html
+```
+
+### Página demo de bodega
+
+La página de bodega ya permite:
+
+- listar productos actuales desde `GET /api/products`
+- seleccionar un archivo Excel `.xlsx`
+- leer el archivo en navegador
+- previsualizar filas válidas
+- marcar qué productos subir
+- detectar si un `id` ya existe en la base
+- mostrar si la acción será `Crear` o `Actualizar`
+- pedir confirmación antes de actualizar productos existentes
+- importar los productos seleccionados al backend
+
+### Regla actual de importación por Excel
+
+El archivo de referencia usado en esta sesión fue:
+
+```text
+C:\Users\kmena\Documents\Productos.xlsx
+```
+
+Columnas detectadas:
+
+- `Codigo Cliente`
+- `Descripcion`
+- `Codigo Barras`
+- `Codigo Cabys`
+- `Registromedicamento`
+- `Valor Unitario`
+- `Precio Con Iva`
+- `Existencias`
+- `Familia Producto`
+
+Mapeo actual de la demo:
+
+- `Codigo Cliente` → `id` y `code`
+- `Descripcion` → `name`
+- `Codigo Barras`, `Codigo Cabys`, `Registromedicamento` → `description`
+- `Precio Con Iva` o `Valor Unitario` → `price`
+- `Existencias` → `quantity`
+- `Familia Producto` → `categoryName`
+- `unit` fijo → `UN`
+- `currency` fijo → `CRC`
+
+### Importación en chunks
+
+Para evitar errores como `request entity too large` y dejar mejor control a futuro:
+
+- la importación del frontend ya no manda todo el Excel de una vez
+- ahora envía bloques de filas al endpoint
+- tamaño actual del chunk en frontend:
+
+```text
+100 filas por bloque
+```
+
+Endpoint usado:
+
+```text
+POST /api/products/import
+```
+
+### Regla importante sobre IDs existentes
+
+- si un `id` del Excel no existe → se crea
+- si un `id` del Excel ya existe → se marca como actualización
+- la UI pide confirmación antes de actualizar
+- si el usuario no confirma, esos productos no deben actualizarse
+- además se agregó protección para no actualizar productos de otra empresa si el `id` pertenece a otra compañía
+
+---
+
+## Reglas operativas nuevas decididas en esta sesión
+
+1. **La base de datos no debe depender a futuro del seed para cargar productos reales**
+2. **La carga real de productos debe venir desde la interfaz de bodega por Excel**
+3. **Solo puede haber un `id` por producto**
+4. **Si el Excel trae un `id` existente, el flujo debe tratarlo como actualización potencial**
+5. **La actualización debe requerir confirmación del usuario**
+6. **La importación masiva debe enviarse en chunks y no en un solo request gigante**
+7. **La UI de bodega ya es parte del flujo de trabajo actual y no debe romperse al seguir iterando**
+
+---
+
 ## Documentación útil ya existente en inventory-api/docs
 
 - `que_es_prisma.md`
@@ -296,29 +406,41 @@ Estas reglas no deberían olvidarse en la siguiente sesión:
 - `roles_y_permisos.md`
 - `estructura_base.md`
 - `logica_inventario_fase1.md`
+- `memoria_sesion_code_puppy.md`
 
 ---
 
 ## Qué falta / próximos pasos recomendados
 
-Todavía no está implementado:
+Todavía no está implementado o sigue incompleto:
 
 - consumo de ingredientes por receta
 - producción de producto terminado
 - lógica FIFO/FEFO por lotes
 - integración de movimientos con producción
 - pruebas automatizadas
-- frontend de prueba
+- diferencias visuales por fila antes de actualizar desde Excel
+- reporte detallado de errores por chunk o por fila importada
+- validaciones más finas del layout del Excel
 - refresh tokens / sesiones avanzadas
 - permisos granulares por acción
 
 ### Próximo paso más natural
-Implementar la **fase 2 de inventario**:
+Hay dos líneas naturales de continuación:
+
+#### Opción A: seguir con inventario fase 2
 
 - consumir materia prima según receta
 - producir producto terminado
 - registrar movimientos de producción
 - opcionalmente asignar por lote
+
+#### Opción B: madurar el flujo de Excel en bodega
+
+- mostrar diferencias entre datos actuales y datos del Excel antes de actualizar
+- guardar reporte de creados / actualizados / omitidos
+- validar mejor categorías y campos faltantes
+- considerar carga backend real del archivo si luego se requiere auditoría
 
 ---
 
@@ -330,8 +452,15 @@ Si code puppy retoma este trabajo, lo primero que debe asumir es:
 - no se está trabajando sobre MongoDB viejo
 - el foco debe mantenerse en `inventory-api`
 - la lógica de inventario ya comenzó y no debe duplicarse ni romperse
+- ya existe un frontend demo mínimo de login + página de bodega
+- la carga de productos por Excel ya empezó y no debe reescribirse desde cero sin revisar el flujo actual
+- la importación desde Excel ya trabaja con detección de `id` existente y envío en chunks
 - cualquier nueva funcionalidad debe respetar el diseño por capas y las reglas de stock ya definidas
+- `docker compose down` conserva la base si no se usa `-v`
+- el stack actual no corre migraciones ni seed automáticamente al iniciar el contenedor, así que para una base limpia aún puede requerirse:
+  - `docker compose exec app npx prisma migrate deploy`
+  - `docker compose exec app npm run prisma:seed`
 
 En resumen:
 
-> el proyecto está en transición hacia un backend nuevo, relacional, con seguridad básica y lógica operativa inicial de inventario ya implementada.
+> el proyecto ya no solo tiene backend base e inventario fase 1; ahora también tiene una primera interfaz funcional de bodega con login, listado de productos e importación de productos desde Excel en chunks.
