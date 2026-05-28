@@ -12,7 +12,7 @@ Backend inicial de `inventory-api` para arrancar la modernización de `Track_sys
 
 - `src/` -> aplicación HTTP
 - `prisma/` -> esquema, migraciones y seed
-- `docs/` -> documentación de la plantilla
+- `docs/` -> documentación local de apoyo; en Git solo se versiona `docs/README.md` si existe
 - `Dockerfile` -> imagen base
 - `docker-compose.yml` -> app + postgres
 
@@ -131,13 +131,12 @@ Esta plantilla ya deja definida una estructura inicial de negocio para:
 
 ## Documentación útil
 
-- `docs/que_es_prisma.md`
-- `docs/estructura_base.md`
-- `docs/auth_bcrypt_jwt.md`
-- `docs/que_es_crud.md`
-- `docs/roles_y_permisos.md`
-- `docs/logica_inventario_fase1.md`
 - `prisma/migration-instructions.md`
+- `docs/README.md` si existe como índice público/versionado
+
+### Nota sobre `docs/`
+
+Los archivos Markdown dentro de `docs/` se consideran documentación operativa/local y no se versionan en Git, excepto `README.md` dentro de esa carpeta si llegara a usarse como índice visible del directorio.
 
 ## Credenciales demo iniciales
 

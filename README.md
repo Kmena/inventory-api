@@ -16,14 +16,17 @@ Este proyecto está orientado a:
 
 - `README.md` -> visión general del proyecto
 - `CHANGELOG.md` -> historial de versiones
-- `docs/acciones_recomendadas.html` -> documento visual con acciones y ruta viable
-- `docs/resumen.md` -> resumen ejecutivo
-- `docs/memoria_sesion_code_puppy.md` -> memoria operativa de la sesión
-- `plan/roadmap_migracion.md` -> plan por fases
+- `docs/` -> documentación local de trabajo; en Git solo se versiona `docs/README.md` si existe
 - `sql/schema_inicial_postgresql.sql` -> esquema relacional inicial sugerido
 - `docker/docker-compose.dev.yml` -> ejemplo de compose para desarrollo
 - `docker/Dockerfile.example` -> ejemplo base de Dockerfile
 - `inventory-api/` -> backend funcional inicial con Node + Express + Prisma + PostgreSQL + Docker
+
+## Nota sobre documentación local
+
+Los archivos Markdown dentro de carpetas `docs/` se usan como documentación operativa local y están ignorados por Git, excepto `README.md` dentro de `docs/` si llegara a existir.
+
+La carpeta `plan/` también está tratada como material local no publicado si está ignorada en el repositorio actual.
 
 ## Estado actual
 
