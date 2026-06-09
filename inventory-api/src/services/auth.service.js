@@ -15,6 +15,18 @@ async function login(payload) {
     throw createHttpError(401, 'Usuario o contraseña inválidos', 'unauthorized');
   }
 
+  if (user.status !== 'ACTIVE') {
+    throw createHttpError(403, 'Usuario inactivo o bloqueado', 'forbidden');
+  }
+
+  if (user.role && user.role.isActive === false) {
+    throw createHttpError(403, 'Rol inactivo', 'forbidden');
+  }
+
+  if (user.company && user.company.isActive === false) {
+    throw createHttpError(403, 'Empresa inactiva', 'forbidden');
+  }
+
   const token = signAccessToken(user);
   const { passwordHash, ...safeUser } = user;
 

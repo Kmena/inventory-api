@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Sin acceso</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="auth-layout">
+      <section class="card auth-card">
+        <p class="eyebrow">Inventori</p>
+        <h1>Sin panel asignado</h1>
+        <p class="muted">El usuario inicio sesion, pero este rol aun no tiene una pagina inicial configurada.</p>
+        <button id="logout-button" type="button">Cerrar sesion</button>
+      </section>
+    </main>
+
+    <script>
+      document.getElementById('logout-button').addEventListener('click', () => {
+        localStorage.removeItem('inventory-api-auth');
+        window.location.href = '/';
+      });
+    </script>
+  </body>
+</html>

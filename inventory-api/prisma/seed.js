@@ -6,37 +6,92 @@ const prisma = new PrismaClient();
 async function main() {
   const rounds = Number(process.env.BCRYPT_ROUNDS || 12);
 
+  const rootRole = await prisma.role.upsert({
+    where: { code: 'root' },
+    update: { name: 'Root', isActive: true },
+    create: { code: 'root', name: 'Root', isActive: true },
+  });
+
   const adminRole = await prisma.role.upsert({
     where: { code: 'admin' },
-    update: { name: 'Administrador' },
-    create: { code: 'admin', name: 'Administrador' },
+    update: { name: 'Administrador', isActive: true },
+    create: { code: 'admin', name: 'Administrador', isActive: true },
   });
 
   const salesRole = await prisma.role.upsert({
     where: { code: 'sales' },
-    update: { name: 'Ventas' },
-    create: { code: 'sales', name: 'Ventas' },
+    update: { name: 'Ventas', isActive: true },
+    create: { code: 'sales', name: 'Ventas', isActive: true },
   });
 
   const warehouseRole = await prisma.role.upsert({
     where: { code: 'warehouse' },
-    update: { name: 'Bodega' },
-    create: { code: 'warehouse', name: 'Bodega' },
+    update: { name: 'Bodega', isActive: true },
+    create: { code: 'warehouse', name: 'Bodega', isActive: true },
   });
+
+  const permissionDefinitions = [
+    ['companies.manage', 'companies', 'manage', 'Crear y administrar empresas'],
+    ['users.manage', 'users', 'manage', 'Crear usuarios y asignar roles'],
+    ['settings.manage', 'settings', 'manage', 'Configurar empresa y parametros fiscales'],
+    ['clients.manage', 'clients', 'manage', 'Crear y actualizar clientes'],
+    ['products.manage', 'products', 'manage', 'Crear y actualizar articulos'],
+    ['inventory.manage', 'inventory', 'manage', 'Gestionar bodegas, lotes y movimientos'],
+    ['procurement.manage', 'procurement', 'manage', 'Gestionar proveedores, compras y recepciones'],
+    ['sales.manage', 'sales', 'manage', 'Gestionar pedidos, facturas y pagos'],
+  ];
+
+  const permissions = {};
+  for (const [code, module, action, description] of permissionDefinitions) {
+    permissions[code] = await prisma.permission.upsert({
+      where: { code },
+      update: { module, action, description, isActive: true },
+      create: { code, module, action, description, isActive: true },
+    });
+  }
+
+  const rolePermissionMap = {
+    root: Object.keys(permissions),
+    admin: Object.keys(permissions),
+    sales: ['clients.manage', 'sales.manage'],
+    warehouse: ['products.manage', 'inventory.manage', 'procurement.manage'],
+  };
+
+  for (const [roleCode, permissionCodes] of Object.entries(rolePermissionMap)) {
+    const role = { root: rootRole, admin: adminRole, sales: salesRole, warehouse: warehouseRole }[roleCode];
+    for (const permissionCode of permissionCodes) {
+      await prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: role.id,
+            permissionId: permissions[permissionCode].id,
+          },
+        },
+        update: { isEnabled: true },
+        create: {
+          roleId: role.id,
+          permissionId: permissions[permissionCode].id,
+          isEnabled: true,
+        },
+      });
+    }
+  }
 
   const company = await prisma.company.upsert({
     where: { id: 1n },
     update: {
-      name: 'Empresa Demo TrackSys',
+      name: 'inventori',
       legalId: '3-101-000000',
+      isActive: true,
       phone: '2222-2222',
       email: 'demo@tracksys.local',
       address: 'San José, Costa Rica',
     },
     create: {
       id: 1n,
-      name: 'Empresa Demo TrackSys',
+      name: 'inventori',
       legalId: '3-101-000000',
+      isActive: true,
       phone: '2222-2222',
       email: 'demo@tracksys.local',
       address: 'San José, Costa Rica',
@@ -76,9 +131,88 @@ async function main() {
     },
   });
 
+  await prisma.companyFiscalConfig.upsert({
+    where: {
+      companyId_haciendaEnvironment: {
+        companyId: company.id,
+        haciendaEnvironment: 'STAGING',
+      },
+    },
+    update: {
+      legalName: company.name,
+      identificationType: '02',
+      identificationNumber: company.legalId || '3101000000',
+      email: company.email,
+      phone: company.phone,
+      address: company.address,
+      defaultBranchCode: '001',
+      defaultTerminalCode: '00001',
+      isActive: true,
+    },
+    create: {
+      companyId: company.id,
+      legalName: company.name,
+      commercialName: company.name,
+      identificationType: '02',
+      identificationNumber: company.legalId || '3101000000',
+      email: company.email,
+      phone: company.phone,
+      address: company.address,
+      haciendaEnvironment: 'STAGING',
+      defaultBranchCode: '001',
+      defaultTerminalCode: '00001',
+      isActive: true,
+    },
+  });
+
+  for (const documentType of ['FACTURA_ELECTRONICA', 'TIQUETE_ELECTRONICO', 'NOTA_CREDITO_ELECTRONICA']) {
+    await prisma.fiscalSequence.upsert({
+      where: {
+        companyId_documentType_branchCode_terminalCode: {
+          companyId: company.id,
+          documentType,
+          branchCode: '001',
+          terminalCode: '00001',
+        },
+      },
+      update: { isActive: true },
+      create: {
+        companyId: company.id,
+        documentType,
+        branchCode: '001',
+        terminalCode: '00001',
+        currentNumber: 0,
+        nextNumber: 1,
+        isActive: true,
+      },
+    });
+  }
+
+  const rootPasswordHash = await bcrypt.hash('root1234', rounds);
   const passwordHash = await bcrypt.hash('admin123', rounds);
   const salesPasswordHash = await bcrypt.hash('ventas123', rounds);
   const warehousePasswordHash = await bcrypt.hash('bodega123', rounds);
+
+  await prisma.user.upsert({
+    where: { username: 'root' },
+    update: {
+      fullName: 'Root Inventori',
+      passwordHash: rootPasswordHash,
+      companyId: company.id,
+      roleId: rootRole.id,
+      status: UserStatus.ACTIVE,
+    },
+    create: {
+      fullName: 'Root Inventori',
+      email: 'root@inventori.local',
+      username: 'root',
+      passwordHash: rootPasswordHash,
+      phone: '8000-0000',
+      companyId: company.id,
+      roleId: rootRole.id,
+      status: UserStatus.ACTIVE,
+    },
+  });
 
   await prisma.user.upsert({
     where: { username: 'admin' },

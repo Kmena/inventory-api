@@ -28,9 +28,10 @@ h1, h2 { margin: 0 0 8px; }
 .muted { color: var(--muted); }
 .stack-lg { display: grid; gap: 16px; margin-top: 24px; }
 .field { display: grid; gap: 8px; }
-.field input, input[type='file'] {
+.field input, .field select, input[type='file'] {
   width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: #fff;
 }
+.field-wide { grid-column: span 2; }
 button { cursor: pointer; border: 0; border-radius: 10px; padding: 12px 16px; background: var(--primary); color: white; font-weight: 700; }
 button:hover { background: var(--primary-dark); }
 button:disabled { opacity: 0.7; cursor: progress; }
@@ -53,6 +54,10 @@ code { background: #eef2ff; padding: 2px 6px; border-radius: 6px; }
 .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 700; }
 .badge-success { color: #116329; background: #dcfce7; }
 .badge-warning { color: #92400e; background: #fef3c7; }
+.dashboard-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.dashboard-tile { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: #f8fafc; display: grid; gap: 8px; }
+.dashboard-tile span { color: var(--muted); font-size: 0.9rem; }
+.dashboard-tile strong { font-size: 1.25rem; }
 input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--primary); }
 input[type='file']::file-selector-button {
   margin-right: 12px; border: 0; border-radius: 8px; padding: 8px 12px; background: #e9eefb; color: var(--primary-dark); font-weight: 700; cursor: pointer;
@@ -74,6 +79,7 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
 
 @media (max-width: 820px) {
   .import-actions, .page-header { flex-direction: column; align-items: stretch; }
+  .dashboard-grid { grid-template-columns: 1fr; }
   .auth-layout, .page-layout { padding: 12px; }
   .card { padding: 18px; box-shadow: none; }
 }
