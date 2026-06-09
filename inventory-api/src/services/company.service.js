@@ -9,7 +9,14 @@ async function listCompanies() {
   return companyRepository.findAllCompanies();
 }
 
-async function listCompaniesForRoot() {
+function assertRootCreator(auth) {
+  if (auth.companyId) {
+    throw createHttpError(403, 'Solo el root principal puede crear o listar empresas', 'forbidden');
+  }
+}
+
+async function listCompaniesForRoot(auth) {
+  assertRootCreator(auth);
   return companyRepository.findAllCompaniesForRoot();
 }
 
@@ -17,21 +24,84 @@ async function registerCompany(payload) {
   return companyRepository.createCompany(payload);
 }
 
-async function registerRootCompany(payload) {
+async function updateRootCompanyStatus(companyId, payload, auth) {
+  assertRootCreator(auth);
+
+  try {
+    return await companyRepository.updateCompanyStatus(companyId, payload.isActive);
+  } catch (error) {
+    if (error.code === 'P2025') {
+      throw createHttpError(404, 'Empresa no encontrada', 'not_found');
+    }
+    throw error;
+  }
+}
+
+function buildCompanyDescription(company) {
+  const fiscalConfig = company.fiscalConfig;
+  const legalName = fiscalConfig?.legalName || company.name;
+  const commercialName = fiscalConfig?.commercialName;
+  const identification = fiscalConfig?.identificationNumber || company.legalId;
+  const contact = company.email || company.phone;
+  const location = company.address || fiscalConfig?.address;
+
+  return [
+    commercialName && commercialName !== legalName ? `${commercialName}, registrada como ${legalName}` : legalName,
+    identification ? `identificacion ${identification}` : null,
+    contact ? `contacto ${contact}` : null,
+    location ? `ubicada en ${location}` : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+async function getExecutiveDashboard(auth) {
+  if (!auth.companyId) {
+    throw createHttpError(403, 'Este dashboard es solo para roots de empresa', 'forbidden');
+  }
+
+  const companyId = BigInt(auth.companyId);
+  const { company, employeesCount } = await companyRepository.findCompanyExecutiveDashboard(companyId);
+  if (!company) {
+    throw createHttpError(404, 'Empresa no encontrada', 'not_found');
+  }
+
+  return {
+    company: {
+      id: company.id,
+      name: company.name,
+      legalId: company.legalId,
+      phone: company.phone,
+      email: company.email,
+      address: company.address,
+      isActive: company.isActive,
+      createdAt: company.createdAt,
+      fiscalConfig: company.fiscalConfig,
+      description: buildCompanyDescription(company),
+    },
+    metrics: {
+      employeesCount,
+    },
+  };
+}
+
+async function registerRootCompany(payload, auth) {
+  assertRootCreator(auth);
+
   const existingUser = await prisma.user.findUnique({
     where: { username: payload.rootUser.username },
   });
   if (existingUser) {
-    throw createHttpError(409, 'El usuario root ya existe', 'conflict');
+    throw createHttpError(409, 'El usuario administrador ya existe', 'conflict');
   }
 
   const passwordHash = await bcrypt.hash(payload.rootUser.password, bcryptRounds);
 
   return prisma.$transaction(async (tx) => {
-    const rootRole = await tx.role.upsert({
-      where: { code: 'root' },
-      update: { name: 'Root', isActive: true },
-      create: { code: 'root', name: 'Root', isActive: true },
+    const adminRole = await tx.role.upsert({
+      where: { code: 'admin' },
+      update: { name: 'Administrador', companyId: null, isActive: true },
+      create: { code: 'admin', name: 'Administrador', companyId: null, isActive: true },
     });
 
     const company = await tx.company.create({
@@ -57,14 +127,13 @@ async function registerRootCompany(payload) {
         email: payload.fiscalConfig.email || payload.company.email,
         phone: payload.fiscalConfig.phone || payload.company.phone,
         address: payload.fiscalConfig.address || payload.company.address,
-        isActive: true,
       },
     });
 
     const rootUser = await tx.user.create({
       data: {
         companyId: company.id,
-        roleId: rootRole.id,
+        roleId: adminRole.id,
         fullName: payload.rootUser.fullName,
         email: payload.rootUser.email,
         username: payload.rootUser.username,
@@ -98,5 +167,7 @@ module.exports = {
   listCompanies,
   listCompaniesForRoot,
   registerCompany,
+  updateRootCompanyStatus,
+  getExecutiveDashboard,
   registerRootCompany,
 };

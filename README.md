@@ -50,7 +50,6 @@ El producto esta orientado a centralizar:
 - `inventory-api/docs/er_mvp_prd.md` -> ER minimo viable alineado al PRD
 - `inventory-api/docs/er_propuesto_prd.md` -> ER ampliado propuesto
 - `inventory-api/docs/ERD_v1.md` y `inventory-api/docs/erDiagram.mmd` -> diagrama ER de referencia
-- `docs/memoria_sesion_code_puppy.md` -> memoria tecnica con estado actual, gaps y siguientes pasos
 
 ## Estado actual
 
@@ -69,6 +68,11 @@ La carpeta `inventory-api/` contiene un backend funcional inicial con:
 - inventario fase 1 con movimientos de stock
 - flujo de pedidos con aprobacion, cancelacion y despacho
 - UI demo de bodega para importar productos desde Excel
+- dashboard root para crear, listar, activar y deshabilitar empresas
+- dashboard ejecutivo para administradores de empresa
+- administracion de usuarios por empresa desde el dashboard ejecutivo
+- roles personalizados por empresa con permisos configurables
+- autorizacion por permisos finos para bodega, productos e inventario
 
 ## Alineacion con PRD/ERD
 
@@ -99,7 +103,6 @@ Los principales gaps frente al PRD/ERD son:
 
 - `README.md` -> vision general y alcance del producto
 - `CHANGELOG.md` -> historial de versiones
-- `docs/` -> memoria y documentos locales de trabajo
 - `inventory-api/` -> backend funcional principal
 - `inventory-api/docs/` -> PRD, ERD y documentacion tecnica del backend
 - `inventory-api/prisma/` -> schema, migraciones y seed

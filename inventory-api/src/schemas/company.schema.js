@@ -46,7 +46,12 @@ const createRootCompanySchema = z.object({
   }),
 });
 
+const updateRootCompanyStatusSchema = z.object({
+  isActive: z.boolean(),
+});
+
 module.exports = {
   createCompanySchema,
   createRootCompanySchema,
+  updateRootCompanyStatusSchema,
 };

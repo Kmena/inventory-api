@@ -48,9 +48,13 @@ model Role {
   id              BigInt           @id @default(autoincrement())
   code            String           @unique
   name            String
+  companyId       BigInt?          @map("company_id")
   isActive        Boolean          @default(true) @map("is_active")
+  company         Company?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   users           User[]
   rolePermissions RolePermission[]
+
+  @@index([companyId])
 }
 
 model Company {
@@ -64,6 +68,7 @@ model Company {
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
   users         User[]
+  roles         Role[]
   regions       Region[]
   inventory     Inventory?
   clients       Client[]
@@ -73,7 +78,7 @@ model Company {
   productionOrders ProductionOrder[]
   suppliers        Supplier[]
   companyConfig    CompanyConfig?
-  fiscalConfigs    CompanyFiscalConfig[]
+  fiscalConfig     CompanyFiscalConfig?
   fiscalSequences  FiscalSequence[]
 
   @@map("companies")
@@ -109,7 +114,7 @@ model RolePermission {
 
 model CompanyFiscalConfig {
   id                           BigInt   @id @default(autoincrement())
-  companyId                    BigInt   @map("company_id")
+  companyId                    BigInt   @unique @map("company_id")
   legalName                    String   @map("legal_name")
   commercialName               String?  @map("commercial_name")
   identificationType           String   @map("identification_type")
@@ -129,12 +134,10 @@ model CompanyFiscalConfig {
   haciendaPasswordSecretRef    String?  @map("hacienda_password_secret_ref")
   defaultBranchCode            String   @default("001") @map("default_branch_code")
   defaultTerminalCode          String   @default("00001") @map("default_terminal_code")
-  isActive                     Boolean  @default(true) @map("is_active")
   createdAt                    DateTime @default(now()) @map("created_at")
   updatedAt                    DateTime @updatedAt @map("updated_at")
   company                      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  @@unique([companyId, haciendaEnvironment])
   @@map("company_fiscal_configs")
 }
 

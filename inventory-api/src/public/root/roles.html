@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Roles</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Inventori</p>
+          <h2>Empresa</h2>
+        </div>
+        <nav class="sidebar-nav" aria-label="Navegacion principal">
+          <a class="sidebar-link" href="/root/dashboard.html">Dashboard</a>
+          <a class="sidebar-link" href="/root/users.html">Usuarios</a>
+          <a class="sidebar-link active" href="/root/roles.html">Roles</a>
+        </nav>
+      </aside>
+
+      <section class="card app-content">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Configuracion</p>
+            <h1>Roles y permisos</h1>
+            <p id="roles-session" class="muted">Sesion activa</p>
+          </div>
+          <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+        </header>
+
+        <section class="import-panel">
+          <div>
+            <h2>Crear variacion de rol</h2>
+          </div>
+
+          <form id="role-form" class="stack-lg">
+            <label class="field">
+              <span>Nombre del rol</span>
+              <input name="name" type="text" placeholder="Bodega solo lectura" required />
+            </label>
+
+            <div id="permissions-list" class="permissions-grid"></div>
+          </form>
+
+          <div class="import-actions">
+            <button id="create-role-button" type="submit" form="role-form">Crear rol</button>
+            <p id="roles-message" class="message" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-title-row">
+            <h2>Roles disponibles</h2>
+          </div>
+
+          <div id="roles-list" class="role-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/root/roles.js"></script>
+  </body>
+</html>

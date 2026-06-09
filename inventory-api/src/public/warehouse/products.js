@@ -15,8 +15,11 @@ const IMPORT_CHUNK_SIZE = 100;
 
 let currentProducts = [];
 let importRows = [];
+const permissions = session?.user?.permissions || [];
+const canAccessWarehouse = session?.user?.role?.code === 'warehouse' || permissions.includes('warehouse.access');
+const canImportProducts = permissions.includes('products.import') || permissions.includes('products.manage');
 
-if (!session?.token || session?.user?.role?.code !== 'warehouse') {
+if (!session?.token || !canAccessWarehouse) {
   window.location.href = '/';
 }
 
@@ -26,6 +29,10 @@ logoutButton.addEventListener('click', () => {
   localStorage.removeItem(STORAGE_KEY);
   window.location.href = '/';
 });
+
+if (!canImportProducts) {
+  document.querySelector('.import-panel')?.classList.add('hidden');
+}
 
 excelFileInput.addEventListener('change', handleExcelSelection);
 importButton.addEventListener('click', submitSelectedImports);

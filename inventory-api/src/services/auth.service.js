@@ -4,6 +4,12 @@ const userRepository = require('../repositories/user.repository');
 const { signAccessToken } = require('../lib/auth');
 const { createHttpError } = require('../lib/errors');
 
+function mapPermissions(role) {
+  return role?.rolePermissions
+    ?.filter((item) => item.isEnabled && item.permission?.isActive)
+    .map((item) => item.permission.code) || [];
+}
+
 async function login(payload) {
   const user = await userRepository.findUserByUsernameWithRelations(payload.username);
   if (!user) {
@@ -29,6 +35,7 @@ async function login(payload) {
 
   const token = signAccessToken(user);
   const { passwordHash, ...safeUser } = user;
+  safeUser.permissions = mapPermissions(user.role);
 
   return { token, user: safeUser };
 }

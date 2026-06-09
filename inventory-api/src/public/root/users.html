@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Usuarios</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Inventori</p>
+          <h2>Empresa</h2>
+        </div>
+        <nav class="sidebar-nav" aria-label="Navegacion principal">
+          <a class="sidebar-link" href="/root/dashboard.html">Dashboard</a>
+          <a class="sidebar-link active" href="/root/users.html">Usuarios</a>
+          <a class="sidebar-link" href="/root/roles.html">Roles</a>
+        </nav>
+      </aside>
+
+      <section class="card app-content">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Administracion</p>
+            <h1>Usuarios de la empresa</h1>
+            <p id="users-session" class="muted">Sesion activa</p>
+          </div>
+          <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+        </header>
+
+        <section class="import-panel">
+          <div>
+            <h2>Crear usuario</h2>
+          </div>
+
+          <form id="user-form" class="pricing-grid">
+            <label class="field">
+              <span>Nombre completo</span>
+              <input name="fullName" type="text" required />
+            </label>
+            <label class="field">
+              <span>Usuario</span>
+              <input name="username" type="text" required />
+            </label>
+            <label class="field">
+              <span>Correo</span>
+              <input name="email" type="email" />
+            </label>
+            <label class="field">
+              <span>Telefono</span>
+              <input name="phone" type="text" />
+            </label>
+            <label class="field">
+              <span>Rol</span>
+              <select name="roleId" required>
+                <option value="">Cargando roles...</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Contrasena</span>
+              <input name="password" type="password" minlength="8" required />
+            </label>
+          </form>
+
+          <div class="import-actions">
+            <button id="create-user-button" type="submit" form="user-form">Crear usuario</button>
+            <p id="users-message" class="message" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-title-row">
+            <h2>Usuarios registrados</h2>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Usuario</th>
+                  <th>Correo</th>
+                  <th>Rol</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="users-body">
+                <tr>
+                  <td class="empty-state" colspan="5">Cargando usuarios...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/root/users.js"></script>
+  </body>
+</html>

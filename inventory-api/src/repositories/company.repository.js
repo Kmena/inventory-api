@@ -10,12 +10,10 @@ async function findAllCompaniesForRoot() {
   return prisma.company.findMany({
     orderBy: { id: 'asc' },
     include: {
-      fiscalConfigs: {
-        orderBy: { id: 'asc' },
-      },
+      fiscalConfig: true,
       users: {
         where: {
-          role: { code: 'root' },
+          role: { code: 'admin' },
         },
         select: {
           id: true,
@@ -40,8 +38,31 @@ async function createCompany(data) {
   return prisma.company.create({ data });
 }
 
+async function updateCompanyStatus(companyId, isActive) {
+  return prisma.company.update({
+    where: { id: companyId },
+    data: { isActive },
+  });
+}
+
+async function findCompanyExecutiveDashboard(companyId) {
+  const [company, employeesCount] = await prisma.$transaction([
+    prisma.company.findUnique({
+      where: { id: companyId },
+      include: { fiscalConfig: true },
+    }),
+    prisma.user.count({
+      where: { companyId },
+    }),
+  ]);
+
+  return { company, employeesCount };
+}
+
 module.exports = {
   findAllCompanies,
   findAllCompaniesForRoot,
   createCompany,
+  updateCompanyStatus,
+  findCompanyExecutiveDashboard,
 };

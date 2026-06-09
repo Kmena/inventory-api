@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Inventori | Root</title>
+    <title>Inventori | Dashboard root</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -11,8 +11,8 @@
       <section class="card">
         <header class="page-header">
           <div>
-            <p class="eyebrow">Inventori</p>
-            <h1>Empresas</h1>
+            <p class="eyebrow">Dashboard root</p>
+            <h1>Administrar empresas</h1>
             <p id="root-session" class="muted">Sesion activa</p>
           </div>
           <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
@@ -87,23 +87,23 @@
 
             <section class="pricing-grid">
               <label class="field">
-                <span>Nombre root</span>
+                <span>Nombre administrador</span>
                 <input name="rootFullName" type="text" required />
               </label>
               <label class="field">
-                <span>Usuario root</span>
+                <span>Usuario administrador</span>
                 <input name="rootUsername" type="text" required />
               </label>
               <label class="field">
-                <span>Correo root</span>
+                <span>Correo administrador</span>
                 <input name="rootEmail" type="email" />
               </label>
               <label class="field">
-                <span>Telefono root</span>
+                <span>Telefono administrador</span>
                 <input name="rootPhone" type="text" />
               </label>
               <label class="field">
-                <span>Contrasena root</span>
+                <span>Contrasena administrador</span>
                 <input name="rootPassword" type="password" minlength="8" required />
               </label>
             </section>
@@ -129,7 +129,8 @@
                   <th>Identificacion</th>
                   <th>Estado</th>
                   <th>Ambiente</th>
-                  <th>Root</th>
+                  <th>Administrador</th>
+                  <th>Accion</th>
                 </tr>
               </thead>
               <tbody id="companies-body"></tbody>

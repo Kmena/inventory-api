@@ -14,6 +14,27 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); }
 .auth-layout, .page-layout { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.app-shell { min-height: 100vh; display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 24px; padding: 24px; }
+.sidebar {
+  background: var(--card);
+  border: 1px solid rgba(208, 215, 222, 0.7);
+  border-radius: 16px;
+  padding: 20px;
+  align-self: start;
+  position: sticky;
+  top: 24px;
+}
+.sidebar-nav { display: grid; gap: 8px; margin-top: 20px; }
+.sidebar-link {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+}
+.sidebar-link:hover, .sidebar-link.active { background: #e9eefb; color: var(--primary-dark); }
+.app-content { width: min(100%, 1180px); }
 .card {
   width: min(100%, 1080px);
   background: var(--card);
@@ -31,12 +52,14 @@ h1, h2 { margin: 0 0 8px; }
 .field input, .field select, input[type='file'] {
   width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: #fff;
 }
+.pricing-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .field-wide { grid-column: span 2; }
 button { cursor: pointer; border: 0; border-radius: 10px; padding: 12px 16px; background: var(--primary); color: white; font-weight: 700; }
 button:hover { background: var(--primary-dark); }
 button:disabled { opacity: 0.7; cursor: progress; }
 .secondary-button { background: #e9eefb; color: var(--primary-dark); }
 .secondary-button:hover { background: #dce6ff; }
+.company-status-button { padding: 8px 12px; }
 .message { min-height: 20px; margin: 0; color: var(--muted); }
 .message.error { color: var(--danger); }
 #import-progress { font-size: 0.95rem; }
@@ -58,6 +81,18 @@ code { background: #eef2ff; padding: 2px 6px; border-radius: 6px; }
 .dashboard-tile { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: #f8fafc; display: grid; gap: 8px; }
 .dashboard-tile span { color: var(--muted); font-size: 0.9rem; }
 .dashboard-tile strong { font-size: 1.25rem; }
+.executive-summary { margin-top: 18px; border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: #fff; }
+.executive-summary p { margin: 8px 0 0; line-height: 1.5; }
+.permissions-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.permission-option { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: #fff; }
+.permission-option span { display: grid; gap: 4px; }
+.permission-option small { color: var(--muted); line-height: 1.35; }
+.role-list { display: grid; gap: 12px; margin-top: 12px; }
+.role-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: #fff; display: grid; gap: 10px; }
+.role-card h3 { margin: 0; }
+.role-card p { margin: 4px 0 0; }
+.permission-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.permission-tags span { background: #eef2ff; color: var(--primary-dark); border-radius: 999px; padding: 4px 8px; font-size: 0.85rem; font-weight: 700; }
 input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--primary); }
 input[type='file']::file-selector-button {
   margin-right: 12px; border: 0; border-radius: 8px; padding: 8px 12px; background: #e9eefb; color: var(--primary-dark); font-weight: 700; cursor: pointer;
@@ -78,6 +113,13 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
 #products-body td:nth-child(3), #import-preview-body td:nth-child(4) { font-weight: 600; }
 
 @media (max-width: 820px) {
+  .app-shell { grid-template-columns: 1fr; gap: 12px; padding: 12px; }
+  .sidebar { position: static; }
+  .sidebar-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sidebar-link { text-align: center; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  .permissions-grid { grid-template-columns: 1fr; }
+  .field-wide { grid-column: auto; }
   .import-actions, .page-header { flex-direction: column; align-items: stretch; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .auth-layout, .page-layout { padding: 12px; }

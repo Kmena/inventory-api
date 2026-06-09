@@ -10,6 +10,14 @@ const ROLE_HOME = {
 
 function getHomeForSession(session) {
   const roleCode = session?.user?.role?.code;
+  const permissions = session?.user?.permissions || [];
+  if (roleCode === 'admin' && session?.user?.companyId) {
+    return '/root/dashboard.html';
+  }
+  if (permissions.includes('warehouse.access')) {
+    return '/warehouse/products.html';
+  }
+
   return ROLE_HOME[roleCode] || '/no-access.html';
 }
 

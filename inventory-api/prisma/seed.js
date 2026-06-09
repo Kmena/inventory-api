@@ -8,26 +8,26 @@ async function main() {
 
   const rootRole = await prisma.role.upsert({
     where: { code: 'root' },
-    update: { name: 'Root', isActive: true },
-    create: { code: 'root', name: 'Root', isActive: true },
+    update: { name: 'Root', companyId: null, isActive: true },
+    create: { code: 'root', name: 'Root', companyId: null, isActive: true },
   });
 
   const adminRole = await prisma.role.upsert({
     where: { code: 'admin' },
-    update: { name: 'Administrador', isActive: true },
-    create: { code: 'admin', name: 'Administrador', isActive: true },
+    update: { name: 'Administrador', companyId: null, isActive: true },
+    create: { code: 'admin', name: 'Administrador', companyId: null, isActive: true },
   });
 
   const salesRole = await prisma.role.upsert({
     where: { code: 'sales' },
-    update: { name: 'Ventas', isActive: true },
-    create: { code: 'sales', name: 'Ventas', isActive: true },
+    update: { name: 'Ventas', companyId: null, isActive: true },
+    create: { code: 'sales', name: 'Ventas', companyId: null, isActive: true },
   });
 
   const warehouseRole = await prisma.role.upsert({
     where: { code: 'warehouse' },
-    update: { name: 'Bodega', isActive: true },
-    create: { code: 'warehouse', name: 'Bodega', isActive: true },
+    update: { name: 'Bodega', companyId: null, isActive: true },
+    create: { code: 'warehouse', name: 'Bodega', companyId: null, isActive: true },
   });
 
   const permissionDefinitions = [
@@ -36,7 +36,11 @@ async function main() {
     ['settings.manage', 'settings', 'manage', 'Configurar empresa y parametros fiscales'],
     ['clients.manage', 'clients', 'manage', 'Crear y actualizar clientes'],
     ['products.manage', 'products', 'manage', 'Crear y actualizar articulos'],
+    ['products.view', 'products', 'view', 'Ver articulos'],
+    ['products.import', 'products', 'import', 'Importar articulos desde Excel'],
     ['inventory.manage', 'inventory', 'manage', 'Gestionar bodegas, lotes y movimientos'],
+    ['inventory.view', 'inventory', 'view', 'Ver inventario y movimientos'],
+    ['warehouse.access', 'warehouse', 'access', 'Entrar al dashboard de bodega'],
     ['procurement.manage', 'procurement', 'manage', 'Gestionar proveedores, compras y recepciones'],
     ['sales.manage', 'sales', 'manage', 'Gestionar pedidos, facturas y pagos'],
   ];
@@ -54,7 +58,7 @@ async function main() {
     root: Object.keys(permissions),
     admin: Object.keys(permissions),
     sales: ['clients.manage', 'sales.manage'],
-    warehouse: ['products.manage', 'inventory.manage', 'procurement.manage'],
+    warehouse: ['warehouse.access', 'products.view', 'products.import', 'products.manage', 'inventory.view', 'inventory.manage', 'procurement.manage'],
   };
 
   for (const [roleCode, permissionCodes] of Object.entries(rolePermissionMap)) {
@@ -133,10 +137,7 @@ async function main() {
 
   await prisma.companyFiscalConfig.upsert({
     where: {
-      companyId_haciendaEnvironment: {
-        companyId: company.id,
-        haciendaEnvironment: 'STAGING',
-      },
+      companyId: company.id,
     },
     update: {
       legalName: company.name,
@@ -147,7 +148,6 @@ async function main() {
       address: company.address,
       defaultBranchCode: '001',
       defaultTerminalCode: '00001',
-      isActive: true,
     },
     create: {
       companyId: company.id,
@@ -161,7 +161,6 @@ async function main() {
       haciendaEnvironment: 'STAGING',
       defaultBranchCode: '001',
       defaultTerminalCode: '00001',
-      isActive: true,
     },
   });
 
@@ -198,7 +197,7 @@ async function main() {
     update: {
       fullName: 'Root Inventori',
       passwordHash: rootPasswordHash,
-      companyId: company.id,
+      companyId: null,
       roleId: rootRole.id,
       status: UserStatus.ACTIVE,
     },
@@ -208,7 +207,7 @@ async function main() {
       username: 'root',
       passwordHash: rootPasswordHash,
       phone: '8000-0000',
-      companyId: company.id,
+      companyId: null,
       roleId: rootRole.id,
       status: UserStatus.ACTIVE,
     },

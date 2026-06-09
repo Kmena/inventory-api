@@ -10,9 +10,10 @@ const companiesBody = document.getElementById('companies-body');
 
 if (!session?.token || session?.user?.role?.code !== 'root') {
   window.location.href = '/';
-}
-
-sessionLabel.textContent = `Sesion activa: ${session.user.fullName} (${session.user.username})`;
+} else if (session?.user?.companyId) {
+  window.location.href = '/root/dashboard.html';
+} else {
+  sessionLabel.textContent = `Sesion activa: ${session.user.fullName} (${session.user.username})`;
 
 function authHeaders() {
   return {
@@ -28,13 +29,13 @@ function optional(value) {
 
 function renderCompanies(companies) {
   if (!companies.length) {
-    companiesBody.innerHTML = '<tr><td class="empty-state" colspan="5">No hay empresas registradas.</td></tr>';
+    companiesBody.innerHTML = '<tr><td class="empty-state" colspan="6">No hay empresas registradas.</td></tr>';
     return;
   }
 
   companiesBody.innerHTML = companies
     .map((company) => {
-      const fiscalConfig = company.fiscalConfigs?.[0];
+      const fiscalConfig = company.fiscalConfig;
       const rootUser = company.users?.[0];
       return `<tr>
         <td>${company.name}</td>
@@ -42,6 +43,11 @@ function renderCompanies(companies) {
         <td>${company.isActive ? 'Activa' : 'Inactiva'}</td>
         <td>${fiscalConfig?.haciendaEnvironment || '-'}</td>
         <td>${rootUser ? `${rootUser.username} (${rootUser.fullName})` : '-'}</td>
+        <td>
+          <button class="secondary-button company-status-button" type="button" data-company-id="${company.id}" data-is-active="${company.isActive}">
+            ${company.isActive ? 'Deshabilitar' : 'Activar'}
+          </button>
+        </td>
       </tr>`;
     })
     .join('');
@@ -71,6 +77,40 @@ refreshButton.addEventListener('click', async () => {
   } catch (error) {
     message.textContent = error.message || 'No se pudieron cargar las empresas';
     message.classList.add('error');
+  }
+});
+
+companiesBody.addEventListener('click', async (event) => {
+  const button = event.target.closest('.company-status-button');
+  if (!button) {
+    return;
+  }
+
+  const companyId = button.dataset.companyId;
+  const isActive = button.dataset.isActive === 'true';
+  message.textContent = '';
+  message.className = 'message';
+  button.disabled = true;
+  button.textContent = isActive ? 'Deshabilitando...' : 'Activando...';
+
+  try {
+    const response = await fetch(`/api/companies/root/companies/${companyId}/status`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ isActive: !isActive }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || 'No se pudo actualizar la empresa');
+    }
+
+    message.textContent = result.isActive ? 'Empresa activada correctamente' : 'Empresa deshabilitada correctamente';
+    await loadCompanies();
+  } catch (error) {
+    message.textContent = error.message || 'No se pudo actualizar la empresa';
+    message.classList.add('error');
+    button.disabled = false;
+    button.textContent = isActive ? 'Deshabilitar' : 'Activar';
   }
 });
 
@@ -143,3 +183,4 @@ loadCompanies().catch((error) => {
   message.textContent = error.message || 'No se pudieron cargar las empresas';
   message.classList.add('error');
 });
+}

@@ -67,13 +67,19 @@ Esta base ya incluye:
 - movimientos de inventario para entradas, ajustes, reservas, liberaciones y salidas
 - flujo dedicado de facturacion: crear pedido, aprobar condiciones, revisar credito, generar proforma, facturar y registrar XML/respuesta de Hacienda
 - UI demo de bodega para importar productos desde Excel por bloques
+- dashboard root para crear, listar, activar y deshabilitar empresas
+- dashboard ejecutivo para administradores de empresa
+- sidebar de administracion con acceso a dashboard, usuarios y roles
+- creacion de usuarios dentro de la empresa del administrador
+- roles personalizados por empresa con seleccion de permisos
+- autorizacion por permisos finos para bodega, productos e inventario
 
 ## Dominios cubiertos en el schema actual
 
 El schema Prisma actual ya modela:
 
 - empresas y configuracion
-- roles y usuarios
+- roles globales, roles por empresa y usuarios
 - permisos configurables por rol
 - zonas, subzonas y rutas comerciales
 - clientes, contactos y referencias
@@ -177,8 +183,17 @@ docker compose up
 - `GET /api/auth/me`
 - `GET /api/companies`
 - `POST /api/companies`
+- `GET /api/companies/root/companies`
+- `POST /api/companies/root/companies`
+- `PATCH /api/companies/root/companies/:companyId/status`
+- `GET /api/companies/root/dashboard`
+- `GET /api/roles/permissions`
+- `GET /api/roles/company`
+- `POST /api/roles/company`
 - `GET /api/users`
 - `POST /api/users`
+- `GET /api/users/company`
+- `POST /api/users/company`
 - `GET /api/clients`
 - `GET /api/clients/:id`
 - `POST /api/clients`
@@ -286,9 +301,6 @@ Estas credenciales son solo para pruebas locales y seed demo.
 - `docs/erd_mvp_1.mmd`
 - `docs/er_mvp_prd.md`
 - `docs/er_propuesto_prd.md`
-- `docs/logica_inventario_fase1.md`
-- `docs/roles_y_permisos.md`
-- `prisma/migration-instructions.md`
 
 ## Nota de alcance
 
