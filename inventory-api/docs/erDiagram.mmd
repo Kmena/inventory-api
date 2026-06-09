@@ -1,15 +1,93 @@
 erDiagram
     COMPANY ||--o{ USER : has
     ROLE ||--o{ USER : assigns
+    ROLE ||--o{ ROLE_PERMISSION : grants
+    PERMISSION ||--o{ ROLE_PERMISSION : assigned
+    PERMISSION ||--o{ APPROVAL_TYPE_PERMISSION : required_by
 
     COMPANY ||--o{ CLIENT : has
+    COMPANY ||--o{ ZONE : has
+    COMPANY ||--o{ SALES_ROUTE : owns
     COMPANY ||--o{ WAREHOUSE : has
     COMPANY ||--o{ PRODUCT : owns
     COMPANY ||--o{ SUPPLIER : has
+    COMPANY ||--o| COMPANY_FISCAL_CONFIG : configures_tax_emission
+    COMPANY ||--o{ FISCAL_SEQUENCE : owns_sequences
+    COMPANY ||--o{ ELECTRONIC_DOCUMENT : emits_fiscal_documents
+    INVOICE ||--o| ELECTRONIC_DOCUMENT : emits
+    CREDIT_NOTE ||--o| ELECTRONIC_DOCUMENT : emits_credit_xml
+    DEBIT_NOTE ||--o| ELECTRONIC_DOCUMENT : emits_debit_xml
+    ELECTRONIC_DOCUMENT ||--o{ ELECTRONIC_DOCUMENT_STATUS_HISTORY : tracks_hacienda_state
+
+    ZONE ||--o{ SUB_ZONE : has
+    SUB_ZONE ||--o{ CLIENT : assigns
+    CLIENT_CLASSIFICATION ||--o{ CLIENT : classifies
+    CLIENT_LEGAL_ENTITY ||--o{ CLIENT_STORE_PROFILE : owns_store
+    CLIENT ||--o{ CLIENT_STORE_PROFILE : operates_store
+    CLIENT ||--o{ CLIENT_DOCUMENT : has_document
+    CLIENT ||--o{ CLIENT_REFERENCE : has_reference
+    SUB_ZONE ||--o{ CLIENT_STORE_PROFILE : locates_store
+    CLIENT_STORE_PROFILE ||--o{ CLIENT_STORE_REPRESENTATIVE : has_people
+    SALES_ROUTE ||--o{ SALES_ROUTE_SUB_ZONE : groups
+    SUB_ZONE ||--o{ SALES_ROUTE_SUB_ZONE : included_in
+    SALES_ROUTE ||--o{ SALES_ROUTE_AGENT : assigned_to
+    USER ||--o{ SALES_ROUTE_AGENT : works_route
+    SALES_ROUTE ||--o{ SALES_ROUTE_SUPERVISOR : supervised_by
+    USER ||--o{ SALES_ROUTE_SUPERVISOR : supervises_route
+    USER ||--o{ SALES_TASK : assigns
+    USER ||--o{ SALES_TASK : receives
+    USER ||--o{ SALES_AGENT_GOAL : owns_goal
+    USER ||--o{ SALES_AGENT_GOAL : assigns_goal
+    USER ||--o{ SALES_SUBADMIN_REVIEW : reviews
+    USER ||--o{ SALES_SUBADMIN_REVIEW : is_reviewed
+    CLIENT ||--o{ CUSTOMER_ACTIVITY : receives
+    USER ||--o{ CUSTOMER_ACTIVITY : performs
+    CLIENT ||--o{ CUSTOMER_ONBOARDING_SHEET : proposed_in
+    USER ||--o{ CUSTOMER_ONBOARDING_SHEET : submits
+    USER ||--o{ CUSTOMER_ONBOARDING_SHEET : approves_credit
+    USER ||--o{ CUSTOMER_ONBOARDING_SHEET : approves_collection
+    CUSTOMER_ONBOARDING_SHEET ||--o| CUSTOMER_CREDIT_APPLICATION : may_request_credit
+    USER ||--o{ CUSTOMER_CREDIT_APPLICATION : reviews_credit
+    USER ||--o{ CUSTOMER_CREDIT_APPLICATION : reviews_collection
+    CLIENT ||--o{ CUSTOMER_CHANGE_REQUEST : changes
+    USER ||--o{ CUSTOMER_CHANGE_REQUEST : requests
+    USER ||--o{ CUSTOMER_CHANGE_REQUEST : approves
+    CLIENT ||--o{ COLLECTION_SHEET : billed_in_route
+    USER ||--o{ COLLECTION_SHEET : collects
+    COMPANY ||--o{ PAYMENT_FREQUENCY_CONFIG : configures
+    CLIENT ||--o{ CUSTOMER_PAYMENT_METRIC : measures_payment
+    CLIENT ||--o{ ROUTE_INVENTORY_SHEET : visited_inventory
+    USER ||--o{ ROUTE_INVENTORY_SHEET : records_inventory
+    CLIENT ||--o{ CUSTOMER_KYC_SHEET : has_kyc
+    USER ||--o{ CUSTOMER_KYC_SHEET : records_kyc
+    CUSTOMER_KYC_SHEET ||--o{ CUSTOMER_DEPENDENT : includes
+    CLIENT ||--o{ CUSTOMER_COMPETITOR_PRODUCT : has_competition
+    CLIENT ||--o{ CUSTOMER_ADVERTISING_PREFERENCE : accepts_ads
+    CLIENT ||--o{ ROUTE_VISIT_LOG : visited
+    SALES_ROUTE ||--o{ ROUTE_VISIT_LOG : logs
+    USER ||--o{ ROUTE_VISIT_LOG : arrives
+    SALES_ROUTE ||--o{ PROSPECT : detects
+    USER ||--o{ PROSPECT : follows
+    COMPANY ||--o{ SALES_ANALYTICS_CONFIG : defines
+    COMPANY ||--o{ SALES_MONTHLY_WEIGHTED_METRIC : calculates
+    ZONE ||--o{ SALES_MONTHLY_WEIGHTED_METRIC : aggregates_zone
+    SUB_ZONE ||--o{ SALES_MONTHLY_WEIGHTED_METRIC : aggregates_subzone
+    COMPANY ||--o{ CLIENT_ACTIVITY_STATUS_CONFIG : configures
 
     CATEGORY ||--o{ PRODUCT : classifies
-    PRODUCT ||--o{ PRODUCT_PRICE : has
+    CATEGORY ||--o{ PRODUCT_SUBCATEGORY : has
+    PRODUCT_SUBCATEGORY ||--o{ PRODUCT : subclassifies
+    PRODUCT ||--o{ PRODUCT_PRICE : has_general_price
     PRODUCT ||--o{ PRODUCT_BARCODE : has
+    PRODUCT ||--o{ COMMERCIAL_ADJUSTMENT : price_adjusted_by
+    PRODUCT ||--o{ COURSE_OFFERING : defines_course
+    PRODUCT ||--o{ AFFILIATION_PLAN : defines_affiliation
+    LOT ||--o{ COURSE_OFFERING : controls_course_capacity
+    LOT ||--o{ AFFILIATION_PLAN : represents_affiliation_type
+    COURSE_OFFERING ||--o{ COURSE_ENROLLMENT : has_enrollment
+    CLIENT ||--o{ COURSE_ENROLLMENT : enrolls
+    AFFILIATION_PLAN ||--o{ CLIENT_AFFILIATION : has_subscription
+    CLIENT ||--o{ CLIENT_AFFILIATION : subscribes
 
     CLIENT ||--o{ SALES_ORDER : places
     CLIENT ||--|| CUSTOMER_CREDIT_ACCOUNT : has
@@ -17,25 +95,79 @@ erDiagram
 
     SALES_ORDER ||--o{ SALES_ORDER_ITEM : contains
     PRODUCT ||--o{ SALES_ORDER_ITEM : sold
+    COMMERCIAL_ADJUSTMENT ||--o{ SALES_ORDER_ITEM : may_apply
     USER ||--o{ SALES_ORDER : creates
+    USER ||--o{ SALES_ORDER_STATUS_HISTORY : changes_status
+    USER ||--o{ DELIVERY_RECEIPT : transporter_signs
     SALES_ORDER ||--o{ APPROVAL_REQUEST : requires
+    SALES_ORDER ||--o{ SALES_ORDER_STATUS_HISTORY : tracks_status
+    SALES_ORDER ||--o{ DELIVERY_RECEIPT : confirms_delivery
     SALES_ORDER ||--o{ INVOICE : generates
+    USER ||--o{ INVOICE : issues
 
+    INVOICE ||--o{ INVOICE_ITEM : details_lot
     INVOICE ||--o{ PAYMENT : receives
+    PAYMENT ||--o{ PAYMENT_RECEIPT : has_receipt
+    PAYMENT ||--o{ PAYMENT_APPLICATION : applies
+    INVOICE ||--o{ PAYMENT_APPLICATION : paid_by
+    USER ||--o{ PAYMENT : records_payment
+    USER ||--o{ AGENT_CASH_SETTLEMENT : delivers_cash
+    USER ||--o{ AGENT_CASH_SETTLEMENT : receives_cash_admin
     PAYMENT_METHOD ||--o{ PAYMENT : used_by
     INVOICE ||--o{ CREDIT_NOTE : may_have
+    CREDIT_NOTE ||--o{ CREDIT_NOTE_ITEM : returns_items
+    CREDIT_NOTE ||--o{ CUSTOMER_CREDIT_BALANCE : creates_balance
+    COMPANY ||--o{ RETURN_POLICY : configures
+    CLIENT ||--o{ CUSTOMER_RETURN_SLIP : requests_return
+    CUSTOMER_RETURN_SLIP ||--o{ CUSTOMER_RETURN_SLIP_ITEM : contains
+    CUSTOMER_RETURN_SLIP_ITEM ||--o{ RETURN_ANALYSIS_SHEET : analyzed_by
+    CUSTOMER_RETURN_SLIP_ITEM ||--o{ CREDIT_NOTE_ITEM : may_create_credit
+    RETURN_POLICY ||--o{ CUSTOMER_RETURN_SLIP : evaluated_with
+    WAREHOUSE ||--o{ CUSTOMER_RETURN_SLIP_ITEM : virtual_admin_storage
+    WAREHOUSE ||--o{ RETURN_ANALYSIS_SHEET : return_warehouse
     INVOICE ||--o{ DEBIT_NOTE : may_have
+    DEBIT_NOTE ||--o{ DEBIT_NOTE_ITEM : increases_items
+    INVOICE_ITEM ||--o{ CREDIT_NOTE_ITEM : validates_return_lot
+    INVOICE_ITEM ||--o{ CUSTOMER_RETURN_SLIP_ITEM : validates_return_lot
+    LOT ||--o{ INVOICE_ITEM : invoiced_lot
+    LOT ||--o{ CREDIT_NOTE_ITEM : returned_lot
+    LOT ||--o{ CUSTOMER_RETURN_SLIP_ITEM : returned_lot
+    LOT ||--o{ RETURN_ANALYSIS_SHEET : analyzed_for_reprocess
+    RETURN_ANALYSIS_SHEET ||--o| REPROCESS_SHEET : may_trigger
+    USER ||--o{ CREDIT_NOTE_ITEM : approves_return_receipt
+    USER ||--o{ CUSTOMER_RETURN_SLIP : records_return
+    USER ||--o{ CUSTOMER_RETURN_SLIP : reviews_return
+    USER ||--o{ RETURN_QA_DECISION : decides_quality_action
+    RETURN_ANALYSIS_SHEET ||--o{ RETURN_QA_DECISION : quality_decision
 
     SUPPLIER ||--o{ SUPPLIER_PRODUCT : offers
     PRODUCT ||--o{ SUPPLIER_PRODUCT : supplied_as
+    SUPPLIER_PRODUCT ||--o{ SUPPLIER_PRODUCT_SUBSTITUTE : may_substitute
+    PRODUCT ||--o{ SUPPLIER_PRODUCT_SUBSTITUTE : substitute_product
+    SUPPLIER_PRODUCT ||--o{ SUPPLIER_DAILY_QUOTE : quoted_today
+    PRODUCT ||--o{ SUPPLIER_DAILY_QUOTE : quote_for_product
+    SUPPLIER_DAILY_QUOTE ||--o{ SUPPLIER_PROFORMA : may_attach
+    SUPPLIER ||--o{ SUPPLIER_PROFORMA : sends
     SUPPLIER ||--o{ PURCHASE_ORDER : receives
     PURCHASE_ORDER ||--o{ PURCHASE_ORDER_ITEM : contains
+    PURCHASE_ORDER ||--o{ PURCHASE_APPROVAL_ANALYSIS : justified_by
+    PURCHASE_ORDER ||--o{ ACCOUNT_PAYABLE : creates_payable
+    PURCHASE_ORDER_ITEM ||--o{ LOT : creates_inventory_lot
     PRODUCT ||--o{ PURCHASE_ORDER_ITEM : requested
     PURCHASE_ORDER ||--o{ PURCHASE_RECEIPT : generates
 
     PRODUCT ||--o{ LOT : has
     SUPPLIER ||--o{ LOT : supplies
+    LOT ||--o{ INCOMING_COA : certified_by
+    LOT ||--o{ INCOMING_QUALITY_TEST : tested_by
+    LOT ||--o{ LOT_LABEL : labeled_with
     WAREHOUSE ||--o{ LOT : stores
+    LOT ||--o{ LOT_QUARANTINE_RECORD : has
+    LOT ||--o{ LOT_STAGE_APPROVAL : requires
+    LOT ||--o| REJECTED_LOT_RETURN : returned_when_rejected
+    SUPPLIER ||--o{ REJECTED_LOT_RETURN : receives_return
+    USER ||--o{ INCOMING_QUALITY_TEST : performs
+    USER ||--o{ REJECTED_LOT_RETURN : records_return
 
     PRODUCT ||--o{ WAREHOUSE_STOCK : balanced_in
     WAREHOUSE ||--o{ WAREHOUSE_STOCK : balanced_in
@@ -43,6 +175,15 @@ erDiagram
     PRODUCT ||--o{ STOCK_MOVEMENT : moves
     LOT ||--o{ STOCK_MOVEMENT : traces
     WAREHOUSE ||--o{ STOCK_MOVEMENT : affects
+    LOT ||--o{ STOCK_ALERT : triggers
+    PRODUCT ||--o{ SPECIAL_STOCK_WITHDRAWAL_ITEM : withdrawn_special
+    LOT ||--o{ SPECIAL_STOCK_WITHDRAWAL_ITEM : withdrawn_lot
+    WAREHOUSE ||--o{ SPECIAL_STOCK_WITHDRAWAL : source_special
+    WAREHOUSE ||--o{ SPECIAL_STOCK_WITHDRAWAL_RETURN : returned_to
+    SPECIAL_STOCK_WITHDRAWAL ||--o{ SPECIAL_STOCK_WITHDRAWAL_ITEM : contains
+    SPECIAL_STOCK_WITHDRAWAL_ITEM ||--o{ SPECIAL_STOCK_WITHDRAWAL_RETURN : may_return
+    USER ||--o{ SPECIAL_STOCK_WITHDRAWAL : requests_special
+    USER ||--o{ SPECIAL_STOCK_WITHDRAWAL : authorizes_special
 
     WAREHOUSE ||--o{ STOCK_TRANSFER : source
     WAREHOUSE ||--o{ STOCK_TRANSFER : destination
@@ -53,13 +194,47 @@ erDiagram
     PRODUCT ||--o{ STOCK_ALERT : triggers
     WAREHOUSE ||--o{ STOCK_ALERT : located_at
 
-    RECIPE ||--o{ RECIPE_INGREDIENT : defines
-    PRODUCT ||--o{ RECIPE_INGREDIENT : used_as_input
-    RECIPE ||--o{ PRODUCT : produces
+    FORMULA ||--o{ FORMULA_COMPONENT : defines
+    FORMULA ||--o{ FORMULA_VERSION : has_version
+    FORMULA_VERSION ||--o{ FORMULA_VERSION_COMPONENT : snapshots_components
+    PRODUCT ||--o{ FORMULA_COMPONENT : used_as_input
+    PRODUCT ||--o{ FORMULA_VERSION_COMPONENT : version_input
+    FORMULA ||--o{ PRODUCT : produces
+    PRODUCT ||--o{ PRODUCT_PURCHASE_COST : has_purchase_cost
+    PRODUCT ||--o{ FORMULA_PRICE_CALCULATION : priced_as_output
+    PRODUCT ||--o{ PRODUCT_QA_PARAMETER : defines_qa_parameters
+    PRODUCT_QA_PARAMETER ||--o{ INCOMING_QUALITY_TEST : specifies
+    FORMULA ||--o{ FORMULA_PHASE : has_phase
+    FORMULA_PHASE ||--o{ FORMULA_STEP : has_step
+    FORMULA_PHASE ||--o{ FORMULA_PHASE_QA_PARAMETER : defines_stage_qa
+    FORMULA_PHASE ||--o{ FORMULA_PHASE_UTENSIL : requires_utensil
+    FORMULA_PHASE ||--o{ FORMULA_PHASE_COST : has_stage_cost
+    UTENSIL ||--o{ FORMULA_PHASE_UTENSIL : used_in_phase
+    FORMULA ||--o{ BOM : generates
+    BOM ||--o{ BOM_ITEM : calculates
+    PRODUCT ||--o{ BOM_ITEM : material_to_prepare
+    BOM ||--o{ FORMULA_PRICE_CALCULATION : costed_by
 
-    RECIPE ||--o{ PRODUCTION_ORDER : drives
+    FORMULA ||--o{ PRODUCTION_ORDER : drives
+    BOM ||--o{ PRODUCTION_ORDER : prepares
     SALES_ORDER ||--o{ PRODUCTION_ORDER : may_trigger
     PRODUCTION_ORDER ||--o{ APPROVAL_REQUEST : requires
+    PRODUCTION_ORDER ||--o{ PRODUCTION_DISPENSING : dispenses
+    BOM_ITEM ||--o{ PRODUCTION_DISPENSING : requested_material
+    LOT ||--o{ PRODUCTION_DISPENSING : taken_from_lot
+    PRODUCTION_DISPENSING ||--o{ SCALE_READING : has_weight
+    PRODUCTION_ORDER ||--o{ PRODUCTION_QA_RELEASE : requires_qa
+    PRODUCTION_QA_RELEASE ||--o{ PRODUCTION_QA_MEASUREMENT : records_values
+    FORMULA_PHASE_QA_PARAMETER ||--o{ PRODUCTION_QA_MEASUREMENT : measured_against
+    PRODUCTION_ORDER ||--o{ PRODUCTION_BULK_RETURN : returns_bulk
+    PRODUCTION_ORDER ||--o{ PRODUCTION_PHASE_EXECUTION : executes_phase
+    FORMULA_PHASE ||--o{ PRODUCTION_PHASE_EXECUTION : phase_template
+    PRODUCTION_ORDER ||--o{ PACKAGING_MATERIAL_REQUEST : requests_packaging
+    PACKAGING_MATERIAL_REQUEST ||--o{ PACKAGING_MATERIAL_REQUEST_ITEM : includes
+    PRODUCTION_ORDER ||--o{ PRODUCTION_FILLING : fills
+    PRODUCTION_ORDER ||--o{ PRODUCTION_LOT_ASSIGNMENT : assigns_lot
+    PRODUCTION_ORDER ||--o{ LABELING_REQUEST : requests_labels
+    LABELING_REQUEST ||--o{ LABELING_EVIDENCE : has_evidence
     PRODUCTION_ORDER ||--o{ PRODUCTION_CONSUMPTION : consumes
     PRODUCT ||--o{ PRODUCTION_CONSUMPTION : input
     LOT ||--o{ PRODUCTION_CONSUMPTION : from_lot
@@ -67,14 +242,15 @@ erDiagram
     PRODUCTION_ORDER ||--o{ PRODUCTION_OUTPUT : outputs
     PRODUCT ||--o{ PRODUCTION_OUTPUT : output
     LOT ||--o| PRODUCTION_OUTPUT : generated_lot
+    PRODUCTION_ORDER ||--o| PRODUCTION_YIELD_SUMMARY : summarizes_yield
 
     PRODUCTION_ORDER ||--o{ PRODUCTION_WASTE : records
     PRODUCT ||--o{ PRODUCTION_WASTE : wasted_item
     WASTE_REASON ||--o{ PRODUCTION_WASTE : explains
 
-    PROMOTION ||--o{ PROMOTION_RULE : has
-    PROMOTION ||--o{ PROMOTION_ITEM : includes
-    PRODUCT ||--o{ PROMOTION_ITEM : discounted_or_combo
+    PROMOTION ||--o{ COMMERCIAL_ADJUSTMENT : configures
+    BONIFICATION ||--o{ COMMERCIAL_ADJUSTMENT : configures
+    GIFT ||--o{ COMMERCIAL_ADJUSTMENT : configures
 
     USER ||--o{ APPROVAL_REQUEST : resolves
     USER ||--o{ AUDIT_LOG : performs

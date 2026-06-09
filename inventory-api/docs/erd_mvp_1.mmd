@@ -1,0 +1,553 @@
+erDiagram
+    COMPANY ||--o{ USER : has
+    ROLE ||--o{ USER : assigns
+    ROLE ||--o{ ROLE_PERMISSION : grants
+    PERMISSION ||--o{ ROLE_PERMISSION : assigned
+    COMPANY ||--o| COMPANY_FISCAL_CONFIG : configures_tax_emission
+    COMPANY ||--o{ FISCAL_SEQUENCE : owns_sequences
+
+    COMPANY ||--o{ CLIENT : has
+    COMPANY ||--o{ ZONE : has
+    COMPANY ||--o{ SALES_ROUTE : owns_routes
+    COMPANY ||--o{ PRODUCT : owns
+    COMPANY ||--o{ SUPPLIER : has
+    COMPANY ||--o{ WAREHOUSE : has
+
+    ZONE ||--o{ SUB_ZONE : has
+    SALES_ROUTE ||--o{ SALES_ROUTE_SUB_ZONE : groups
+    SUB_ZONE ||--o{ SALES_ROUTE_SUB_ZONE : included_in
+    SUB_ZONE ||--o{ CLIENT_STORE_PROFILE : locates_store
+    CLIENT ||--o{ CLIENT_STORE_PROFILE : operates_store
+    CLIENT_STORE_PROFILE ||--o{ CLIENT_STORE_REPRESENTATIVE : has_people
+
+    CATEGORY ||--o{ PRODUCT_SUBCATEGORY : has
+    CATEGORY ||--o{ PRODUCT : classifies
+    PRODUCT_SUBCATEGORY ||--o{ PRODUCT : subclassifies
+    PRODUCT ||--o{ PRODUCT_PRICE : has_general_price
+    PRODUCT ||--o{ SUPPLIER_PRODUCT : sourced_by
+    SUPPLIER ||--o{ SUPPLIER_PRODUCT : offers
+
+    PRODUCT ||--o{ LOT : has
+    WAREHOUSE ||--o{ LOT : stores
+    PRODUCT ||--o{ WAREHOUSE_STOCK : balanced_in
+    WAREHOUSE ||--o{ WAREHOUSE_STOCK : balanced_in
+    PRODUCT ||--o{ STOCK_MOVEMENT : moves
+    LOT ||--o{ STOCK_MOVEMENT : traces
+    WAREHOUSE ||--o{ STOCK_MOVEMENT : affects
+    USER ||--o{ STOCK_MOVEMENT : records
+    LOT ||--o{ STOCK_ALERT : triggers
+    PRODUCT ||--o{ STOCK_ALERT : alerts_product
+    WAREHOUSE ||--o{ STOCK_ALERT : located_at
+
+    SUPPLIER ||--o{ PURCHASE_ORDER : receives
+    PURCHASE_ORDER ||--o{ PURCHASE_ORDER_ITEM : contains
+    PRODUCT ||--o{ PURCHASE_ORDER_ITEM : requested
+    PURCHASE_ORDER ||--o{ PURCHASE_RECEIPT : receives_goods
+    PURCHASE_RECEIPT ||--o{ PURCHASE_RECEIPT_ITEM : contains
+    PURCHASE_ORDER_ITEM ||--o{ PURCHASE_RECEIPT_ITEM : received_from
+    PURCHASE_RECEIPT_ITEM ||--o{ LOT : creates_lot
+    PURCHASE_RECEIPT_ITEM ||--o{ STOCK_MOVEMENT : creates_in_movement
+    USER ||--o{ PURCHASE_ORDER : creates_purchase
+    USER ||--o{ PURCHASE_RECEIPT : receives_purchase
+
+    PRODUCT ||--o{ COURSE_OFFERING : defines_course
+    LOT ||--o{ COURSE_OFFERING : controls_course_capacity
+    COURSE_OFFERING ||--o{ COURSE_ENROLLMENT : has_enrollment
+    CLIENT ||--o{ COURSE_ENROLLMENT : enrolls
+
+    PRODUCT ||--o{ AFFILIATION_PLAN : defines_affiliation
+    LOT ||--o{ AFFILIATION_PLAN : represents_affiliation_type
+    AFFILIATION_PLAN ||--o{ CLIENT_AFFILIATION : has_subscription
+    CLIENT ||--o{ CLIENT_AFFILIATION : subscribes
+
+    CLIENT ||--o{ SALES_ORDER : places
+    CLIENT_STORE_PROFILE ||--o{ SALES_ORDER : receives_order
+    SALES_ROUTE ||--o{ SALES_ORDER : classifies_order
+    USER ||--o{ SALES_ORDER : creates
+    SALES_ORDER ||--o{ SALES_ORDER_ITEM : contains
+    PRODUCT ||--o{ SALES_ORDER_ITEM : sold
+    LOT ||--o{ SALES_ORDER_ITEM : sold_from_lot
+    WAREHOUSE ||--o{ SALES_ORDER_ITEM : sold_from_warehouse
+    SALES_ORDER ||--o{ SALES_ORDER_STATUS_HISTORY : tracks_status
+    USER ||--o{ SALES_ORDER_STATUS_HISTORY : changes_status
+    SALES_ORDER_ITEM ||--o| COURSE_ENROLLMENT : may_enroll
+    SALES_ORDER_ITEM ||--o| CLIENT_AFFILIATION : may_start_subscription
+
+    SALES_ORDER ||--o| INVOICE : generates
+    CLIENT ||--o{ INVOICE : billed_to
+    CLIENT_STORE_PROFILE ||--o{ INVOICE : billed_store
+    SALES_ROUTE ||--o{ INVOICE : classifies_invoice
+    USER ||--o{ INVOICE : issues
+    INVOICE ||--o{ INVOICE_ITEM : contains
+    SALES_ORDER_ITEM ||--o| INVOICE_ITEM : billed_from
+    PRODUCT ||--o{ INVOICE_ITEM : billed_product
+    LOT ||--o{ INVOICE_ITEM : billed_lot
+    WAREHOUSE ||--o{ INVOICE_ITEM : billed_warehouse
+
+    INVOICE ||--o{ PAYMENT_APPLICATION : paid_by
+    PAYMENT ||--o{ PAYMENT_APPLICATION : applies
+    CLIENT ||--o{ PAYMENT : pays
+    CLIENT_STORE_PROFILE ||--o{ PAYMENT : pays_from_store
+    USER ||--o{ PAYMENT : records
+    PAYMENT_METHOD ||--o{ PAYMENT : used_by
+
+    INVOICE ||--o| ELECTRONIC_DOCUMENT : may_emit_fiscal_document
+    COMPANY ||--o{ ELECTRONIC_DOCUMENT : emits_fiscal_documents
+    ELECTRONIC_DOCUMENT ||--o{ ELECTRONIC_DOCUMENT_STATUS_HISTORY : tracks_hacienda_state
+
+    COMPANY {
+      bigint id PK
+      string name
+      string legal_id
+      boolean is_active
+    }
+
+    COMPANY_FISCAL_CONFIG {
+      bigint id PK
+      bigint company_id FK
+      string legal_name
+      string identification_type
+      string identification_number
+      string economic_activity_code
+      string email
+      string phone
+      string hacienda_environment
+      string certificate_storage_ref
+      string default_branch_code
+      string default_terminal_code
+      boolean is_active
+    }
+
+    FISCAL_SEQUENCE {
+      bigint id PK
+      bigint company_id FK
+      string document_type
+      string branch_code
+      string terminal_code
+      bigint next_number
+      boolean is_active
+    }
+
+    USER {
+      bigint id PK
+      bigint company_id FK
+      bigint role_id FK
+      string username
+      string full_name
+      boolean is_active
+    }
+
+    ROLE {
+      bigint id PK
+      string code
+      string name
+      boolean is_active
+    }
+
+    PERMISSION {
+      bigint id PK
+      string code
+      string module
+      string action
+      boolean is_active
+    }
+
+    ROLE_PERMISSION {
+      bigint id PK
+      bigint role_id FK
+      bigint permission_id FK
+      boolean is_enabled
+    }
+
+    CLIENT {
+      bigint id PK
+      bigint company_id FK
+      string code
+      string name
+      string legal_name
+      string identification_type
+      string identification_number
+      string email
+      string phone
+      string address_reference
+      string payment_condition
+      decimal credit_limit
+      decimal current_balance
+      string status
+    }
+
+    ZONE {
+      bigint id PK
+      bigint company_id FK
+      string code
+      string name
+      boolean is_active
+    }
+
+    SUB_ZONE {
+      bigint id PK
+      bigint zone_id FK
+      string code
+      string name
+      boolean is_active
+    }
+
+    SALES_ROUTE {
+      bigint id PK
+      bigint company_id FK
+      string code
+      string name
+      string description
+      boolean is_active
+    }
+
+    SALES_ROUTE_SUB_ZONE {
+      bigint id PK
+      bigint sales_route_id FK
+      bigint sub_zone_id FK
+      boolean is_active
+    }
+
+    CLIENT_STORE_PROFILE {
+      bigint id PK
+      bigint client_id FK
+      bigint sub_zone_id FK
+      string store_name
+      string legal_name
+      string store_type
+      decimal latitude
+      decimal longitude
+      string location_reference
+      string address
+      string opening_hours
+      boolean is_active
+    }
+
+    CLIENT_STORE_REPRESENTATIVE {
+      bigint id PK
+      bigint client_store_profile_id FK
+      string full_name
+      string identification_number
+      string position
+      string store_role
+      string email
+      string phone
+      string mobile
+      datetime birthday
+      string important_dates_note
+      string comment
+      boolean is_active
+    }
+
+    CATEGORY {
+      bigint id PK
+      string code
+      string name
+      boolean is_active
+    }
+
+    PRODUCT_SUBCATEGORY {
+      bigint id PK
+      bigint category_id FK
+      string code
+      string name
+      boolean is_active
+    }
+
+    PRODUCT {
+      bigint id PK
+      bigint company_id FK
+      bigint category_id FK
+      bigint subcategory_id FK
+      string code
+      string name
+      string product_type
+      string sellable_kind
+      string unit
+      string cabys_code
+      string tax_category
+      decimal tax_rate
+      string lot_strategy
+      boolean is_active
+    }
+
+    PRODUCT_PRICE {
+      bigint id PK
+      bigint product_id FK
+      string price_type
+      decimal amount
+      string currency
+      boolean is_active
+    }
+
+    SUPPLIER {
+      bigint id PK
+      bigint company_id FK
+      string code
+      string name
+      string identification_number
+      string email
+      string phone
+      boolean is_active
+    }
+
+    SUPPLIER_PRODUCT {
+      bigint id PK
+      bigint supplier_id FK
+      bigint product_id FK
+      string supplier_sku
+      decimal last_purchase_price
+      boolean is_active
+    }
+
+    WAREHOUSE {
+      bigint id PK
+      bigint company_id FK
+      string code
+      string name
+      string warehouse_type
+      boolean is_virtual
+      boolean is_sellable_source
+      boolean is_active
+    }
+
+    LOT {
+      bigint id PK
+      bigint product_id FK
+      bigint warehouse_id FK
+      string internal_lot_number
+      string manufacturer_lot_number
+      decimal original_quantity
+      decimal available_quantity
+      string status
+      string qa_status
+      datetime entry_date
+      datetime expiration_date
+    }
+
+    WAREHOUSE_STOCK {
+      bigint id PK
+      bigint warehouse_id FK
+      bigint product_id FK
+      decimal quantity
+      decimal reserved_quantity
+    }
+
+    STOCK_MOVEMENT {
+      bigint id PK
+      bigint product_id FK
+      bigint lot_id FK
+      bigint warehouse_id FK
+      bigint user_id FK
+      string movement_type
+      decimal quantity
+      string reason
+      datetime created_at
+    }
+
+    STOCK_ALERT {
+      bigint id PK
+      bigint product_id FK
+      bigint lot_id FK
+      bigint warehouse_id FK
+      string alert_type
+      string severity
+      string status
+      datetime created_at
+    }
+
+    PURCHASE_ORDER {
+      bigint id PK
+      bigint supplier_id FK
+      bigint created_by_user_id FK
+      string number
+      string status
+      decimal total_amount
+      datetime created_at
+    }
+
+    PURCHASE_ORDER_ITEM {
+      bigint id PK
+      bigint purchase_order_id FK
+      bigint product_id FK
+      decimal quantity
+      decimal unit_price
+      decimal total_amount
+    }
+
+    PURCHASE_RECEIPT {
+      bigint id PK
+      bigint purchase_order_id FK
+      bigint received_by_user_id FK
+      string number
+      string status
+      datetime received_at
+    }
+
+    PURCHASE_RECEIPT_ITEM {
+      bigint id PK
+      bigint purchase_receipt_id FK
+      bigint purchase_order_item_id FK
+      bigint lot_id FK
+      decimal received_quantity
+      string manufacturer_lot_number
+    }
+
+    COURSE_OFFERING {
+      bigint id PK
+      bigint product_id FK
+      bigint virtual_lot_id FK
+      string code
+      string name
+      int capacity
+      int enrolled_count
+      datetime starts_at
+      datetime ends_at
+      string status
+    }
+
+    COURSE_ENROLLMENT {
+      bigint id PK
+      bigint course_offering_id FK
+      bigint client_id FK
+      bigint sales_order_item_id FK
+      string status
+      datetime enrolled_at
+    }
+
+    AFFILIATION_PLAN {
+      bigint id PK
+      bigint product_id FK
+      bigint virtual_lot_id FK
+      string code
+      string billing_frequency
+      decimal recurring_amount
+      int billing_interval
+      boolean is_active
+    }
+
+    CLIENT_AFFILIATION {
+      bigint id PK
+      bigint affiliation_plan_id FK
+      bigint client_id FK
+      bigint sales_order_item_id FK
+      string affiliation_code
+      string status
+      datetime starts_at
+      datetime next_billing_at
+    }
+
+    SALES_ORDER {
+      bigint id PK
+      bigint client_id FK
+      bigint client_store_profile_id FK
+      bigint sales_route_id FK
+      bigint created_by_user_id FK
+      string number
+      string status
+      string payment_condition
+      decimal total_amount
+      datetime created_at
+    }
+
+    SALES_ORDER_ITEM {
+      bigint id PK
+      bigint sales_order_id FK
+      bigint product_id FK
+      bigint lot_id FK
+      bigint warehouse_id FK
+      decimal quantity
+      decimal base_unit_price
+      decimal discount_amount
+      decimal final_unit_price
+      decimal total_amount
+    }
+
+    SALES_ORDER_STATUS_HISTORY {
+      bigint id PK
+      bigint sales_order_id FK
+      bigint changed_by_user_id FK
+      string from_status
+      string to_status
+      string reason
+      datetime changed_at
+    }
+
+    INVOICE {
+      bigint id PK
+      bigint sales_order_id FK
+      bigint client_id FK
+      bigint client_store_profile_id FK
+      bigint sales_route_id FK
+      bigint issued_by_user_id FK
+      string number
+      string status
+      decimal total_amount
+      datetime issued_at
+      datetime due_at
+    }
+
+    INVOICE_ITEM {
+      bigint id PK
+      bigint invoice_id FK
+      bigint sales_order_item_id FK
+      bigint product_id FK
+      bigint lot_id FK
+      bigint warehouse_id FK
+      string product_name
+      string cabys_code
+      decimal quantity
+      decimal unit_price
+      decimal tax_amount
+      decimal total_amount
+    }
+
+    PAYMENT {
+      bigint id PK
+      bigint client_id FK
+      bigint client_store_profile_id FK
+      bigint recorded_by_user_id FK
+      bigint payment_method_id FK
+      decimal amount
+      string reference_number
+      string status
+      datetime paid_at
+    }
+
+    PAYMENT_APPLICATION {
+      bigint id PK
+      bigint payment_id FK
+      bigint invoice_id FK
+      decimal applied_amount
+    }
+
+    PAYMENT_METHOD {
+      bigint id PK
+      string code
+      string name
+      boolean is_active
+    }
+
+    ELECTRONIC_DOCUMENT {
+      bigint id PK
+      bigint company_id FK
+      bigint invoice_id FK
+      string document_type
+      string hacienda_environment
+      string schema_version
+      string clave
+      string consecutive_number
+      string xml_signed_ref
+      string xml_response_ref
+      string hacienda_status
+      datetime submitted_at
+    }
+
+    ELECTRONIC_DOCUMENT_STATUS_HISTORY {
+      bigint id PK
+      bigint electronic_document_id FK
+      string previous_status
+      string new_status
+      string response_message
+      datetime created_at
+    }
