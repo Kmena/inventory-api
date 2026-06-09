@@ -44,3 +44,9 @@ prisma/dev.db
 # Python cache just in case
 __pycache__/
 *.pyc
+
+# Docs markdown: ignore all docs/*.md except README.md
+**/docs/**/*.md
+**/docs/**/*.html
+!**/docs/**/README.md
+plan/*
