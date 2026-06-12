@@ -15,6 +15,10 @@ const orderRouter = require('./routes/order.routes');
 const invoiceRouter = require('./routes/invoice.routes');
 const paymentRouter = require('./routes/payment.routes');
 const inventoryRouter = require('./routes/inventory.routes');
+const regionRouter = require('./routes/region.routes');
+const taxpayerRouter = require('./routes/taxpayer.routes');
+const geocodingRouter = require('./routes/geocoding.routes');
+const economicActivityRouter = require('./routes/economic-activity.routes');
 
 const app = express();
 app.set('json replacer', (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
@@ -36,6 +40,10 @@ app.use('/api/orders', orderRouter);
 app.use('/api/invoices', invoiceRouter);
 app.use('/api/payments', paymentRouter);
 app.use('/api/inventory', inventoryRouter);
+app.use('/api/regions', regionRouter);
+app.use('/api/taxpayers', taxpayerRouter);
+app.use('/api/geocoding', geocodingRouter);
+app.use('/api/economic-activities', economicActivityRouter);
 
 app.use((error, _req, res, _next) => {
   console.error(error);

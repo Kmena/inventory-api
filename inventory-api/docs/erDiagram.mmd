@@ -20,7 +20,6 @@ erDiagram
     ELECTRONIC_DOCUMENT ||--o{ ELECTRONIC_DOCUMENT_STATUS_HISTORY : tracks_hacienda_state
 
     ZONE ||--o{ SUB_ZONE : has
-    SUB_ZONE ||--o{ CLIENT : assigns
     CLIENT_CLASSIFICATION ||--o{ CLIENT : classifies
     CLIENT_LEGAL_ENTITY ||--o{ CLIENT_STORE_PROFILE : owns_store
     CLIENT ||--o{ CLIENT_STORE_PROFILE : operates_store

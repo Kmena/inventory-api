@@ -3,6 +3,16 @@ const bcrypt = require('bcrypt');
 
 const prisma = new PrismaClient();
 
+async function resetIdSequence(tableName) {
+  await prisma.$queryRawUnsafe(`
+    SELECT setval(
+      pg_get_serial_sequence('"${tableName}"', 'id'),
+      GREATEST(COALESCE((SELECT MAX(id) FROM "${tableName}"), 0), 1),
+      true
+    )
+  `);
+}
+
 async function main() {
   const rounds = Number(process.env.BCRYPT_ROUNDS || 12);
 
@@ -214,6 +224,27 @@ async function main() {
   });
 
   await prisma.user.upsert({
+    where: { username: 'empresas' },
+    update: {
+      fullName: 'Root Empresas',
+      passwordHash: rootPasswordHash,
+      companyId: null,
+      roleId: rootRole.id,
+      status: UserStatus.ACTIVE,
+    },
+    create: {
+      fullName: 'Root Empresas',
+      email: 'empresas@inventori.local',
+      username: 'empresas',
+      passwordHash: rootPasswordHash,
+      phone: '8000-0001',
+      companyId: null,
+      roleId: rootRole.id,
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  await prisma.user.upsert({
     where: { username: 'admin' },
     update: {
       fullName: 'Administrador Demo',
@@ -402,6 +433,40 @@ async function main() {
       reference: 'TRX-DEMO-001',
     },
   });
+
+  for (const tableName of [
+    'Role',
+    'companies',
+    'permissions',
+    'role_permissions',
+    'company_fiscal_configs',
+    'fiscal_sequences',
+    'company_configs',
+    'users',
+    'regions',
+    'subregions',
+    'clients',
+    'client_stores',
+    'client_contacts',
+    'client_references',
+    'inventories',
+    'categories',
+    'recipes',
+    'products',
+    'product_competitors',
+    'suppliers',
+    'lots',
+    'stock_movements',
+    'orders',
+    'order_items',
+    'invoices',
+    'payments',
+    'recipe_ingredients',
+    'production_orders',
+    'production_items',
+  ]) {
+    await resetIdSequence(tableName);
+  }
 
   console.log('Seed completado con estructura base');
 }

@@ -11,6 +11,9 @@ const ROLE_HOME = {
 function getHomeForSession(session) {
   const roleCode = session?.user?.role?.code;
   const permissions = session?.user?.permissions || [];
+  if (roleCode === 'root') {
+    return '/root/index.html';
+  }
   if (roleCode === 'admin' && session?.user?.companyId) {
     return '/root/dashboard.html';
   }

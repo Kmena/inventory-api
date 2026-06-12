@@ -14,4 +14,7 @@ module.exports = {
   bcryptRounds: getNumber(process.env.BCRYPT_ROUNDS, 12),
   jwtSecret: process.env.JWT_SECRET || 'change_this_super_secret_key',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
+  haciendaTaxpayerLookupUrl:
+    process.env.HACIENDA_TAXPAYER_LOOKUP_URL || 'https://api.hacienda.go.cr/fe/ae?identificacion={identification}',
+  geocodingSearchUrl: process.env.GEOCODING_SEARCH_URL || 'https://nominatim.openstreetmap.org/search',
 };

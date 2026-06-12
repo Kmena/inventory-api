@@ -4,7 +4,12 @@ const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
-const { createClientSchema, updateClientSchema } = require('../schemas/client.schema');
+const {
+  createClientSchema,
+  updateClientSchema,
+  createCompanyClientSchema,
+  createClientStoreSchema,
+} = require('../schemas/client.schema');
 const clientService = require('../services/client.service');
 
 const router = express.Router();
@@ -12,6 +17,22 @@ router.use(authenticate);
 
 router.get('/', authorize('admin', 'sales'), async (_req, res, next) => {
   try { return res.json(await clientService.listClients()); } catch (error) { return next(error); }
+});
+
+router.get('/company', authorize('admin', 'sales'), async (req, res, next) => {
+  try { return res.json(await clientService.listCompanyClients(req.auth)); } catch (error) { return next(error); }
+});
+
+router.post('/company', authorize('admin', 'sales'), validate(createCompanyClientSchema), async (req, res, next) => {
+  try { return res.status(201).json(await clientService.createCompanyClient(req.body, req.auth)); } catch (error) { return next(error); }
+});
+
+router.post('/company/:clientId/stores', authorize('admin', 'sales'), validate(createClientStoreSchema), async (req, res, next) => {
+  try {
+    return res.status(201).json(
+      await clientService.createCompanyClientStore(parseBigIntId(req.params.clientId, 'clientId'), req.body, req.auth),
+    );
+  } catch (error) { return next(error); }
 });
 
 router.get('/:id', authorize('admin', 'sales'), async (req, res, next) => {

@@ -72,6 +72,7 @@ model Company {
   regions       Region[]
   inventory     Inventory?
   clients       Client[]
+  clientLegalEntities ClientLegalEntity[]
   recipes       Recipe[]
   products         Product[]
   orders           Order[]
@@ -202,19 +203,38 @@ model Region {
   updatedAt DateTime @updatedAt @map("updated_at")
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   clients   Client[]
+  subregions Subregion[]
+  stores    ClientStore[]
 
   @@unique([companyId, name])
   @@map("regions")
+}
+
+model Subregion {
+  id        BigInt   @id @default(autoincrement())
+  regionId  BigInt   @map("region_id")
+  name      String
+  routeCode String?  @map("route_code")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  region    Region   @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  stores    ClientStore[]
+
+  @@unique([regionId, name])
+  @@map("subregions")
 }
 
 model Client {
   id             BigInt          @id @default(autoincrement())
   companyId      BigInt          @map("company_id")
   regionId       BigInt?         @map("region_id")
+  legalEntityId  BigInt?         @map("legal_entity_id")
   code           String?
   name           String
   legalId        String?         @map("legal_id")
   documentType   String?         @map("document_type")
+  economicActivityCode String?   @map("economic_activity_code")
+  economicActivityName String?   @map("economic_activity_name")
   emailBilling   String?         @map("email_billing")
   emailCourtesy  String?         @map("email_courtesy")
   phone          String?
@@ -231,13 +251,72 @@ model Client {
   updatedAt      DateTime        @updatedAt @map("updated_at")
   company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   region         Region?         @relation(fields: [regionId], references: [id])
+  legalEntity    ClientLegalEntity? @relation(fields: [legalEntityId], references: [id])
+  stores         ClientStore[]
   contacts       ClientContact[]
   references     ClientReference[]
   orders         Order[]
   invoices       Invoice[]
 
   @@unique([companyId, code])
+  @@index([legalEntityId])
   @@map("clients")
+}
+
+model ClientLegalEntity {
+  id                   BigInt   @id @default(autoincrement())
+  companyId            BigInt   @map("company_id")
+  legalName            String   @map("legal_name")
+  commercialName       String?  @map("commercial_name")
+  identificationType   String?  @map("identification_type")
+  identificationNumber String?  @map("identification_number")
+  economicActivityCode String?  @map("economic_activity_code")
+  economicActivityName String?  @map("economic_activity_name")
+  province             String?
+  canton               String?
+  district             String?
+  neighborhood         String?
+  address              String?
+  email                String?
+  phone                String?
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  company              Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  clients              Client[]
+  stores               ClientStore[]
+
+  @@unique([companyId, identificationNumber])
+  @@map("client_legal_entities")
+}
+
+model ClientStore {
+  id        BigInt   @id @default(autoincrement())
+  clientId  BigInt   @map("client_id")
+  legalEntityId BigInt? @map("legal_entity_id")
+  regionId  BigInt?  @map("region_id")
+  subregionId BigInt  @map("subregion_id")
+  code      String?
+  name      String
+  phone     String?
+  address   String?
+  latitude  Decimal? @db.Decimal(10, 7)
+  longitude Decimal? @db.Decimal(10, 7)
+  province  String?
+  canton    String?
+  district  String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  legalEntity ClientLegalEntity? @relation(fields: [legalEntityId], references: [id])
+  region    Region?  @relation(fields: [regionId], references: [id])
+  subregion Subregion @relation(fields: [subregionId], references: [id])
+
+  @@unique([clientId, code])
+  @@index([legalEntityId])
+  @@index([regionId])
+  @@index([subregionId])
+  @@map("client_stores")
 }
 
 model ClientContact {

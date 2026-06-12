@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Zonas</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Inventori</p>
+          <h2>Empresa</h2>
+        </div>
+        <nav class="sidebar-nav" aria-label="Navegacion principal">
+          <a class="sidebar-link" href="/root/dashboard.html">Dashboard</a>
+          <a class="sidebar-link" href="/root/users.html">Usuarios</a>
+          <a class="sidebar-link" href="/root/roles.html">Roles</a>
+          <a class="sidebar-link active" href="/root/zones.html">Zonas</a>
+          <a class="sidebar-link" href="/root/clients.html">Clientes</a>
+        </nav>
+      </aside>
+
+      <section class="card app-content">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Administracion</p>
+            <h1>Zonas y subzonas</h1>
+            <p id="zones-session" class="muted">Sesion activa</p>
+          </div>
+          <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+        </header>
+
+        <section class="import-panel">
+          <div>
+            <h2>Crear zona</h2>
+          </div>
+
+          <form id="zone-form" class="pricing-grid">
+            <label class="field">
+              <span>Nombre de zona</span>
+              <input name="name" type="text" placeholder="San Jose Oeste" required />
+            </label>
+            <label class="field">
+              <span>Codigo de ruta</span>
+              <input name="routeCode" type="text" placeholder="SJ-OESTE" />
+            </label>
+          </form>
+
+          <div class="import-actions">
+            <button id="create-zone-button" type="submit" form="zone-form">Crear zona</button>
+            <p id="zones-message" class="message" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <section class="import-panel">
+          <div>
+            <h2>Crear subzona</h2>
+          </div>
+
+          <form id="subzone-form" class="pricing-grid">
+            <label class="field">
+              <span>Zona</span>
+              <select name="regionId" required>
+                <option value="">Cargando zonas...</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Nombre de subzona</span>
+              <input name="name" type="text" placeholder="Escazu" required />
+            </label>
+            <label class="field">
+              <span>Codigo de ruta</span>
+              <input name="routeCode" type="text" placeholder="SJ-OE-01" />
+            </label>
+          </form>
+
+          <div class="import-actions">
+            <button id="create-subzone-button" type="submit" form="subzone-form">Crear subzona</button>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-title-row">
+            <h2>Zonas registradas</h2>
+            <button id="refresh-zones-button" class="secondary-button" type="button">Actualizar</button>
+          </div>
+
+          <div id="zones-list" class="role-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/root/zones.js"></script>
+  </body>
+</html>
