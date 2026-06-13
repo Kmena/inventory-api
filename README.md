@@ -20,7 +20,7 @@ El producto esta orientado a centralizar:
 - ficha de cuarentena/aprobación para productos de ingreso con lote interno y lote del manufacturador
 - entradas, ajustes, reservas, salidas y transferencias de stock
 - clientes, credito comercial, facturas y pagos parciales
-- cursos con cupos limitados y afiliaciones con cobro recurrente usando lotes en bodegas virtuales separadas
+- productos temporales o limitados con disponibilidad controlada y afiliaciones con cobro recurrente usando lotes en bodegas virtuales separadas
 - pagos de contado, contra entrega y credito con comprobantes, abonos, recibos de dinero, tesoreria y conciliacion de efectivo de agentes
 - notas de credito/debito ligadas a factura, Hacienda, saldo a favor/deuda, devoluciones por lote y decision de QA
 - zonas, subzonas, rutas y agentes para ventas y seguimiento comercial

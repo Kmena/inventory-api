@@ -29,7 +29,7 @@ El PRD plantea una plataforma web responsive para centralizar:
 - notas de credito/debito ligadas a factura, Hacienda, saldo a favor/deuda, devoluciones por lote y decision de QA
 - historial completo de pedidos y estados, incluyendo rechazado, aceptado, cancelado, facturado, entregado con firma, pagado y vencido
 - clientes, credito comercial y aprobaciones
-- productos vendibles no fisicos: cursos con cupos y afiliaciones recurrentes usando lotes en bodegas virtuales separadas
+- productos vendibles no fisicos temporales o limitados con disponibilidad controlada y afiliaciones recurrentes usando lotes en bodegas virtuales separadas
 - zonas, subzonas, rutas y agentes comerciales para ventas y seguimiento
 - jerarquia de ventas con gerente, supervisor y agente
 - hojas de cobro, inventario, conozca a sus clientes y ruta para agentes
