@@ -80,12 +80,12 @@ erDiagram
     PRODUCT ||--o{ PRODUCT_PRICE : has_general_price
     PRODUCT ||--o{ PRODUCT_BARCODE : has
     PRODUCT ||--o{ COMMERCIAL_ADJUSTMENT : price_adjusted_by
-    PRODUCT ||--o{ COURSE_OFFERING : defines_course
+    PRODUCT ||--o{ LIMITED_PRODUCT_OFFERING : defines_limited_offering
     PRODUCT ||--o{ AFFILIATION_PLAN : defines_affiliation
-    LOT ||--o{ COURSE_OFFERING : controls_course_capacity
+    LOT ||--o{ LIMITED_PRODUCT_OFFERING : controls_limited_capacity
     LOT ||--o{ AFFILIATION_PLAN : represents_affiliation_type
-    COURSE_OFFERING ||--o{ COURSE_ENROLLMENT : has_enrollment
-    CLIENT ||--o{ COURSE_ENROLLMENT : enrolls
+    LIMITED_PRODUCT_OFFERING ||--o{ LIMITED_PRODUCT_RESERVATION : has_reservation
+    CLIENT ||--o{ LIMITED_PRODUCT_RESERVATION : reserves
     AFFILIATION_PLAN ||--o{ CLIENT_AFFILIATION : has_subscription
     CLIENT ||--o{ CLIENT_AFFILIATION : subscribes
 

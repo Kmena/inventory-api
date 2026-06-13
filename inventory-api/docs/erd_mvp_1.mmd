@@ -50,10 +50,10 @@ erDiagram
     USER ||--o{ PURCHASE_ORDER : creates_purchase
     USER ||--o{ PURCHASE_RECEIPT : receives_purchase
 
-    PRODUCT ||--o{ COURSE_OFFERING : defines_course
-    LOT ||--o{ COURSE_OFFERING : controls_course_capacity
-    COURSE_OFFERING ||--o{ COURSE_ENROLLMENT : has_enrollment
-    CLIENT ||--o{ COURSE_ENROLLMENT : enrolls
+    PRODUCT ||--o{ LIMITED_PRODUCT_OFFERING : defines_limited_offering
+    LOT ||--o{ LIMITED_PRODUCT_OFFERING : controls_limited_capacity
+    LIMITED_PRODUCT_OFFERING ||--o{ LIMITED_PRODUCT_RESERVATION : has_reservation
+    CLIENT ||--o{ LIMITED_PRODUCT_RESERVATION : reserves
 
     PRODUCT ||--o{ AFFILIATION_PLAN : defines_affiliation
     LOT ||--o{ AFFILIATION_PLAN : represents_affiliation_type
@@ -70,7 +70,7 @@ erDiagram
     WAREHOUSE ||--o{ SALES_ORDER_ITEM : sold_from_warehouse
     SALES_ORDER ||--o{ SALES_ORDER_STATUS_HISTORY : tracks_status
     USER ||--o{ SALES_ORDER_STATUS_HISTORY : changes_status
-    SALES_ORDER_ITEM ||--o| COURSE_ENROLLMENT : may_enroll
+    SALES_ORDER_ITEM ||--o| LIMITED_PRODUCT_RESERVATION : may_reserve_limited_product
     SALES_ORDER_ITEM ||--o| CLIENT_AFFILIATION : may_start_subscription
 
     SALES_ORDER ||--o| INVOICE : generates
@@ -393,26 +393,26 @@ erDiagram
       string manufacturer_lot_number
     }
 
-    COURSE_OFFERING {
+    LIMITED_PRODUCT_OFFERING {
       bigint id PK
       bigint product_id FK
       bigint virtual_lot_id FK
       string code
       string name
       int capacity
-      int enrolled_count
+      int reserved_count
       datetime starts_at
       datetime ends_at
       string status
     }
 
-    COURSE_ENROLLMENT {
+    LIMITED_PRODUCT_RESERVATION {
       bigint id PK
-      bigint course_offering_id FK
+      bigint limited_product_offering_id FK
       bigint client_id FK
       bigint sales_order_item_id FK
       string status
-      datetime enrolled_at
+      datetime reserved_at
     }
 
     AFFILIATION_PLAN {
