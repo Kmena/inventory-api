@@ -191,14 +191,14 @@ Este documento consolida las reglas de negocio definidas para el proyecto a part
 
 ## Productos no fisicos
 
-- Un producto vendible puede ser fisico, curso o afiliacion.
+- Un producto vendible puede ser fisico, temporal o limitado, o una afiliacion.
 - Los productos fisicos usan inventario, lotes y bodegas cuando aplique.
-- Cursos y afiliaciones deben conservar trazabilidad con bodegas virtuales.
-- Las bodegas virtuales de cursos y afiliaciones no alimentan movimientos fisicos, produccion, cuarentena ni devoluciones.
-- Los cursos deben manejar cupos limitados.
-- Cada curso u oferta creada debe tener un lote virtual asociado para controlar cupos.
-- Una venta de curso debe registrar inscripcion del cliente.
-- El sistema no debe permitir inscribir clientes por encima del cupo disponible.
+- Los productos temporales o limitados y las afiliaciones deben conservar trazabilidad con bodegas virtuales.
+- Las bodegas virtuales de productos temporales o limitados y afiliaciones no alimentan movimientos fisicos, produccion, cuarentena ni devoluciones.
+- Los productos temporales o limitados deben manejar disponibilidad controlada.
+- Cada oferta de producto temporal o limitado debe tener un lote virtual asociado para controlar cupos o disponibilidad.
+- Una venta de producto temporal o limitado debe registrar reserva del cliente.
+- El sistema no debe permitir reservar o vender por encima de la disponibilidad controlada.
 - Las afiliaciones deben manejar vigencia y estado.
 - Cada tipo o plan de afiliacion debe tener un lote virtual asociado.
 - Cada afiliacion activa de cliente debe tener un codigo unico en la relacion cliente-plan.

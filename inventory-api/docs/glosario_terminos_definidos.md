@@ -60,7 +60,7 @@ Bodega configurada como fuente valida para alimentar ventas.
 
 ### Bodega virtual
 
-Bodega usada para trazabilidad de productos no fisicos, como cursos o afiliaciones. No debe alimentar movimientos fisicos, produccion, cuarentena ni devoluciones.
+Bodega usada para trazabilidad de productos no fisicos, como productos temporales o limitados y afiliaciones. No debe alimentar movimientos fisicos, produccion, cuarentena ni devoluciones.
 
 ### BOM
 
@@ -150,7 +150,7 @@ Obligacion financiera generada por una compra aprobada hacia un proveedor.
 
 ### Cupo
 
-Cantidad maxima disponible para un curso u oferta no fisica. El sistema no debe permitir inscripciones por encima del cupo disponible.
+Cantidad maxima disponible para un producto temporal o limitado. El sistema no debe permitir reservas o ventas por encima de la disponibilidad controlada.
 
 ## D
 
@@ -260,9 +260,9 @@ Registro de inventario observado o reportado durante una visita a cliente. Debe 
 
 Numero y tipo de identificacion usado para empresa, razon social, cliente o receptor fiscal.
 
-### Inscripcion
+### Reserva de producto limitado
 
-Registro creado cuando se vende un curso a un cliente.
+Registro creado cuando se vende o reserva un producto temporal o limitado para un cliente.
 
 ### Inventario
 
@@ -296,7 +296,7 @@ Numero o identificador creado por la empresa para controlar un lote recibido o p
 
 ### Lote virtual
 
-Lote usado para trazabilidad de cursos o afiliaciones, sin representar inventario fisico.
+Lote usado para trazabilidad de productos temporales o limitados y afiliaciones, sin representar inventario fisico.
 
 ## M
 
@@ -380,7 +380,7 @@ Producto vendible final. Puede activarse o desactivarse logicamente desde catalo
 
 ### Producto vendible
 
-Producto que puede agregarse a pedidos. Puede ser fisico, curso o afiliacion.
+Producto que puede agregarse a pedidos. Puede ser fisico, temporal o limitado, o una afiliacion.
 
 ### Promocion
 
