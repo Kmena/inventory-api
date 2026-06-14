@@ -5,6 +5,7 @@ erDiagram
     PERMISSION ||--o{ ROLE_PERMISSION : assigned
     COMPANY ||--o| COMPANY_FISCAL_CONFIG : configures_tax_emission
     COMPANY ||--o{ FISCAL_SEQUENCE : owns_sequences
+    COMPANY_FISCAL_CONFIG ||--o{ ELECTRONIC_DOCUMENT : used_for_emission
 
     COMPANY ||--o{ CLIENT : has
     COMPANY ||--o{ ZONE : has
@@ -113,8 +114,14 @@ erDiagram
       string phone
       string hacienda_environment
       string certificate_storage_ref
+      string certificate_password_secret_ref
+      string hacienda_username_secret_ref
+      string hacienda_password_secret_ref
       string default_branch_code
       string default_terminal_code
+      string credential_status
+      datetime validated_at
+      string last_validation_error
       boolean is_active
     }
 
@@ -531,6 +538,7 @@ erDiagram
     ELECTRONIC_DOCUMENT {
       bigint id PK
       bigint company_id FK
+      bigint company_fiscal_config_id FK
       bigint invoice_id FK
       string document_type
       string hacienda_environment

@@ -171,10 +171,15 @@ Este documento consolida las reglas de negocio definidas para el proyecto a part
 
 ## Facturacion fiscal Costa Rica
 
-- La empresa puede almacenar datos fiscales necesarios para emitir ante Hacienda.
+- Cada empresa representa un cliente/tenant independiente del SaaS para efectos de facturacion electronica.
+- La empresa puede almacenar referencias seguras a los datos fiscales necesarios para emitir ante Hacienda.
 - La configuracion fiscal debe incluir identificacion, actividad economica, direccion, correo, telefono, ambiente, certificado o referencias seguras, credenciales y codigos de sucursal/terminal.
 - Una empresa puede tener configuracion separada para pruebas y produccion.
+- Cada empresa debe usar sus propias credenciales y llave/certificado de Hacienda.
+- Una empresa no puede emitir documentos fiscales sin configuracion fiscal activa y validada.
+- Un usuario o proceso de una empresa no puede usar credenciales fiscales de otra empresa.
 - Un comprobante emitido debe conservar la configuracion fiscal usada o una referencia inmutable a ella.
+- La configuracion fiscal usada por un comprobante debe pertenecer a la misma empresa emisora.
 - Los consecutivos fiscales se controlan por empresa, tipo de comprobante, sucursal y terminal.
 - La asignacion de consecutivo debe ser transaccional.
 - No se deben generar consecutivos duplicados aunque existan solicitudes concurrentes.
