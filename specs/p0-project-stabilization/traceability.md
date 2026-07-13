@@ -66,3 +66,24 @@
 | AUD-003 | Tenant isolation en pagos | Accepted | TASK-006, TASK-007 |
 | AUD-012 | Exposición pública de documentos | Accepted | TASK-008 |
 | AUD-013 | Logging sensible | Accepted | TASK-001 |
+
+## 6. Closure validation update by `baseline-audit-agent-b9bb2c`
+
+| Validation item | Expected | Observed | Status |
+|---|---|---|---|
+| Approved tasks completed | TASK-001 a TASK-009 completed | `tasks.md` marks all as completed | Confirmed by docs |
+| Code for client tenant isolation | Present | Present in routes/services/repositories/schemas/tests | Confirmed statically |
+| Code for invoice tenant isolation | Present | Present in routes/services/repositories/tests | Confirmed statically |
+| Code for payment tenant isolation | Present | Present in routes/services/repositories/tests | Confirmed statically |
+| Protected client document flow | Present | Present in storage helper, service, route, UI and migration script | Confirmed statically |
+| Logging hardening | Present | Present in `src/lib/logging.js`, `src/app.js`, `src/config.js` and tests | Confirmed statically |
+| Reproducible automated tests | `npm test` available | Present in `inventory-api/package.json` | Confirmed statically |
+| Re-execution of tests in this closure pass | Executed when possible | Follow-up package `specs/p0-extra-inclusion/` recorded passing mandatory gate evidence in supported runtime | Resolved by follow-up package |
+| Clean DB migration replay | Evidence required | Original document still lacks independent clean-DB replay evidence | Open |
+| Lint/typecheck/build | Execute when available | Implemented and validated by follow-up package `specs/p0-extra-inclusion/` | Resolved by follow-up package |
+### Closure conclusion
+- Traceability between findings, tasks and code artifacts is **strong**.
+- This specific closure review session still had incomplete direct re-execution evidence.
+- Follow-up approved package `specs/p0-extra-inclusion/` resolved the missing repository quality-gate closure items and recorded final supported-runtime evidence.
+- Original-package closure status in isolation: **`P0 Incomplete`**.
+- Combined closure status with approved follow-up package: **`P0 closure gaps resolved, pending only documented clean-DB replay evidence from the original package`**.

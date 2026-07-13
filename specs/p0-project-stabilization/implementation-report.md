@@ -188,4 +188,43 @@
 - Confirmed via HTTP test that unauthenticated document download is rejected and authenticated same-tenant download returns `attachment`.
 
 ## 16. Next executable task
-- No remaining approved tasks. Any further work requires a new approved specification or follow-up package.
+- No remaining tasks in the original package. Follow-up closure work was executed through the approved package `specs/p0-extra-inclusion/`.
+
+## 17. Independent closure review by `baseline-audit-agent-b9bb2c`
+### Result
+- **Classification:** `P0 Incomplete`
+
+### What was independently confirmed
+- The approved specification package exists and tasks `TASK-001` through `TASK-009` are marked `Completed` in `specs/p0-project-stabilization/tasks.md`.
+- The repository code currently contains the expected stabilization changes for:
+  - tenant scoping in clients
+  - tenant scoping in invoices
+  - tenant scoping in payments
+  - protected storage/download path for client documents
+  - environment-aware logging
+  - a reproducible `npm test` command in `inventory-api/package.json`
+- The baseline critical findings `AUD-001`, `AUD-002`, `AUD-003`, `AUD-012` and `AUD-013` now have clear code-level resolution evidence.
+
+### What could not be independently re-executed in this session
+- `npm test`
+- `npm run validate:agent-workspace`
+- Prisma migration replay from a clean database
+- Docker validation
+- startup smoke tests
+
+### Closure interpretation
+- Based on static inspection, the implementation appears consistent with the approved tasks.
+- Based on repository documentation, prior implementation-time command evidence exists and reports passing validations.
+- However, because this closure review could not independently re-run the mandatory validations, the package should remain classified as `P0 Incomplete` rather than fully validated.
+
+### Remaining closure gaps
+- Clean-database migration replay is not evidenced in this document.
+- Independent non-regression execution was not possible in this specific review session.
+
+## 18. Follow-up closure addendum from `specs/p0-extra-inclusion`
+- Approved follow-up package `specs/p0-extra-inclusion/` has now been implemented.
+- Added repository quality gates: `npm run lint`, `npm run typecheck`, `npm run build`, `npm run verify`.
+- Added CI workflow: `.github/workflows/p0-quality-gates.yml`.
+- Final supported-runtime validation was executed after `npm ci` using Node 20 for `lint`, `typecheck`, `build`, `test`, and `verify`.
+- A local Node 24 drift was observed during clean-environment validation; it was classified as environment drift because the supported Node 20 path passed.
+- As a result, the original closure blockers related to missing repository quality gates are resolved by the approved follow-up package.
