@@ -180,7 +180,7 @@
 ## 14. Remaining risks
 - Logging reduction in non-dev can reduce diagnostics if the format is too sparse.
 - Historical document migration logic is validated, but production-like execution still requires prior file backup and environment-specific operational care.
-- Lack of formal `lint`, `typecheck`, and `build` scripts still limits standardized validation breadth beyond the new `npm test` command.
+- Follow-up package `specs/p0-extra-inclusion/` resolved the prior lack of formal `lint`, `typecheck`, `build`, and `verify` scripts, but remaining operational risks persist around clean replay inconsistency and CI run outcome interpretation.
 
 ## 15. Manual validation
 - Confirmed that requiring `src/app` under `development` still loads successfully.
@@ -188,4 +188,47 @@
 - Confirmed via HTTP test that unauthenticated document download is rejected and authenticated same-tenant download returns `attachment`.
 
 ## 16. Next executable task
-- No remaining approved tasks. Any further work requires a new approved specification or follow-up package.
+- No remaining tasks in the original package.
+- Follow-up closure work from `specs/p0-extra-inclusion/` has now been back-propagated into the original P0 package through `TASK-P0X-013`.
+
+## 17. Independent closure review by `baseline-audit-agent-b9bb2c`
+### Result
+- **Classification:** `P0 Incomplete`
+
+### What was independently confirmed
+- The approved specification package exists and tasks `TASK-001` through `TASK-009` are marked `Completed` in `specs/p0-project-stabilization/tasks.md`.
+- The repository code currently contains the expected stabilization changes for:
+  - tenant scoping in clients
+  - tenant scoping in invoices
+  - tenant scoping in payments
+  - protected storage/download path for client documents
+  - environment-aware logging
+  - a reproducible `npm test` command in `inventory-api/package.json`
+- The baseline critical findings `AUD-001`, `AUD-002`, `AUD-003`, `AUD-012` and `AUD-013` now have clear code-level resolution evidence.
+
+### What could not be independently re-executed in this session
+- `npm test`
+- `npm run validate:agent-workspace`
+- Prisma migration replay from a clean database
+- Docker validation
+- startup smoke tests
+
+### Closure interpretation
+- Based on static inspection, the implementation appears consistent with the approved tasks.
+- Based on repository documentation, prior implementation-time command evidence exists and reports passing validations.
+- However, because this closure review could not independently re-run the mandatory validations, the package should remain classified as `P0 Incomplete` rather than fully validated.
+
+### Remaining closure gaps
+- Clean-database migration replay is not evidenced in this document.
+- Independent non-regression execution was not possible in this specific review session.
+
+## 18. Follow-up closure addendum from `specs/p0-extra-inclusion`
+- Approved follow-up package `specs/p0-extra-inclusion/` has now been implemented.
+- Added repository quality gates: `npm run lint`, `npm run typecheck`, `npm run build`, `npm run verify`.
+- Added CI workflow: `.github/workflows/p0-quality-gates.yml`.
+- Final supported-runtime validation was executed after `npm ci` using Node 20 for `lint`, `typecheck`, `build`, `test`, and `verify`.
+- A local Node 24 drift was observed during clean-environment validation; it was classified as environment drift because the supported Node 20 path passed.
+- Real GitHub Actions evidence is now durably linked at run `29287056129` with associated job `86942014049`; the captured outcome was `failure` at the lint gate and is preserved as evidence rather than rewritten as success.
+- Supported runtime is now explicit through `package.json` engines, README runtime contract, CI Node 20 pinning, and Docker base-image alignment.
+- Clean replay evidence was expanded with a canonical replay sequence and recorded migration execution, while seed/bootstrap remained operationally blocked by target-environment inconsistency.
+- As a result, the original closure blockers related to missing repository quality gates are resolved by the approved follow-up package, but the replay inconsistency and captured CI failure remain documented operational facts.

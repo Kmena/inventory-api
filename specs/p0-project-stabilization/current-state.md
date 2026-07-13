@@ -147,10 +147,44 @@ PrivateStorage --> DownloadResponse[attachment download]
 - Introducir pruebas mínimas requerirá definir una convención nueva en el proyecto.
 - Cambios de logging pueden reducir observabilidad si no se diseñan flags claros.
 
-## 12. Relevant files
+## 13. Validation drift update by `baseline-audit-agent-b9bb2c`
+
+### Differences detected between this document and the actual repository state
+- The earlier statement that client documents are still stored under `src/public/uploads/...` is no longer accurate for new uploads; the current code uses private storage via `inventory-api/src/lib/client-document-storage.js` and protected downloads.
+- The earlier statement that `inventory-api/package.json` has no `test` script is no longer accurate; a reproducible `test` script now exists.
+- The earlier statement that there is only a minimal logging test is outdated; the test suite now includes tenant-scope and document-security tests.
+- The earlier limitations section saying logging is not sufficiently differentiated by environment is outdated; current code does differentiate logging behavior by environment.
+
+### Current closure snapshot
+- `npm test` exists in `inventory-api/package.json`.
+- Tenant isolation fixes for clients, invoices and payments are present in the codebase.
+- Protected client document download flow is present in the codebase.
+- Prior implementation documentation claims successful execution of tests and Docker-assisted validation.
+- This closure pass did not independently rerun those commands.
+
+## 15. Follow-up stabilization update from `specs/p0-extra-inclusion`
+- Follow-up package `specs/p0-extra-inclusion/` is now implemented and validated.
+- `inventory-api/package.json` now includes `lint`, `typecheck`, `build`, and `verify` scripts in addition to `test`.
+- `.github/workflows/p0-quality-gates.yml` now runs the mandatory quality gates in CI using the same repository scripts.
+- Final clean-environment evidence was recorded after `npm ci` and supported-runtime execution under Node 20.
+- A real GitHub Actions run is now durably linked at `https://github.com/Kmena/inventory-api/actions/runs/29287056129` with job evidence at `https://github.com/Kmena/inventory-api/actions/runs/29287056129/job/86942014049?pr=20`; the recorded outcome was `failure` at `npm run lint`, which satisfies evidence capture without implying CI success.
+- Supported runtime is now explicit repository contract: `inventory-api/package.json` declares `engines.node` as `>=20 <21`, README documents Node 20.x, CI is pinned to Node 20, and Docker remains aligned.
+- Clean database replay evidence was expanded: the canonical replay sequence is documented and migration invocation was recorded, but seed/bootstrap remains operationally blocked by target-environment inconsistency during replay.
+- The original closure gap around missing quality gates is therefore resolved by the follow-up approved package, while historical notes above are preserved as an earlier snapshot.
+
+## 16. Closure interpretation after follow-up package
+- Original-package closure status in isolation remains a historical snapshot only; it should not be used without the approved follow-up package.
+- Combined interpretation after `specs/p0-extra-inclusion/`:
+  - repository-level mandatory quality gates now exist and have supported-runtime passing evidence under Node 20;
+  - real GitHub Actions execution evidence is now linked, but the captured run outcome is a real `failure`, not a green CI result;
+  - clean-database replay evidence is improved but still operationally inconclusive because seed/bootstrap could not be closed reliably in the observed environment.
+- Therefore, the original P0 package is now better evidenced and back-linked, but this documentation does not reinterpret the recorded CI failure or the replay inconsistency as resolved facts.
+
+## 14. Relevant files
 - `docs/audit/audit.json`
 - `inventory-api/src/app.js`
 - `inventory-api/src/config.js`
+- `inventory-api/src/lib/logging.js`
 - `inventory-api/src/middlewares/authenticate.js`
 - `inventory-api/src/middlewares/authorize.js`
 - `inventory-api/src/routes/client.routes.js`
@@ -165,7 +199,10 @@ PrivateStorage --> DownloadResponse[attachment download]
 - `inventory-api/src/schemas/client.schema.js`
 - `inventory-api/src/schemas/invoice.schema.js`
 - `inventory-api/src/schemas/payment.schema.js`
+- `inventory-api/src/lib/client-document-storage.js`
+- `inventory-api/scripts/migrate-client-documents-to-private-storage.js`
 - `inventory-api/prisma/schema.prisma`
 - `inventory-api/src/public/root/client-detail.js`
 - `inventory-api/src/public/root/clients.js`
 - `inventory-api/package.json`
+- `inventory-api/tests/`

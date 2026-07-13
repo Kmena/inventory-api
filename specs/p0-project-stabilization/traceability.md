@@ -66,3 +66,26 @@
 | AUD-003 | Tenant isolation en pagos | Accepted | TASK-006, TASK-007 |
 | AUD-012 | Exposición pública de documentos | Accepted | TASK-008 |
 | AUD-013 | Logging sensible | Accepted | TASK-001 |
+
+## 6. Closure validation update by `baseline-audit-agent-b9bb2c`
+
+| Validation item | Expected | Observed | Status |
+|---|---|---|---|
+| Approved tasks completed | TASK-001 a TASK-009 completed | `tasks.md` marks all as completed | Confirmed by docs |
+| Code for client tenant isolation | Present | Present in routes/services/repositories/schemas/tests | Confirmed statically |
+| Code for invoice tenant isolation | Present | Present in routes/services/repositories/tests | Confirmed statically |
+| Code for payment tenant isolation | Present | Present in routes/services/repositories/tests | Confirmed statically |
+| Protected client document flow | Present | Present in storage helper, service, route, UI and migration script | Confirmed statically |
+| Logging hardening | Present | Present in `src/lib/logging.js`, `src/app.js`, `src/config.js` and tests | Confirmed statically |
+| Reproducible automated tests | `npm test` available | Present in `inventory-api/package.json` | Confirmed statically |
+| Re-execution of tests in this closure pass | Executed when possible | Follow-up package `specs/p0-extra-inclusion/` recorded passing mandatory gate evidence in supported runtime | Resolved by follow-up package |
+| Clean DB migration replay | Evidence required | Follow-up package documented canonical replay sequence, successful migration invocation, and unresolved seed/bootstrap environment inconsistency | Partially resolved by follow-up package |
+| Lint/typecheck/build | Execute when available | Implemented and validated by follow-up package `specs/p0-extra-inclusion/` | Resolved by follow-up package |
+| Real GitHub Actions evidence | Durable run reference required | Captured in follow-up package: run `29287056129`, job `86942014049`, outcome `failure` at lint gate | Resolved by follow-up package |
+| Supported Node runtime contract | Explicit repository declaration required | Captured in follow-up package via `package.json` engines, README, CI, and Docker alignment | Resolved by follow-up package |
+### Closure conclusion
+- Traceability between findings, tasks and code artifacts is **strong**.
+- This specific closure review session still had incomplete direct re-execution evidence.
+- Follow-up approved package `specs/p0-extra-inclusion/` resolved the missing repository quality-gate closure items and recorded final supported-runtime evidence.
+- Original-package closure status in isolation: **`P0 Incomplete`**.
+- Combined closure status with approved follow-up package: **quality-gate gaps resolved, real GitHub Actions evidence linked, explicit Node runtime contract declared, and clean-DB replay still operationally inconclusive due to documented seed/bootstrap environment inconsistency**.
