@@ -2,11 +2,19 @@ const prisma = require('../lib/prisma');
 
 function clientInclude() {
   return {
-    region: true,
+    classification: true,
     legalEntity: true,
-    stores: { orderBy: { name: 'asc' }, include: { region: true, subregion: true, legalEntity: true } },
+    stores: {
+      orderBy: { name: 'asc' },
+      include: {
+        subregion: { include: { region: true } },
+        legalEntity: true,
+        representatives: { where: { isActive: true }, orderBy: [{ isPrimaryContact: 'desc' }, { fullName: 'asc' }] },
+      },
+    },
     contacts: true,
     references: true,
+    documents: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
     _count: { select: { stores: true } },
   };
 }
@@ -40,6 +48,23 @@ function findCompanyClientById(id, companyId) {
   });
 }
 
+function findCompanyClassificationById(id, companyId) {
+  return prisma.clientClassification.findFirst({
+    where: { id, companyId, isActive: true },
+  });
+}
+
+function findCompanyClassifications(companyId) {
+  return prisma.clientClassification.findMany({
+    where: { companyId, isActive: true },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+  });
+}
+
+function countClientStores(clientId) {
+  return prisma.clientStore.count({ where: { clientId } });
+}
+
 function createClient(data) {
   return prisma.client.create({
     data,
@@ -47,16 +72,99 @@ function createClient(data) {
   });
 }
 
-function updateClient(id, data) {
-  return prisma.client.update({ where: { id }, data, include: { region: true, contacts: true, references: true } });
+async function updateCompanyClient(id, companyId, data) {
+  const result = await prisma.client.updateMany({
+    where: { id, companyId },
+    data,
+  });
+
+  if (result.count === 0) {
+    return null;
+  }
+
+  return prisma.client.findFirst({
+    where: { id, companyId },
+    include: {
+      classification: true,
+      legalEntity: true,
+      contacts: true,
+      references: true,
+      documents: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+    },
+  });
 }
 
-function deleteClient(id) {
-  return prisma.client.delete({ where: { id } });
+function deleteCompanyClient(id, companyId) {
+  return prisma.client.deleteMany({
+    where: { id, companyId },
+  });
 }
 
 function createClientStore(data) {
-  return prisma.clientStore.create({ data, include: { region: true, subregion: true } });
+  const { representatives, ...storeData } = data;
+  const primaryRepresentativeIndex = representatives?.findIndex((representative) => representative.isPrimaryContact) ?? -1;
+  return prisma.clientStore.create({
+    data: {
+      ...storeData,
+      representatives: representatives?.length
+        ? {
+            create: representatives.map((representative, index) => ({
+              ...representative,
+              isPrimaryContact: primaryRepresentativeIndex >= 0 ? index === primaryRepresentativeIndex : index === 0,
+              isActive: true,
+            })),
+          }
+        : undefined,
+    },
+    include: {
+      subregion: { include: { region: true } },
+      legalEntity: true,
+      representatives: { where: { isActive: true }, orderBy: [{ isPrimaryContact: 'desc' }, { fullName: 'asc' }] },
+    },
+  });
+}
+
+function createClientDocument(data) {
+  return prisma.clientDocument.create({
+    data,
+  });
+}
+
+function updateClientDocument(id, data) {
+  return prisma.clientDocument.update({
+    where: { id },
+    data,
+  });
+}
+
+function deleteClientDocument(id) {
+  return prisma.clientDocument.delete({
+    where: { id },
+  });
+}
+
+function findCompanyClientDocumentById(documentId, clientId, companyId) {
+  return prisma.clientDocument.findFirst({
+    where: {
+      id: documentId,
+      clientId,
+      client: { companyId },
+    },
+    include: {
+      client: {
+        select: {
+          id: true,
+          companyId: true,
+        },
+      },
+    },
+  });
+}
+
+function createClientReference(data) {
+  return prisma.clientReference.create({
+    data,
+  });
 }
 
 async function findOrCreateLegalEntity(companyId, payload) {
@@ -109,9 +217,17 @@ module.exports = {
   findCompanyClients,
   findClientById,
   findCompanyClientById,
+  findCompanyClassificationById,
+  findCompanyClassifications,
+  countClientStores,
   createClient,
   findOrCreateLegalEntity,
-  updateClient,
-  deleteClient,
+  updateCompanyClient,
+  deleteCompanyClient,
   createClientStore,
+  createClientDocument,
+  updateClientDocument,
+  deleteClientDocument,
+  findCompanyClientDocumentById,
+  createClientReference,
 };

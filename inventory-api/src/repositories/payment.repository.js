@@ -1,15 +1,25 @@
 const prisma = require('../lib/prisma');
 
-function findAllPayments() {
+function findCompanyPayments(companyId) {
   return prisma.payment.findMany({
+    where: {
+      invoice: {
+        client: { companyId },
+      },
+    },
     orderBy: { id: 'asc' },
     include: { invoice: true },
   });
 }
 
-function findPaymentById(id) {
-  return prisma.payment.findUnique({
-    where: { id },
+function findCompanyPaymentById(id, companyId) {
+  return prisma.payment.findFirst({
+    where: {
+      id,
+      invoice: {
+        client: { companyId },
+      },
+    },
     include: { invoice: true },
   });
 }
@@ -21,16 +31,41 @@ function createPayment(data) {
   });
 }
 
-function updatePayment(id, data) {
-  return prisma.payment.update({
-    where: { id },
+async function updateCompanyPayment(id, companyId, data) {
+  const result = await prisma.payment.updateMany({
+    where: {
+      id,
+      invoice: {
+        client: { companyId },
+      },
+    },
     data,
+  });
+
+  if (result.count === 0) {
+    return null;
+  }
+
+  return prisma.payment.findFirst({
+    where: {
+      id,
+      invoice: {
+        client: { companyId },
+      },
+    },
     include: { invoice: true },
   });
 }
 
-function deletePayment(id) {
-  return prisma.payment.delete({ where: { id } });
+function deleteCompanyPayment(id, companyId) {
+  return prisma.payment.deleteMany({
+    where: {
+      id,
+      invoice: {
+        client: { companyId },
+      },
+    },
+  });
 }
 
-module.exports = { findAllPayments, findPaymentById, createPayment, updatePayment, deletePayment };
+module.exports = { findCompanyPayments, findCompanyPaymentById, createPayment, updateCompanyPayment, deleteCompanyPayment };

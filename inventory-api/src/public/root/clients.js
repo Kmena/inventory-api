@@ -4,13 +4,41 @@ const sessionLabel = document.getElementById('clients-session');
 const logoutButton = document.getElementById('logout-button');
 const clientForm = document.getElementById('client-form');
 const storeForm = document.getElementById('store-form');
+const representativeForm = document.getElementById('representative-form');
+const clientReferenceForm = document.getElementById('client-reference-form');
+const clientDocumentForm = document.getElementById('client-document-form');
 const message = document.getElementById('clients-message');
 const createClientButton = document.getElementById('create-client-button');
 const addStoreButton = document.getElementById('add-store-button');
+const addRepresentativeButton = document.getElementById('add-representative-button');
+const addClientReferenceButton = document.getElementById('add-client-reference-button');
+const addClientDocumentButton = document.getElementById('add-client-document-button');
 const lookupTaxpayerButton = document.getElementById('lookup-taxpayer-button');
 const refreshButton = document.getElementById('refresh-clients-button');
 const clientsBody = document.getElementById('clients-body');
+const openClientPanelButton = document.getElementById('open-client-panel-button');
+const closeClientPanelButton = document.getElementById('close-client-panel-button');
+const cancelClientPanelButton = document.getElementById('cancel-client-panel-button');
+const clientPanel = document.getElementById('client-panel');
+const clientPanelBackdrop = document.getElementById('client-panel-backdrop');
+const clientPanelTitle = document.getElementById('client-panel-title');
+const clientPanelSubtitle = document.getElementById('client-panel-subtitle');
+const clientSearchInput = document.getElementById('client-search-input');
+const clientClassificationFilter = document.getElementById('client-classification-filter');
+const clientStatusFilter = document.getElementById('client-status-filter');
+const clearClientFiltersButton = document.getElementById('clear-client-filters-button');
+const clientsResultsLabel = document.getElementById('clients-results-label');
+const clientsTotalCount = document.getElementById('clients-total-count');
+const clientsWithoutStoreCount = document.getElementById('clients-without-store-count');
+const clientsWithoutFiscalCount = document.getElementById('clients-without-fiscal-count');
+const clientsCreditCount = document.getElementById('clients-credit-count');
 const pendingStoresList = document.getElementById('pending-stores-list');
+const pendingRepresentativesList = document.getElementById('pending-representatives-list');
+const pendingClientReferencesList = document.getElementById('pending-client-references-list');
+const existingClientReferencesList = document.getElementById('existing-client-references-list');
+const pendingClientDocumentsList = document.getElementById('pending-client-documents-list');
+const existingClientDocumentsList = document.getElementById('existing-client-documents-list');
+const clientDocumentTypeSelect = document.getElementById('client-document-type');
 const openStoreMapButton = document.getElementById('open-store-map-button');
 const storeMapModal = document.getElementById('store-map-modal');
 const closeStoreMapButton = document.getElementById('close-store-map-button');
@@ -22,7 +50,15 @@ const mapSearchResults = document.getElementById('map-search-results');
 const economicActivityOptions = document.getElementById('economic-activity-options');
 let clients = [];
 let zones = [];
+let classifications = [];
+let documentTypes = [];
 let pendingStores = [];
+let pendingRepresentatives = [];
+let pendingClientReferences = [];
+let pendingClientDocuments = [];
+let existingClientReferences = [];
+let existingClientDocuments = [];
+let editingClientId = null;
 let selectedStoreLocation;
 let storeMap;
 let storeMarker;
@@ -52,6 +88,23 @@ function optional(value) {
   return normalized || undefined;
 }
 
+function optionalNumber(value) {
+  const normalized = optional(value);
+  if (normalized === undefined) {
+    return undefined;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function documentTypeLabel(value) {
+  if (value === 'REFERENCIA_COMERCIAL') {
+    return 'Soporte de referencia';
+  }
+  return documentTypes.find((type) => type.value === value)?.label || value || 'Sin tipo';
+}
+
 function setMessage(text, isError = false) {
   message.textContent = text;
   message.className = 'message';
@@ -66,6 +119,33 @@ function setMapMessage(text, isError = false) {
   if (isError) {
     storeMapMessage.classList.add('error');
   }
+}
+
+async function downloadProtectedClientDocument(fileUrl, fileName) {
+  const response = await fetch(fileUrl, {
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+
+  if (!response.ok) {
+    let result = null;
+    try {
+      result = await response.json();
+    } catch (_error) {
+      result = null;
+    }
+
+    throw new Error(result?.message || 'No se pudo descargar el documento');
+  }
+
+  const blob = await response.blob();
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = fileName || 'documento';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(downloadUrl);
 }
 
 function setFieldIfEmpty(fieldName, value) {
@@ -123,6 +203,25 @@ function renderZoneOptions() {
   renderSubzoneOptions();
 }
 
+function renderClassificationOptions() {
+  const select = clientForm.elements.clientClassificationId;
+  const currentFilter = clientClassificationFilter.value;
+  select.innerHTML = '<option value="">Sin clasificacion</option>'
+    + classifications.map((classification) => `<option value="${classification.id}">${classification.name}</option>`).join('');
+  clientClassificationFilter.innerHTML = '<option value="">Todas</option>'
+    + classifications.map((classification) => `<option value="${classification.id}">${classification.name}</option>`).join('');
+  clientClassificationFilter.value = currentFilter;
+  const general = classifications.find((classification) => classification.code === 'GENERAL');
+  if (general && !select.value) {
+    select.value = general.id;
+  }
+}
+
+function renderDocumentTypeOptions() {
+  clientDocumentTypeSelect.innerHTML = '<option value="">Seleccione tipo</option>'
+    + documentTypes.map((type) => `<option value="${type.value}">${type.label}</option>`).join('');
+}
+
 function renderSubzoneOptions() {
   const select = storeForm.elements.subregionId;
   const regionId = storeForm.elements.regionId.value;
@@ -136,46 +235,115 @@ function renderSubzoneOptions() {
 function renderClientOptions() {
 }
 
+function hasFiscalData(client) {
+  return Boolean(client.legalId || client.legalEntity?.legalId || client.legalEntity?.legalName || client.emailBilling);
+}
+
+function hasCreditData(client) {
+  return Boolean(client.paymentType === 'CREDIT' || client.paymentDays || client.creditLimit || client.creditBalance);
+}
+
+function clientSearchText(client) {
+  return [
+    client.name,
+    client.code,
+    client.phone,
+    client.legalId,
+    client.emailBilling,
+    client.legalEntity?.legalName,
+    client.legalEntity?.commercialName,
+    client.classification?.name,
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function filteredClients() {
+  const query = clientSearchInput.value.trim().toLowerCase();
+  const classificationId = clientClassificationFilter.value;
+  const status = clientStatusFilter.value;
+
+  return clients.filter((client) => {
+    const storesCount = client.storesCount || client.stores?.length || 0;
+    const matchesSearch = !query || clientSearchText(client).includes(query);
+    const matchesClassification = !classificationId || client.clientClassificationId === classificationId || client.classification?.id === classificationId;
+    const matchesStatus = !status
+      || (status === 'missing-store' && storesCount === 0)
+      || (status === 'missing-fiscal' && !hasFiscalData(client))
+      || (status === 'with-credit' && hasCreditData(client));
+
+    return matchesSearch && matchesClassification && matchesStatus;
+  });
+}
+
+function renderClientMetrics() {
+  const total = clients.length;
+  const withoutStore = clients.filter((client) => (client.storesCount || client.stores?.length || 0) === 0).length;
+  const withoutFiscal = clients.filter((client) => !hasFiscalData(client)).length;
+  const withCredit = clients.filter(hasCreditData).length;
+
+  clientsTotalCount.textContent = total;
+  clientsWithoutStoreCount.textContent = withoutStore;
+  clientsWithoutFiscalCount.textContent = withoutFiscal;
+  clientsCreditCount.textContent = withCredit;
+}
+
 function renderClients() {
+  renderClientMetrics();
+  const visibleClients = filteredClients();
+  clientsResultsLabel.textContent = `${visibleClients.length} de ${clients.length} cliente(s)`;
+
   if (!clients.length) {
-    clientsBody.innerHTML = '<tr><td class="empty-state" colspan="4">No hay clientes registrados.</td></tr>';
+    clientsBody.innerHTML = '<tr><td class="empty-state" colspan="7">No hay clientes registrados.</td></tr>';
     renderClientOptions();
     return;
   }
 
-  clientsBody.innerHTML = clients
+  if (!visibleClients.length) {
+    clientsBody.innerHTML = '<tr><td class="empty-state" colspan="7">No hay clientes con esos filtros.</td></tr>';
+    renderClientOptions();
+    return;
+  }
+
+  clientsBody.innerHTML = visibleClients
     .map((client) => {
+      const storesCount = client.storesCount || client.stores?.length || 0;
+      const fiscalReady = hasFiscalData(client);
       const stores = client.stores?.length
         ? client.stores.map((store) => {
-          const location = [store.region?.name, store.subregion?.name].filter(Boolean).join(' / ') || 'Sin zona';
-          return `<span>${store.name} (${location})</span>`;
+          const location = [store.subregion?.region?.name, store.subregion?.name].filter(Boolean).join(' / ') || 'Sin zona';
+          const primary = store.isPrimary ? 'Principal' : 'Tienda';
+          const people = store.representatives?.length ? `, ${store.representatives.length} persona(s)` : '';
+          return `<span>${store.name} - ${primary} (${location}${people})</span>`;
         }).join('')
         : '<span>Sin tiendas</span>';
 
       return `
         <tr>
-          <td>
+          <td data-label="Cliente">
             <strong>${client.name}</strong>
             <div class="permission-tags">${stores}</div>
           </td>
-          <td>${client.code || '-'}</td>
-          <td>${client.phone || '-'}</td>
-          <td>${client.storesCount || 0}</td>
+          <td data-label="Codigo">${client.code || '-'}</td>
+          <td data-label="Clasificacion">${client.classification?.name || '-'}</td>
+          <td data-label="Telefono">${client.phone || '-'}</td>
+          <td data-label="Estado">
+            <div class="status-stack">
+              <span class="badge ${fiscalReady ? 'badge-success' : 'badge-warning'}">${fiscalReady ? 'Fiscal completo' : 'Fiscal pendiente'}</span>
+              <span class="badge ${storesCount ? 'badge-success' : 'badge-warning'}">${storesCount ? 'Con tienda' : 'Sin tienda'}</span>
+            </div>
+          </td>
+          <td data-label="Tiendas">${storesCount}</td>
+          <td data-label="Acciones">
+            <div class="table-actions">
+              <a class="secondary-button table-action-link" href="/root/client-detail.html?id=${client.id}">Ver</a>
+              <button class="secondary-button table-action-link edit-client-button" type="button" data-client-id="${client.id}">Editar</button>
+            </div>
+          </td>
         </tr>
       `;
     })
     .join('');
 
   renderClientOptions();
-}
-
-function zoneLabel(regionId) {
-  return zones.find((zone) => zone.id === regionId)?.name || 'Sin zona';
-}
-
-function subzoneLabel(regionId, subregionId) {
-  const zone = zones.find((item) => item.id === regionId);
-  return zone?.subregions?.find((subzone) => subzone.id === subregionId)?.name || 'Sin subzona';
 }
 
 function renderPendingStores() {
@@ -189,7 +357,10 @@ function renderPendingStores() {
       <article class="role-card">
         <div>
           <h3>${store.name}</h3>
-          <p class="muted">${zoneLabel(store.regionId)} / ${subzoneLabel(store.regionId, store.subregionId)}</p>
+          <p class="muted">${store.storeType || 'Tipo no indicado'}${index === 0 ? ' / Principal' : ''}</p>
+          <p class="muted">${subzonePathLabel(store.subregionId)}</p>
+          <p class="muted">${store.attentionSchedule || 'Sin horario'}${store.locationReference ? ` / ${store.locationReference}` : ''}</p>
+          <p class="muted">${store.representatives?.length ? `${store.representatives.length} persona(s) registrada(s)` : 'Sin personal registrado'}</p>
           <p class="muted">${store.latitude && store.longitude ? `${store.latitude}, ${store.longitude}` : 'Sin coordenadas'}</p>
         </div>
         <div class="import-actions">
@@ -199,6 +370,218 @@ function renderPendingStores() {
       </article>
     `)
     .join('');
+}
+
+function subzonePathLabel(subregionId) {
+  for (const zone of zones) {
+    const subzone = zone.subregions?.find((item) => item.id === subregionId);
+    if (subzone) {
+      return `${zone.name} / ${subzone.name}`;
+    }
+  }
+
+  return 'Sin subzona';
+}
+
+function renderPendingRepresentatives() {
+  if (!pendingRepresentatives.length) {
+    pendingRepresentativesList.innerHTML = '<p class="muted">No hay personal agregado para esta tienda.</p>';
+    return;
+  }
+
+  pendingRepresentativesList.innerHTML = pendingRepresentatives
+    .map((representative, index) => `
+      <article class="role-card">
+        <div>
+          <h3>${representative.fullName}</h3>
+          <p class="muted">${representative.position || 'Sin cargo'}${representative.role ? ` / ${representative.role}` : ''}</p>
+          <p class="muted">${representative.email || 'Sin correo'}${representative.phonePrimary ? ` / ${representative.phonePrimary}` : ''}</p>
+          <p class="muted">${representative.isPrimaryContact || index === 0 ? 'Contacto principal' : 'Contacto adicional'}</p>
+        </div>
+        <div class="import-actions">
+          <span class="badge badge-success">${representative.identificationNumber || 'Sin identificacion'}</span>
+          <button class="secondary-button remove-representative-button" type="button" data-representative-index="${index}">Quitar</button>
+        </div>
+      </article>
+    `)
+    .join('');
+}
+
+function renderPendingClientDocuments() {
+  if (!pendingClientDocuments.length) {
+    pendingClientDocumentsList.innerHTML = '<p class="muted">No hay documentos pendientes.</p>';
+    return;
+  }
+
+  pendingClientDocumentsList.innerHTML = pendingClientDocuments
+    .map((document, index) => `
+      <article class="role-card">
+        <div>
+          <h3>${documentTypeLabel(document.documentType)}</h3>
+          <p class="muted">${document.fileName}</p>
+          <p class="muted">${document.documentNumber || 'Sin numero'}${document.notes ? ` / ${document.notes}` : ''}</p>
+        </div>
+        <div class="import-actions">
+          <span class="badge badge-success">Pendiente</span>
+          <button class="secondary-button remove-client-document-button" type="button" data-document-index="${index}">Quitar</button>
+        </div>
+      </article>
+    `)
+    .join('');
+}
+
+function renderPendingClientReferences() {
+  if (!pendingClientReferences.length) {
+    pendingClientReferencesList.innerHTML = '<p class="muted">No hay referencias pendientes.</p>';
+    return;
+  }
+
+  pendingClientReferencesList.innerHTML = pendingClientReferences
+    .map((reference, index) => `
+      <article class="role-card">
+        <div>
+          <h3>${reference.name}</h3>
+          <p class="muted">${reference.contact || 'Sin contacto'}${reference.phone1 ? ` / ${reference.phone1}` : ''}</p>
+          <p class="muted">${reference.termDays ? `${reference.termDays} dia(s)` : 'Sin plazo'}${reference.amount !== undefined ? ` / CRC ${Number(reference.amount).toFixed(2)}` : ''}</p>
+        </div>
+        <div class="import-actions">
+          <span class="badge ${reference.approved ? 'badge-success' : 'badge-warning'}">${reference.approved ? 'Aprobada' : 'Pendiente'}</span>
+          <button class="secondary-button remove-client-reference-button" type="button" data-reference-index="${index}">Quitar</button>
+        </div>
+      </article>
+    `)
+    .join('');
+}
+
+function renderExistingClientReferences() {
+  if (!existingClientReferences.length) {
+    existingClientReferencesList.innerHTML = '<p class="muted">No hay referencias guardadas para este cliente.</p>';
+    return;
+  }
+
+  existingClientReferencesList.innerHTML = existingClientReferences
+    .map((reference) => `
+      <article class="role-card">
+        <div>
+          <h3>${reference.name}</h3>
+          <p class="muted">${reference.contact || 'Sin contacto'}${reference.phone1 ? ` / ${reference.phone1}` : ''}</p>
+          <p class="muted">${reference.termDays ? `${reference.termDays} dia(s)` : 'Sin plazo'}${reference.amount !== null && reference.amount !== undefined ? ` / CRC ${Number(reference.amount).toFixed(2)}` : ''}</p>
+        </div>
+        <div class="import-actions">
+          <span class="badge ${reference.approved ? 'badge-success' : 'badge-warning'}">${reference.approved ? 'Aprobada' : 'Pendiente'}</span>
+          <span class="badge badge-success">${reference.approvedBy || 'Sin validador'}</span>
+        </div>
+      </article>
+    `)
+    .join('');
+}
+
+function renderExistingClientDocuments() {
+  if (!existingClientDocuments.length) {
+    existingClientDocumentsList.innerHTML = '<p class="muted">No hay documentos guardados para este cliente.</p>';
+    return;
+  }
+
+  existingClientDocumentsList.innerHTML = existingClientDocuments
+    .map((document) => `
+      <article class="role-card">
+        <div>
+          <h3>${documentTypeLabel(document.documentType)}</h3>
+          <p class="muted">${document.fileName}</p>
+          <p class="muted">${document.documentNumber || 'Sin numero'}${document.notes ? ` / ${document.notes}` : ''}</p>
+        </div>
+        <div class="import-actions">
+          <span class="badge badge-success">${document.status || 'Activo'}</span>
+          <button class="secondary-button table-action-link client-document-download-button" type="button" data-file-url="${document.fileUrl}" data-file-name="${document.fileName}">Descargar</button>
+        </div>
+      </article>
+    `)
+    .join('');
+}
+
+function setActiveClientPanelTab(tabName) {
+  document.querySelectorAll('[data-client-tab]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.clientTab === tabName);
+  });
+  document.querySelectorAll('[data-client-panel]').forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.clientPanel !== tabName);
+  });
+}
+
+function resetClientWorkspace() {
+  clientForm.reset();
+  storeForm.reset();
+  representativeForm.reset();
+  clientReferenceForm.reset();
+  clientDocumentForm.reset();
+  pendingStores = [];
+  pendingRepresentatives = [];
+  pendingClientReferences = [];
+  pendingClientDocuments = [];
+  existingClientReferences = [];
+  existingClientDocuments = [];
+  editingClientId = null;
+  selectedStoreLocation = undefined;
+  renderPendingStores();
+  renderPendingRepresentatives();
+  renderPendingClientReferences();
+  renderPendingClientDocuments();
+  renderExistingClientReferences();
+  renderExistingClientDocuments();
+  renderClassificationOptions();
+  renderDocumentTypeOptions();
+  renderSubzoneOptions();
+  setActiveClientPanelTab('general');
+}
+
+function openClientPanel(client = null) {
+  resetClientWorkspace();
+  clientPanel.classList.remove('hidden');
+  clientPanelBackdrop.classList.remove('hidden');
+  document.body.classList.add('drawer-open');
+
+  if (client) {
+    editingClientId = client.id;
+    clientPanelTitle.textContent = `Editar cliente: ${client.name}`;
+    clientPanelSubtitle.textContent = 'Actualice datos generales o fiscales sin salir del listado.';
+    createClientButton.textContent = 'Guardar cambios';
+    clientForm.elements.clientId.value = client.id;
+    clientForm.elements.name.value = client.name || '';
+    clientForm.elements.code.value = client.code || '';
+    clientForm.elements.clientClassificationId.value = client.clientClassificationId || client.classification?.id || '';
+    clientForm.elements.phone.value = client.phone || '';
+    clientForm.elements.address.value = client.address || '';
+    clientForm.elements.legalName.value = client.legalEntity?.legalName || client.legalName || '';
+    clientForm.elements.commercialName.value = client.legalEntity?.commercialName || client.commercialName || '';
+    clientForm.elements.documentType.value = client.documentType || '01';
+    clientForm.elements.legalId.value = client.legalId || client.legalEntity?.legalId || '';
+    clientForm.elements.emailBilling.value = client.emailBilling || '';
+    clientForm.elements.economicActivityCode.value = client.economicActivityCode || '';
+    clientForm.elements.economicActivityName.value = client.economicActivityName || '';
+    clientForm.elements.paymentType.value = client.paymentType || 'CASH';
+    clientForm.elements.paymentDays.value = client.paymentDays ?? '';
+    clientForm.elements.creditLimit.value = client.creditLimit ?? '';
+    clientForm.elements.creditBalance.value = client.creditBalance ?? '';
+    existingClientReferences = client.references || [];
+    existingClientDocuments = client.documents || [];
+    renderExistingClientReferences();
+    renderExistingClientDocuments();
+  } else {
+    clientPanelTitle.textContent = 'Nuevo cliente';
+    clientPanelSubtitle.textContent = 'Complete primero los datos esenciales. Puede agregar tiendas antes de guardar.';
+    createClientButton.textContent = 'Guardar cliente';
+    clientForm.elements.paymentType.value = 'CASH';
+    renderExistingClientReferences();
+    renderExistingClientDocuments();
+  }
+
+  clientForm.elements.name.focus();
+}
+
+function closeClientPanel() {
+  clientPanel.classList.add('hidden');
+  clientPanelBackdrop.classList.add('hidden');
+  document.body.classList.remove('drawer-open');
 }
 
 function currentStoreCoordinates() {
@@ -389,6 +772,45 @@ async function loadZones() {
   renderZoneOptions();
 }
 
+async function loadClassifications() {
+  const response = await fetch('/api/clients/classifications/company', {
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'No se pudieron cargar las clasificaciones');
+  }
+
+  classifications = data;
+  renderClassificationOptions();
+}
+
+async function loadDocumentTypes() {
+  const response = await fetch('/api/clients/document-types', {
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'No se pudieron cargar los tipos de documento');
+  }
+
+  documentTypes = data;
+  renderDocumentTypeOptions();
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result?.toString() || '';
+      const [, base64 = ''] = result.split(',');
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado'));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function loadClients() {
   const response = await fetch('/api/clients/company', {
     headers: { Authorization: `Bearer ${session.token}` },
@@ -405,6 +827,44 @@ async function loadClients() {
 logoutButton.addEventListener('click', () => {
   localStorage.removeItem(STORAGE_KEY);
   window.location.href = '/';
+});
+
+openClientPanelButton.addEventListener('click', () => {
+  setMessage('');
+  openClientPanel();
+});
+
+closeClientPanelButton.addEventListener('click', closeClientPanel);
+cancelClientPanelButton.addEventListener('click', closeClientPanel);
+clientPanelBackdrop.addEventListener('click', closeClientPanel);
+
+document.querySelectorAll('[data-client-tab]').forEach((button) => {
+  button.addEventListener('click', () => {
+    setActiveClientPanelTab(button.dataset.clientTab);
+  });
+});
+
+clientSearchInput.addEventListener('input', renderClients);
+clientClassificationFilter.addEventListener('change', renderClients);
+clientStatusFilter.addEventListener('change', renderClients);
+clearClientFiltersButton.addEventListener('click', () => {
+  clientSearchInput.value = '';
+  clientClassificationFilter.value = '';
+  clientStatusFilter.value = '';
+  renderClients();
+});
+
+clientsBody.addEventListener('click', (event) => {
+  const button = event.target.closest('.edit-client-button');
+  if (!button) {
+    return;
+  }
+
+  const client = clients.find((item) => item.id === button.dataset.clientId);
+  if (client) {
+    setMessage('');
+    openClientPanel(client);
+  }
 });
 
 refreshButton.addEventListener('click', async () => {
@@ -499,6 +959,36 @@ pendingStoresList.addEventListener('click', (event) => {
   renderPendingStores();
 });
 
+pendingRepresentativesList.addEventListener('click', (event) => {
+  const button = event.target.closest('.remove-representative-button');
+  if (!button) {
+    return;
+  }
+
+  pendingRepresentatives.splice(Number(button.dataset.representativeIndex), 1);
+  renderPendingRepresentatives();
+});
+
+pendingClientReferencesList.addEventListener('click', (event) => {
+  const button = event.target.closest('.remove-client-reference-button');
+  if (!button) {
+    return;
+  }
+
+  pendingClientReferences.splice(Number(button.dataset.referenceIndex), 1);
+  renderPendingClientReferences();
+});
+
+pendingClientDocumentsList.addEventListener('click', (event) => {
+  const button = event.target.closest('.remove-client-document-button');
+  if (!button) {
+    return;
+  }
+
+  pendingClientDocuments.splice(Number(button.dataset.documentIndex), 1);
+  renderPendingClientDocuments();
+});
+
 lookupTaxpayerButton.addEventListener('click', async () => {
   setMessage('');
   const legalId = optional(clientForm.elements.legalId.value);
@@ -560,13 +1050,15 @@ clientForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   setMessage('');
   createClientButton.disabled = true;
-  createClientButton.textContent = 'Creando...';
+  createClientButton.textContent = editingClientId ? 'Guardando...' : 'Creando...';
 
   const data = new FormData(clientForm);
   const clientName = data.get('name').toString().trim();
+  const wasEditing = Boolean(editingClientId);
   const payload = {
     name: clientName,
     code: optional(data.get('code')),
+    clientClassificationId: optional(data.get('clientClassificationId')),
     legalName: optional(data.get('legalName')) || clientName,
     commercialName: optional(data.get('commercialName')) || clientName,
     legalId: optional(data.get('legalId')),
@@ -576,21 +1068,27 @@ clientForm.addEventListener('submit', async (event) => {
     emailBilling: optional(data.get('emailBilling')),
     phone: optional(data.get('phone')),
     address: optional(data.get('address')),
+    paymentType: optional(data.get('paymentType')),
+    paymentDays: optionalNumber(data.get('paymentDays')),
+    creditLimit: optionalNumber(data.get('creditLimit')),
+    creditBalance: optionalNumber(data.get('creditBalance')),
   };
 
   try {
-    const response = await fetch('/api/clients/company', {
-      method: 'POST',
+    const url = editingClientId ? `/api/clients/${editingClientId}` : '/api/clients/company';
+    const response = await fetch(url, {
+      method: editingClientId ? 'PUT' : 'POST',
       headers: authHeaders(),
       body: JSON.stringify(payload),
     });
     const result = await response.json();
     if (!response.ok) {
-      throw new Error(result.message || 'No se pudo crear el cliente');
+      throw new Error(result.message || (editingClientId ? 'No se pudo actualizar el cliente' : 'No se pudo crear el cliente'));
     }
 
+    const targetClientId = editingClientId || result.id;
     for (const store of pendingStores) {
-      const storeResponse = await fetch(`/api/clients/company/${result.id}/stores`, {
+      const storeResponse = await fetch(`/api/clients/company/${targetClientId}/stores`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify(store),
@@ -601,19 +1099,177 @@ clientForm.addEventListener('submit', async (event) => {
       }
     }
 
-    clientForm.reset();
-    storeForm.reset();
-    pendingStores = [];
-    renderPendingStores();
-    renderSubzoneOptions();
-    setMessage('Cliente creado correctamente');
+    for (const reference of pendingClientReferences) {
+      const referenceResponse = await fetch(`/api/clients/${targetClientId}/references`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(reference),
+      });
+      const referenceResult = await referenceResponse.json();
+      if (!referenceResponse.ok) {
+        throw new Error(referenceResult.message || `No se pudo guardar la referencia ${reference.name}`);
+      }
+    }
+
+    for (const document of pendingClientDocuments) {
+      const documentResponse = await fetch(`/api/clients/${targetClientId}/documents`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(document),
+      });
+      const documentResult = await documentResponse.json();
+      if (!documentResponse.ok) {
+        throw new Error(documentResult.message || `No se pudo subir el documento ${document.fileName}`);
+      }
+    }
+
+    resetClientWorkspace();
+    closeClientPanel();
+    setMessage(wasEditing ? 'Cliente actualizado correctamente' : 'Cliente creado correctamente');
     await loadClients();
   } catch (error) {
-    setMessage(error.message || 'No se pudo crear el cliente', true);
+    setMessage(error.message || (wasEditing ? 'No se pudo actualizar el cliente' : 'No se pudo crear el cliente'), true);
   } finally {
     createClientButton.disabled = false;
-    createClientButton.textContent = 'Crear cliente';
+    createClientButton.textContent = wasEditing ? 'Guardar cambios' : 'Guardar cliente';
   }
+});
+
+clientReferenceForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  setMessage('');
+
+  const data = new FormData(clientReferenceForm);
+  const name = data.get('name').toString().trim();
+  if (!name) {
+    setMessage('Ingrese el nombre de la referencia', true);
+    clientReferenceForm.elements.name.focus();
+    return;
+  }
+
+  pendingClientReferences.push({
+    name,
+    contact: optional(data.get('contact')),
+    phone1: optional(data.get('phone1')),
+    phone2: optional(data.get('phone2')),
+    termDays: optionalNumber(data.get('termDays')),
+    amount: optionalNumber(data.get('amount')),
+    approved: data.get('approved') === 'on',
+    approvedBy: optional(data.get('approvedBy')),
+  });
+
+  clientReferenceForm.reset();
+  renderPendingClientReferences();
+  setMessage('Referencia agregada. Se guardara junto con el cliente.');
+});
+
+existingClientDocumentsList.addEventListener('click', async (event) => {
+  const button = event.target.closest('.client-document-download-button');
+  if (!button) {
+    return;
+  }
+
+  button.disabled = true;
+  const originalLabel = button.textContent;
+  button.textContent = 'Descargando...';
+
+  try {
+    setMessage('');
+    await downloadProtectedClientDocument(button.dataset.fileUrl, button.dataset.fileName);
+  } catch (error) {
+    setMessage(error.message || 'No se pudo descargar el documento', true);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
+  }
+});
+
+clientDocumentForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  setMessage('');
+
+  const data = new FormData(clientDocumentForm);
+  const documentType = optional(data.get('documentType'));
+  const file = data.get('file');
+  if (!documentType) {
+    setMessage('Seleccione el tipo de documento', true);
+    clientDocumentTypeSelect.focus();
+    return;
+  }
+
+  if (!(file instanceof File) || !file.size) {
+    setMessage('Seleccione un archivo para el documento', true);
+    clientDocumentForm.elements.file.focus();
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    setMessage('Cada documento debe pesar 5 MB o menos', true);
+    return;
+  }
+
+  addClientDocumentButton.disabled = true;
+  addClientDocumentButton.textContent = 'Agregando...';
+
+  try {
+    const fileContentBase64 = await readFileAsBase64(file);
+    pendingClientDocuments.push({
+      documentType,
+      documentNumber: optional(data.get('documentNumber')),
+      fileName: file.name,
+      mimeType: file.type || undefined,
+      fileContentBase64,
+      notes: optional(data.get('notes')),
+    });
+    clientDocumentForm.reset();
+    renderPendingClientDocuments();
+    setMessage('Documento agregado. Se subira al guardar el cliente.');
+  } catch (error) {
+    setMessage(error.message || 'No se pudo preparar el documento', true);
+  } finally {
+    addClientDocumentButton.disabled = false;
+    addClientDocumentButton.textContent = 'Agregar documento';
+  }
+});
+
+representativeForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  setMessage('');
+
+  const data = new FormData(representativeForm);
+  const fullName = data.get('fullName').toString().trim();
+  if (!fullName) {
+    setMessage('Ingrese el nombre del representante o empleado', true);
+    representativeForm.elements.fullName.focus();
+    return;
+  }
+
+  const isPrimaryContact = data.get('isPrimaryContact') === 'on' || pendingRepresentatives.length === 0;
+  if (isPrimaryContact) {
+    pendingRepresentatives = pendingRepresentatives.map((representative) => ({
+      ...representative,
+      isPrimaryContact: false,
+    }));
+  }
+
+  pendingRepresentatives.push({
+    fullName,
+    identificationNumber: optional(data.get('identificationNumber')),
+    position: optional(data.get('position')),
+    role: optional(data.get('role')),
+    email: optional(data.get('email')),
+    phonePrimary: optional(data.get('phonePrimary')),
+    phoneSecondary: optional(data.get('phoneSecondary')),
+    birthday: optional(data.get('birthday')),
+    importantDate: optional(data.get('importantDate')),
+    importantDateType: optional(data.get('importantDateType')),
+    comment: optional(data.get('comment')),
+    isPrimaryContact,
+  });
+
+  representativeForm.reset();
+  renderPendingRepresentatives();
+  setMessage('Personal agregado a la tienda en edicion.');
 });
 
 storeForm.addEventListener('submit', async (event) => {
@@ -638,7 +1294,13 @@ storeForm.addEventListener('submit', async (event) => {
   pendingStores.push({
     name,
     code: optional(data.get('code')),
-    regionId,
+    storeType: optional(data.get('storeType')),
+    locationReference: optional(data.get('locationReference')),
+    attentionSchedule: optional(data.get('attentionSchedule')),
+    representatives: pendingRepresentatives.map((representative, index) => ({
+      ...representative,
+      isPrimaryContact: Boolean(representative.isPrimaryContact || index === 0),
+    })),
     subregionId,
     phone: optional(data.get('phone')),
     address: optional(data.get('address')),
@@ -647,15 +1309,23 @@ storeForm.addEventListener('submit', async (event) => {
   });
 
   storeForm.reset();
+  representativeForm.reset();
+  pendingRepresentatives = [];
   renderSubzoneOptions();
+  renderPendingRepresentatives();
   renderPendingStores();
   setMessage('Tienda agregada a la lista. Se creara junto con el cliente.');
 });
 
-Promise.all([loadZones(), loadClients(), loadEconomicActivities()]).catch((error) => {
-  clientsBody.innerHTML = '<tr><td class="empty-state" colspan="4">No fue posible cargar los clientes.</td></tr>';
+Promise.all([loadZones(), loadClassifications(), loadDocumentTypes(), loadClients(), loadEconomicActivities()]).catch((error) => {
+  clientsBody.innerHTML = '<tr><td class="empty-state" colspan="7">No fue posible cargar los clientes.</td></tr>';
   setMessage(error.message || 'No se pudieron cargar los clientes', true);
 });
 
 renderPendingStores();
+renderPendingRepresentatives();
+renderPendingClientReferences();
+renderPendingClientDocuments();
+renderExistingClientReferences();
+renderExistingClientDocuments();
 }

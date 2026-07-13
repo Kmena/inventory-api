@@ -7,6 +7,9 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "test": "node --test tests/logging.test.js tests/client-tenant-scope.test.js tests/invoice-tenant-scope.test.js tests/payment-tenant-scope.test.js tests/client-document-security.test.js",
+    "map:local": "node scripts/generate-local-project-map.js",
+    "validate:agent-workspace": "node scripts/validate-agent-workspace.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",

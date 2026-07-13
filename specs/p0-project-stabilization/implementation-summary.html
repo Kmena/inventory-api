@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Resumen de implementación - p0-project-stabilization</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121933;
+      --panel-2: #1a2447;
+      --text: #eef2ff;
+      --muted: #b9c2e6;
+      --accent: #6ea8fe;
+      --ok: #38d39f;
+      --warn: #f6c85f;
+      --border: #2b3769;
+      --code: #0d1328;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, var(--bg), #0f1630 50%, #101a37);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .container {
+      width: min(1100px, calc(100% - 32px));
+      margin: 32px auto 48px;
+    }
+    .hero, .card {
+      background: rgba(18, 25, 51, 0.96);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+    }
+    .hero {
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+    h1, h2, h3 { margin: 0 0 12px; }
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.2rem; color: var(--accent); }
+    p { margin: 0 0 12px; color: var(--muted); }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .meta div, .stat {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .label {
+      display: block;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .value {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+      margin-top: 20px;
+    }
+    .card { padding: 22px; }
+    ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+    li { margin: 6px 0; color: var(--muted); }
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    .badge.ok { background: rgba(56, 211, 159, 0.15); color: var(--ok); border: 1px solid rgba(56, 211, 159, 0.35); }
+    .badge.warn { background: rgba(246, 200, 95, 0.15); color: var(--warn); border: 1px solid rgba(246, 200, 95, 0.35); }
+    .code {
+      background: var(--code);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      overflow: auto;
+      color: #dbe6ff;
+      font-family: Consolas, Menlo, Monaco, monospace;
+      font-size: 0.9rem;
+      margin-top: 10px;
+      white-space: pre-wrap;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 8px;
+      vertical-align: top;
+      color: var(--muted);
+    }
+    th { color: var(--text); }
+    .footer {
+      margin-top: 20px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="hero">
+      <h1>Resumen de implementación</h1>
+      <p>Paquete aprobado: <strong>p0-project-stabilization</strong></p>
+      <p>Este documento resume lo implementado para estabilización P0 del backend <code>inventory-api</code>, con énfasis en aislamiento tenant, protección de documentos, logging por ambiente y automatización mínima de pruebas.</p>
+      <div>
+        <span class="badge ok">9 tareas completadas</span>
+        <span class="badge ok">Suite mínima automatizada activa</span>
+        <span class="badge ok">Validación final exitosa</span>
+      </div>
+      <div class="meta">
+        <div>
+          <span class="label">Especificación</span>
+          <span class="value">specs/p0-project-stabilization</span>
+        </div>
+        <div>
+          <span class="label">Estado</span>
+          <span class="value">Implementation completed and validated</span>
+        </div>
+        <div>
+          <span class="label">Fecha final</span>
+          <span class="value">2026-07-13</span>
+        </div>
+        <div>
+          <span class="label">Comando principal</span>
+          <span class="value">npm test</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Objetivos cubiertos</h2>
+        <ul>
+          <li>Scope tenant en clientes.</li>
+          <li>Scope tenant en facturas.</li>
+          <li>Scope tenant en pagos.</li>
+          <li>Bloqueo de <code>companyId</code> arbitrario en payloads empresariales.</li>
+          <li>Validación de referencias cross-tenant en facturas y pagos.</li>
+          <li>Almacenamiento privado para documentos de clientes.</li>
+          <li>Descarga autenticada y scopeada de documentos.</li>
+          <li>Logging reducido fuera de <code>development</code>.</li>
+          <li>Suite mínima reproducible con <code>npm test</code>.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Tareas completadas</h2>
+        <table>
+          <thead>
+            <tr><th>Tarea</th><th>Resultado</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>TASK-001</td><td>Política de logging por ambiente</td></tr>
+            <tr><td>TASK-002</td><td>Lectura y mutación de clientes por tenant</td></tr>
+            <tr><td>TASK-003</td><td>Eliminación de inyección libre de <code>companyId</code></td></tr>
+            <tr><td>TASK-004</td><td>Consulta de facturas por tenant</td></tr>
+            <tr><td>TASK-005</td><td>Validación de referencias y mutación de facturas</td></tr>
+            <tr><td>TASK-006</td><td>Consulta de pagos por tenant</td></tr>
+            <tr><td>TASK-007</td><td>Validación de referencias y mutación de pagos</td></tr>
+            <tr><td>TASK-008</td><td>Documentos privados y descarga protegida</td></tr>
+            <tr><td>TASK-009</td><td>Comando reproducible de pruebas automatizadas</td></tr>
+          </tbody>
+        </table>
+      </article>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Archivos principales modificados</h2>
+        <ul>
+          <li><code>inventory-api/src/app.js</code></li>
+          <li><code>inventory-api/src/config.js</code></li>
+          <li><code>inventory-api/src/lib/logging.js</code></li>
+          <li><code>inventory-api/src/routes/client.routes.js</code></li>
+          <li><code>inventory-api/src/services/client.service.js</code></li>
+          <li><code>inventory-api/src/repositories/client.repository.js</code></li>
+          <li><code>inventory-api/src/routes/invoice.routes.js</code></li>
+          <li><code>inventory-api/src/services/invoice.service.js</code></li>
+          <li><code>inventory-api/src/repositories/invoice.repository.js</code></li>
+          <li><code>inventory-api/src/routes/payment.routes.js</code></li>
+          <li><code>inventory-api/src/services/payment.service.js</code></li>
+          <li><code>inventory-api/src/repositories/payment.repository.js</code></li>
+          <li><code>inventory-api/src/lib/client-document-storage.js</code></li>
+          <li><code>inventory-api/src/public/root/clients.js</code></li>
+          <li><code>inventory-api/src/public/root/client-detail.js</code></li>
+          <li><code>inventory-api/scripts/migrate-client-documents-to-private-storage.js</code></li>
+          <li><code>inventory-api/tests/*.test.js</code></li>
+          <li><code>inventory-api/package.json</code></li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Pruebas automatizadas incluidas</h2>
+        <ul>
+          <li><code>tests/logging.test.js</code></li>
+          <li><code>tests/client-tenant-scope.test.js</code></li>
+          <li><code>tests/invoice-tenant-scope.test.js</code></li>
+          <li><code>tests/payment-tenant-scope.test.js</code></li>
+          <li><code>tests/client-document-security.test.js</code></li>
+        </ul>
+        <div class="code">npm test</div>
+      </article>
+    </section>
+
+    <section class="card" style="margin-top: 20px;">
+      <h2>Validaciones relevantes ejecutadas</h2>
+      <ul>
+        <li><code>npm test --silent</code> → 32 pruebas, 32 exitosas, 0 fallas.</li>
+        <li><code>npm run prisma:generate</code> → validado con éxito.</li>
+        <li><code>docker compose up -d</code> → infraestructura levantada para validación.</li>
+        <li><code>node scripts/migrate-client-documents-to-private-storage.js</code> → ejecutado con resultado <code>scannedCount: 0</code>.</li>
+        <li>Validación HTTP de descarga protegida → autenticación requerida y descarga same-tenant exitosa.</li>
+      </ul>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Decisiones de arquitectura aplicadas</h2>
+        <ul>
+          <li><strong>DEC-004:</strong> documentos fuera de almacenamiento público.</li>
+          <li><strong>DEC-004A:</strong> migración de documentos históricos incluida.</li>
+          <li><strong>DEC-004B:</strong> <code>fileUrl</code> reutilizado como ruta lógica protegida.</li>
+          <li><strong>DEC-004C:</strong> primera versión de acceso solo por descarga.</li>
+          <li><strong>DEC-006:</strong> logging detallado solo en <code>development</code>.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Desviaciones documentadas</h2>
+        <ul>
+          <li>Se agregó <code>src/lib/logging.js</code> como helper focalizado.</li>
+          <li>No se introdujo columna <code>storagePath</code> en Prisma.</li>
+          <li>La ruta física privada se deriva usando <code>companyId</code>, <code>clientId</code>, <code>documentId</code> y extensión de archivo.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="card" style="margin-top: 20px;">
+      <h2>Riesgos remanentes</h2>
+      <ul>
+        <li>La migración histórica está validada lógicamente, pero en producción requiere respaldo previo y cuidado operativo.</li>
+        <li>Aún no existen scripts formales de <code>lint</code>, <code>typecheck</code> y <code>build</code>.</li>
+        <li>La suite actual es suficiente para estabilización P0, pero no reemplaza una estrategia de calidad más amplia.</li>
+      </ul>
+    </section>
+
+    <p class="footer">
+      Archivo generado como resumen ejecutivo y técnico del trabajo realizado. Para evidencia completa, revisar:
+      <code>tasks.md</code>, <code>traceability.md</code>, <code>changelog.md</code> e <code>implementation-report.md</code> dentro de <code>specs/p0-project-stabilization</code>.
+    </p>
+  </main>
+</body>
+</html>

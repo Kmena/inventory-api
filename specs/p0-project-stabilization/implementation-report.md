@@ -1,0 +1,191 @@
+# Implementation Report
+## 1. Specification
+- Feature: `p0-project-stabilization`
+- Path: `specs/p0-project-stabilization`
+
+## 2. Approval status
+- `metadata.yaml` updated to `status: approved`.
+
+## 3. Pre-implementation baseline
+- Repository drift: Compatible
+  - The requested feature path was provided with a typo (`o-project-stabilzation`), but the actual approved specification is `specs/p0-project-stabilization`.
+  - Mandatory specification documents `advisor-review.md`, `domain-analysis.md`, and `traceability.md` were missing and have been added before implementation to unblock the approved package.
+  - The coding standard exists at `inventory-api/docs/coding-standards.md` and was read in chunks because of file size.
+- Commands executed:
+  - `npm run prisma:generate` (cwd: `inventory-api`) → failed, exit 1, pre-existing environment issue while renaming Prisma engine binary on Windows (`EPERM ... query_engine-windows.dll.node.tmp...`). Not directly related to the requested feature.
+  - `npm run start` (cwd: `inventory-api`) → application started and printed `Inventory API corriendo en http://localhost:2500`, then command timed out because the server remained running. Startup warning: `JWT_SECRET no configurado o inseguro. Se genero un secreto temporal solo para esta ejecucion.` This is existing behavior and related to current logging/configuration work only as baseline context.
+- Validation commands not available at baseline:
+  - No `test` script in `inventory-api/package.json`.
+  - No `lint`, `typecheck`, or `build` scripts in `inventory-api/package.json`.
+
+## 4. Tasks selected
+- Completed tasks:
+  - `TASK-001: Ajustar política de logging por ambiente`
+  - `TASK-002: Scopear lectura y mutación de clientes por tenant`
+  - `TASK-003: Eliminar inyección libre de companyId en clientes`
+  - `TASK-004: Scopear consulta de facturas por tenant`
+  - `TASK-005: Validar referencias y mutación de facturas por tenant`
+  - `TASK-006: Scopear consulta de pagos por tenant`
+  - `TASK-007: Validar referencias y mutación de pagos por tenant`
+  - `TASK-008: Mover documentos de clientes a almacenamiento privado y exponer descarga protegida`
+  - `TASK-009: Agregar suite mínima de pruebas automatizadas de estabilización`
+
+## 5. Files changed
+- `specs/p0-project-stabilization/metadata.yaml`
+- `specs/p0-project-stabilization/advisor-review.md`
+- `specs/p0-project-stabilization/domain-analysis.md`
+- `specs/p0-project-stabilization/traceability.md`
+- `specs/p0-project-stabilization/current-state.md`
+- `specs/p0-project-stabilization/changelog.md`
+- `specs/p0-project-stabilization/tasks.md`
+- `inventory-api/src/app.js`
+- `inventory-api/src/config.js`
+- `inventory-api/src/lib/logging.js`
+- `inventory-api/src/routes/client.routes.js`
+- `inventory-api/src/services/client.service.js`
+- `inventory-api/src/repositories/client.repository.js`
+- `inventory-api/src/schemas/client.schema.js`
+- `inventory-api/src/routes/invoice.routes.js`
+- `inventory-api/src/services/invoice.service.js`
+- `inventory-api/src/repositories/invoice.repository.js`
+- `inventory-api/src/routes/payment.routes.js`
+- `inventory-api/src/services/payment.service.js`
+- `inventory-api/src/repositories/payment.repository.js`
+- `inventory-api/src/lib/client-document-storage.js`
+- `inventory-api/src/public/root/clients.js`
+- `inventory-api/src/public/root/client-detail.js`
+- `inventory-api/scripts/migrate-client-documents-to-private-storage.js`
+- `inventory-api/tests/logging.test.js`
+- `inventory-api/tests/client-tenant-scope.test.js`
+- `inventory-api/tests/invoice-tenant-scope.test.js`
+- `inventory-api/tests/payment-tenant-scope.test.js`
+- `inventory-api/tests/client-document-security.test.js`
+- `inventory-api/package.json`
+
+## 6. Architecture decisions followed
+- `DEC-004`: documentos de clientes fuera de almacenamiento público.
+- `DEC-004A`: incluir estrategia de migración para documentos históricos.
+- `DEC-004B`: reutilizar `fileUrl` como ruta protegida.
+- `DEC-004C`: acceso inicial solo como descarga.
+- `DEC-006`: Logging detallado solo en development.
+- Incremental change over current Express + services + repositories structure.
+
+## 7. Coding-standard validation
+- Logging behavior was extracted into a focused helper to keep `app.js` and `config.js` explicit and small.
+- No unrelated refactoring was introduced.
+- Non-development logs avoid stack traces and full error objects by default.
+- The document-storage change stayed within the current routes -> services -> repositories structure and kept tenant validation server-side.
+
+## 8. Tests added or updated
+- Added `inventory-api/tests/logging.test.js` with `node:test` coverage for:
+  - development detection
+  - structured non-dev request logging payload
+  - sanitized non-dev error logging
+  - environment-specific configuration warning output
+- Added `inventory-api/tests/client-tenant-scope.test.js` with `node:test` coverage for:
+  - root rejection without `companyId`
+  - client list scoped by tenant
+  - cross-tenant client detail denial
+  - scoped client update and delete behavior
+  - forced `companyId` derivation from authenticated context
+  - schema-level stripping of arbitrary `companyId` from legacy client payloads
+- Added `inventory-api/tests/invoice-tenant-scope.test.js` with `node:test` coverage for:
+  - root rejection without `companyId` in invoice queries
+  - invoice list scoped by tenant
+  - cross-tenant invoice detail denial
+  - invoice detail lookup scoped by authenticated company
+  - create rejection with cross-tenant client
+  - create rejection with cross-tenant order
+  - scoped invoice update behavior
+  - cross-tenant delete denial
+- Added `inventory-api/tests/payment-tenant-scope.test.js` with `node:test` coverage for:
+  - root rejection without `companyId` in payment queries
+  - payment list scoped by tenant
+  - cross-tenant payment detail denial
+  - payment detail lookup scoped by authenticated company
+  - create rejection with cross-tenant invoice
+  - scoped payment update behavior
+  - cross-tenant delete denial
+- Added `inventory-api/tests/client-document-security.test.js` with `node:test` coverage for:
+  - private storage path for new client documents
+  - cross-tenant denial for document download lookup
+  - unauthenticated download rejection
+  - authenticated attachment download success
+- Added `inventory-api/package.json` test script to run the stabilization suite reproducibly with `npm test`.
+
+## 9. Commands executed
+- `npm run prisma:generate`
+- `npm test --silent`
+- `node -e "const pkg=require('./package.json'); console.log(pkg.scripts.test)"`
+- `npm run start`
+- `node --test tests/logging.test.js`
+- `node -e "process.env.NODE_ENV='development'; require('./src/app'); console.log('app-loaded-development')"`
+- `node -e "process.env.NODE_ENV='staging'; require('./src/app'); console.log('app-loaded-staging')"`
+- `node --test tests/logging.test.js tests/client-tenant-scope.test.js`
+- `node -e "process.env.NODE_ENV='test'; require('./src/routes/client.routes'); console.log('client-routes-loaded')"`
+- `node --test tests/logging.test.js tests/client-tenant-scope.test.js tests/invoice-tenant-scope.test.js`
+- `node -e "process.env.NODE_ENV='test'; require('./src/routes/invoice.routes'); console.log('invoice-routes-loaded')"`
+- `node --test tests/logging.test.js tests/client-tenant-scope.test.js tests/invoice-tenant-scope.test.js tests/payment-tenant-scope.test.js`
+- `node -e "process.env.NODE_ENV='test'; require('./src/routes/payment.routes'); console.log('payment-routes-loaded')"`
+- `node -e "process.env.NODE_ENV='test'; require('./src/services/payment.service'); console.log('payment-service-loaded')"`
+- `node --test tests/logging.test.js tests/client-tenant-scope.test.js tests/invoice-tenant-scope.test.js tests/payment-tenant-scope.test.js tests/client-document-security.test.js`
+- `node -e "process.env.NODE_ENV='test'; require('./src/services/client.service'); console.log('client-service-loaded')"`
+- `node --check src/public/root/clients.js`
+- `node --check src/public/root/client-detail.js`
+- `node --check scripts/migrate-client-documents-to-private-storage.js`
+- `node scripts/migrate-client-documents-to-private-storage.js`
+- `docker compose up -d`
+- `docker compose ps`
+- `docker compose logs db --tail=50`
+- `docker compose logs app --tail=50`
+- `node -e "const net=require('net'); const socket=net.createConnection({host:'127.0.0.1',port:5432}); socket.on('connect',()=>{console.log('postgres-open'); socket.end();}); socket.on('error',(error)=>{console.error('postgres-error:'+error.code); process.exit(1);});"`
+- `npm run prisma:generate`
+
+## 10. Validation results
+- `node --test tests/logging.test.js` → passed.
+- App load validation in `development` → passed.
+- App load validation in `staging` → passed and emitted structured warning output.
+- `node --test tests/logging.test.js tests/client-tenant-scope.test.js` → passed.
+- Client routes load validation in `test` → passed.
+- `node --test tests/logging.test.js tests/client-tenant-scope.test.js tests/invoice-tenant-scope.test.js` → passed.
+- Invoice routes load validation in `test` → passed.
+- `node --test tests/logging.test.js tests/client-tenant-scope.test.js tests/invoice-tenant-scope.test.js tests/payment-tenant-scope.test.js` → passed.
+- Payment routes load validation in `test` → passed.
+- Payment service load validation in `test` → passed.
+- `node --test tests/logging.test.js tests/client-tenant-scope.test.js tests/invoice-tenant-scope.test.js tests/payment-tenant-scope.test.js tests/client-document-security.test.js` → passed.
+- Client service load validation in `test` → passed.
+- `node --check src/public/root/clients.js` → passed.
+- `node --check src/public/root/client-detail.js` → passed.
+- `node --check scripts/migrate-client-documents-to-private-storage.js` → passed.
+- `docker compose up -d` → passed after Docker Desktop was started manually.
+- `docker compose logs db --tail=50` → confirmed PostgreSQL ready to accept connections.
+- `docker compose logs app --tail=50` → confirmed compose app container running.
+- TCP connectivity check to `localhost:5432` → passed.
+- `npm run prisma:generate` → passed after infrastructure was available and file lock condition cleared.
+- `node scripts/migrate-client-documents-to-private-storage.js` → passed with result `{ "migratedCount": 0, "updatedReferenceCount": 0, "missingFileCount": 0, "scannedCount": 0 }`.
+- `npm test --silent` → passed with 32 tests.
+- `node -e "const pkg=require('./package.json'); console.log(pkg.scripts.test)"` → confirmed reproducible `npm test` command.
+- Baseline startup was previously confirmed with `npm run start`.
+
+## 11. Existing failures
+- None currently confirmed for TASK-008 validation after infrastructure startup.
+
+## 12. New failures
+- None.
+
+## 13. Deviations from the approved plan
+- A dedicated helper file `inventory-api/src/lib/logging.js` was added to keep the change small and testable. This is compatible with Step 1, which explicitly allowed an optional helper under `src/lib/`.
+- The approved architecture recommended evaluating a new `storagePath` column for `ClientDocument`. The implementation deliberately avoided a schema change because the same approved requirements can be met by deriving the private file location from `companyId`, `clientId`, `documentId` and file extension while reusing `fileUrl` as the protected logical URL. This kept the change smaller and avoided an unnecessary schema migration.
+
+## 14. Remaining risks
+- Logging reduction in non-dev can reduce diagnostics if the format is too sparse.
+- Historical document migration logic is validated, but production-like execution still requires prior file backup and environment-specific operational care.
+- Lack of formal `lint`, `typecheck`, and `build` scripts still limits standardized validation breadth beyond the new `npm test` command.
+
+## 15. Manual validation
+- Confirmed that requiring `src/app` under `development` still loads successfully.
+- Confirmed that requiring `src/app` under `staging` loads successfully and emits a structured warning instead of a raw warning string.
+- Confirmed via HTTP test that unauthenticated document download is rejected and authenticated same-tenant download returns `attachment`.
+
+## 16. Next executable task
+- No remaining approved tasks. Any further work requires a new approved specification or follow-up package.
