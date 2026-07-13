@@ -1,9 +1,12 @@
 # Changelog
 
 ## 2026-07-13
-- Added closure back-propagation notes linking `specs/p0-extra-inclusion/` to the original `p0-project-stabilization` package.
-- Recorded that repository quality-gate gaps (`lint`, `typecheck`, `build`, `verify`, CI) were resolved by the approved follow-up package.
-- Preserved the original closure review as a historical snapshot while adding a follow-up addendum.
+- Completed closure back-propagation from `specs/p0-extra-inclusion/` into the original `p0-project-stabilization` package.
+- Recorded durable GitHub Actions evidence: run `29287056129`, job `86942014049`, with real `failure` outcome at the lint gate.
+- Recorded explicit supported-runtime contract alignment across `package.json`, README, CI, and Docker (Node 20.x / `>=20 <21`).
+- Updated original P0 documents to reflect the canonical clean-DB replay sequence and its still-open seed/bootstrap environment inconsistency.
+- Added a dedicated post-implementation `closure-report.md` for the original package.
+- Preserved the earlier closure review as a historical snapshot while clarifying the combined interpretation after the approved follow-up package.
 
 ## 2026-07-12
 - Aprobado el paquete `specs/p0-project-stabilization/` para implementación.

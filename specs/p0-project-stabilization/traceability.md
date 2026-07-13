@@ -79,11 +79,13 @@
 | Logging hardening | Present | Present in `src/lib/logging.js`, `src/app.js`, `src/config.js` and tests | Confirmed statically |
 | Reproducible automated tests | `npm test` available | Present in `inventory-api/package.json` | Confirmed statically |
 | Re-execution of tests in this closure pass | Executed when possible | Follow-up package `specs/p0-extra-inclusion/` recorded passing mandatory gate evidence in supported runtime | Resolved by follow-up package |
-| Clean DB migration replay | Evidence required | Original document still lacks independent clean-DB replay evidence | Open |
+| Clean DB migration replay | Evidence required | Follow-up package documented canonical replay sequence, successful migration invocation, and unresolved seed/bootstrap environment inconsistency | Partially resolved by follow-up package |
 | Lint/typecheck/build | Execute when available | Implemented and validated by follow-up package `specs/p0-extra-inclusion/` | Resolved by follow-up package |
+| Real GitHub Actions evidence | Durable run reference required | Captured in follow-up package: run `29287056129`, job `86942014049`, outcome `failure` at lint gate | Resolved by follow-up package |
+| Supported Node runtime contract | Explicit repository declaration required | Captured in follow-up package via `package.json` engines, README, CI, and Docker alignment | Resolved by follow-up package |
 ### Closure conclusion
 - Traceability between findings, tasks and code artifacts is **strong**.
 - This specific closure review session still had incomplete direct re-execution evidence.
 - Follow-up approved package `specs/p0-extra-inclusion/` resolved the missing repository quality-gate closure items and recorded final supported-runtime evidence.
 - Original-package closure status in isolation: **`P0 Incomplete`**.
-- Combined closure status with approved follow-up package: **`P0 closure gaps resolved, pending only documented clean-DB replay evidence from the original package`**.
+- Combined closure status with approved follow-up package: **quality-gate gaps resolved, real GitHub Actions evidence linked, explicit Node runtime contract declared, and clean-DB replay still operationally inconclusive due to documented seed/bootstrap environment inconsistency**.
