@@ -11,8 +11,10 @@ const orderItemSchema = z.object({
 });
 
 const createOrderSchema = z.object({
-  companyId: z.coerce.bigint(),
+  warehouseId: z.coerce.bigint().optional().nullable(),
+  companyId: z.coerce.bigint().optional(),
   clientId: z.coerce.bigint().optional().nullable(),
+  clientStoreId: z.coerce.bigint().optional().nullable(),
   userId: z.coerce.bigint().optional().nullable(),
   approvedById: z.coerce.bigint().optional().nullable(),
   receiptNumber: z.string().max(80).optional(),
@@ -32,3 +34,4 @@ const createOrderSchema = z.object({
 const updateOrderSchema = createOrderSchema.partial();
 
 module.exports = { createOrderSchema, updateOrderSchema };
+
