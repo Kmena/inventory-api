@@ -119,6 +119,11 @@ async function registerRootCompany(payload, auth) {
       },
     });
 
+    await tx.clientClassification.createMany({
+      data: companyRepository.defaultClientClassifications(company.id),
+      skipDuplicates: true,
+    });
+
     const fiscalConfig = await tx.companyFiscalConfig.create({
       data: {
         companyId: company.id,

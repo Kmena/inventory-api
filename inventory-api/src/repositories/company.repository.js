@@ -35,7 +35,22 @@ async function findAllCompaniesForRoot() {
 }
 
 async function createCompany(data) {
-  return prisma.company.create({ data });
+  return prisma.$transaction(async (tx) => {
+    const company = await tx.company.create({ data });
+    await tx.clientClassification.createMany({
+      data: defaultClientClassifications(company.id),
+      skipDuplicates: true,
+    });
+    return company;
+  });
+}
+
+function defaultClientClassifications(companyId) {
+  return [
+    { companyId, code: 'GENERAL', name: 'General', isActive: true },
+    { companyId, code: 'MAYORISTA', name: 'Mayorista', isActive: true },
+    { companyId, code: 'MINORISTA', name: 'Minorista', isActive: true },
+  ];
 }
 
 async function updateCompanyStatus(companyId, isActive) {
@@ -60,6 +75,7 @@ async function findCompanyExecutiveDashboard(companyId) {
 }
 
 module.exports = {
+  defaultClientClassifications,
   findAllCompanies,
   findAllCompaniesForRoot,
   createCompany,
