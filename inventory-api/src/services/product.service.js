@@ -1,5 +1,50 @@
 const productRepository = require('../repositories/product.repository');
+const inventoryService = require('./inventory.service');
 const { createHttpError } = require('../lib/errors');
+
+function authScope(auth) {
+  if (!auth?.companyId || !auth?.sub) {
+    throw createHttpError(403, 'Se requiere un usuario asociado a una empresa', 'forbidden');
+  }
+  return { companyId: BigInt(auth.companyId), userId: BigInt(auth.sub) };
+}
+function hasPermission(auth, ...allowedPermissions) {
+  const permissions = auth?.permissions || [];
+  return allowedPermissions.some((permission) => permissions.includes(permission));
+}
+
+function decorateWarehouseLotStock(stock) {
+  if (!stock?.lot) return stock;
+  return {
+    ...stock,
+    lot: {
+      ...stock.lot,
+      derivedUsability: inventoryService.deriveLotUsability(stock.lot),
+    },
+  };
+}
+
+function serializeProductForPermissions(product, auth) {
+  if (!product) return product;
+  const enrichedProduct = Array.isArray(product.warehouseLotStocks)
+    ? {
+        ...product,
+        warehouseLotStocks: product.warehouseLotStocks.map(decorateWarehouseLotStock),
+      }
+    : product;
+  if (hasPermission(auth, 'inventory.view', 'inventory.manage')) return enrichedProduct;
+  const {
+    quantity: _quantity,
+    reservedQuantity: _reservedQuantity,
+    minStock: _minStock,
+    maxStock: _maxStock,
+    standbyStock: _standbyStock,
+    warehouseStocks: _warehouseStocks,
+    warehouseLotStocks: _warehouseLotStocks,
+    ...catalogProduct
+  } = enrichedProduct;
+  return catalogProduct;
+}
 
 function normalizeOptionalString(value) {
   if (value === undefined || value === null) return null;
@@ -12,61 +57,221 @@ function normalizeOptionalNumber(value) {
   return Number(value);
 }
 
-function buildImportedProductData(row, companyId, categoryId) {
+function deriveProductType(categoryType) {
+  switch (categoryType) {
+    case 'MP':
+      return 'RAW_MATERIAL';
+    case 'EM':
+      return 'PACKAGING';
+    default:
+      return 'FINISHED_PRODUCT';
+  }
+}
+
+function deriveSellableKind(categoryType) {
+  return categoryType === 'PT' ? 'STANDARD' : 'NON_SELLABLE';
+}
+
+function deriveTaxDefaults(taxExempt) {
+  if (taxExempt) {
+    return {
+      taxCategory: 'VAT_EXEMPT',
+      taxRate: 0,
+    };
+  }
+
+  return {
+    taxCategory: 'VAT_STANDARD',
+    taxRate: 13,
+  };
+}
+
+function buildImportedProductData(row, companyId, category, auth) {
   const code = normalizeOptionalString(row.code) ?? row.id.toString();
   const description = normalizeOptionalString(row.description);
   const unit = normalizeOptionalString(row.unit) ?? 'UN';
   const currency = normalizeOptionalString(row.currency) ?? 'CRC';
+  const taxExempt = row.taxExempt ?? false;
+  const taxDefaults = deriveTaxDefaults(taxExempt);
+  const categoryType = category?.categoryType ?? 'PT';
 
   return {
     companyId,
-    categoryId,
+    categoryId: category?.id ?? null,
+    createdByUserId: auth?.sub ? BigInt(auth.sub) : null,
     code,
     name: row.name.trim(),
     description,
+    productType: normalizeOptionalString(row.productType) ?? deriveProductType(categoryType),
+    sellableKind: normalizeOptionalString(row.sellableKind) ?? deriveSellableKind(categoryType),
     unit,
+    cabysCode: normalizeOptionalString(row.cabysCode),
     currency,
     price: normalizeOptionalNumber(row.price),
-    quantity: normalizeOptionalNumber(row.quantity) ?? 0,
-    reservedQuantity: normalizeOptionalNumber(row.reservedQuantity) ?? 0,
-    taxExempt: row.taxExempt ?? false,
+    taxExempt,
+    taxCategory: normalizeOptionalString(row.taxCategory) ?? taxDefaults.taxCategory,
+    taxRate: normalizeOptionalNumber(row.taxRate) ?? taxDefaults.taxRate,
+    density: normalizeOptionalNumber(row.density),
+    densityUnit: normalizeOptionalString(row.densityUnit),
+    isActive: row.isActive ?? true,
+    lotStrategy: 'TRACKED',
     inCatalog: row.inCatalog ?? true,
     netContent: normalizeOptionalNumber(row.netContent) ?? 0,
     conversionFactor: normalizeOptionalNumber(row.conversionFactor) ?? 1,
+    kgConversionFactor: normalizeOptionalNumber(row.kgConversionFactor) ?? normalizeOptionalNumber(row.conversionFactor) ?? 1,
     minStock: normalizeOptionalNumber(row.minStock),
     maxStock: normalizeOptionalNumber(row.maxStock),
     standbyStock: normalizeOptionalNumber(row.standbyStock) ?? 0,
   };
 }
 
-async function listProducts() {
-  return productRepository.findAllProducts();
+function buildProductWriteData(payload, auth, existingProduct) {
+  const taxExempt = payload.taxExempt ?? existingProduct?.taxExempt ?? false;
+  const defaults = deriveTaxDefaults(taxExempt);
+  const categoryType = payload.productType ? null : existingProduct?.category?.categoryType ?? 'PT';
+
+  return {
+    ...payload,
+    companyId: payload.companyId ?? (auth?.companyId ? BigInt(auth.companyId) : existingProduct?.companyId),
+    createdByUserId: payload.createdByUserId ?? existingProduct?.createdByUserId ?? (auth?.sub ? BigInt(auth.sub) : null),
+    productType: payload.productType ?? existingProduct?.productType ?? deriveProductType(categoryType),
+    sellableKind: payload.sellableKind ?? existingProduct?.sellableKind ?? deriveSellableKind(categoryType),
+    cabysCode: normalizeOptionalString(payload.cabysCode) ?? existingProduct?.cabysCode ?? null,
+    taxExempt,
+    taxCategory: payload.taxCategory ?? existingProduct?.taxCategory ?? defaults.taxCategory,
+    taxRate: payload.taxRate ?? existingProduct?.taxRate ?? defaults.taxRate,
+    density: payload.density ?? existingProduct?.density ?? null,
+    densityUnit: normalizeOptionalString(payload.densityUnit) ?? existingProduct?.densityUnit ?? null,
+    isActive: payload.isActive ?? existingProduct?.isActive ?? true,
+    lotStrategy: payload.lotStrategy ?? existingProduct?.lotStrategy ?? 'TRACKED',
+    kgConversionFactor: payload.kgConversionFactor
+      ?? payload.conversionFactor
+      ?? existingProduct?.kgConversionFactor
+      ?? existingProduct?.conversionFactor
+      ?? 1,
+  };
 }
 
-async function getProduct(id) {
-  const product = await productRepository.findProductById(id);
+async function syncGeneralPrice(tx, productId, amount, currency) {
+  if (amount === undefined || amount === null) return;
+
+  await tx.productPrice.updateMany({
+    where: {
+      productId,
+      priceType: 'GENERAL',
+      isActive: true,
+    },
+    data: {
+      isActive: false,
+      validTo: new Date(),
+    },
+  });
+
+  await tx.productPrice.create({
+    data: {
+      productId,
+      priceType: 'GENERAL',
+      amount,
+      currency: currency || 'CRC',
+      isActive: true,
+    },
+  });
+}
+
+async function listProducts(auth) {
+  const { companyId } = authScope(auth);
+  const products = await productRepository.findAllProducts(companyId);
+  return products.map((product) => serializeProductForPermissions(product, auth));
+}
+
+async function getProduct(id, auth) {
+  const { companyId } = authScope(auth);
+  const product = await productRepository.findProductById(id, companyId);
   if (!product) throw createHttpError(404, 'Producto no encontrado', 'not_found');
-  return product;
+  return serializeProductForPermissions(product, auth);
 }
 
-async function createProduct(payload) {
-  return productRepository.createProduct(payload);
+async function createProduct(payload, auth) {
+  const scope = authScope(auth);
+  const {
+    initialLots = [],
+    quantity: _quantity,
+    reservedQuantity: _reserved,
+    companyId: _company,
+    ...productPayload
+  } = payload;
+
+  if (initialLots.length && !hasPermission(auth, 'inventory.manage')) {
+    throw createHttpError(403, 'Se requiere permiso de inventario para registrar existencias iniciales', 'forbidden');
+  }
+
+  return productRepository.transaction(async (tx) => {
+    const data = buildProductWriteData({
+      ...productPayload,
+      companyId: scope.companyId,
+      createdByUserId: scope.userId,
+      quantity: 0,
+      reservedQuantity: 0,
+    }, auth);
+
+    const product = await tx.product.create({
+      data,
+      include: productRepository.productInclude,
+    });
+
+    await syncGeneralPrice(tx, product.id, data.price, data.currency);
+
+    for (const initialLot of initialLots) {
+      await inventoryService.registerStockEntryInTransaction(tx, {
+        ...initialLot,
+        productId: product.id,
+        reasonCode: 'INITIAL_PRODUCT_STOCK',
+        note: initialLot.note || 'Existencia inicial registrada con el producto',
+        useLot: true,
+      }, auth);
+    }
+
+    const createdProduct = await tx.product.findUnique({
+      where: { id: product.id },
+      include: productRepository.productInclude,
+    });
+    return serializeProductForPermissions(createdProduct, auth);
+  });
 }
 
-async function updateProduct(id, payload) {
-  await getProduct(id);
-  return productRepository.updateProduct(id, payload);
+async function updateProduct(id, payload, auth) {
+  const existingProduct = await getProduct(id, auth);
+
+  return productRepository.transaction(async (tx) => {
+    const data = buildProductWriteData(payload, auth, existingProduct);
+    const product = await tx.product.update({
+      where: { id },
+      data,
+      include: productRepository.productInclude,
+    });
+
+    await syncGeneralPrice(tx, product.id, data.price, data.currency ?? product.currency);
+
+    const updatedProduct = await tx.product.findUnique({
+      where: { id: product.id },
+      include: productRepository.productInclude,
+    });
+    return serializeProductForPermissions(updatedProduct, auth);
+  });
 }
 
-async function removeProduct(id) {
-  await getProduct(id);
+async function removeProduct(id, auth) {
+  await getProduct(id, auth);
   return productRepository.deleteProduct(id);
 }
 
 async function importProducts(rows, auth) {
-  const companyId = BigInt(auth.companyId);
+  const { companyId } = authScope(auth);
+  if (rows.some((row) => Number(row.quantity || 0) > 0) && !hasPermission(auth, 'inventory.manage')) {
+    throw createHttpError(403, 'Se requiere permiso de inventario para importar existencias', 'forbidden');
+  }
   const productIds = rows.map((row) => row.id);
-  const existingProducts = await productRepository.findProductsByIds(productIds);
+  const existingProducts = await productRepository.findProductsByIds(productIds, companyId);
   const existingProductsById = new Map(existingProducts.map((product) => [product.id.toString(), product]));
 
   return productRepository.transaction(async (tx) => {
@@ -115,7 +320,13 @@ async function importProducts(rows, auth) {
         categoryId = category.id;
       }
 
-      const data = buildImportedProductData(row, companyId, categoryId);
+      const category = categoryId
+        ? await tx.category.findUnique({
+            where: { id: categoryId },
+          })
+        : null;
+
+      const data = buildImportedProductData(row, companyId, category, auth);
 
       if (existing) {
         if (existing.companyId.toString() !== companyId.toString()) {
@@ -131,8 +342,10 @@ async function importProducts(rows, auth) {
         const updated = await tx.product.update({
           where: { id: row.id },
           data,
-          include: { category: true, recipe: true },
+          include: productRepository.productInclude,
         });
+
+        await syncGeneralPrice(tx, updated.id, data.price, data.currency);
 
         summary.updated.push({ id: updated.id.toString(), name: updated.name });
         continue;
@@ -142,9 +355,27 @@ async function importProducts(rows, auth) {
         data: {
           id: row.id,
           ...data,
+          quantity: 0,
+          reservedQuantity: 0,
         },
-        include: { category: true, recipe: true },
+        include: productRepository.productInclude,
       });
+
+      await syncGeneralPrice(tx, created.id, data.price, data.currency);
+
+      if (Number(row.quantity || 0) > 0) {
+        await inventoryService.registerStockEntryInTransaction(tx, {
+          warehouseId: row.warehouseId,
+          productId: created.id,
+          quantity: Number(row.quantity),
+          internalLotNumber: row.internalLotNumber,
+          manufacturerLotNumber: row.manufacturerLotNumber,
+          expirationDate: row.expirationDate,
+          reasonCode: 'INITIAL_IMPORT_STOCK',
+          note: 'Existencia inicial importada desde Excel',
+          useLot: true,
+        }, auth);
+      }
 
       summary.created.push({ id: created.id.toString(), name: created.name });
     }
@@ -161,3 +392,4 @@ module.exports = {
   removeProduct,
   importProducts,
 };
+

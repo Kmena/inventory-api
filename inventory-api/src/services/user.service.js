@@ -2,15 +2,28 @@ const bcrypt = require('bcrypt');
 
 const { bcryptRounds } = require('../config');
 const userRepository = require('../repositories/user.repository');
+const roleRepository = require('../repositories/role.repository');
 const { createHttpError } = require('../lib/errors');
 
 function sanitizeUser(user) {
-  const { passwordHash, ...safeUser } = user;
+  const { passwordHash: _passwordHash, ...safeUser } = user;
   return safeUser;
 }
 
 async function listUsers() {
   const users = await userRepository.findAllUsers();
+  return users.map(sanitizeUser);
+}
+
+function assertCompanyAdmin(auth) {
+  if (!auth.companyId) {
+    throw createHttpError(403, 'El administrador debe pertenecer a una empresa', 'forbidden');
+  }
+}
+
+async function listCompanyUsers(auth) {
+  assertCompanyAdmin(auth);
+  const users = await userRepository.findUsersByCompanyId(BigInt(auth.companyId));
   return users.map(sanitizeUser);
 }
 
@@ -21,7 +34,7 @@ async function registerUser(payload) {
   }
 
   const passwordHash = await bcrypt.hash(payload.password, bcryptRounds);
-  const { password, ...rest } = payload;
+  const { password: _password, ...rest } = payload;
 
   const user = await userRepository.createUser({
     ...rest,
@@ -31,7 +44,42 @@ async function registerUser(payload) {
   return sanitizeUser(user);
 }
 
+async function registerCompanyUser(payload, auth) {
+  assertCompanyAdmin(auth);
+
+  const existing = await userRepository.findUserByUsername(payload.username);
+  if (existing) {
+    throw createHttpError(409, 'El username ya existe', 'conflict');
+  }
+
+  const role = await roleRepository.findRoleById(payload.roleId);
+  if (!role || role.isActive === false) {
+    throw createHttpError(400, 'Rol no disponible', 'validation_error');
+  }
+  if (role.code === 'root') {
+    throw createHttpError(403, 'No se pueden crear usuarios root desde esta pantalla', 'forbidden');
+  }
+  if (role.companyId && role.companyId.toString() !== auth.companyId) {
+    throw createHttpError(403, 'El rol no pertenece a esta empresa', 'forbidden');
+  }
+
+  const passwordHash = await bcrypt.hash(payload.password, bcryptRounds);
+  const { password: _password, roleId, ...rest } = payload;
+
+  const user = await userRepository.createUser({
+    ...rest,
+    companyId: BigInt(auth.companyId),
+    roleId,
+    passwordHash,
+    status: 'ACTIVE',
+  });
+
+  return sanitizeUser(user);
+}
+
 module.exports = {
   listUsers,
+  listCompanyUsers,
   registerUser,
+  registerCompanyUser,
 };

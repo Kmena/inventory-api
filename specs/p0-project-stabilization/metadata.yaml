@@ -1,0 +1,39 @@
+feature: p0-project-stabilization
+spec_version: 1
+status: approved
+owner_agent: sdd-planning-agent-d7495d
+created_at: 2025-02-14
+updated_at: 2025-02-14
+source_request: >-
+  Plan de la etapa 1 de estabilización urgente (0 a 2 semanas) basado en el análisis
+  de auditoría y plan de acción ubicado en docs, enfocado en aislamiento tenant,
+  autorización mínima, protección de documentos y reducción de logging sensible.
+  Incluye decisiones confirmadas por el usuario sobre roots sin companyId,
+  migración sistemática de documentos históricos, `fileUrl` protegido y `node:test`.
+scope:
+  phase: 1
+  priority: P0
+  horizon: 0-2 weeks
+related_inputs:
+  - docs/audit/audit.json
+  - inventory-api/src/routes/client.routes.js
+  - inventory-api/src/services/client.service.js
+  - inventory-api/src/repositories/client.repository.js
+  - inventory-api/src/routes/invoice.routes.js
+  - inventory-api/src/services/invoice.service.js
+  - inventory-api/src/repositories/invoice.repository.js
+  - inventory-api/src/routes/payment.routes.js
+  - inventory-api/src/services/payment.service.js
+  - inventory-api/src/repositories/payment.repository.js
+  - inventory-api/src/app.js
+  - inventory-api/src/config.js
+  - inventory-api/prisma/schema.prisma
+outputs:
+  - requirements.md
+  - current-state.md
+  - architecture.md
+  - implementation-plan.md
+  - tasks.md
+  - risks.md
+  - decisions.md
+  - changelog.md

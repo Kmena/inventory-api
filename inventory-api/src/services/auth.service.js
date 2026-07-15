@@ -4,6 +4,12 @@ const userRepository = require('../repositories/user.repository');
 const { signAccessToken } = require('../lib/auth');
 const { createHttpError } = require('../lib/errors');
 
+function mapPermissions(role) {
+  return role?.rolePermissions
+    ?.filter((item) => item.isEnabled && item.permission?.isActive)
+    .map((item) => item.permission.code) || [];
+}
+
 async function login(payload) {
   const user = await userRepository.findUserByUsernameWithRelations(payload.username);
   if (!user) {
@@ -15,10 +21,28 @@ async function login(payload) {
     throw createHttpError(401, 'Usuario o contraseña inválidos', 'unauthorized');
   }
 
-  const token = signAccessToken(user);
-  const { passwordHash, ...safeUser } = user;
+  if (user.status !== 'ACTIVE') {
+    throw createHttpError(403, 'Usuario inactivo o bloqueado', 'forbidden');
+  }
 
-  return { token, user: safeUser };
+  if (user.role && user.role.isActive === false) {
+    throw createHttpError(403, 'Rol inactivo', 'forbidden');
+  }
+
+  if (user.company && user.company.isActive === false) {
+    throw createHttpError(403, 'Empresa inactiva', 'forbidden');
+  }
+
+  const token = signAccessToken(user);
+  const { passwordHash: _passwordHash, ...safeUser } = user;
+
+  return {
+    token,
+    user: {
+      ...safeUser,
+      permissions: mapPermissions(user.role),
+    },
+  };
 }
 
 module.exports = {

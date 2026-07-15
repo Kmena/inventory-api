@@ -4,6 +4,34 @@ Todos los cambios relevantes de este proyecto se documentan en este archivo.
 
 El formato se inspira en Keep a Changelog y el versionado sigue Semantic Versioning.
 
+## [0.2.0] - 2026-06-09
+
+### Added
+- dashboard root para crear, listar, activar y deshabilitar empresas
+- dashboard ejecutivo para administradores de empresa
+- sidebar de administracion para dashboard ejecutivo, usuarios y roles
+- pagina de usuarios de empresa para que el admin cree usuarios dentro de su propia empresa
+- pagina de roles y permisos para crear variaciones de roles por empresa
+- soporte Prisma para roles asociados a empresa mediante `Role.companyId`
+- endpoints `GET /api/roles/permissions`, `GET /api/roles/company` y `POST /api/roles/company`
+- endpoints `GET /api/users/company` y `POST /api/users/company`
+- middleware `authorizePermission` para proteger acciones por permiso
+- permisos finos `warehouse.access`, `products.view`, `products.import`, `products.manage`, `inventory.view` e `inventory.manage`
+- migracion para hacer la configuracion fiscal de empresa uno-a-uno
+
+### Changed
+- el usuario `root` principal queda sin empresa y administra empresas
+- los usuarios admin de empresa entran al dashboard ejecutivo
+- la creacion de empresas ahora crea un administrador de empresa
+- la creacion de usuarios de empresa asigna roles base o roles personalizados
+- el login puede redirigir a bodega por permiso `warehouse.access`
+- el dashboard de bodega oculta importacion si el usuario no tiene permiso de importacion o gestion de productos
+- productos e inventario empezaron a validar permisos finos en lugar de depender solo del codigo de rol
+
+### Notes
+- las migraciones se aplicaron localmente usando la base Docker publicada en `localhost:5432`
+- se regenero Prisma Client despues de agregar `Role.companyId`
+
 ## [0.1.1] - 2026-05-26
 
 ### Added

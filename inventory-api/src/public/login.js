@@ -3,9 +3,30 @@ const message = document.getElementById('login-message');
 const loginButton = document.getElementById('login-button');
 const STORAGE_KEY = 'inventory-api-auth';
 
+const ROLE_HOME = {
+  root: '/root/index.html',
+  warehouse: '/warehouse/products.html',
+};
+
+function getHomeForSession(session) {
+  const roleCode = session?.user?.role?.code;
+  const permissions = session?.user?.permissions || [];
+  if (roleCode === 'root') {
+    return '/root/index.html';
+  }
+  if (roleCode === 'admin' && session?.user?.companyId) {
+    return '/root/dashboard.html';
+  }
+  if (permissions.includes('warehouse.access')) {
+    return '/warehouse/products.html';
+  }
+
+  return ROLE_HOME[roleCode] || '/no-access.html';
+}
+
 const existingSession = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-if (existingSession?.token && existingSession?.user?.role?.code === 'warehouse') {
-  window.location.href = '/warehouse/products.html';
+if (existingSession?.token) {
+  window.location.href = getHomeForSession(existingSession);
 }
 
 form.addEventListener('submit', async (event) => {
@@ -34,13 +55,8 @@ form.addEventListener('submit', async (event) => {
       throw new Error(data.message || 'No se pudo iniciar sesión');
     }
 
-    if (data.user?.role?.code !== 'warehouse') {
-      localStorage.removeItem(STORAGE_KEY);
-      throw new Error('Este login sencillo solo redirige al flujo de bodega. Use el usuario bodega.');
-    }
-
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    window.location.href = '/warehouse/products.html';
+    window.location.href = getHomeForSession(data);
   } catch (error) {
     message.textContent = error.message || 'Ocurrió un error inesperado';
     message.classList.add('error');

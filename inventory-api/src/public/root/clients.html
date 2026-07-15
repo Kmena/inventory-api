@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Clientes</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Inventori</p>
+          <h2>Empresa</h2>
+        </div>
+        <nav class="sidebar-nav" aria-label="Navegacion principal">
+          <a class="sidebar-link" href="/root/dashboard.html">Dashboard</a>
+          <a class="sidebar-link" href="/root/users.html">Usuarios</a>
+          <a class="sidebar-link" href="/root/roles.html">Roles</a>
+          <a class="sidebar-link" href="/root/zones.html">Zonas</a>
+          <a class="sidebar-link active" href="/root/clients.html">Clientes</a>
+        </nav>
+      </aside>
+
+      <section class="card app-content">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Comercial</p>
+            <h1>Clientes</h1>
+            <p id="clients-session" class="muted">Sesion activa</p>
+          </div>
+          <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+        </header>
+
+        <section class="import-panel">
+          <div>
+            <h2>Crear cliente</h2>
+          </div>
+
+          <form id="client-form" class="pricing-grid">
+            <label class="field">
+              <span>Nombre comercial</span>
+              <input name="name" type="text" required />
+            </label>
+            <label class="field">
+              <span>Codigo cliente</span>
+              <input name="code" type="text" />
+            </label>
+            <label class="field">
+              <span>Razon social</span>
+              <input name="legalName" type="text" />
+            </label>
+            <label class="field">
+              <span>Nombre comercial fiscal</span>
+              <input name="commercialName" type="text" />
+            </label>
+            <label class="field">
+              <span>Tipo identificacion</span>
+              <select name="documentType">
+                <option value="01">Cedula fisica</option>
+                <option value="02">Cedula juridica</option>
+                <option value="03">DIMEX</option>
+                <option value="04">NITE</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Identificacion</span>
+              <input name="legalId" type="text" />
+            </label>
+            <div class="field">
+              <span>Hacienda</span>
+              <button id="lookup-taxpayer-button" class="secondary-button" type="button">Consultar identificacion</button>
+            </div>
+            <label class="field">
+              <span>Correo facturacion</span>
+              <input name="emailBilling" type="email" />
+            </label>
+            <label class="field">
+              <span>Telefono</span>
+              <input name="phone" type="text" />
+            </label>
+            <label class="field field-wide">
+              <span>Direccion</span>
+              <input name="address" type="text" />
+            </label>
+            <label class="field">
+              <span>Codigo actividad</span>
+              <input name="economicActivityCode" type="text" list="economic-activity-options" />
+            </label>
+            <label class="field">
+              <span>Actividad economica</span>
+              <input name="economicActivityName" type="text" list="economic-activity-options" />
+              <datalist id="economic-activity-options"></datalist>
+            </label>
+          </form>
+
+          <div class="import-actions">
+            <button id="create-client-button" type="submit" form="client-form">Crear cliente</button>
+            <p id="clients-message" class="message" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <section class="import-panel">
+          <div>
+            <h2>Tiendas del cliente</h2>
+          </div>
+
+          <form id="store-form" class="pricing-grid">
+            <label class="field">
+              <span>Nombre tienda</span>
+              <input name="name" type="text" />
+            </label>
+            <label class="field">
+              <span>Codigo tienda</span>
+              <input name="code" type="text" />
+            </label>
+            <label class="field">
+              <span>Zona</span>
+              <select name="regionId" required>
+                <option value="">Sin zona</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Subzona</span>
+              <select name="subregionId" required>
+                <option value="">Sin subzona</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Telefono</span>
+              <input name="phone" type="text" />
+            </label>
+            <label class="field field-wide">
+              <span>Direccion</span>
+              <input name="address" type="text" />
+            </label>
+            <label class="field">
+              <span>Latitud</span>
+              <input name="latitude" type="number" min="-90" max="90" step="0.0000001" placeholder="9.9280694" />
+            </label>
+            <label class="field">
+              <span>Longitud</span>
+              <input name="longitude" type="number" min="-180" max="180" step="0.0000001" placeholder="-84.0907246" />
+            </label>
+            <div class="field">
+              <span>Mapa</span>
+              <button id="open-store-map-button" class="secondary-button" type="button">Seleccionar en mapa</button>
+            </div>
+          </form>
+
+          <div class="import-actions">
+            <button id="add-store-button" class="secondary-button" type="submit" form="store-form">Agregar tienda a la lista</button>
+          </div>
+
+          <div id="pending-stores-list" class="role-list"></div>
+        </section>
+
+        <section>
+          <div class="section-title-row">
+            <h2>Clientes registrados</h2>
+            <button id="refresh-clients-button" class="secondary-button" type="button">Actualizar</button>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Codigo</th>
+                  <th>Telefono</th>
+                  <th>Tiendas</th>
+                </tr>
+              </thead>
+              <tbody id="clients-body">
+                <tr>
+                  <td class="empty-state" colspan="4">Cargando clientes...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="store-map-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="store-map-title">
+      <section class="modal-card">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Ubicacion</p>
+            <h2 id="store-map-title">Seleccionar tienda en mapa</h2>
+          </div>
+          <button id="close-store-map-button" class="secondary-button" type="button">Cerrar</button>
+        </header>
+        <form id="map-search-form" class="map-search-form">
+          <label class="field">
+            <span>Buscar lugar</span>
+            <input name="query" type="search" placeholder="Ej. Curridabat, Multiplaza Escazu, Cartago centro" />
+          </label>
+          <button id="map-search-button" class="secondary-button" type="submit">Buscar</button>
+        </form>
+        <div id="map-search-results" class="map-search-results"></div>
+        <div id="store-map" class="map-picker"></div>
+        <div class="import-actions">
+          <button id="use-store-map-button" type="button">Usar ubicacion</button>
+          <p id="store-map-message" class="message" aria-live="polite"></p>
+        </div>
+      </section>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/root/clients.js"></script>
+  </body>
+</html>
