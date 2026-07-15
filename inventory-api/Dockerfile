@@ -13,6 +13,7 @@ COPY prisma ./prisma
 RUN npx prisma generate
 
 COPY src ./src
+COPY scripts ./scripts
 COPY .env.example ./.env.example
 
 EXPOSE 2500

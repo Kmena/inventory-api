@@ -308,6 +308,13 @@ docker compose up --build
 
 El contenedor de la app no ejecuta migraciones automaticamente al arrancar. Primero aplique migraciones con Prisma y luego levante Docker.
 
+Importante para validacion de replay P0:
+
+- la imagen comprometida actual copia `src/` y `prisma/`, pero no copia `scripts/`
+- por eso `npm run prisma:apply-committed-migrations` no esta disponible dentro del contenedor `app` en el baseline actual
+- la secuencia canonica y su clasificacion vigente se documentan en `prisma/migration-instructions.md`
+- el ultimo replay compose preservado en `specs/p0-extra-inclusion/` quedo clasificado como `Failed / Environment blocked`; no trate el simple arranque de `/health` como prueba de replay exitoso
+
 Si cambia la imagen base, Prisma o dependencias del contenedor, use reconstruccion completa:
 
 ```bash
