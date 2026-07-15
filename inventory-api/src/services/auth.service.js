@@ -34,10 +34,15 @@ async function login(payload) {
   }
 
   const token = signAccessToken(user);
-  const { passwordHash, ...safeUser } = user;
-  safeUser.permissions = mapPermissions(user.role);
+  const { passwordHash: _passwordHash, ...safeUser } = user;
 
-  return { token, user: safeUser };
+  return {
+    token,
+    user: {
+      ...safeUser,
+      permissions: mapPermissions(user.role),
+    },
+  };
 }
 
 module.exports = {

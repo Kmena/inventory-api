@@ -15,6 +15,16 @@ function findCompanyRegionById(id, companyId) {
   });
 }
 
+function findCompanySubregionById(id, companyId) {
+  return prisma.subregion.findFirst({
+    where: {
+      id,
+      region: { companyId },
+    },
+    include: { region: true },
+  });
+}
+
 function createCompanyRegion(data) {
   return prisma.region.create({
     data,
@@ -29,6 +39,7 @@ function createSubregion(data) {
 module.exports = {
   findCompanyRegions,
   findCompanyRegionById,
+  findCompanySubregionById,
   createCompanyRegion,
   createSubregion,
 };

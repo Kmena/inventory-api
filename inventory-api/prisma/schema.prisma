@@ -36,12 +36,53 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum VisitMotive {
+  VENTA
+  COBRO
+  SEGUIMIENTO
+}
+
+enum VisitResult {
+  EXITOSA
+  PENDIENTE
+  SIN_CONTACTO
+  REPROGRAMADA
+}
+
 enum StockMovementType {
   IN
   OUT
   ADJUSTMENT
   RESERVE
   RELEASE
+}
+
+enum WarehouseType {
+  GENERAL
+  RAW_MATERIAL
+  FINISHED_GOODS
+  PACKAGING
+  QUARANTINE
+  RETURNS
+  PRODUCTION
+  ADMIN_VIRTUAL
+  COURSES_VIRTUAL
+  AFFILIATIONS_VIRTUAL
+}
+
+enum LotStatus {
+  AVAILABLE
+  QUARANTINED
+  EXPIRED
+  BLOCKED
+  CONSUMED
+}
+
+enum LotQaStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FAILED
 }
 
 model Role {
@@ -70,8 +111,14 @@ model Company {
   users         User[]
   roles         Role[]
   regions       Region[]
+  warehouses    Warehouse[]
+  stockMovements StockMovement[]
+  lots           Lot[]
+  inventoryAlerts InventoryAlert[]
+  lotStatusHistory LotStatusHistory[]
   inventory     Inventory?
   clients       Client[]
+  clientClassifications ClientClassification[]
   clientLegalEntities ClientLegalEntity[]
   recipes       Recipe[]
   products         Product[]
@@ -81,6 +128,12 @@ model Company {
   companyConfig    CompanyConfig?
   fiscalConfig     CompanyFiscalConfig?
   fiscalSequences  FiscalSequence[]
+  salesRoutes            SalesRoute[]
+  salesRouteSubzones     SalesRouteSubzone[]
+  salesRouteAssignments  SalesRouteAssignment[]
+  salesGoals             SalesGoal[]
+  routeVisitLogs         RouteVisitLog[]
+  orderStoreBackfillAudits OrderStoreBackfillAudit[]
 
   @@map("companies")
 }
@@ -190,6 +243,12 @@ model User {
   role         Role?      @relation(fields: [roleId], references: [id])
   orders       Order[]    @relation("order_user")
   approvals    Order[]    @relation("order_approver")
+  createdProducts Product[] @relation("product_creator")
+  stockMovements StockMovement[]
+  lotStatusHistory LotStatusHistory[]
+  salesRouteAssignments SalesRouteAssignment[]
+  salesGoals            SalesGoal[]
+  routeVisitLogs        RouteVisitLog[]
 
   @@map("users")
 }
@@ -202,9 +261,7 @@ model Region {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  clients   Client[]
   subregions Subregion[]
-  stores    ClientStore[]
 
   @@unique([companyId, name])
   @@map("regions")
@@ -219,15 +276,95 @@ model Subregion {
   updatedAt DateTime @updatedAt @map("updated_at")
   region    Region   @relation(fields: [regionId], references: [id], onDelete: Cascade)
   stores    ClientStore[]
+  salesRoutes SalesRouteSubzone[]
+  routeVisitLogs RouteVisitLog[]
 
   @@unique([regionId, name])
   @@map("subregions")
 }
 
+model SalesRoute {
+  id                 BigInt    @id @default(autoincrement())
+  companyId          BigInt    @map("company_id")
+  code               String
+  name               String
+  visitFrequencyDays Int       @default(15) @map("visit_frequency_days")
+  nearLimitDays      Int       @default(3) @map("near_limit_days")
+  isActive           Boolean   @default(true) @map("is_active")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  subzones           SalesRouteSubzone[]
+  assignments        SalesRouteAssignment[]
+  visitLogs          RouteVisitLog[]
+
+  @@unique([companyId, code])
+  @@index([companyId, isActive])
+  @@map("sales_routes")
+}
+
+model SalesRouteSubzone {
+  id           BigInt     @id @default(autoincrement())
+  companyId    BigInt     @map("company_id")
+  salesRouteId BigInt     @map("sales_route_id")
+  subregionId  BigInt     @map("subregion_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  company      Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesRoute   SalesRoute @relation(fields: [salesRouteId], references: [id], onDelete: Cascade)
+  subregion    Subregion  @relation(fields: [subregionId], references: [id], onDelete: Cascade)
+
+  @@unique([salesRouteId, subregionId])
+  @@index([companyId])
+  @@index([subregionId])
+  @@map("sales_route_subzones")
+}
+
+model SalesRouteAssignment {
+  id            BigInt     @id @default(autoincrement())
+  companyId     BigInt     @map("company_id")
+  userId        BigInt     @map("user_id")
+  salesRouteId  BigInt     @map("sales_route_id")
+  effectiveFrom DateTime?  @map("effective_from")
+  effectiveTo   DateTime?  @map("effective_to")
+  isActive      Boolean    @default(true) @map("is_active")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  salesRoute    SalesRoute @relation(fields: [salesRouteId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, salesRouteId])
+  @@index([companyId])
+  @@index([userId])
+  @@index([salesRouteId])
+  @@map("sales_route_assignments")
+}
+
+model SalesGoal {
+  id            BigInt    @id @default(autoincrement())
+  companyId      BigInt   @map("company_id")
+  userId         BigInt   @map("user_id")
+  title          String
+  periodLabel    String?  @map("period_label")
+  targetAmount   Decimal  @default(0) @db.Decimal(14, 2) @map("target_amount")
+  currentAmount  Decimal  @default(0) @db.Decimal(14, 2) @map("current_amount")
+  notes          String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId])
+  @@map("sales_goals")
+}
+
 model Client {
   id             BigInt          @id @default(autoincrement())
   companyId      BigInt          @map("company_id")
-  regionId       BigInt?         @map("region_id")
+  clientClassificationId BigInt? @map("client_classification_id")
   legalEntityId  BigInt?         @map("legal_entity_id")
   code           String?
   name           String
@@ -250,17 +387,37 @@ model Client {
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
   company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  region         Region?         @relation(fields: [regionId], references: [id])
+  classification ClientClassification? @relation(fields: [clientClassificationId], references: [id])
   legalEntity    ClientLegalEntity? @relation(fields: [legalEntityId], references: [id])
   stores         ClientStore[]
   contacts       ClientContact[]
   references     ClientReference[]
+  documents      ClientDocument[]
   orders         Order[]
   invoices       Invoice[]
+  routeVisitLogs RouteVisitLog[]
+  orderStoreBackfillAudits OrderStoreBackfillAudit[]
 
   @@unique([companyId, code])
+  @@index([clientClassificationId])
   @@index([legalEntityId])
   @@map("clients")
+}
+
+model ClientClassification {
+  id        BigInt   @id @default(autoincrement())
+  companyId BigInt   @map("company_id")
+  code      String
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  clients   Client[]
+
+  @@unique([companyId, code])
+  @@unique([companyId, name])
+  @@map("client_classifications")
 }
 
 model ClientLegalEntity {
@@ -294,10 +451,14 @@ model ClientStore {
   id        BigInt   @id @default(autoincrement())
   clientId  BigInt   @map("client_id")
   legalEntityId BigInt? @map("legal_entity_id")
-  regionId  BigInt?  @map("region_id")
   subregionId BigInt  @map("subregion_id")
   code      String?
   name      String
+  storeType String?  @map("store_type")
+  locationReference String? @map("location_reference")
+  attentionSchedule String? @map("attention_schedule")
+  isPrimary Boolean @default(false) @map("is_primary")
+  isActive  Boolean @default(true) @map("is_active")
   phone     String?
   address   String?
   latitude  Decimal? @db.Decimal(10, 7)
@@ -309,14 +470,39 @@ model ClientStore {
   updatedAt DateTime @updatedAt @map("updated_at")
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   legalEntity ClientLegalEntity? @relation(fields: [legalEntityId], references: [id])
-  region    Region?  @relation(fields: [regionId], references: [id])
   subregion Subregion @relation(fields: [subregionId], references: [id])
+  representatives ClientStoreRepresentative[]
+  orders          Order[]
+  routeVisitLogs  RouteVisitLog[]
 
   @@unique([clientId, code])
   @@index([legalEntityId])
-  @@index([regionId])
   @@index([subregionId])
   @@map("client_stores")
+}
+
+model ClientStoreRepresentative {
+  id                   BigInt   @id @default(autoincrement())
+  clientStoreId        BigInt   @map("client_store_id")
+  fullName             String   @map("full_name")
+  identificationNumber String?  @map("identification_number")
+  position             String?
+  role                 String?
+  email                String?
+  phonePrimary         String?  @map("phone_primary")
+  phoneSecondary       String?  @map("phone_secondary")
+  birthday             DateTime?
+  importantDate        DateTime? @map("important_date")
+  importantDateType    String?  @map("important_date_type")
+  comment              String?
+  isPrimaryContact     Boolean  @default(false) @map("is_primary_contact")
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  store                ClientStore @relation(fields: [clientStoreId], references: [id], onDelete: Cascade)
+
+  @@index([clientStoreId])
+  @@map("client_store_representatives")
 }
 
 model ClientContact {
@@ -352,6 +538,24 @@ model ClientReference {
   @@map("client_references")
 }
 
+model ClientDocument {
+  id             BigInt   @id @default(autoincrement())
+  clientId       BigInt   @map("client_id")
+  documentType   String   @map("document_type")
+  documentNumber String?  @map("document_number")
+  fileName       String   @map("file_name")
+  mimeType       String?  @map("mime_type")
+  fileUrl        String   @map("file_url")
+  status         String   @default("ACTIVE")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("client_documents")
+}
+
 model Inventory {
   id        BigInt     @id @default(autoincrement())
   companyId BigInt     @unique @map("company_id")
@@ -359,8 +563,72 @@ model Inventory {
   updatedAt DateTime   @updatedAt @map("updated_at")
   company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   categories Category[]
+  warehouseStocks WarehouseStock[]
 
   @@map("inventories")
+}
+
+model Warehouse {
+  id               BigInt          @id @default(autoincrement())
+  companyId        BigInt          @map("company_id")
+  code             String
+  name             String
+  warehouseType    WarehouseType   @default(GENERAL) @map("warehouse_type")
+  isVirtual        Boolean         @default(false) @map("is_virtual")
+  isSellableSource Boolean         @default(false) @map("is_sellable_source")
+  isActive         Boolean         @default(true) @map("is_active")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  company          Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  warehouseStocks  WarehouseStock[]
+  warehouseLotStocks WarehouseLotStock[]
+  stockMovements   StockMovement[]
+  inventoryAlerts  InventoryAlert[]
+  orders           Order[]
+
+  @@unique([companyId, code])
+  @@unique([companyId, name])
+  @@index([companyId, warehouseType])
+  @@map("warehouses")
+}
+
+model WarehouseStock {
+  id               BigInt    @id @default(autoincrement())
+  inventoryId      BigInt    @map("inventory_id")
+  warehouseId      BigInt    @map("warehouse_id")
+  productId        BigInt    @map("product_id")
+  quantity         Decimal   @default(0) @db.Decimal(14, 3)
+  reservedQuantity Decimal   @default(0) @db.Decimal(14, 3) @map("reserved_quantity")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  inventory        Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  warehouse        Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, productId])
+  @@index([inventoryId])
+  @@index([productId])
+  @@map("warehouse_stocks")
+}
+
+
+model WarehouseLotStock {
+  id               BigInt    @id @default(autoincrement())
+  warehouseId      BigInt    @map("warehouse_id")
+  lotId            BigInt    @map("lot_id")
+  productId        BigInt    @map("product_id")
+  quantity         Decimal   @default(0) @db.Decimal(14, 3)
+  reservedQuantity Decimal   @default(0) @db.Decimal(14, 3) @map("reserved_quantity")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  warehouse        Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  lot              Lot       @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, lotId])
+  @@index([warehouseId, productId])
+  @@index([lotId])
+  @@map("warehouse_lot_stocks")
 }
 
 model Category {
@@ -368,14 +636,32 @@ model Category {
   inventoryId  BigInt    @map("inventory_id")
   name         String
   categoryType String    @default("PT") @map("category_type")
+  isActive     Boolean   @default(true) @map("is_active")
   sortOrder    Int       @default(0) @map("sort_order")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   inventory    Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
   products     Product[]
+  subcategories ProductSubcategory[]
 
   @@unique([inventoryId, name])
   @@map("categories")
+}
+
+model ProductSubcategory {
+  id         BigInt    @id @default(autoincrement())
+  categoryId BigInt    @map("category_id")
+  code       String
+  name       String
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  category   Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  products   Product[]
+
+  @@unique([categoryId, code])
+  @@unique([categoryId, name])
+  @@map("product_subcategories")
 }
 
 model Recipe {
@@ -401,19 +687,31 @@ model Product {
   id               BigInt            @id @default(autoincrement())
   companyId        BigInt            @map("company_id")
   categoryId       BigInt?           @map("category_id")
+  subcategoryId    BigInt?           @map("subcategory_id")
   recipeId         BigInt?           @map("recipe_id")
+  createdByUserId  BigInt?           @map("created_by_user_id")
   code             String?
   name             String
   description      String?
+  productType      String            @default("FINISHED_PRODUCT") @map("product_type")
+  sellableKind     String            @default("STANDARD") @map("sellable_kind")
   unit             String            @default("KG")
+  cabysCode        String?           @map("cabys_code")
   currency         String            @default("CRC")
   price            Decimal?          @db.Decimal(14, 2)
   quantity         Decimal           @default(0) @db.Decimal(14, 3)
   reservedQuantity Decimal           @default(0) @db.Decimal(14, 3) @map("reserved_quantity")
   taxExempt        Boolean           @default(false) @map("tax_exempt")
+  taxCategory      String            @default("VAT_STANDARD") @map("tax_category")
+  taxRate          Decimal           @default(13.0) @db.Decimal(5, 2) @map("tax_rate")
+  density          Decimal?          @db.Decimal(14, 6)
+  densityUnit      String?           @map("density_unit")
+  isActive         Boolean           @default(true) @map("is_active")
+  lotStrategy      String            @default("TRACKED") @map("lot_strategy")
   inCatalog        Boolean           @default(false) @map("in_catalog")
   netContent       Decimal           @default(0) @db.Decimal(14, 3) @map("net_content")
   conversionFactor Decimal           @default(1) @db.Decimal(14, 6) @map("conversion_factor")
+  kgConversionFactor Decimal         @default(1) @db.Decimal(14, 6) @map("kg_conversion_factor")
   minStock         Decimal?          @db.Decimal(14, 3) @map("min_stock")
   maxStock         Decimal?          @db.Decimal(14, 3) @map("max_stock")
   standbyStock     Decimal           @default(0) @db.Decimal(14, 3) @map("standby_stock")
@@ -421,10 +719,16 @@ model Product {
   updatedAt        DateTime          @updatedAt @map("updated_at")
   company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   category         Category?         @relation(fields: [categoryId], references: [id])
+  subcategory      ProductSubcategory? @relation(fields: [subcategoryId], references: [id])
   recipe           Recipe?           @relation(fields: [recipeId], references: [id])
+  createdByUser    User?             @relation("product_creator", fields: [createdByUserId], references: [id])
   competitors      ProductCompetitor[]
+  prices           ProductPrice[]
+  warehouseStocks  WarehouseStock[]
+  warehouseLotStocks WarehouseLotStock[]
   lotes            Lot[]
   stockMovements   StockMovement[]
+  inventoryAlerts  InventoryAlert[]
   orderItems       OrderItem[]
   recipeIngredients RecipeIngredient[]
   supplierLinks    ProductSupplier[]
@@ -432,6 +736,23 @@ model Product {
 
   @@unique([companyId, code])
   @@map("products")
+}
+
+model ProductPrice {
+  id        BigInt   @id @default(autoincrement())
+  productId BigInt   @map("product_id")
+  priceType String   @default("GENERAL") @map("price_type")
+  amount    Decimal  @db.Decimal(14, 2)
+  currency  String   @default("CRC")
+  validFrom DateTime @default(now()) @map("valid_from")
+  validTo   DateTime? @map("valid_to")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, priceType, isActive])
+  @@map("product_prices")
 }
 
 model ProductCompetitor {
@@ -476,38 +797,109 @@ model ProductSupplier {
 }
 
 model Lot {
-  id             BigInt          @id @default(autoincrement())
-  productId      BigInt          @map("product_id")
-  supplierId     BigInt?         @map("supplier_id")
-  invoiceNumber  String?         @map("invoice_number")
-  lotNumber      String?         @map("lot_number")
-  productionDate DateTime?       @map("production_date")
-  expirationDate DateTime?       @map("expiration_date")
-  entryDate      DateTime?       @map("entry_date")
-  quantity       Decimal         @db.Decimal(14, 3)
-  casNumber      String?         @map("cas_number")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
-  stockMovements StockMovement[]
+  id                    BigInt              @id @default(autoincrement())
+  companyId             BigInt              @map("company_id")
+  productId             BigInt              @map("product_id")
+  supplierId            BigInt?             @map("supplier_id")
+  invoiceNumber         String?             @map("invoice_number")
+  lotNumber             String?             @map("lot_number")
+  internalLotNumber     String              @map("internal_lot_number")
+  manufacturerLotNumber String?             @map("manufacturer_lot_number")
+  productionDate        DateTime?           @map("production_date")
+  expirationDate        DateTime?           @map("expiration_date")
+  entryDate             DateTime?           @map("entry_date")
+  quantity              Decimal             @db.Decimal(14, 3)
+  originalQuantity      Decimal             @default(0) @db.Decimal(14, 3) @map("original_quantity")
+  status                LotStatus           @default(QUARANTINED)
+  qaStatus              LotQaStatus         @default(PENDING) @map("qa_status")
+  casNumber             String?             @map("cas_number")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+  company               Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product               Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier              Supplier?           @relation(fields: [supplierId], references: [id])
+  stockMovements        StockMovement[]
+  warehouseLotStocks    WarehouseLotStock[]
+  inventoryAlerts       InventoryAlert[]
+  statusHistory         LotStatusHistory[]
 
+  @@unique([companyId, internalLotNumber])
+  @@index([productId])
+  @@index([expirationDate, status, qaStatus])
   @@map("lots")
 }
 
-model StockMovement {
-  id           BigInt            @id @default(autoincrement())
-  productId     BigInt           @map("product_id")
-  lotId        BigInt?           @map("lot_id")
-  movementType StockMovementType @map("movement_type")
-  quantity     Decimal           @db.Decimal(14, 3)
-  sourceType   String?           @map("source_type")
-  sourceId     BigInt?           @map("source_id")
-  note         String?
-  createdAt    DateTime          @default(now()) @map("created_at")
-  product      Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  lot          Lot?              @relation(fields: [lotId], references: [id])
+model InventoryAlert {
+  id          BigInt     @id @default(autoincrement())
+  companyId   BigInt     @map("company_id")
+  productId   BigInt     @map("product_id")
+  lotId       BigInt?    @map("lot_id")
+  warehouseId BigInt?    @map("warehouse_id")
+  alertType   String     @map("alert_type")
+  severity    String     @default("WARNING")
+  status      String     @default("OPEN")
+  message     String
+  metadata    Json?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  resolvedAt  DateTime?  @map("resolved_at")
+  company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product     Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lot         Lot?       @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
 
+  @@index([companyId, alertType, status])
+  @@index([productId, lotId])
+  @@map("inventory_alerts")
+}
+
+model LotStatusHistory {
+  id               BigInt      @id @default(autoincrement())
+  companyId        BigInt      @map("company_id")
+  lotId            BigInt      @map("lot_id")
+  userId           BigInt?     @map("user_id")
+  action           String
+  previousStatus   LotStatus   @map("previous_status")
+  newStatus        LotStatus   @map("new_status")
+  previousQaStatus LotQaStatus @map("previous_qa_status")
+  newQaStatus      LotQaStatus @map("new_qa_status")
+  reason           String
+  createdAt        DateTime    @default(now()) @map("created_at")
+  company          Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lot              Lot         @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  user             User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([lotId, createdAt])
+  @@map("lot_status_history")
+}
+
+model StockMovement {
+  id              BigInt            @id @default(autoincrement())
+  companyId       BigInt            @map("company_id")
+  warehouseId     BigInt            @map("warehouse_id")
+  productId       BigInt            @map("product_id")
+  lotId           BigInt?           @map("lot_id")
+  userId          BigInt?           @map("user_id")
+  movementType    StockMovementType @map("movement_type")
+  quantity        Decimal           @db.Decimal(14, 3)
+  quantityBefore  Decimal?          @db.Decimal(14, 3) @map("quantity_before")
+  quantityAfter   Decimal?          @db.Decimal(14, 3) @map("quantity_after")
+  reasonCode      String            @map("reason_code")
+  movementGroupId String?           @map("movement_group_id")
+  sourceType      String?           @map("source_type")
+  sourceId        BigInt?           @map("source_id")
+  note            String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  warehouse       Warehouse         @relation(fields: [warehouseId], references: [id])
+  product         Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lot             Lot?              @relation(fields: [lotId], references: [id])
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([warehouseId, productId, createdAt])
+  @@index([lotId])
+  @@index([movementGroupId])
   @@map("stock_movements")
 }
 
@@ -515,8 +907,10 @@ model Order {
   id            BigInt       @id @default(autoincrement())
   companyId      BigInt      @map("company_id")
   clientId      BigInt?      @map("client_id")
+  clientStoreId BigInt?      @map("client_store_id")
   userId        BigInt?      @map("user_id")
   approvedById  BigInt?      @map("approved_by_id")
+  warehouseId   BigInt?      @map("warehouse_id")
   receiptNumber String?      @map("receipt_number")
   invoiceNumber String?      @map("invoice_number")
   notes         String?
@@ -533,13 +927,47 @@ model Order {
   updatedAt     DateTime     @updatedAt @map("updated_at")
   company       Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   client        Client?      @relation(fields: [clientId], references: [id])
+  clientStore   ClientStore? @relation(fields: [clientStoreId], references: [id])
   user          User?        @relation("order_user", fields: [userId], references: [id])
   approvedBy    User?        @relation("order_approver", fields: [approvedById], references: [id])
+  warehouse     Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   items         OrderItem[]
   invoices      Invoice[]
   productionOrders ProductionOrder[]
+  storeBackfillAudit OrderStoreBackfillAudit?
 
+  @@index([warehouseId])
+  @@index([clientStoreId])
   @@map("orders")
+}
+
+model RouteVisitLog {
+  id                   BigInt      @id @default(autoincrement())
+  companyId            BigInt      @map("company_id")
+  salesRouteId         BigInt      @map("sales_route_id")
+  subregionId          BigInt      @map("subregion_id")
+  clientId             BigInt      @map("client_id")
+  clientStoreId        BigInt      @map("client_store_id")
+  userId               BigInt      @map("user_id")
+  motive               VisitMotive
+  result               VisitResult
+  comment              String?     @db.Text
+  suggestedNextVisitAt DateTime?   @map("suggested_next_visit_at")
+  visitedAt            DateTime    @default(now()) @map("visited_at")
+  createdAt            DateTime    @default(now()) @map("created_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+  company              Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesRoute           SalesRoute  @relation(fields: [salesRouteId], references: [id], onDelete: Cascade)
+  subregion            Subregion   @relation(fields: [subregionId], references: [id], onDelete: Cascade)
+  client               Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientStore          ClientStore @relation(fields: [clientStoreId], references: [id], onDelete: Cascade)
+  user                 User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, visitedAt])
+  @@index([salesRouteId, visitedAt])
+  @@index([clientStoreId, visitedAt])
+  @@index([userId, visitedAt])
+  @@map("route_visit_logs")
 }
 
 model OrderItem {
@@ -640,3 +1068,19 @@ model ProductionItem {
 
   @@map("production_items")
 }
+model OrderStoreBackfillAudit {
+  id        BigInt   @id @default(autoincrement())
+  orderId   BigInt   @unique @map("order_id")
+  companyId BigInt   @map("company_id")
+  clientId  BigInt?  @map("client_id")
+  reason    String
+  createdAt DateTime @default(now()) @map("created_at")
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@map("order_store_backfill_audit")
+}
+
+

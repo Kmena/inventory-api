@@ -1,28 +1,44 @@
 const { z } = require('zod');
+const { optionalLotDateSchema } = require('./lot-date.schema');
 
 const createStockEntrySchema = z.object({
+  warehouseId: z.coerce.bigint(),
   productId: z.coerce.bigint(),
   quantity: z.number().positive(),
+  reasonCode: z.string().trim().min(2).max(80).default('MANUAL_ENTRY'),
   note: z.string().max(500).optional(),
   supplierId: z.coerce.bigint().optional().nullable(),
   invoiceNumber: z.string().max(100).optional(),
-  lotNumber: z.string().max(100).optional(),
-  productionDate: z.string().datetime().optional().nullable(),
-  expirationDate: z.string().datetime().optional().nullable(),
-  entryDate: z.string().datetime().optional().nullable(),
+  internalLotNumber: z.string().trim().min(1).max(100),
+  manufacturerLotNumber: z.string().trim().max(100).optional().nullable(),
+  lotNumber: z.string().trim().max(100).optional(),
+  productionDate: optionalLotDateSchema,
+  expirationDate: optionalLotDateSchema,
+  entryDate: optionalLotDateSchema,
   casNumber: z.string().max(100).optional(),
+  lotStatus: z.enum(['AVAILABLE', 'QUARANTINED', 'EXPIRED', 'BLOCKED', 'CONSUMED']).optional(),
+  qaStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'FAILED']).optional(),
   useLot: z.boolean().optional(),
 });
 
+const updateLotQaSchema = z.object({
+  action: z.enum(['APPROVE', 'REJECT', 'FAIL', 'BLOCK', 'REACTIVATE']),
+  reason: z.string().trim().min(3).max(500),
+});
+
 const adjustStockSchema = z.object({
+  warehouseId: z.coerce.bigint(),
   productId: z.coerce.bigint(),
   quantity: z.number().positive(),
   direction: z.enum(['IN', 'OUT']),
-  note: z.string().min(3).max(500),
+  reasonCode: z.string().trim().min(2).max(80),
+  note: z.string().trim().min(3).max(500),
   lotId: z.coerce.bigint().optional().nullable(),
 });
 
 module.exports = {
   createStockEntrySchema,
+  updateLotQaSchema,
   adjustStockSchema,
 };
+

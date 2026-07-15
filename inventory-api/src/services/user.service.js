@@ -6,7 +6,7 @@ const roleRepository = require('../repositories/role.repository');
 const { createHttpError } = require('../lib/errors');
 
 function sanitizeUser(user) {
-  const { passwordHash, ...safeUser } = user;
+  const { passwordHash: _passwordHash, ...safeUser } = user;
   return safeUser;
 }
 
@@ -34,7 +34,7 @@ async function registerUser(payload) {
   }
 
   const passwordHash = await bcrypt.hash(payload.password, bcryptRounds);
-  const { password, ...rest } = payload;
+  const { password: _password, ...rest } = payload;
 
   const user = await userRepository.createUser({
     ...rest,
@@ -64,7 +64,7 @@ async function registerCompanyUser(payload, auth) {
   }
 
   const passwordHash = await bcrypt.hash(payload.password, bcryptRounds);
-  const { password, roleId, ...rest } = payload;
+  const { password: _password, roleId, ...rest } = payload;
 
   const user = await userRepository.createUser({
     ...rest,

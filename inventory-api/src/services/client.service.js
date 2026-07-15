@@ -223,7 +223,7 @@ async function createCompanyClientDocument(clientId, payload, auth) {
       fileName: file.fileName,
       buffer: file.buffer,
     });
-  } catch (error) {
+  } catch {
     try {
       await clientRepository.deleteClientDocument(createdDocument.id);
     } catch (_cleanupError) {
