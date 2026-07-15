@@ -4,6 +4,7 @@ const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
+const { parsePaginationQuery } = require('../lib/pagination');
 const { createInvoiceSchema, updateInvoiceSchema } = require('../schemas/invoice.schema');
 const invoiceService = require('../services/invoice.service');
 
@@ -11,7 +12,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', authorize('admin', 'sales'), async (req, res, next) => {
-  try { return res.json(await invoiceService.listInvoices(req.auth)); } catch (error) { return next(error); }
+  try { return res.json(await invoiceService.listInvoices(req.auth, parsePaginationQuery(req.query))); } catch (error) { return next(error); }
 });
 
 router.get('/inconsistencies', authorize('admin'), async (req, res, next) => {

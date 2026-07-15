@@ -1,6 +1,7 @@
 const productRepository = require('../repositories/product.repository');
 const inventoryService = require('./inventory.service');
 const { createHttpError } = require('../lib/errors');
+const { buildPaginatedResponse } = require('../lib/pagination');
 
 function authScope(auth) {
   if (!auth?.companyId || !auth?.sub) {
@@ -178,10 +179,19 @@ async function syncGeneralPrice(tx, productId, amount, currency) {
   });
 }
 
-async function listProducts(auth) {
+async function listProducts(auth, pagination = null) {
   const { companyId } = authScope(auth);
-  const products = await productRepository.findAllProducts(companyId);
-  return products.map((product) => serializeProductForPermissions(product, auth));
+  const products = await productRepository.findAllProducts(companyId, pagination);
+  if (pagination) {
+    const paginatedProducts = /** @type {{ items: Array<any>, totalItems: number }} */ (products);
+    return buildPaginatedResponse(
+      paginatedProducts.items.map((product) => serializeProductForPermissions(product, auth)),
+      pagination,
+      paginatedProducts.totalItems,
+    );
+  }
+  const productRows = /** @type {Array<any>} */ (products);
+  return productRows.map((product) => serializeProductForPermissions(product, auth));
 }
 
 async function getProduct(id, auth) {
@@ -261,8 +271,9 @@ async function updateProduct(id, payload, auth) {
 }
 
 async function removeProduct(id, auth) {
+  const { companyId } = authScope(auth);
   await getProduct(id, auth);
-  return productRepository.deleteProduct(id);
+  return productRepository.deactivateCompanyProduct(id, companyId);
 }
 
 async function importProducts(rows, auth) {

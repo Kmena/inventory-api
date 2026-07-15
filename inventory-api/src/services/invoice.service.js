@@ -2,6 +2,7 @@ const invoiceRepository = require('../repositories/invoice.repository');
 const clientRepository = require('../repositories/client.repository');
 const orderRepository = require('../repositories/order.repository');
 const { createHttpError } = require('../lib/errors');
+const { buildPaginatedResponse } = require('../lib/pagination');
 
 function normalizeInvoicePayload(payload) {
   return {
@@ -22,8 +23,15 @@ function assertCompanyScope(auth) {
   return BigInt(auth.companyId);
 }
 
+function isActivePayment(payment) {
+  return !payment?.status || payment.status === 'ACTIVE';
+}
+
 function getAppliedAmount(invoice) {
-  return Number((invoice.payments || []).reduce((total, payment) => total + Number(payment.amount || 0), 0).toFixed(2));
+  return Number((invoice.payments || [])
+    .filter(isActivePayment)
+    .reduce((total, payment) => total + Number(payment.amount || 0), 0)
+    .toFixed(2));
 }
 
 function getPendingAmount(invoice, appliedAmount = getAppliedAmount(invoice)) {
@@ -94,9 +102,14 @@ function serializeInconsistency(invoice) {
   };
 }
 
-async function listInvoices(auth) {
+async function listInvoices(auth, pagination = null) {
   const companyId = assertCompanyScope(auth);
-  return invoiceRepository.findCompanyInvoices(companyId);
+  const invoices = await invoiceRepository.findCompanyInvoices(companyId, pagination);
+  if (!pagination) {
+    return invoices;
+  }
+  const paginatedInvoices = /** @type {{ items: Array<any>, totalItems: number }} */ (invoices);
+  return buildPaginatedResponse(paginatedInvoices.items, pagination, paginatedInvoices.totalItems);
 }
 
 async function getInvoice(id, auth) {
@@ -156,8 +169,18 @@ async function updateInvoice(id, payload, auth) {
 
 async function removeInvoice(id, auth) {
   const companyId = assertCompanyScope(auth);
-  await getInvoice(id, auth);
-  return invoiceRepository.deleteCompanyInvoice(id, companyId);
+  const invoice = await getInvoice(id, auth);
+
+  if (invoice.status === 'CANCELLED') {
+    throw createHttpError(409, 'La factura ya fue cancelada', 'conflict');
+  }
+
+  const result = await invoiceRepository.cancelCompanyInvoice(id, companyId);
+  if (!result || result.count === 0) {
+    throw createHttpError(404, 'Factura no encontrada', 'not_found');
+  }
+
+  return result;
 }
 
 module.exports = {

@@ -4,6 +4,7 @@ const authenticate = require('../middlewares/authenticate');
 const authorizePermission = require('../middlewares/authorizePermission');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
+const { parsePaginationQuery } = require('../lib/pagination');
 const { createProductSchema, updateProductSchema, importProductsSchema } = require('../schemas/product.schema');
 const productService = require('../services/product.service');
 
@@ -11,7 +12,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', authorizePermission('products.view', 'products.manage'), async (req, res, next) => {
-  try { return res.json(await productService.listProducts(req.auth)); } catch (error) { return next(error); }
+  try { return res.json(await productService.listProducts(req.auth, parsePaginationQuery(req.query))); } catch (error) { return next(error); }
 });
 
 router.get('/:id', authorizePermission('products.view', 'products.manage'), async (req, res, next) => {

@@ -1,13 +1,32 @@
 const prisma = require('../lib/prisma');
 
-function findCompanyInvoices(companyId) {
-  return prisma.invoice.findMany({
-    where: {
-      client: { companyId },
-    },
-    orderBy: { id: 'asc' },
-    include: { client: true, order: true, payments: true },
-  });
+/** @typedef {import('@prisma/client').Prisma.InvoiceOrderByWithRelationInput} InvoiceOrderByWithRelationInput */
+
+function findCompanyInvoices(companyId, pagination = null) {
+  const where = {
+    client: { companyId },
+  };
+  const orderBy = /** @type {InvoiceOrderByWithRelationInput} */ ({ id: 'asc' });
+  const include = { client: true, order: true, payments: true };
+
+  if (!pagination) {
+    return prisma.invoice.findMany({
+      where,
+      orderBy,
+      include,
+    });
+  }
+
+  return prisma.$transaction([
+    prisma.invoice.count({ where }),
+    prisma.invoice.findMany({
+      where,
+      orderBy,
+      skip: pagination.skip,
+      take: pagination.take,
+      include,
+    }),
+  ]).then(([totalItems, items]) => ({ totalItems, items }));
 }
 
 function findCompanyInvoiceById(id, companyId) {
@@ -67,11 +86,15 @@ async function updateCompanyInvoice(id, companyId, data) {
   });
 }
 
-function deleteCompanyInvoice(id, companyId) {
-  return prisma.invoice.deleteMany({
+function cancelCompanyInvoice(id, companyId) {
+  return prisma.invoice.updateMany({
     where: {
       id,
+      status: { not: 'CANCELLED' },
       client: { companyId },
+    },
+    data: {
+      status: 'CANCELLED',
     },
   });
 }
@@ -82,5 +105,5 @@ module.exports = {
   findInvoicesForDebtReview,
   createInvoice,
   updateCompanyInvoice,
-  deleteCompanyInvoice,
+  cancelCompanyInvoice,
 };

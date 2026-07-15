@@ -36,6 +36,11 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum PaymentLifecycleStatus {
+  ACTIVE
+  REVERSED
+}
+
 enum VisitMotive {
   VENTA
   COBRO
@@ -368,6 +373,8 @@ model Client {
   legalEntityId  BigInt?         @map("legal_entity_id")
   code           String?
   name           String
+  isActive       Boolean         @default(true) @map("is_active")
+  deletedAt      DateTime?       @map("deleted_at")
   legalId        String?         @map("legal_id")
   documentType   String?         @map("document_type")
   economicActivityCode String?   @map("economic_activity_code")
@@ -399,6 +406,8 @@ model Client {
   orderStoreBackfillAudits OrderStoreBackfillAudit[]
 
   @@unique([companyId, code])
+  @@index([companyId, isActive])
+  @@index([companyId, deletedAt])
   @@index([clientClassificationId])
   @@index([legalEntityId])
   @@map("clients")
@@ -1008,14 +1017,21 @@ model Invoice {
 }
 
 model Payment {
-  id            BigInt      @id @default(autoincrement())
-  invoiceId      BigInt     @map("invoice_id")
-  amount        Decimal     @db.Decimal(14, 2)
-  paymentMethod PaymentType @map("payment_method")
-  reference     String?
-  createdAt     DateTime    @default(now()) @map("created_at")
-  invoice       Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id               BigInt                 @id @default(autoincrement())
+  invoiceId        BigInt                 @map("invoice_id")
+  amount           Decimal                @db.Decimal(14, 2)
+  paymentMethod    PaymentType            @map("payment_method")
+  status           PaymentLifecycleStatus @default(ACTIVE)
+  reference        String?
+  reversalReason   String?                @map("reversal_reason")
+  reversedAt       DateTime?              @map("reversed_at")
+  reversedByUserId BigInt?                @map("reversed_by_user_id")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+  invoice          Invoice                @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
+  @@index([invoiceId, status])
+  @@index([status])
   @@map("payments")
 }
 

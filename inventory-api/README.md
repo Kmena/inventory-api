@@ -166,6 +166,25 @@ npx.cmd prisma migrate dev --name init
 
 ## Quality gates
 
+## Contract summary
+
+Los scripts soportados del repositorio para validación del backend son:
+
+| Script | Tipo | Propósito | Obligatorio en baseline P1 |
+|---|---|---|---|
+| `npm run lint` | gate individual | validación estática del backend, scripts y tests | Sí |
+| `npm run typecheck` | gate individual | verificación de tipos JS con `tsc --noEmit` sobre alcance aprobado | Sí |
+| `npm run build` | gate individual | generación de Prisma Client requerida por runtime | Sí |
+| `npm run test` | gate individual | suites automatizadas obligatorias del backend | Sí |
+| `npm run verify` | gate agregado | ejecución fail-fast de `lint + typecheck + build + test` | Sí |
+| `npm run validate:agent-workspace` | diagnóstico | validación adicional de workspace/agente fuera del gate obligatorio | No |
+
+Reglas de uso del contrato actual:
+
+- `verify` reutiliza exactamente los mismos scripts obligatorios definidos de forma individual.
+- `validate:agent-workspace` permanece como diagnóstico opcional mientras no forme parte del gate obligatorio aprobado.
+- La evidencia canónica del repositorio debe seguir ejecutándose con Node 20, aunque localmente puedan observarse otros runtimes.
+
 ### Lint
 
 El gate inicial de lint se ejecuta con:
@@ -255,7 +274,7 @@ Validación diagnóstica opcional separada del cierre P0 actual:
 npm run validate:agent-workspace
 ```
 
-Esta validación adicional permanece fuera del gate obligatorio porque hoy falla en baseline y no forma parte del paquete mínimo de estabilización ya aceptado para P0.
+Esta validación adicional permanece fuera del gate obligatorio porque hoy falla en baseline y no forma parte del paquete mínimo de estabilización ya aceptado para P0/P1.
 
 ### Verify
 
@@ -348,11 +367,13 @@ docker compose up
 - `POST /api/users/company`
 - `GET /api/clients`
 - `GET /api/clients/:id`
+  - compatibilidad P1: `GET /api/clients` y `GET /api/clients/company` aceptan `page` y `pageSize`; cuando se envían, responden `{ items, pagination }`; sin esos query params preservan la respuesta legacy basada en arreglos
 - `POST /api/clients`
 - `PUT /api/clients/:id`
 - `DELETE /api/clients/:id`
 - `GET /api/products`
 - `GET /api/products/:id`
+  - compatibilidad P1: `GET /api/products` acepta `page` y `pageSize`; con paginación responde `{ items, pagination }`; sin esos query params preserva la respuesta legacy basada en arreglos
 - `POST /api/products`
 - `POST /api/products/import`
 - `PUT /api/products/:id`
@@ -367,15 +388,18 @@ docker compose up
 - `DELETE /api/orders/:id`
 - `GET /api/invoices`
 - `GET /api/invoices/:id`
+  - compatibilidad P1: `GET /api/invoices` acepta `page` y `pageSize`; con paginación responde `{ items, pagination }`; sin esos query params preserva la respuesta legacy basada en arreglos
 - `POST /api/invoices`
 - `PUT /api/invoices/:id`
 - `DELETE /api/invoices/:id`
 - `GET /api/payments`
 - `GET /api/payments/:id`
+  - compatibilidad P1: `GET /api/payments` acepta `page` y `pageSize`; con paginación responde `{ items, pagination }`; sin esos query params preserva la respuesta legacy basada en arreglos
 - `POST /api/payments`
 - `PUT /api/payments/:id`
 - `DELETE /api/payments/:id`
 - `GET /api/inventory/movements`
+  - compatibilidad P1: `GET /api/inventory/movements` acepta `page` y `pageSize`; con paginación responde `{ items, pagination }`; sin esos query params preserva la respuesta legacy basada en arreglos
 - `POST /api/inventory/entries`
 - `POST /api/inventory/adjustments`
 

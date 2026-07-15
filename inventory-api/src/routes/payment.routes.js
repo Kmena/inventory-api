@@ -4,6 +4,7 @@ const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
+const { parsePaginationQuery } = require('../lib/pagination');
 const { createPaymentSchema, updatePaymentSchema } = require('../schemas/payment.schema');
 const paymentService = require('../services/payment.service');
 
@@ -11,7 +12,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', authorize('admin', 'sales'), async (req, res, next) => {
-  try { return res.json(await paymentService.listPayments(req.auth)); } catch (error) { return next(error); }
+  try { return res.json(await paymentService.listPayments(req.auth, parsePaginationQuery(req.query))); } catch (error) { return next(error); }
 });
 
 router.get('/:id', authorize('admin', 'sales'), async (req, res, next) => {

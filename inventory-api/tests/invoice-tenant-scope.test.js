@@ -172,7 +172,7 @@ test('removeInvoice rejects deleting an invoice outside the authenticated tenant
   await withRepositoryStubs(
     [[invoiceRepository, {
       findCompanyInvoiceById: async () => null,
-      deleteCompanyInvoice: async () => {
+      cancelCompanyInvoice: async () => {
         deleteCalled = true;
       },
     }]],
@@ -189,4 +189,71 @@ test('removeInvoice rejects deleting an invoice outside the authenticated tenant
   );
 
   assert.equal(deleteCalled, false);
+});
+
+test('removeInvoice converts DELETE compatibility flow into cancellation', async () => {
+  let receivedCancellation = null;
+
+  const result = await withRepositoryStubs(
+    [[invoiceRepository, {
+      findCompanyInvoiceById: async () => ({ id: 40n, clientId: 3n, status: 'PENDING', number: 'F-040' }),
+      cancelCompanyInvoice: async (invoiceId, companyId) => {
+        receivedCancellation = { invoiceId, companyId };
+        return { count: 1 };
+      },
+    }]],
+    () => invoiceService.removeInvoice(40n, { companyId: '19' }),
+  );
+
+  assert.deepEqual(receivedCancellation, { invoiceId: 40n, companyId: 19n });
+  assert.deepEqual(result, { count: 1 });
+});
+
+test('removeInvoice rejects repeated cancellation attempts with controlled conflict', async () => {
+  await withRepositoryStubs(
+    [[invoiceRepository, {
+      findCompanyInvoiceById: async () => ({ id: 40n, clientId: 3n, status: 'CANCELLED', number: 'F-040' }),
+    }]],
+    async () => {
+      await assert.rejects(
+        () => invoiceService.removeInvoice(40n, { companyId: '19' }),
+        (error) => {
+          assert.equal(error.statusCode, 409);
+          assert.equal(error.code, 'conflict');
+          return true;
+        },
+      );
+    },
+  );
+});
+
+test('listInvoiceDebtInconsistencies ignores reversed payments in pending calculations', async () => {
+  const result = await withRepositoryStubs(
+    [[invoiceRepository, {
+      findInvoicesForDebtReview: async () => ([{
+        id: 50n,
+        number: 'F-050',
+        amount: 100,
+        status: 'PENDING',
+        issuedAt: new Date('2026-07-15T00:00:00Z'),
+        dueAt: null,
+        clientId: 3n,
+        client: { id: 3n, code: 'C-3', name: 'Cliente 3' },
+        order: {
+          id: 5n,
+          clientId: 3n,
+          clientStoreId: 9n,
+          clientStore: { id: 9n, name: 'Tienda 9', clientId: 99n },
+        },
+        payments: [
+          { id: 1n, amount: 20, status: 'ACTIVE' },
+          { id: 2n, amount: 30, status: 'REVERSED' },
+        ],
+      }]),
+    }]],
+    () => invoiceService.listInvoiceDebtInconsistencies({ companyId: '77' }),
+  );
+
+  assert.equal(result.summary.total, 1);
+  assert.equal(result.invoices[0].pendingAmount, 80);
 });

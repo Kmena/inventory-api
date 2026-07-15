@@ -11,6 +11,7 @@ const {
   buildProtectedClientDocumentUrl,
   buildPrivateClientDocumentPath,
 } = require('../lib/client-document-storage');
+const { buildPaginatedResponse } = require('../lib/pagination');
 
 const MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set([
@@ -57,16 +58,26 @@ function serializeClient(client) {
   return serializedClient;
 }
 
-async function listClients(auth) {
+async function listClients(auth, pagination = null) {
   assertCompanyUser(auth);
-  const clients = await clientRepository.findCompanyClients(BigInt(auth.companyId));
-  return clients.map(serializeClient);
+  const clients = await clientRepository.findCompanyClients(BigInt(auth.companyId), pagination);
+  if (pagination) {
+    const paginatedClients = /** @type {{ items: Array<any>, totalItems: number }} */ (clients);
+    return buildPaginatedResponse(paginatedClients.items.map(serializeClient), pagination, paginatedClients.totalItems);
+  }
+  const clientRows = /** @type {Array<any>} */ (clients);
+  return clientRows.map(serializeClient);
 }
 
-async function listCompanyClients(auth) {
+async function listCompanyClients(auth, pagination = null) {
   assertCompanyUser(auth);
-  const clients = await clientRepository.findCompanyClients(BigInt(auth.companyId));
-  return clients.map(serializeClient);
+  const clients = await clientRepository.findCompanyClients(BigInt(auth.companyId), pagination);
+  if (pagination) {
+    const paginatedClients = /** @type {{ items: Array<any>, totalItems: number }} */ (clients);
+    return buildPaginatedResponse(paginatedClients.items.map(serializeClient), pagination, paginatedClients.totalItems);
+  }
+  const clientRows = /** @type {Array<any>} */ (clients);
+  return clientRows.map(serializeClient);
 }
 
 function validateClientDocumentPayload(payload) {
@@ -314,7 +325,7 @@ async function removeClient(id, auth) {
     throw createHttpError(404, 'Cliente no encontrado', 'not_found');
   }
 
-  return clientRepository.deleteCompanyClient(id, companyId);
+  return clientRepository.softDeleteCompanyClient(id, companyId);
 }
 
 module.exports = {

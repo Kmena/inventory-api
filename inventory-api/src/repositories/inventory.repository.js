@@ -1,25 +1,44 @@
 const prisma = require('../lib/prisma');
 
+/** @typedef {import('@prisma/client').Prisma.StockMovementOrderByWithRelationInput} StockMovementOrderByWithRelationInput */
+
 function transaction(work) {
   return prisma.$transaction(work);
 }
 
-function findAllMovements(companyId, filters = {}) {
-  return prisma.stockMovement.findMany({
-    where: {
-      companyId,
-      ...(filters.warehouseId ? { warehouseId: filters.warehouseId } : {}),
-      ...(filters.productId ? { productId: filters.productId } : {}),
-      ...(filters.lotId ? { lotId: filters.lotId } : {}),
-    },
-    orderBy: { id: 'desc' },
-    include: {
-      product: true,
-      lot: true,
-      warehouse: true,
-      user: { select: { id: true, fullName: true, username: true } },
-    },
-  });
+function findAllMovements(companyId, filters = {}, pagination = null) {
+  const where = {
+    companyId,
+    ...(filters.warehouseId ? { warehouseId: filters.warehouseId } : {}),
+    ...(filters.productId ? { productId: filters.productId } : {}),
+    ...(filters.lotId ? { lotId: filters.lotId } : {}),
+  };
+  const orderBy = /** @type {StockMovementOrderByWithRelationInput} */ ({ id: 'desc' });
+  const include = {
+    product: true,
+    lot: true,
+    warehouse: true,
+    user: { select: { id: true, fullName: true, username: true } },
+  };
+
+  if (!pagination) {
+    return prisma.stockMovement.findMany({
+      where,
+      orderBy,
+      include,
+    });
+  }
+
+  return prisma.$transaction([
+    prisma.stockMovement.count({ where }),
+    prisma.stockMovement.findMany({
+      where,
+      orderBy,
+      skip: pagination.skip,
+      take: pagination.take,
+      include,
+    }),
+  ]).then(([totalItems, items]) => ({ totalItems, items }));
 }
 
 function findWarehouseStocks(companyId, filters = {}) {

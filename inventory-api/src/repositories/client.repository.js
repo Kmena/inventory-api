@@ -20,31 +20,55 @@ function clientInclude() {
   };
 }
 
+function buildDefaultClientWhere(where = {}) {
+  return {
+    ...where,
+    deletedAt: null,
+  };
+}
+
 function findAllClients() {
   return prisma.client.findMany({
+    where: buildDefaultClientWhere(),
     orderBy: { id: 'asc' },
     include: clientInclude(),
   });
 }
 
-function findCompanyClients(companyId) {
-  return prisma.client.findMany({
-    where: { companyId },
-    orderBy: { name: 'asc' },
-    include: clientInclude(),
-  });
+function findCompanyClients(companyId, pagination = null) {
+  const where = buildDefaultClientWhere({ companyId });
+  const orderBy = [{ name: 'asc' }, { id: 'asc' }];
+
+  if (!pagination) {
+    return prisma.client.findMany({
+      where,
+      orderBy,
+      include: clientInclude(),
+    });
+  }
+
+  return prisma.$transaction([
+    prisma.client.count({ where }),
+    prisma.client.findMany({
+      where,
+      orderBy,
+      skip: pagination.skip,
+      take: pagination.take,
+      include: clientInclude(),
+    }),
+  ]).then(([totalItems, items]) => ({ totalItems, items }));
 }
 
 function findClientById(id) {
-  return prisma.client.findUnique({
-    where: { id },
+  return prisma.client.findFirst({
+    where: buildDefaultClientWhere({ id }),
     include: clientInclude(),
   });
 }
 
 function findCompanyClientById(id, companyId) {
   return prisma.client.findFirst({
-    where: { id, companyId },
+    where: buildDefaultClientWhere({ id, companyId }),
     include: clientInclude(),
   });
 }
@@ -84,7 +108,7 @@ async function updateCompanyClient(id, companyId, data) {
   }
 
   return prisma.client.findFirst({
-    where: { id, companyId },
+    where: buildDefaultClientWhere({ id, companyId }),
     include: {
       classification: true,
       legalEntity: true,
@@ -95,9 +119,13 @@ async function updateCompanyClient(id, companyId, data) {
   });
 }
 
-function deleteCompanyClient(id, companyId) {
-  return prisma.client.deleteMany({
-    where: { id, companyId },
+function softDeleteCompanyClient(id, companyId, deletedAt = new Date()) {
+  return prisma.client.updateMany({
+    where: buildDefaultClientWhere({ id, companyId }),
+    data: {
+      isActive: false,
+      deletedAt,
+    },
   });
 }
 
@@ -224,7 +252,7 @@ module.exports = {
   createClient,
   findOrCreateLegalEntity,
   updateCompanyClient,
-  deleteCompanyClient,
+  softDeleteCompanyClient,
   createClientStore,
   createClientDocument,
   updateClientDocument,
