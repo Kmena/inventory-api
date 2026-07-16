@@ -9,6 +9,12 @@ const invoiceRepository = require('../src/repositories/invoice.repository');
 const invoiceService = require('../src/services/invoice.service');
 const paymentRepository = require('../src/repositories/payment.repository');
 const paymentService = require('../src/services/payment.service');
+const userRepository = require('../src/repositories/user.repository');
+const userService = require('../src/services/user.service');
+const warehouseRepository = require('../src/repositories/warehouse.repository');
+const warehouseService = require('../src/services/warehouse.service');
+const roleRepository = require('../src/repositories/role.repository');
+const roleService = require('../src/services/role.service');
 const inventoryRepository = require('../src/repositories/inventory.repository');
 const inventoryService = require('../src/services/inventory.service');
 const { parsePaginationQuery } = require('../src/lib/pagination');
@@ -145,6 +151,93 @@ test('listPayments returns paginated responses when requested', async () => {
 
   assert.deepEqual(result, {
     items: [{ id: 5n, amount: 100 }],
+    pagination: {
+      page: 2,
+      pageSize: 1,
+      totalItems: 4,
+      totalPages: 4,
+    },
+  });
+});
+
+test('listUsers returns paginated metadata when requested', async () => {
+  const result = await withStubs(
+    [[userRepository, {
+      findAllUsers: async () => ({
+        totalItems: 2,
+        items: [{ id: 1n, username: 'root', passwordHash: 'secret' }],
+      }),
+    }]],
+    () => userService.listUsers({ page: 1, pageSize: 1, skip: 0, take: 1 }),
+  );
+
+  assert.deepEqual(result, {
+    items: [{ id: 1n, username: 'root' }],
+    pagination: {
+      page: 1,
+      pageSize: 1,
+      totalItems: 2,
+      totalPages: 2,
+    },
+  });
+});
+
+test('listCompanyWarehouses returns paginated items while preserving summary and warehouseTypes', async () => {
+  const result = await withStubs(
+    [[warehouseRepository, {
+      findCompanyWarehouses: async () => ({
+        totalItems: 3,
+        summary: { total: 3, active: 2, virtual: 1, sellable: 1 },
+        items: [{
+          id: 5n,
+          companyId: 9n,
+          code: 'BOD-01',
+          name: 'Bodega Central',
+          warehouseType: 'PHYSICAL',
+          isVirtual: false,
+          isSellableSource: true,
+          isActive: true,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }],
+      }),
+    }]],
+    () => warehouseService.listCompanyWarehouses({ companyId: '9' }, { page: 1, pageSize: 1, skip: 0, take: 1 }),
+  );
+
+  assert.equal(result.summary.total, 3);
+  assert.equal(result.pagination.totalItems, 3);
+  assert.equal(result.items[0].warehouseTypeLabel, 'General');
+  assert.ok(Array.isArray(result.warehouseTypes));
+});
+
+test('listAssignableRoles returns paginated metadata when requested', async () => {
+  const result = await withStubs(
+    [[roleRepository, {
+      findAssignableRoles: async () => ({
+        totalItems: 4,
+        items: [{
+          id: 6n,
+          code: 'admin_local',
+          name: 'Admin local',
+          companyId: 2n,
+          isActive: true,
+          rolePermissions: [{ isEnabled: true, permission: { code: 'users.view', isActive: true } }],
+        }],
+      }),
+    }]],
+    () => roleService.listAssignableRoles({ companyId: '2' }, { page: 2, pageSize: 1, skip: 1, take: 1 }),
+  );
+
+  assert.deepEqual(result, {
+    items: [{
+      id: 6n,
+      code: 'admin_local',
+      name: 'Admin local',
+      companyId: 2n,
+      isActive: true,
+      permissions: [{ code: 'users.view', isActive: true }],
+    }],
     pagination: {
       page: 2,
       pageSize: 1,

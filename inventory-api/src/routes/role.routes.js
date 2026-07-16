@@ -3,6 +3,7 @@ const express = require('express');
 const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const validate = require('../middlewares/validate');
+const { parsePaginationQuery } = require('../lib/pagination');
 const { createCompanyRoleSchema } = require('../schemas/role.schema');
 const roleService = require('../services/role.service');
 
@@ -21,7 +22,7 @@ router.get('/permissions', async (req, res, next) => {
 
 router.get('/company', async (req, res, next) => {
   try {
-    const roles = await roleService.listAssignableRoles(req.auth);
+    const roles = await roleService.listAssignableRoles(req.auth, parsePaginationQuery(req.query));
     return res.json(roles);
   } catch (error) {
     return next(error);

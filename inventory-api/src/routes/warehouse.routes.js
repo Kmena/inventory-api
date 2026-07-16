@@ -3,6 +3,7 @@ const express = require('express');
 const authenticate = require('../middlewares/authenticate');
 const authorizePermission = require('../middlewares/authorizePermission');
 const validate = require('../middlewares/validate');
+const { parsePaginationQuery } = require('../lib/pagination');
 const { createWarehouseSchema } = require('../schemas/warehouse.schema');
 const warehouseService = require('../services/warehouse.service');
 
@@ -11,7 +12,7 @@ router.use(authenticate);
 
 router.get('/company', authorizePermission('inventory.view', 'inventory.manage'), async (req, res, next) => {
   try {
-    return res.json(await warehouseService.listCompanyWarehouses(req.auth));
+    return res.json(await warehouseService.listCompanyWarehouses(req.auth, parsePaginationQuery(req.query)));
   } catch (error) {
     return next(error);
   }

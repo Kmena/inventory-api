@@ -3,15 +3,16 @@ const express = require('express');
 const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const validate = require('../middlewares/validate');
+const { parsePaginationQuery } = require('../lib/pagination');
 const { createUserSchema, createCompanyUserSchema } = require('../schemas/user.schema');
 const userService = require('../services/user.service');
 
 const router = express.Router();
 router.use(authenticate);
 
-router.get('/', authorize('root'), async (_req, res, next) => {
+router.get('/', authorize('root'), async (req, res, next) => {
   try {
-    const users = await userService.listUsers();
+    const users = await userService.listUsers(parsePaginationQuery(req.query));
     return res.json(users);
   } catch (error) {
     return next(error);
@@ -20,7 +21,7 @@ router.get('/', authorize('root'), async (_req, res, next) => {
 
 router.get('/company', authorize('admin'), async (req, res, next) => {
   try {
-    const users = await userService.listCompanyUsers(req.auth);
+    const users = await userService.listCompanyUsers(req.auth, parsePaginationQuery(req.query));
     return res.json(users);
   } catch (error) {
     return next(error);

@@ -4,15 +4,21 @@ const { bcryptRounds } = require('../config');
 const userRepository = require('../repositories/user.repository');
 const roleRepository = require('../repositories/role.repository');
 const { createHttpError } = require('../lib/errors');
+const { buildPaginatedResponse } = require('../lib/pagination');
 
 function sanitizeUser(user) {
   const { passwordHash: _passwordHash, ...safeUser } = user;
   return safeUser;
 }
 
-async function listUsers() {
-  const users = await userRepository.findAllUsers();
-  return users.map(sanitizeUser);
+async function listUsers(pagination = null) {
+  const users = await userRepository.findAllUsers(pagination);
+  if (!pagination) {
+    const userRows = /** @type {Array<any>} */ (users);
+    return userRows.map(sanitizeUser);
+  }
+  const paginatedUsers = /** @type {{ items: Array<any>, totalItems: number }} */ (users);
+  return buildPaginatedResponse(paginatedUsers.items.map(sanitizeUser), pagination, paginatedUsers.totalItems);
 }
 
 function assertCompanyAdmin(auth) {
@@ -21,10 +27,15 @@ function assertCompanyAdmin(auth) {
   }
 }
 
-async function listCompanyUsers(auth) {
+async function listCompanyUsers(auth, pagination = null) {
   assertCompanyAdmin(auth);
-  const users = await userRepository.findUsersByCompanyId(BigInt(auth.companyId));
-  return users.map(sanitizeUser);
+  const users = await userRepository.findUsersByCompanyId(BigInt(auth.companyId), pagination);
+  if (!pagination) {
+    const userRows = /** @type {Array<any>} */ (users);
+    return userRows.map(sanitizeUser);
+  }
+  const paginatedUsers = /** @type {{ items: Array<any>, totalItems: number }} */ (users);
+  return buildPaginatedResponse(paginatedUsers.items.map(sanitizeUser), pagination, paginatedUsers.totalItems);
 }
 
 async function registerUser(payload) {

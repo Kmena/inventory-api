@@ -1,4 +1,5 @@
 const { createHttpError } = require('../lib/errors');
+const { buildPaginatedResponse } = require('../lib/pagination');
 const roleRepository = require('../repositories/role.repository');
 
 function assertCompanyAdmin(auth) {
@@ -35,10 +36,15 @@ async function listPermissions(auth) {
   return roleRepository.findActivePermissions();
 }
 
-async function listAssignableRoles(auth) {
+async function listAssignableRoles(auth, pagination = null) {
   assertCompanyAdmin(auth);
-  const roles = await roleRepository.findAssignableRoles(BigInt(auth.companyId));
-  return roles.map(serializeRole);
+  const roles = await roleRepository.findAssignableRoles(BigInt(auth.companyId), pagination);
+  if (!pagination) {
+    const roleRows = /** @type {Array<any>} */ (roles);
+    return roleRows.map(serializeRole);
+  }
+  const paginatedRoles = /** @type {{ items: Array<any>, totalItems: number }} */ (roles);
+  return buildPaginatedResponse(paginatedRoles.items.map(serializeRole), pagination, paginatedRoles.totalItems);
 }
 
 async function createCompanyRole(payload, auth) {
