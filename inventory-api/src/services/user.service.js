@@ -5,6 +5,7 @@ const userRepository = require('../repositories/user.repository');
 const roleRepository = require('../repositories/role.repository');
 const { createHttpError } = require('../lib/errors');
 const { buildPaginatedResponse } = require('../lib/pagination');
+const audit = require('../lib/audit');
 
 function sanitizeUser(user) {
   const { passwordHash: _passwordHash, ...safeUser } = user;
@@ -38,7 +39,7 @@ async function listCompanyUsers(auth, pagination = null) {
   return buildPaginatedResponse(paginatedUsers.items.map(sanitizeUser), pagination, paginatedUsers.totalItems);
 }
 
-async function registerUser(payload) {
+async function registerUser(payload, req = null) {
   const existing = await userRepository.findUserByUsername(payload.username);
   if (existing) {
     throw createHttpError(409, 'El username ya existe', 'conflict');
@@ -52,10 +53,26 @@ async function registerUser(payload) {
     passwordHash,
   });
 
-  return sanitizeUser(user);
+  const safeUser = sanitizeUser(user);
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'users.create',
+    resourceType: 'user',
+    resourceId: safeUser.id,
+    outcome: 'SUCCESS',
+    afterState: {
+      id: safeUser.id,
+      username: safeUser.username,
+      companyId: safeUser.companyId,
+      roleId: safeUser.roleId,
+      status: safeUser.status,
+    },
+  });
+
+  return safeUser;
 }
 
-async function registerCompanyUser(payload, auth) {
+async function registerCompanyUser(payload, auth, req = null) {
   assertCompanyAdmin(auth);
 
   const existing = await userRepository.findUserByUsername(payload.username);
@@ -85,7 +102,23 @@ async function registerCompanyUser(payload, auth) {
     status: 'ACTIVE',
   });
 
-  return sanitizeUser(user);
+  const safeUser = sanitizeUser(user);
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'users.company.create',
+    resourceType: 'user',
+    resourceId: safeUser.id,
+    outcome: 'SUCCESS',
+    afterState: {
+      id: safeUser.id,
+      username: safeUser.username,
+      companyId: safeUser.companyId,
+      roleId: safeUser.roleId,
+      status: safeUser.status,
+    },
+  });
+
+  return safeUser;
 }
 
 module.exports = {

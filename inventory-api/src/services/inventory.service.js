@@ -3,6 +3,7 @@ const { randomUUID } = require('crypto');
 const inventoryRepository = require('../repositories/inventory.repository');
 const { createHttpError } = require('../lib/errors');
 const { buildPaginatedResponse } = require('../lib/pagination');
+const audit = require('../lib/audit');
 
 const BUSINESS_TIME_ZONE = 'America/Guatemala';
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -422,14 +423,35 @@ async function registerStockEntryInTransaction(tx, payload, auth) {
   };
 }
 
-async function registerStockEntry(payload, auth) {
-  return inventoryRepository.transaction((tx) => registerStockEntryInTransaction(tx, payload, auth));
+async function registerStockEntry(payload, auth, req = null) {
+  const result = /** @type {any} */ (await inventoryRepository.transaction((tx) => registerStockEntryInTransaction(tx, payload, auth)));
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'inventory.stock_entry.register',
+    resourceType: 'lot',
+    resourceId: result.lot.id,
+    outcome: 'SUCCESS',
+    afterState: {
+      lotId: result.lot.id,
+      productId: result.lot.productId,
+      warehouseId: result.warehouseStock.warehouseId,
+      quantity: result.lot.quantity,
+      status: result.lot.status,
+      qaStatus: result.lot.qaStatus,
+      movementId: result.movement.id,
+    },
+    metadata: {
+      reasonCode: payload.reasonCode,
+      lotNumberCollision: result.lotNumberCollision,
+    },
+  });
+  return result;
 }
 
-async function updateLotQa(lotId, payload, auth) {
+async function updateLotQa(lotId, payload, auth, req = null) {
   const { companyId, userId } = authScope(auth);
 
-  return inventoryRepository.transaction(async (tx) => {
+  const result = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const lot = await tx.lot.findFirst({
       where: { id: lotId, companyId },
       include: {
@@ -521,12 +543,36 @@ async function updateLotQa(lotId, payload, auth) {
       });
     }
 
-    return updatedLot;
+    return { updatedLot, previousLot: lot };
+  }));
+
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'inventory.lot.qa.update',
+    resourceType: 'lot',
+    resourceId: lotId,
+    outcome: 'SUCCESS',
+    beforeState: {
+      id: result.previousLot.id,
+      status: result.previousLot.status,
+      qaStatus: result.previousLot.qaStatus,
+    },
+    afterState: {
+      id: result.updatedLot.id,
+      status: result.updatedLot.status,
+      qaStatus: result.updatedLot.qaStatus,
+    },
+    metadata: {
+      action: payload.action,
+      reason: payload.reason,
+    },
   });
+
+  return result.updatedLot;
 }
 
-async function adjustStock(payload, auth) {
-  return inventoryRepository.transaction(async (tx) => {
+async function adjustStock(payload, auth, req = null) {
+  const result = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const context = await getInventoryContext(tx, auth, payload.warehouseId, payload.productId);
     if (!payload.lotId) {
       throw createHttpError(400, 'Todo ajuste de inventario requiere lote', 'validation_error');
@@ -573,7 +619,29 @@ async function adjustStock(payload, auth) {
     });
 
     return { product, warehouseStock: warehouseStock.record, lotStock: lotStock?.record ?? null, lot, movement };
+  }));
+
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'inventory.stock.adjust',
+    resourceType: 'stock_movement',
+    resourceId: result.movement.id,
+    outcome: 'SUCCESS',
+    afterState: {
+      movementId: result.movement.id,
+      productId: result.product.id,
+      warehouseId: result.warehouseStock.warehouseId,
+      lotId: result.lot?.id || null,
+      quantity: result.movement.quantity,
+      movementType: result.movement.movementType,
+    },
+    metadata: {
+      direction: payload.direction,
+      reasonCode: payload.reasonCode,
+    },
   });
+
+  return result;
 }
 
 function sortFefo(items) {
@@ -628,8 +696,8 @@ function assertOrderHasOperationalWarehouse(order) {
   throw createHttpError(409, 'El pedido aun no tiene una bodega operativa asignada. Defina la bodega y el lote durante la salida antes de aprobar o despachar.', 'conflict');
 }
 
-async function reserveStockForOrder(orderId, auth) {
-  return inventoryRepository.transaction(async (tx) => {
+async function reserveStockForOrder(orderId, auth, req = null) {
+  const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const scope = authScope(auth);
     const order = await tx.order.findFirst({
       where: { id: orderId, companyId: scope.companyId },
@@ -689,7 +757,24 @@ async function reserveStockForOrder(orderId, auth) {
       },
       include: { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } },
     });
+  }));
+
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'orders.approve',
+    resourceType: 'order',
+    resourceId: orderId,
+    outcome: 'SUCCESS',
+    afterState: {
+      id: updatedOrder.id,
+      status: updatedOrder.status,
+      approved: updatedOrder.approved,
+      approvedById: updatedOrder.approvedById,
+      warehouseId: updatedOrder.warehouseId,
+    },
   });
+
+  return updatedOrder;
 }
 
 async function getActiveAllocations(tx, order) {
@@ -719,8 +804,8 @@ async function getActiveAllocations(tx, order) {
   return [...balances.values()].filter((item) => item.quantity > 0.000001);
 }
 
-async function releaseStockReservation(orderId, cancel, auth) {
-  return inventoryRepository.transaction(async (tx) => {
+async function releaseStockReservation(orderId, cancel, auth, req = null) {
+  const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const scope = authScope(auth);
     const order = await tx.order.findFirst({
       where: { id: orderId, companyId: scope.companyId },
@@ -784,11 +869,27 @@ async function releaseStockReservation(orderId, cancel, auth) {
       },
       include: { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } },
     });
+  }));
+
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: cancel ? 'orders.cancel' : 'orders.release',
+    resourceType: 'order',
+    resourceId: orderId,
+    outcome: 'SUCCESS',
+    afterState: {
+      id: updatedOrder.id,
+      status: updatedOrder.status,
+      approved: updatedOrder.approved,
+      warehouseId: updatedOrder.warehouseId,
+    },
   });
+
+  return updatedOrder;
 }
 
-async function dispatchOrder(orderId, auth) {
-  return inventoryRepository.transaction(async (tx) => {
+async function dispatchOrder(orderId, auth, req = null) {
+  const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const scope = authScope(auth);
     const order = await tx.order.findFirst({
       where: { id: orderId, companyId: scope.companyId },
@@ -855,7 +956,23 @@ async function dispatchOrder(orderId, auth) {
       data: { status: 'DELIVERED' },
       include: { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } },
     });
+  }));
+
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'orders.dispatch',
+    resourceType: 'order',
+    resourceId: orderId,
+    outcome: 'SUCCESS',
+    afterState: {
+      id: updatedOrder.id,
+      status: updatedOrder.status,
+      approved: updatedOrder.approved,
+      warehouseId: updatedOrder.warehouseId,
+    },
   });
+
+  return updatedOrder;
 }
 
 module.exports = {

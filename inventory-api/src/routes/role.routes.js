@@ -31,7 +31,7 @@ router.get('/company', async (req, res, next) => {
 
 router.post('/company', validate(createCompanyRoleSchema), async (req, res, next) => {
   try {
-    const role = await roleService.createCompanyRole(req.body, req.auth);
+    const role = await roleService.createCompanyRole(req.body, req.auth, req);
     return res.status(201).json(role);
   } catch (error) {
     return next(error);

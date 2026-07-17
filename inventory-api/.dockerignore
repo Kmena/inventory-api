@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+*.log
+docs
+tests
+storage
+back_end
+front_end
+specs

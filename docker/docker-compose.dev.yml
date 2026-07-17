@@ -1,31 +1,40 @@
+# Deprecated development Compose file kept only as a compatibility bridge.
+# Use inventory-api/docker-compose.dev.yml instead.
+# Canonical startup command from inventory-api/: docker compose -f docker-compose.dev.yml up --build
 services:
   app:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.example
+      context: ../inventory-api
+      dockerfile: Dockerfile
     ports:
-      - "2500:2500"
+      - "${PORT:-2500}:2500"
+    env_file:
+      - ../inventory-api/.env
     environment:
-      PORT: 2500
-      NODE_ENV: development
-      DATABASE_URL: postgresql://tracksys:tracksys@db:5432/tracksys
-      APP_BASE_URL: http://localhost:2500
-      CORS_ORIGIN: http://localhost:2500
+      PORT: ${PORT:-2500}
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: ${DATABASE_URL}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:2500}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:2500}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
     depends_on:
       - db
     volumes:
-      - ../:/app
+      - ../inventory-api:/app
+      - /app/node_modules
       - uploads_data:/app/back_end/Top_end/uploads
       - images_data:/app/front_end/assets/img
 
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: tracksys
-      POSTGRES_USER: tracksys
-      POSTGRES_PASSWORD: tracksys
+      POSTGRES_DB: ${POSTGRES_DB:-tracksys}
+      POSTGRES_USER: ${POSTGRES_USER:-tracksys}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

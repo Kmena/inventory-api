@@ -3,6 +3,7 @@ const clientRepository = require('../repositories/client.repository');
 const orderRepository = require('../repositories/order.repository');
 const { createHttpError } = require('../lib/errors');
 const { buildPaginatedResponse } = require('../lib/pagination');
+const audit = require('../lib/audit');
 
 function normalizeInvoicePayload(payload) {
   return {
@@ -149,13 +150,28 @@ async function validateInvoiceReferences(payload, companyId) {
   }
 }
 
-async function createInvoice(payload, auth) {
+async function createInvoice(payload, auth, req = null) {
   const companyId = assertCompanyScope(auth);
   await validateInvoiceReferences(payload, companyId);
-  return invoiceRepository.createInvoice(normalizeInvoicePayload(payload));
+  const invoice = await invoiceRepository.createInvoice(normalizeInvoicePayload(payload));
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'invoices.create',
+    resourceType: 'invoice',
+    resourceId: invoice.id,
+    outcome: 'SUCCESS',
+    afterState: {
+      id: invoice.id,
+      clientId: invoice.clientId,
+      orderId: invoice.orderId,
+      amount: invoice.amount,
+      status: invoice.status,
+    },
+  });
+  return invoice;
 }
 
-async function updateInvoice(id, payload, auth) {
+async function updateInvoice(id, payload, auth, req = null) {
   const companyId = assertCompanyScope(auth);
   const existingInvoice = await getInvoice(id, auth);
   const nextPayload = {
@@ -164,10 +180,34 @@ async function updateInvoice(id, payload, auth) {
   };
 
   await validateInvoiceReferences(nextPayload, companyId);
-  return invoiceRepository.updateCompanyInvoice(id, companyId, normalizeInvoicePayload(payload));
+  const updatedInvoice = await invoiceRepository.updateCompanyInvoice(id, companyId, normalizeInvoicePayload(payload));
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'invoices.update',
+    resourceType: 'invoice',
+    resourceId: id,
+    outcome: 'SUCCESS',
+    beforeState: {
+      id: existingInvoice.id,
+      clientId: existingInvoice.clientId,
+      orderId: existingInvoice.orderId,
+      amount: existingInvoice.amount,
+      status: existingInvoice.status,
+    },
+    afterState: updatedInvoice
+      ? {
+          id: updatedInvoice.id,
+          clientId: updatedInvoice.clientId,
+          orderId: updatedInvoice.orderId,
+          amount: updatedInvoice.amount,
+          status: updatedInvoice.status,
+        }
+      : null,
+  });
+  return updatedInvoice;
 }
 
-async function removeInvoice(id, auth) {
+async function removeInvoice(id, auth, req = null) {
   const companyId = assertCompanyScope(auth);
   const invoice = await getInvoice(id, auth);
 
@@ -179,6 +219,25 @@ async function removeInvoice(id, auth) {
   if (!result || result.count === 0) {
     throw createHttpError(404, 'Factura no encontrada', 'not_found');
   }
+
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'invoices.cancel',
+    resourceType: 'invoice',
+    resourceId: id,
+    outcome: 'SUCCESS',
+    beforeState: {
+      id: invoice.id,
+      clientId: invoice.clientId,
+      orderId: invoice.orderId,
+      amount: invoice.amount,
+      status: invoice.status,
+    },
+    afterState: {
+      id,
+      status: 'CANCELLED',
+    },
+  });
 
   return result;
 }

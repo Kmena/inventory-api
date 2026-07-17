@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 
 const { createRequestLogger, logRequestError } = require('./lib/logging');
+const { createRequestContextMiddleware } = require('./lib/request-context');
 const { corsOrigin, nodeEnv } = require('./config');
 const healthRouter = require('./routes/health.routes');
 const authRouter = require('./routes/auth.routes');
@@ -77,6 +78,7 @@ function setSecurityHeaders(_req, res, next) {
 
 app.use(cors({ origin: corsOrigin }));
 app.use(setSecurityHeaders);
+app.use(createRequestContextMiddleware());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(createRequestLogger(nodeEnv));

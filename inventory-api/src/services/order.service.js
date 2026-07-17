@@ -3,6 +3,7 @@ const inventoryService = require('./inventory.service');
 const { createHttpError } = require('../lib/errors');
 const { isAgentWorkspaceUser } = require('./sales-route.service');
 const agentWorkspaceRepository = require('../repositories/agent-workspace.repository');
+const audit = require('../lib/audit');
 
 function scope(auth) {
   if (!auth?.companyId || !auth?.sub) {
@@ -168,14 +169,31 @@ async function getOrder(id, auth) {
   return order;
 }
 
-async function createOrder(payload, auth) {
+async function createOrder(payload, auth, req = null) {
   const authScope = scope(auth);
   await validateOrderScope(payload, authScope, auth);
   await validateOrderReferences(payload, authScope.companyId);
-  return orderRepository.createOrder(toOrderCreateData(payload, authScope));
+  const order = await orderRepository.createOrder(toOrderCreateData(payload, authScope));
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'orders.create',
+    resourceType: 'order',
+    resourceId: order.id,
+    outcome: 'SUCCESS',
+    afterState: {
+      id: order.id,
+      clientId: order.clientId,
+      clientStoreId: order.clientStoreId,
+      warehouseId: order.warehouseId,
+      status: order.status,
+      approved: order.approved,
+      itemsCount: order.items?.length || 0,
+    },
+  });
+  return order;
 }
 
-async function updateOrder(id, payload, auth) {
+async function updateOrder(id, payload, auth, req = null) {
   const authScope = scope(auth);
   const currentOrder = await getOrder(id, auth);
   assertDraftEditAccess(currentOrder, authScope, auth);
@@ -207,15 +225,41 @@ async function updateOrder(id, payload, auth) {
     data.items = { deleteMany: {}, create: toOrderItemsCreate(payload.items) };
   }
 
-  return orderRepository.updateOrder(id, data);
+  const updatedOrder = await orderRepository.updateOrder(id, data);
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'orders.update',
+    resourceType: 'order',
+    resourceId: id,
+    outcome: 'SUCCESS',
+    beforeState: {
+      id: currentOrder.id,
+      clientId: currentOrder.clientId,
+      clientStoreId: currentOrder.clientStoreId,
+      warehouseId: currentOrder.warehouseId,
+      status: currentOrder.status,
+      approved: currentOrder.approved,
+      itemsCount: currentOrder.items?.length || 0,
+    },
+    afterState: {
+      id: updatedOrder.id,
+      clientId: updatedOrder.clientId,
+      clientStoreId: updatedOrder.clientStoreId,
+      warehouseId: updatedOrder.warehouseId,
+      status: updatedOrder.status,
+      approved: updatedOrder.approved,
+      itemsCount: updatedOrder.items?.length || 0,
+    },
+  });
+  return updatedOrder;
 }
 
-async function approveOrder(id, auth) {
+async function approveOrder(id, auth, req = null) {
   await getOrder(id, auth);
-  return inventoryService.reserveStockForOrder(id, auth);
+  return inventoryService.reserveStockForOrder(id, auth, req);
 }
 
-async function cancelOrder(id, auth) {
+async function cancelOrder(id, auth, req = null) {
   const order = await getOrder(id, auth);
   if (order.status === 'DELIVERED') {
     throw createHttpError(409, 'No se puede cancelar un pedido ya despachado', 'conflict');
@@ -224,17 +268,35 @@ async function cancelOrder(id, auth) {
     throw createHttpError(409, 'El pedido ya esta cancelado', 'conflict');
   }
   if (order.status === 'APPROVED') {
-    return inventoryService.releaseStockReservation(id, true, auth);
+    return inventoryService.releaseStockReservation(id, true, auth, req);
   }
-  return orderRepository.updateOrder(id, { status: 'CANCELLED' });
+  const cancelledOrder = await orderRepository.updateOrder(id, { status: 'CANCELLED' });
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'orders.cancel',
+    resourceType: 'order',
+    resourceId: id,
+    outcome: 'SUCCESS',
+    beforeState: {
+      id: order.id,
+      status: order.status,
+      approved: order.approved,
+    },
+    afterState: {
+      id: cancelledOrder.id,
+      status: cancelledOrder.status,
+      approved: cancelledOrder.approved,
+    },
+  });
+  return cancelledOrder;
 }
 
-async function dispatchOrder(id, auth) {
+async function dispatchOrder(id, auth, req = null) {
   await getOrder(id, auth);
-  return inventoryService.dispatchOrder(id, auth);
+  return inventoryService.dispatchOrder(id, auth, req);
 }
 
-async function removeOrder(id, auth) {
+async function removeOrder(id, auth, req = null) {
   const order = await getOrder(id, auth);
   if (order.status === 'APPROVED') {
     throw createHttpError(409, 'Cancele el pedido antes de eliminarlo para liberar reservas', 'conflict');
@@ -242,7 +304,26 @@ async function removeOrder(id, auth) {
   if (order.status === 'DELIVERED') {
     throw createHttpError(409, 'No se puede eliminar un pedido ya despachado', 'conflict');
   }
-  return orderRepository.deleteOrder(id);
+  const deletedOrder = await orderRepository.deleteOrder(id);
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'orders.delete',
+    resourceType: 'order',
+    resourceId: id,
+    outcome: 'SUCCESS',
+    beforeState: {
+      id: order.id,
+      status: order.status,
+      approved: order.approved,
+      clientId: order.clientId,
+      warehouseId: order.warehouseId,
+    },
+    afterState: {
+      id: deletedOrder.id,
+      deleted: true,
+    },
+  });
+  return deletedOrder;
 }
 
 module.exports = {

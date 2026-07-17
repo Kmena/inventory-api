@@ -4,6 +4,7 @@ const { bcryptRounds } = require('../config');
 const prisma = require('../lib/prisma');
 const { createHttpError } = require('../lib/errors');
 const companyRepository = require('../repositories/company.repository');
+const audit = require('../lib/audit');
 
 async function listCompanies() {
   return companyRepository.findAllCompanies();
@@ -20,15 +21,41 @@ async function listCompaniesForRoot(auth) {
   return companyRepository.findAllCompaniesForRoot();
 }
 
-async function registerCompany(payload) {
-  return companyRepository.createCompany(payload);
+async function registerCompany(payload, req = null) {
+  const company = await companyRepository.createCompany(payload);
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'companies.create',
+    resourceType: 'company',
+    resourceId: company.id,
+    outcome: 'SUCCESS',
+    afterState: {
+      id: company.id,
+      name: company.name,
+      legalId: company.legalId,
+      isActive: company.isActive,
+    },
+  });
+  return company;
 }
 
-async function updateRootCompanyStatus(companyId, payload, auth) {
+async function updateRootCompanyStatus(companyId, payload, auth, req = null) {
   assertRootCreator(auth);
 
   try {
-    return await companyRepository.updateCompanyStatus(companyId, payload.isActive);
+    const company = await companyRepository.updateCompanyStatus(companyId, payload.isActive);
+    await audit.recordAuditEventIfAvailable({
+      req,
+      action: 'companies.root.status.update',
+      resourceType: 'company',
+      resourceId: companyId,
+      outcome: 'SUCCESS',
+      afterState: {
+        id: company.id,
+        isActive: company.isActive,
+      },
+    });
+    return company;
   } catch (error) {
     if (error.code === 'P2025') {
       throw createHttpError(404, 'Empresa no encontrada', 'not_found');
@@ -85,7 +112,7 @@ async function getExecutiveDashboard(auth) {
   };
 }
 
-async function registerRootCompany(payload, auth) {
+async function registerRootCompany(payload, auth, req = null) {
   assertRootCreator(auth);
 
   const existingUser = await prisma.user.findUnique({
@@ -164,7 +191,21 @@ async function registerRootCompany(payload, auth) {
     }
 
     const { passwordHash: _passwordHash, ...safeRootUser } = rootUser;
-    return { company, fiscalConfig, rootUser: safeRootUser };
+    const result = { company, fiscalConfig, rootUser: safeRootUser };
+    await audit.recordAuditEventIfAvailable({
+      req,
+      action: 'companies.root.create',
+      resourceType: 'company',
+      resourceId: company.id,
+      outcome: 'SUCCESS',
+      afterState: {
+        companyId: company.id,
+        companyName: company.name,
+        rootUserId: safeRootUser.id,
+        rootUsername: safeRootUser.username,
+      },
+    }, { prismaClient: tx });
+    return result;
   });
 }
 

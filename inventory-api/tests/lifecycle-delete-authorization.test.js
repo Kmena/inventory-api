@@ -13,11 +13,11 @@ function getDeleteRouteGuard(router, path) {
   return layer.route.stack[0].handle;
 }
 
-test('client DELETE route keeps admin-only authorization', () => {
+test('client DELETE route keeps admin-only authorization', async () => {
   const guard = getDeleteRouteGuard(clientRoutes, '/:id');
   let nextError = null;
 
-  guard({ auth: { role: 'sales' } }, {}, (error) => {
+  await guard({ auth: { role: 'sales' } }, {}, (error) => {
     nextError = error;
   });
 
@@ -25,17 +25,17 @@ test('client DELETE route keeps admin-only authorization', () => {
   assert.equal(nextError?.code, 'forbidden');
 
   let allowedError = 'not-called';
-  guard({ auth: { role: 'admin' } }, {}, (error) => {
+  await guard({ auth: { role: 'admin' } }, {}, (error) => {
     allowedError = error;
   });
   assert.equal(allowedError, undefined);
 });
 
-test('payment DELETE route keeps admin-only authorization', () => {
+test('payment DELETE route keeps admin-only authorization', async () => {
   const guard = getDeleteRouteGuard(paymentRoutes, '/:id');
   let nextError = null;
 
-  guard({ auth: { role: 'sales' } }, {}, (error) => {
+  await guard({ auth: { role: 'sales' } }, {}, (error) => {
     nextError = error;
   });
 
@@ -43,17 +43,17 @@ test('payment DELETE route keeps admin-only authorization', () => {
   assert.equal(nextError?.code, 'forbidden');
 
   let allowedError = 'not-called';
-  guard({ auth: { role: 'admin' } }, {}, (error) => {
+  await guard({ auth: { role: 'admin' } }, {}, (error) => {
     allowedError = error;
   });
   assert.equal(allowedError, undefined);
 });
 
-test('product DELETE route keeps products.manage permission requirement', () => {
+test('product DELETE route keeps products.manage permission requirement', async () => {
   const guard = getDeleteRouteGuard(productRoutes, '/:id');
   let nextError = null;
 
-  guard({ auth: { permissions: ['products.view'] } }, {}, (error) => {
+  await guard({ auth: { permissions: ['products.view'] } }, {}, (error) => {
     nextError = error;
   });
 
@@ -61,17 +61,17 @@ test('product DELETE route keeps products.manage permission requirement', () => 
   assert.equal(nextError?.code, 'forbidden');
 
   let allowedError = 'not-called';
-  guard({ auth: { permissions: ['products.manage'] } }, {}, (error) => {
+  await guard({ auth: { permissions: ['products.manage'] } }, {}, (error) => {
     allowedError = error;
   });
   assert.equal(allowedError, undefined);
 });
 
-test('invoice DELETE route keeps admin-only authorization', () => {
+test('invoice DELETE route keeps admin-only authorization', async () => {
   const guard = getDeleteRouteGuard(invoiceRoutes, '/:id');
   let nextError = null;
 
-  guard({ auth: { role: 'sales' } }, {}, (error) => {
+  await guard({ auth: { role: 'sales' } }, {}, (error) => {
     nextError = error;
   });
 
@@ -79,7 +79,7 @@ test('invoice DELETE route keeps admin-only authorization', () => {
   assert.equal(nextError?.code, 'forbidden');
 
   let allowedError = 'not-called';
-  guard({ auth: { role: 'admin' } }, {}, (error) => {
+  await guard({ auth: { role: 'admin' } }, {}, (error) => {
     allowedError = error;
   });
   assert.equal(allowedError, undefined);
