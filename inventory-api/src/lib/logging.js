@@ -8,10 +8,11 @@ function toStructuredLog(payload) {
   return JSON.stringify(payload);
 }
 
-function createRequestLogMessage({ nodeEnv, method, path, statusCode, durationMs, errorCode }) {
+function createRequestLogMessage({ nodeEnv, requestId, method, path, statusCode, durationMs, errorCode }) {
   return toStructuredLog({
     level: 'info',
     environment: nodeEnv,
+    requestId: requestId || '-',
     method,
     path,
     statusCode,
@@ -21,8 +22,10 @@ function createRequestLogMessage({ nodeEnv, method, path, statusCode, durationMs
 }
 
 function createRequestLogger(nodeEnv) {
+  morgan.token('request-id', (req, res) => req.requestContext?.requestId || res.locals?.requestId || '-');
+
   if (isDevelopmentEnvironment(nodeEnv)) {
-    return morgan('dev');
+    return morgan(':method :url :status :res[content-length] - :response-time ms reqId=:request-id');
   }
 
   return morgan((tokens, req, res) => {
@@ -31,6 +34,7 @@ function createRequestLogger(nodeEnv) {
 
     return createRequestLogMessage({
       nodeEnv,
+      requestId: tokens['request-id'](req, res),
       method: tokens.method(req, res),
       path: tokens.url(req, res),
       statusCode: statusToken ? Number(statusToken) : 0,
@@ -48,6 +52,7 @@ function buildErrorLogEntry({ error, req, nodeEnv }) {
   return {
     level: 'error',
     environment: nodeEnv,
+    requestId: req.requestContext?.requestId || '-',
     method: req.method,
     path: req.originalUrl || req.url,
     statusCode: error?.statusCode || 500,

@@ -35,16 +35,16 @@ router.get('/movements', authorizePermission('inventory.view', 'inventory.manage
 });
 
 router.post('/entries', authorizePermission('inventory.manage'), validate(createStockEntrySchema), async (req, res, next) => {
-  try { return res.status(201).json(await inventoryService.registerStockEntry(req.body, req.auth)); } catch (error) { return next(error); }
+  try { return res.status(201).json(await inventoryService.registerStockEntry(req.body, req.auth, req)); } catch (error) { return next(error); }
 });
 router.patch('/lots/:id/qa', authorizePermission('inventory.qa.manage'), validate(updateLotQaSchema), async (req, res, next) => {
   try {
-    return res.json(await inventoryService.updateLotQa(parseBigIntId(req.params.id), req.body, req.auth));
+    return res.json(await inventoryService.updateLotQa(parseBigIntId(req.params.id), req.body, req.auth, req));
   } catch (error) { return next(error); }
 });
 
 router.post('/adjustments', authorizePermission('inventory.manage'), validate(adjustStockSchema), async (req, res, next) => {
-  try { return res.status(201).json(await inventoryService.adjustStock(req.body, req.auth)); } catch (error) { return next(error); }
+  try { return res.status(201).json(await inventoryService.adjustStock(req.body, req.auth, req)); } catch (error) { return next(error); }
 });
 
 module.exports = router;

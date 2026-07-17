@@ -138,6 +138,7 @@ model Company {
   salesRouteAssignments  SalesRouteAssignment[]
   salesGoals             SalesGoal[]
   routeVisitLogs         RouteVisitLog[]
+  auditEvents            AuditEvent[]
   orderStoreBackfillAudits OrderStoreBackfillAudit[]
 
   @@map("companies")
@@ -254,6 +255,7 @@ model User {
   salesRouteAssignments SalesRouteAssignment[]
   salesGoals            SalesGoal[]
   routeVisitLogs        RouteVisitLog[]
+  auditEvents           AuditEvent[] @relation("audit_event_actor")
 
   @@map("users")
 }
@@ -1084,6 +1086,39 @@ model ProductionItem {
 
   @@map("production_items")
 }
+model AuditEvent {
+  id            BigInt   @id @default(autoincrement())
+  requestId     String   @map("request_id")
+  occurredAt    DateTime @default(now()) @map("occurred_at")
+  actorUserId   BigInt?  @map("actor_user_id")
+  actorUsername String?  @map("actor_username")
+  actorRoleCode String?  @map("actor_role_code")
+  companyId     BigInt?  @map("company_id")
+  action        String
+  resourceType  String   @map("resource_type")
+  resourceId    String?  @map("resource_id")
+  outcome       String
+  reasonCode    String?  @map("reason_code")
+  httpMethod    String?  @map("http_method")
+  routePattern  String?  @map("route_pattern")
+  path          String?
+  ip            String?
+  userAgent     String?  @map("user_agent")
+  beforeState   Json?    @map("before_state")
+  afterState    Json?    @map("after_state")
+  metadata      Json?
+  actorUser     User?    @relation("audit_event_actor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  company       Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([occurredAt(sort: Desc)])
+  @@index([companyId, occurredAt(sort: Desc)])
+  @@index([actorUserId, occurredAt(sort: Desc)])
+  @@index([resourceType, resourceId, occurredAt(sort: Desc)])
+  @@index([action, occurredAt(sort: Desc)])
+  @@index([requestId])
+  @@map("audit_events")
+}
+
 model OrderStoreBackfillAudit {
   id        BigInt   @id @default(autoincrement())
   orderId   BigInt   @unique @map("order_id")

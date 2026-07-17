@@ -1,6 +1,5 @@
-# Transitional dev-only Compose alias.
-# Canonical file: docker-compose.dev.yml
-# Canonical startup command: docker compose -f docker-compose.dev.yml up --build
+# Dev-only Docker Compose file for local development.
+# Canonical startup command from inventory-api/: docker compose -f docker-compose.dev.yml up --build
 services:
   app:
     build: .

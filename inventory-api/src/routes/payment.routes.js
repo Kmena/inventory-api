@@ -20,16 +20,16 @@ router.get('/:id', authorize('admin', 'sales'), async (req, res, next) => {
 });
 
 router.post('/', authorize('admin', 'sales'), validate(createPaymentSchema), async (req, res, next) => {
-  try { return res.status(201).json(await paymentService.createPayment(req.body, req.auth)); } catch (error) { return next(error); }
+  try { return res.status(201).json(await paymentService.createPayment(req.body, req.auth, req)); } catch (error) { return next(error); }
 });
 
 router.put('/:id', authorize('admin', 'sales'), validate(updatePaymentSchema), async (req, res, next) => {
-  try { return res.json(await paymentService.updatePayment(parseBigIntId(req.params.id), req.body, req.auth)); } catch (error) { return next(error); }
+  try { return res.json(await paymentService.updatePayment(parseBigIntId(req.params.id), req.body, req.auth, req)); } catch (error) { return next(error); }
 });
 
 router.delete('/:id', authorize('admin'), async (req, res, next) => {
   try {
-    await paymentService.removePayment(parseBigIntId(req.params.id), req.auth);
+    await paymentService.removePayment(parseBigIntId(req.params.id), req.auth, req);
     return res.status(204).send();
   } catch (error) { return next(error); }
 });

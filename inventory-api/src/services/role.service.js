@@ -1,6 +1,7 @@
 const { createHttpError } = require('../lib/errors');
 const { buildPaginatedResponse } = require('../lib/pagination');
 const roleRepository = require('../repositories/role.repository');
+const audit = require('../lib/audit');
 
 function assertCompanyAdmin(auth) {
   if (!auth.companyId) {
@@ -47,7 +48,7 @@ async function listAssignableRoles(auth, pagination = null) {
   return buildPaginatedResponse(paginatedRoles.items.map(serializeRole), pagination, paginatedRoles.totalItems);
 }
 
-async function createCompanyRole(payload, auth) {
+async function createCompanyRole(payload, auth, req = null) {
   assertCompanyAdmin(auth);
 
   const companyId = BigInt(auth.companyId);
@@ -67,7 +68,22 @@ async function createCompanyRole(payload, auth) {
     permissionCodes: uniquePermissionCodes,
   });
 
-  return serializeRole(role);
+  const serializedRole = serializeRole(role);
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'roles.company.create',
+    resourceType: 'role',
+    resourceId: serializedRole.id,
+    outcome: 'SUCCESS',
+    afterState: {
+      id: serializedRole.id,
+      code: serializedRole.code,
+      name: serializedRole.name,
+      companyId: serializedRole.companyId,
+      permissionsCount: serializedRole.permissions.length,
+    },
+  });
+  return serializedRole;
 }
 
 module.exports = {

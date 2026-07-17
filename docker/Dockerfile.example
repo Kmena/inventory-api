@@ -1,13 +1,16 @@
+# Deprecated development example kept only as a compatibility reference.
+# Canonical runtime definition: inventory-api/Dockerfile
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Ejemplo base. Requiere package.json real en el proyecto objetivo.
+RUN apk add --no-cache python3 make g++
+
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY . .
 
 EXPOSE 2500
 
-CMD ["node", "back_end/server.js"]
+CMD ["node", "src/server.js"]

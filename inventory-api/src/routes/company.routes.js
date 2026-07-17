@@ -48,7 +48,7 @@ router.patch(
   async (req, res, next) => {
     try {
       const companyId = parseBigIntId(req.params.companyId, 'companyId');
-      const company = await companyService.updateRootCompanyStatus(companyId, req.body, req.auth);
+      const company = await companyService.updateRootCompanyStatus(companyId, req.body, req.auth, req);
       return res.json(company);
     } catch (error) {
       return next(error);
@@ -58,7 +58,7 @@ router.patch(
 
 router.post('/', authorize('admin'), validate(createCompanySchema), async (req, res, next) => {
   try {
-    const company = await companyService.registerCompany(req.body);
+    const company = await companyService.registerCompany(req.body, req);
     return res.status(201).json(company);
   } catch (error) {
     return next(error);
@@ -67,7 +67,7 @@ router.post('/', authorize('admin'), validate(createCompanySchema), async (req, 
 
 router.post('/root/companies', authorize('root'), validate(createRootCompanySchema), async (req, res, next) => {
   try {
-    const company = await companyService.registerRootCompany(req.body, req.auth);
+    const company = await companyService.registerRootCompany(req.body, req.auth, req);
     return res.status(201).json(company);
   } catch (error) {
     return next(error);

@@ -30,7 +30,7 @@ router.get('/company', authorize('admin'), async (req, res, next) => {
 
 router.post('/company', authorize('admin'), validate(createCompanyUserSchema), async (req, res, next) => {
   try {
-    const user = await userService.registerCompanyUser(req.body, req.auth);
+    const user = await userService.registerCompanyUser(req.body, req.auth, req);
     return res.status(201).json(user);
   } catch (error) {
     return next(error);
@@ -39,7 +39,7 @@ router.post('/company', authorize('admin'), validate(createCompanyUserSchema), a
 
 router.post('/', authorize('root'), validate(createUserSchema), async (req, res, next) => {
   try {
-    const user = await userService.registerUser(req.body);
+    const user = await userService.registerUser(req.body, req);
     return res.status(201).json(user);
   } catch (error) {
     return next(error);

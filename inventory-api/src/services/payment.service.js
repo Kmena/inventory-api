@@ -2,6 +2,7 @@ const paymentRepository = require('../repositories/payment.repository');
 const invoiceRepository = require('../repositories/invoice.repository');
 const { createHttpError } = require('../lib/errors');
 const { buildPaginatedResponse } = require('../lib/pagination');
+const audit = require('../lib/audit');
 
 function assertCompanyScope(auth) {
   if (!auth?.companyId) {
@@ -35,22 +36,58 @@ async function validatePaymentInvoice(invoiceId, companyId) {
   return invoice;
 }
 
-async function createPayment(payload, auth) {
+async function createPayment(payload, auth, req = null) {
   const companyId = assertCompanyScope(auth);
   await validatePaymentInvoice(payload.invoiceId, companyId);
-  return paymentRepository.createPayment(payload);
+  const payment = await paymentRepository.createPayment(payload);
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'payments.create',
+    resourceType: 'payment',
+    resourceId: payment.id,
+    outcome: 'SUCCESS',
+    afterState: {
+      id: payment.id,
+      invoiceId: payment.invoiceId,
+      amount: payment.amount,
+      status: payment.status || 'ACTIVE',
+    },
+  });
+  return payment;
 }
 
-async function updatePayment(id, payload, auth) {
+async function updatePayment(id, payload, auth, req = null) {
   const companyId = assertCompanyScope(auth);
   const existingPayment = await getPayment(id, auth);
   const invoiceId = payload.invoiceId ?? existingPayment.invoiceId;
 
   await validatePaymentInvoice(invoiceId, companyId);
-  return paymentRepository.updateCompanyPayment(id, companyId, payload);
+  const updatedPayment = await paymentRepository.updateCompanyPayment(id, companyId, payload);
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'payments.update',
+    resourceType: 'payment',
+    resourceId: id,
+    outcome: 'SUCCESS',
+    beforeState: {
+      id: existingPayment.id,
+      invoiceId: existingPayment.invoiceId,
+      amount: existingPayment.amount,
+      status: existingPayment.status || 'ACTIVE',
+    },
+    afterState: updatedPayment
+      ? {
+          id: updatedPayment.id,
+          invoiceId: updatedPayment.invoiceId,
+          amount: updatedPayment.amount,
+          status: updatedPayment.status || 'ACTIVE',
+        }
+      : null,
+  });
+  return updatedPayment;
 }
 
-async function removePayment(id, auth) {
+async function removePayment(id, auth, req = null) {
   const companyId = assertCompanyScope(auth);
   const existingPayment = await getPayment(id, auth);
 
@@ -69,6 +106,27 @@ async function removePayment(id, auth) {
   if (!result || result.count === 0) {
     throw createHttpError(404, 'Pago no encontrado', 'not_found');
   }
+
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'payments.reverse',
+    resourceType: 'payment',
+    resourceId: id,
+    outcome: 'SUCCESS',
+    beforeState: {
+      id: existingPayment.id,
+      invoiceId: existingPayment.invoiceId,
+      amount: existingPayment.amount,
+      status: existingPayment.status || 'ACTIVE',
+    },
+    afterState: {
+      id,
+      status: 'REVERSED',
+      reversedAt,
+      reversedByUserId,
+      reversalReason: 'DELETE_COMPATIBILITY_FLOW',
+    },
+  });
 
   return result;
 }
