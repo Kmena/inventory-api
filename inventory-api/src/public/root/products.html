@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Productos e inventario</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell products-admin-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Inventori</p>
+          <h2>Empresa</h2>
+        </div>
+        <nav class="sidebar-nav" aria-label="Navegacion principal">
+          <a class="sidebar-link" href="/root/dashboard.html">Dashboard</a>
+          <a class="sidebar-link" href="/root/users.html">Usuarios</a>
+          <a class="sidebar-link" href="/root/roles.html">Roles</a>
+          <a class="sidebar-link" href="/root/warehouses.html">Bodegas</a>
+          <a class="sidebar-link active" href="/root/products.html">Productos</a>
+          <a class="sidebar-link" href="/root/zones.html">Zonas</a>
+          <a class="sidebar-link" href="/root/routes.html">Rutas</a>
+          <a class="sidebar-link" href="/root/clients.html">Clientes</a>
+          <a class="sidebar-link" href="/root/invoice-inconsistencies.html">Revision de facturas</a>
+        </nav>
+      </aside>
+
+      <section class="card app-content products-admin">
+        <header class="page-header products-admin-header">
+          <div>
+            <p class="eyebrow">Inventario</p>
+            <h1>Productos y lotes</h1>
+            <p id="products-session" class="muted">Sesion activa</p>
+          </div>
+          <div class="products-header-actions">
+            <button id="create-product-button" type="button">Crear producto</button>
+            <button id="register-lot-button" type="button">Registrar lote</button>
+            <button id="refresh-products-button" class="secondary-button" type="button">Actualizar</button>
+            <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+          </div>
+        </header>
+
+        <div id="products-banner" class="products-banner hidden" role="status" aria-live="polite"></div>
+
+        <section class="products-filter-panel" aria-labelledby="filters-title">
+          <div class="section-title-row">
+            <div>
+              <h2 id="filters-title">Consulta de inventario</h2>
+              <p class="muted">El stock se calcula desde las existencias registradas por lote.</p>
+            </div>
+            <button id="clear-product-filters" class="text-button" type="button">Limpiar filtros</button>
+          </div>
+          <div class="products-filter-grid">
+            <label class="field products-search-field">
+              <span>Buscar producto</span>
+              <input id="product-search" type="search" placeholder="Nombre o codigo" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Bodega</span>
+              <select id="product-warehouse-filter">
+                <option value="">Todas</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Tipo</span>
+              <select id="product-type-filter">
+                <option value="">Todos</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Estado del lote</span>
+              <select id="product-lot-status-filter">
+                <option value="">Todos</option>
+                <option value="AVAILABLE">Disponible</option>
+                <option value="QUARANTINED">Cuarentena</option>
+                <option value="BLOCKED">Bloqueado</option>
+                <option value="EXPIRED">Vencido</option>
+                <option value="CONSUMED">Consumido</option>
+                <option value="CRITICAL">Con alerta</option>
+              </select>
+            </label>
+            <label class="products-toggle">
+              <input id="product-stock-only" type="checkbox" />
+              <span>Solo con stock</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="products-kpi-grid" aria-label="Resumen de productos">
+          <article class="products-kpi">
+            <span>Total productos</span>
+            <strong id="products-kpi-total">0</strong>
+            <small>Catalogo visible</small>
+          </article>
+          <article class="products-kpi products-kpi-success">
+            <span>Con stock</span>
+            <strong id="products-kpi-stock">0</strong>
+            <small>Existencias por lote</small>
+          </article>
+          <article class="products-kpi">
+            <span>Sin stock</span>
+            <strong id="products-kpi-empty">0</strong>
+            <small>Disponibles para recibir</small>
+          </article>
+          <article class="products-kpi products-kpi-warning">
+            <span>Lotes con alerta</span>
+            <strong id="products-kpi-critical">0</strong>
+            <small>QA, bloqueo o vencimiento</small>
+          </article>
+        </section>
+
+        <section class="products-table-section" aria-labelledby="products-list-title">
+          <div class="section-title-row">
+            <div>
+              <h2 id="products-list-title">Catalogo</h2>
+              <p id="products-result-count" class="muted">Cargando productos...</p>
+            </div>
+          </div>
+          <div class="table-wrapper products-table-wrapper">
+            <table class="products-admin-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Tipo</th>
+                  <th class="numeric-cell">Stock</th>
+                  <th class="numeric-cell">Reservado</th>
+                  <th class="numeric-cell">Disponible</th>
+                  <th class="numeric-cell">Bodegas</th>
+                  <th class="numeric-cell">Lotes activos</th>
+                  <th class="products-action-cell">Accion</th>
+                </tr>
+              </thead>
+              <tbody id="products-table-body">
+                <tr><td colspan="8" class="empty-state">Cargando productos...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="product-drawer-backdrop" class="product-drawer-backdrop hidden"></div>
+    <aside id="product-detail-drawer" class="product-detail-drawer" aria-hidden="true" aria-labelledby="drawer-title">
+      <header class="product-drawer-header">
+        <div>
+          <p class="eyebrow">Detalle de inventario</p>
+          <h2 id="drawer-title">Producto</h2>
+          <p id="drawer-subtitle" class="muted"></p>
+        </div>
+        <button id="close-product-drawer" class="icon-button" type="button" aria-label="Cerrar detalle">x</button>
+      </header>
+      <div class="product-drawer-body">
+        <section id="drawer-summary" class="product-summary-grid"></section>
+        <nav class="tabs-nav" aria-label="Secciones del producto">
+          <button class="tab-button active" type="button" data-product-tab="summary">Resumen</button>
+          <button class="tab-button" type="button" data-product-tab="warehouses">Bodegas</button>
+          <button class="tab-button" type="button" data-product-tab="lots">Lotes</button>
+        </nav>
+        <section id="product-tab-summary" class="product-tab-panel"></section>
+        <section id="product-tab-warehouses" class="product-tab-panel hidden"></section>
+        <section id="product-tab-lots" class="product-tab-panel hidden"></section>
+      </div>
+      <footer class="product-drawer-footer">
+        <button id="drawer-register-lot-button" type="button">Registrar lote para este producto</button>
+        <button id="drawer-close-button" class="secondary-button" type="button">Cerrar</button>
+      </footer>
+    </aside>
+
+    <div id="create-product-modal" class="modal-backdrop hidden" role="presentation" aria-hidden="true">
+      <section class="modal-card products-modal-card" role="dialog" aria-modal="true" aria-labelledby="create-product-title">
+        <header class="products-modal-header">
+          <div>
+            <p class="eyebrow">Catalogo</p>
+            <h2 id="create-product-title">Crear producto</h2>
+            <p class="muted">El producto puede iniciar sin stock; toda existencia debe registrarse en un lote.</p>
+          </div>
+          <button class="icon-button" type="button" data-close-modal="create-product-modal" aria-label="Cerrar">x</button>
+        </header>
+        <form id="create-product-form">
+          <div class="products-form-grid">
+            <label class="field">
+              <span>Codigo</span>
+              <input name="code" type="text" maxlength="50" placeholder="PT-001" />
+            </label>
+            <label class="field products-field-wide">
+              <span>Nombre</span>
+              <input name="name" type="text" minlength="2" maxlength="255" required />
+            </label>
+            <label class="field">
+              <span>Unidad</span>
+              <input name="unit" type="text" maxlength="30" value="UN" required />
+            </label>
+            <label class="field">
+              <span>Precio</span>
+              <input name="price" type="number" min="0" step="0.01" />
+            </label>
+            <label class="field">
+              <span>Tipo</span>
+              <select name="productType" required>
+                <option value="FINISHED_PRODUCT">Producto terminado</option>
+                <option value="RAW_MATERIAL">Materia prima</option>
+                <option value="PACKAGING">Empaque</option>
+                <option value="MISCELLANEOUS">Miscelaneo</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Stock minimo</span>
+              <input name="minStock" type="number" min="0" step="0.01" />
+            </label>
+            <label class="field">
+              <span>Stock maximo</span>
+              <input name="maxStock" type="number" min="0" step="0.01" />
+            </label>
+          </div>
+
+          <div class="initial-lots-header">
+            <div>
+              <h3>Existencias iniciales</h3>
+              <p class="muted">Opcional. Cada fila crea un lote unico en una bodega.</p>
+            </div>
+            <button id="add-initial-lot-button" class="secondary-button" type="button">Agregar lote</button>
+          </div>
+          <div id="create-product-lots" class="initial-lots-list"></div>
+          <p id="create-product-error" class="message" aria-live="polite"></p>
+          <footer class="products-modal-actions">
+            <button class="secondary-button" type="button" data-close-modal="create-product-modal">Cancelar</button>
+            <button id="submit-create-product" type="submit">Crear producto</button>
+          </footer>
+        </form>
+      </section>
+    </div>
+
+    <div id="register-lot-modal" class="modal-backdrop hidden" role="presentation" aria-hidden="true">
+      <section class="modal-card products-modal-card" role="dialog" aria-modal="true" aria-labelledby="register-lot-title">
+        <header class="products-modal-header">
+          <div>
+            <p class="eyebrow">Movimiento de entrada</p>
+            <h2 id="register-lot-title">Registrar lote manual</h2>
+            <p class="muted">La entrada quedara vinculada al usuario, producto, lote y bodega.</p>
+          </div>
+          <button class="icon-button" type="button" data-close-modal="register-lot-modal" aria-label="Cerrar">x</button>
+        </header>
+        <form id="register-lot-form">
+          <div class="products-form-grid">
+            <label class="field products-field-wide">
+              <span>Producto</span>
+              <select name="productId" required></select>
+            </label>
+            <label class="field products-field-wide">
+              <span>Bodega</span>
+              <select name="warehouseId" required></select>
+            </label>
+            <label class="field">
+              <span>Cantidad</span>
+              <input name="quantity" type="number" min="0.01" step="0.01" required />
+            </label>
+            <label class="field">
+              <span>Lote interno</span>
+              <input name="internalLotNumber" type="text" maxlength="100" required />
+            </label>
+            <label class="field">
+              <span>Lote fabricante</span>
+              <input name="manufacturerLotNumber" type="text" maxlength="100" />
+            </label>
+            <label class="field">
+              <span>Fecha de ingreso</span>
+              <input name="entryDate" type="date" />
+            </label>
+            <label class="field">
+              <span>Produccion</span>
+              <input name="productionDate" type="date" />
+            </label>
+            <label class="field">
+              <span>Vencimiento</span>
+              <input name="expirationDate" type="date" />
+            </label>
+            <div class="products-entry-state products-field-wide">
+              <span>Estado inicial controlado por el sistema</span>
+              <strong id="entry-state-hint">Se definira segun la bodega seleccionada.</strong>
+              <small>Catalogo visible</small>
+            </div>
+            <label class="field products-field-full">
+              <span>Nota</span>
+              <textarea name="note" rows="3" maxlength="500" placeholder="Motivo y referencia de la entrada"></textarea>
+            </label>
+          </div>
+          <p id="register-lot-error" class="message" aria-live="polite"></p>
+          <footer class="products-modal-actions">
+            <button class="secondary-button" type="button" data-close-modal="register-lot-modal">Cancelar</button>
+            <button id="submit-register-lot" type="submit">Registrar entrada</button>
+          </footer>
+        </form>
+      </section>
+    </div>
+
+    <script src="/root/root-sidebar.js"></script>
+    <script src="/shared/lot-dates.js"></script>
+    <script src="/root/products.shared.js"></script>
+    <script src="/root/products.js"></script>
+  </body>
+</html>
+
+
+

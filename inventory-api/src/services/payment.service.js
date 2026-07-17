@@ -1,6 +1,7 @@
 const paymentRepository = require('../repositories/payment.repository');
 const invoiceRepository = require('../repositories/invoice.repository');
 const { createHttpError } = require('../lib/errors');
+const { buildPaginatedResponse } = require('../lib/pagination');
 
 function assertCompanyScope(auth) {
   if (!auth?.companyId) {
@@ -9,9 +10,14 @@ function assertCompanyScope(auth) {
   return BigInt(auth.companyId);
 }
 
-async function listPayments(auth) {
+async function listPayments(auth, pagination = null) {
   const companyId = assertCompanyScope(auth);
-  return paymentRepository.findCompanyPayments(companyId);
+  const payments = await paymentRepository.findCompanyPayments(companyId, pagination);
+  if (!pagination) {
+    return payments;
+  }
+  const paginatedPayments = /** @type {{ items: Array<any>, totalItems: number }} */ (payments);
+  return buildPaginatedResponse(paginatedPayments.items, pagination, paginatedPayments.totalItems);
 }
 
 async function getPayment(id, auth) {
@@ -46,8 +52,25 @@ async function updatePayment(id, payload, auth) {
 
 async function removePayment(id, auth) {
   const companyId = assertCompanyScope(auth);
-  await getPayment(id, auth);
-  return paymentRepository.deleteCompanyPayment(id, companyId);
+  const existingPayment = await getPayment(id, auth);
+
+  if (existingPayment.status === 'REVERSED') {
+    throw createHttpError(409, 'El pago ya fue reversado', 'conflict');
+  }
+
+  const reversedAt = new Date();
+  const reversedByUserId = auth?.sub ? BigInt(auth.sub) : null;
+  const result = await paymentRepository.reverseCompanyPayment(id, companyId, {
+    reversedAt,
+    reversedByUserId,
+    reversalReason: 'DELETE_COMPATIBILITY_FLOW',
+  });
+
+  if (!result || result.count === 0) {
+    throw createHttpError(404, 'Pago no encontrado', 'not_found');
+  }
+
+  return result;
 }
 
 module.exports = { listPayments, getPayment, createPayment, updatePayment, removePayment };

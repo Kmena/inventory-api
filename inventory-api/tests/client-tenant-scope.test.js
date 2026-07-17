@@ -132,7 +132,7 @@ test('removeClient rejects deleting a client from another company', async () => 
   await withRepositoryStubs(
     {
       findCompanyClientById: async () => null,
-      deleteCompanyClient: async () => {
+      softDeleteCompanyClient: async () => {
         deleteCalled = true;
       },
     },
@@ -149,4 +149,22 @@ test('removeClient rejects deleting a client from another company', async () => 
   );
 
   assert.equal(deleteCalled, false);
+});
+
+test('removeClient converts DELETE compatibility flow into soft delete', async () => {
+  let receivedSoftDelete = null;
+
+  const result = await withRepositoryStubs(
+    {
+      findCompanyClientById: async (clientId, companyId) => ({ id: clientId, companyId, deletedAt: null }),
+      softDeleteCompanyClient: async (clientId, companyId) => {
+        receivedSoftDelete = { clientId, companyId };
+        return { count: 1 };
+      },
+    },
+    () => clientService.removeClient(21n, { companyId: '31' }),
+  );
+
+  assert.deepEqual(receivedSoftDelete, { clientId: 21n, companyId: 31n });
+  assert.deepEqual(result, { count: 1 });
 });

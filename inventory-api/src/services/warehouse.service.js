@@ -1,4 +1,5 @@
 const { createHttpError } = require('../lib/errors');
+const { buildPaginatedResponse } = require('../lib/pagination');
 const { WAREHOUSE_TYPES, getWarehouseTypeDefinition, isVirtualWarehouseType } = require('../lib/warehouse-types');
 const warehouseRepository = require('../repositories/warehouse.repository');
 
@@ -43,14 +44,23 @@ function buildSummary(items) {
   };
 }
 
-async function listCompanyWarehouses(auth) {
+async function listCompanyWarehouses(auth, pagination = null) {
   assertCompanyAdmin(auth);
-  const warehouses = await warehouseRepository.findCompanyWarehouses(BigInt(auth.companyId));
-  const items = warehouses.map(serializeWarehouse);
+  const warehouses = await warehouseRepository.findCompanyWarehouses(BigInt(auth.companyId), pagination);
+  if (!pagination) {
+    const warehouseRows = /** @type {Array<any>} */ (warehouses);
+    const items = warehouseRows.map(serializeWarehouse);
+    return {
+      items,
+      summary: buildSummary(items),
+      warehouseTypes: WAREHOUSE_TYPES,
+    };
+  }
 
+  const paginatedWarehouses = /** @type {{ items: Array<any>, totalItems: number, summary: { total: number, active: number, virtual: number, sellable: number } }} */ (warehouses);
   return {
-    items,
-    summary: buildSummary(items),
+    ...buildPaginatedResponse(paginatedWarehouses.items.map(serializeWarehouse), pagination, paginatedWarehouses.totalItems),
+    summary: paginatedWarehouses.summary,
     warehouseTypes: WAREHOUSE_TYPES,
   };
 }

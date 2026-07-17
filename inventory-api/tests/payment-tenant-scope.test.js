@@ -138,13 +138,13 @@ test('removePayment rejects deleting a payment outside the authenticated tenant'
   await withRepositoryStubs(
     [[paymentRepository, {
       findCompanyPaymentById: async () => null,
-      deleteCompanyPayment: async () => {
+      reverseCompanyPayment: async () => {
         deleteCalled = true;
       },
     }]],
     async () => {
       await assert.rejects(
-        () => paymentService.removePayment(99n, { companyId: '19' }),
+        () => paymentService.removePayment(99n, { companyId: '19', sub: '200' }),
         (error) => {
           assert.equal(error.statusCode, 404);
           assert.equal(error.code, 'not_found');
@@ -155,4 +155,44 @@ test('removePayment rejects deleting a payment outside the authenticated tenant'
   );
 
   assert.equal(deleteCalled, false);
+});
+
+test('removePayment converts DELETE compatibility flow into payment reversal', async () => {
+  let receivedReverseCall = null;
+
+  const result = await withRepositoryStubs(
+    [[paymentRepository, {
+      findCompanyPaymentById: async () => ({ id: 13n, invoiceId: 7n, amount: 90, status: 'ACTIVE' }),
+      reverseCompanyPayment: async (paymentId, companyId, payload) => {
+        receivedReverseCall = { paymentId, companyId, payload };
+        return { count: 1 };
+      },
+    }]],
+    () => paymentService.removePayment(13n, { companyId: '19', sub: '200' }),
+  );
+
+  assert.equal(receivedReverseCall.paymentId, 13n);
+  assert.equal(receivedReverseCall.companyId, 19n);
+  assert.equal(receivedReverseCall.payload.reversedByUserId, 200n);
+  assert.equal(receivedReverseCall.payload.reversalReason, 'DELETE_COMPATIBILITY_FLOW');
+  assert.ok(receivedReverseCall.payload.reversedAt instanceof Date);
+  assert.deepEqual(result, { count: 1 });
+});
+
+test('removePayment rejects repeated reversal attempts with controlled conflict', async () => {
+  await withRepositoryStubs(
+    [[paymentRepository, {
+      findCompanyPaymentById: async () => ({ id: 13n, invoiceId: 7n, amount: 90, status: 'REVERSED' }),
+    }]],
+    async () => {
+      await assert.rejects(
+        () => paymentService.removePayment(13n, { companyId: '19', sub: '200' }),
+        (error) => {
+          assert.equal(error.statusCode, 409);
+          assert.equal(error.code, 'conflict');
+          return true;
+        },
+      );
+    },
+  );
 });

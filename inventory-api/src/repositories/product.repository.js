@@ -38,17 +38,40 @@ function transaction(work) {
   return prisma.$transaction(work);
 }
 
-function findAllProducts(companyId) {
-  return prisma.product.findMany({
-    where: { companyId },
-    orderBy: { id: 'asc' },
-    include: productInclude,
-  });
+function buildDefaultActiveProductWhere(where = {}) {
+  return {
+    ...where,
+    isActive: true,
+  };
+}
+
+function findAllProducts(companyId, pagination = null) {
+  const where = buildDefaultActiveProductWhere({ companyId });
+  const orderBy = [{ id: 'asc' }];
+
+  if (!pagination) {
+    return prisma.product.findMany({
+      where,
+      orderBy,
+      include: productInclude,
+    });
+  }
+
+  return prisma.$transaction([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      orderBy,
+      skip: pagination.skip,
+      take: pagination.take,
+      include: productInclude,
+    }),
+  ]).then(([totalItems, items]) => ({ totalItems, items }));
 }
 
 function findProductById(id, companyId) {
   return prisma.product.findFirst({
-    where: { id, companyId },
+    where: buildDefaultActiveProductWhere({ id, companyId }),
     include: productInclude,
   });
 }
@@ -68,8 +91,13 @@ function updateProduct(id, data) {
   return prisma.product.update({ where: { id }, data, include: productInclude });
 }
 
-function deleteProduct(id) {
-  return prisma.product.delete({ where: { id } });
+function deactivateCompanyProduct(id, companyId) {
+  return prisma.product.updateMany({
+    where: buildDefaultActiveProductWhere({ id, companyId }),
+    data: {
+      isActive: false,
+    },
+  });
 }
 
 module.exports = {
@@ -80,5 +108,5 @@ module.exports = {
   findProductsByIds,
   createProduct,
   updateProduct,
-  deleteProduct,
+  deactivateCompanyProduct,
 };

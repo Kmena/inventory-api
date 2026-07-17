@@ -4,6 +4,7 @@ const authenticate = require('../middlewares/authenticate');
 const authorize = require('../middlewares/authorize');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
+const { parsePaginationQuery } = require('../lib/pagination');
 const {
   updateClientSchema,
   createCompanyClientSchema,
@@ -17,11 +18,11 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', authorize('admin', 'sales'), async (req, res, next) => {
-  try { return res.json(await clientService.listClients(req.auth)); } catch (error) { return next(error); }
+  try { return res.json(await clientService.listClients(req.auth, parsePaginationQuery(req.query))); } catch (error) { return next(error); }
 });
 
 router.get('/company', authorize('admin', 'sales'), async (req, res, next) => {
-  try { return res.json(await clientService.listCompanyClients(req.auth)); } catch (error) { return next(error); }
+  try { return res.json(await clientService.listCompanyClients(req.auth, parsePaginationQuery(req.query))); } catch (error) { return next(error); }
 });
 
 router.get('/classifications/company', authorize('admin', 'sales'), async (req, res, next) => {

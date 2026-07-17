@@ -2,6 +2,7 @@ const { randomUUID } = require('crypto');
 
 const inventoryRepository = require('../repositories/inventory.repository');
 const { createHttpError } = require('../lib/errors');
+const { buildPaginatedResponse } = require('../lib/pagination');
 
 const BUSINESS_TIME_ZONE = 'America/Guatemala';
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -19,19 +20,14 @@ function toGuatemalaStartOfDay(dateKey) {
   return new Date(`${dateKey}T00:00:00-06:00`);
 }
 
-function normalizeLotDateInput(value, fieldLabel, options = {}) {
-  const { defaultToNow = false, normalizeToStartOfDay = true } = options;
-  if (value === undefined || value === null || value === '') {
-    return defaultToNow ? new Date() : null;
-  }
+function defaultLotDateValue(defaultToNow) {
+  return defaultToNow ? new Date() : null;
+}
 
+function dateKeyFromAcceptedLotInput(value, fieldLabel) {
   const normalized = String(value).trim();
-  if (!normalized) {
-    return defaultToNow ? new Date() : null;
-  }
-
   if (DATE_ONLY_PATTERN.test(normalized)) {
-    return toGuatemalaStartOfDay(normalized);
+    return normalized;
   }
 
   const parsed = new Date(normalized);
@@ -39,7 +35,31 @@ function normalizeLotDateInput(value, fieldLabel, options = {}) {
     throw createHttpError(400, `La fecha de ${fieldLabel} no tiene un formato valido. Use YYYY-MM-DD o un datetime ISO.`, 'validation_error');
   }
 
-  return normalizeToStartOfDay ? toGuatemalaStartOfDay(guatemalaDateKey(parsed)) : parsed;
+  const calendarDatePrefix = normalized.slice(0, 10);
+  if (DATE_ONLY_PATTERN.test(calendarDatePrefix)) {
+    return calendarDatePrefix;
+  }
+
+  return guatemalaDateKey(parsed);
+}
+
+function normalizeLotDateInput(value, fieldLabel, options = {}) {
+  const { defaultToNow = false, normalizeToStartOfDay = true } = options;
+  if (value === undefined || value === null || value === '') {
+    return defaultLotDateValue(defaultToNow);
+  }
+
+  const normalized = String(value).trim();
+  if (!normalized) {
+    return defaultLotDateValue(defaultToNow);
+  }
+
+  const dateKey = dateKeyFromAcceptedLotInput(normalized, fieldLabel);
+  if (!normalizeToStartOfDay) {
+    return new Date(normalized);
+  }
+
+  return toGuatemalaStartOfDay(dateKey);
 }
 
 function lotDateKey(value) {
@@ -109,9 +129,14 @@ function number(value) {
   return Number(value || 0);
 }
 
-async function listMovements(auth, filters = {}) {
+async function listMovements(auth, filters = {}, pagination = null) {
   const { companyId } = authScope(auth);
-  return inventoryRepository.findAllMovements(companyId, filters);
+  const movements = await inventoryRepository.findAllMovements(companyId, filters, pagination);
+  if (!pagination) {
+    return movements;
+  }
+  const paginatedMovements = /** @type {{ items: Array<any>, totalItems: number }} */ (movements);
+  return buildPaginatedResponse(paginatedMovements.items, pagination, paginatedMovements.totalItems);
 }
 
 async function listStocks(auth, filters = {}) {

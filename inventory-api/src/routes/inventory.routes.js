@@ -4,6 +4,7 @@ const authenticate = require('../middlewares/authenticate');
 const authorizePermission = require('../middlewares/authorizePermission');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
+const { parsePaginationQuery } = require('../lib/pagination');
 const { createStockEntrySchema, updateLotQaSchema, adjustStockSchema } = require('../schemas/inventory.schema');
 const inventoryService = require('../services/inventory.service');
 
@@ -29,7 +30,7 @@ router.get('/movements', authorizePermission('inventory.view', 'inventory.manage
       warehouseId: optionalBigInt(req.query.warehouseId, 'warehouseId'),
       productId: optionalBigInt(req.query.productId, 'productId'),
       lotId: optionalBigInt(req.query.lotId, 'lotId'),
-    }));
+    }, parsePaginationQuery(req.query)));
   } catch (error) { return next(error); }
 });
 

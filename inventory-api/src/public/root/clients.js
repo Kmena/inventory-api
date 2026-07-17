@@ -62,13 +62,9 @@ let editingClientId = null;
 let selectedStoreLocation;
 let storeMap;
 let storeMarker;
-const COSTA_RICA_CENTER = { latitude: 9.7489, longitude: -83.7534 };
-const COSTA_RICA_BOUNDS = {
-  north: 11.3,
-  south: 8.0,
-  west: -86.2,
-  east: -82.3,
-};
+const clientsShared = window.RootClientsShared;
+const COSTA_RICA_CENTER = clientsShared.COSTA_RICA_CENTER;
+const COSTA_RICA_BOUNDS = clientsShared.COSTA_RICA_BOUNDS;
 let mapState = { centerLat: COSTA_RICA_CENTER.latitude, centerLng: COSTA_RICA_CENTER.longitude };
 
 if (!session?.token || session?.user?.role?.code !== 'admin' || !session?.user?.companyId) {
@@ -76,27 +72,9 @@ if (!session?.token || session?.user?.role?.code !== 'admin' || !session?.user?.
 } else {
   sessionLabel.textContent = `Sesion activa: ${session.user.fullName} (${session.user.username})`;
 
-function authHeaders() {
-  return {
-    Authorization: `Bearer ${session.token}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-function optional(value) {
-  const normalized = value?.toString().trim();
-  return normalized || undefined;
-}
-
-function optionalNumber(value) {
-  const normalized = optional(value);
-  if (normalized === undefined) {
-    return undefined;
-  }
-
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
+const authHeaders = () => clientsShared.authHeaders(session);
+const optional = clientsShared.optional;
+const optionalNumber = clientsShared.optionalNumber;
 
 function documentTypeLabel(value) {
   if (value === 'REFERENCIA_COMERCIAL') {
@@ -105,48 +83,9 @@ function documentTypeLabel(value) {
   return documentTypes.find((type) => type.value === value)?.label || value || 'Sin tipo';
 }
 
-function setMessage(text, isError = false) {
-  message.textContent = text;
-  message.className = 'message';
-  if (isError) {
-    message.classList.add('error');
-  }
-}
-
-function setMapMessage(text, isError = false) {
-  storeMapMessage.textContent = text;
-  storeMapMessage.className = 'message';
-  if (isError) {
-    storeMapMessage.classList.add('error');
-  }
-}
-
-async function downloadProtectedClientDocument(fileUrl, fileName) {
-  const response = await fetch(fileUrl, {
-    headers: { Authorization: `Bearer ${session.token}` },
-  });
-
-  if (!response.ok) {
-    let result = null;
-    try {
-      result = await response.json();
-    } catch (_error) {
-      result = null;
-    }
-
-    throw new Error(result?.message || 'No se pudo descargar el documento');
-  }
-
-  const blob = await response.blob();
-  const downloadUrl = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = downloadUrl;
-  link.download = fileName || 'documento';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(downloadUrl);
-}
+const setMessage = (text, isError = false) => clientsShared.setMessage(message, text, isError);
+const setMapMessage = (text, isError = false) => clientsShared.setMessage(storeMapMessage, text, isError);
+const downloadProtectedClientDocument = (fileUrl, fileName) => clientsShared.downloadProtectedFile(session, fileUrl, fileName, 'No se pudo descargar el documento');
 
 function setFieldIfEmpty(fieldName, value) {
   if (!value) {
@@ -605,25 +544,11 @@ function currentStoreCoordinates() {
   return COSTA_RICA_CENTER;
 }
 
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function lngToPercent(longitude) {
-  return ((longitude - COSTA_RICA_BOUNDS.west) / (COSTA_RICA_BOUNDS.east - COSTA_RICA_BOUNDS.west)) * 100;
-}
-
-function latToPercent(latitude) {
-  return ((COSTA_RICA_BOUNDS.north - latitude) / (COSTA_RICA_BOUNDS.north - COSTA_RICA_BOUNDS.south)) * 100;
-}
-
-function percentToLng(percent) {
-  return COSTA_RICA_BOUNDS.west + (percent / 100) * (COSTA_RICA_BOUNDS.east - COSTA_RICA_BOUNDS.west);
-}
-
-function percentToLat(percent) {
-  return COSTA_RICA_BOUNDS.north - (percent / 100) * (COSTA_RICA_BOUNDS.north - COSTA_RICA_BOUNDS.south);
-}
+const clamp = clientsShared.clamp;
+const lngToPercent = clientsShared.lngToPercent;
+const latToPercent = clientsShared.latToPercent;
+const percentToLng = clientsShared.percentToLng;
+const percentToLat = clientsShared.percentToLat;
 
 function setStoreMarker(latitude, longitude) {
   selectedStoreLocation = {
@@ -798,18 +723,7 @@ async function loadDocumentTypes() {
   renderDocumentTypeOptions();
 }
 
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result?.toString() || '';
-      const [, base64 = ''] = result.split(',');
-      resolve(base64);
-    };
-    reader.onerror = () => reject(new Error('No se pudo leer el archivo seleccionado'));
-    reader.readAsDataURL(file);
-  });
-}
+const readFileAsBase64 = clientsShared.readFileAsBase64;
 
 async function loadClients() {
   const response = await fetch('/api/clients/company', {
