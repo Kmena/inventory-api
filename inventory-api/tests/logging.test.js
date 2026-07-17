@@ -17,6 +17,7 @@ test('isDevelopmentEnvironment returns true only for development', () => {
 test('createRequestLogMessage keeps minimal non-dev request context', () => {
   const message = createRequestLogMessage({
     nodeEnv: 'staging',
+    requestId: 'req-123',
     method: 'GET',
     path: '/api/clients',
     statusCode: 403,
@@ -27,6 +28,7 @@ test('createRequestLogMessage keeps minimal non-dev request context', () => {
   assert.deepEqual(JSON.parse(message), {
     level: 'info',
     environment: 'staging',
+    requestId: 'req-123',
     method: 'GET',
     path: '/api/clients',
     statusCode: 403,
@@ -57,13 +59,18 @@ test('buildErrorLogEntry sanitizes error details outside development', () => {
 
   const entry = buildErrorLogEntry({
     error,
-    req: { method: 'POST', originalUrl: '/api/payments' },
+    req: {
+      method: 'POST',
+      originalUrl: '/api/payments',
+      requestContext: { requestId: 'req-789' },
+    },
     nodeEnv: 'production',
   });
 
   assert.deepEqual(entry, {
     level: 'error',
     environment: 'production',
+    requestId: 'req-789',
     method: 'POST',
     path: '/api/payments',
     statusCode: 400,
