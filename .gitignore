@@ -49,6 +49,7 @@ __pycache__/
 **/docs/**/*.md
 **/docs/**/*.html
 !**/docs/**/README.md
+!inventory-api/docs/production-baseline.md
 plan/*
 
 */docs/*.txt
