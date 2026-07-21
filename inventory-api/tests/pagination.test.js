@@ -143,14 +143,14 @@ test('listPayments returns paginated responses when requested', async () => {
     [[paymentRepository, {
       findCompanyPayments: async () => ({
         totalItems: 4,
-        items: [{ id: 5n, amount: 100 }],
+        items: [{ id: 5n, amount: 100, receipts: [] }],
       }),
     }]],
-    () => paymentService.listPayments({ companyId: '9' }, { page: 2, pageSize: 1, skip: 1, take: 1 }),
+    () => paymentService.listPayments({ companyId: '9', permissions: ['sales.manage'] }, { page: 2, pageSize: 1, skip: 1, take: 1 }),
   );
 
   assert.deepEqual(result, {
-    items: [{ id: 5n, amount: 100 }],
+    items: [{ id: 5n, amount: 100, receipts: [] }],
     pagination: {
       page: 2,
       pageSize: 1,

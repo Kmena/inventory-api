@@ -4,12 +4,13 @@ const orderRepository = require('../repositories/order.repository');
 const { createHttpError } = require('../lib/errors');
 const { buildPaginatedResponse } = require('../lib/pagination');
 const audit = require('../lib/audit');
+const { getPendingAmount, getPendingAmountDecimal } = require('./invoice-financial-state');
 
 function normalizeInvoicePayload(payload) {
+  const { status: _ignoredStatus, paidAt: _ignoredPaidAt, ...safePayload } = payload;
   return {
-    ...payload,
-    dueAt: payload.dueAt ? new Date(payload.dueAt) : payload.dueAt,
-    paidAt: payload.paidAt ? new Date(payload.paidAt) : payload.paidAt,
+    ...safePayload,
+    dueAt: safePayload.dueAt ? new Date(safePayload.dueAt) : safePayload.dueAt,
   };
 }
 
@@ -24,20 +25,6 @@ function assertCompanyScope(auth) {
   return BigInt(auth.companyId);
 }
 
-function isActivePayment(payment) {
-  return !payment?.status || payment.status === 'ACTIVE';
-}
-
-function getAppliedAmount(invoice) {
-  return Number((invoice.payments || [])
-    .filter(isActivePayment)
-    .reduce((total, payment) => total + Number(payment.amount || 0), 0)
-    .toFixed(2));
-}
-
-function getPendingAmount(invoice, appliedAmount = getAppliedAmount(invoice)) {
-  return Number(Math.max(0, Number(invoice.amount || 0) - appliedAmount).toFixed(2));
-}
 
 function hasAssignmentInconsistency(invoice) {
   const order = invoice.order;
@@ -63,11 +50,12 @@ function serializeInconsistency(invoice) {
     return null;
   }
 
-  const pendingAmount = getPendingAmount(invoice);
-  if (pendingAmount <= 0) {
-    return null;
-  }
+  const pendingAmountDecimal = getPendingAmountDecimal(invoice);
+  if (pendingAmountDecimal.lte(0)) {
+     return null;
+   }
 
+   const pendingAmount = getPendingAmount(invoice);
   const inconsistencyTypes = [];
   if (hasAssignmentInconsistency(invoice)) {
     inconsistencyTypes.push('ASIGNACION_TIENDA');

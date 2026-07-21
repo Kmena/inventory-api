@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Workspace de agente</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="agent-shell">
+      <section class="card agent-page">
+        <header class="page-header clients-header agent-header">
+          <div>
+            <p class="eyebrow">Workspace comercial</p>
+            <h1>Ruta del agente</h1>
+            <p id="agent-session" class="muted">Sesion activa</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="refresh-agent-button" class="secondary-button" type="button">Actualizar</button>
+            <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+          </div>
+        </header>
+
+        <section class="agent-summary-grid" aria-label="Resumen del agente">
+          <article class="dashboard-tile">
+            <span>Rutas asignadas</span>
+            <strong id="agent-routes-count">0</strong>
+          </article>
+          <article class="dashboard-tile">
+            <span>Tiendas por visitar</span>
+            <strong id="agent-pending-count">0</strong>
+          </article>
+          <article class="dashboard-tile">
+            <span>Cerca del limite</span>
+            <strong id="agent-near-limit-count">0</strong>
+          </article>
+          <button id="open-agent-goals-button" class="dashboard-tile agent-summary-button" type="button" aria-haspopup="dialog" aria-controls="agent-goals-modal">
+            <span>Metas activas</span>
+            <strong id="agent-goals-count">0</strong>
+          </button>
+        </section>
+
+        <section class="client-command-bar agent-filter-bar" aria-label="Filtros de tiendas">
+          <label class="field client-search-field">
+            <span>Buscar tienda</span>
+            <input id="agent-store-name-filter" type="search" placeholder="Nombre de tienda o cliente" />
+          </label>
+          <label class="field">
+            <span>Zona o subzona</span>
+            <input id="agent-zone-filter" type="search" placeholder="Zona o subzona" />
+          </label>
+          <button id="clear-agent-filters-button" class="secondary-button" type="button">Limpiar</button>
+        </section>
+
+        <section class="agent-layout">
+          <section class="agent-stores-panel">
+            <div class="section-title-row">
+              <div>
+                <h2>Recorrido sugerido</h2>
+                <p id="agent-stores-caption" class="muted">0 tiendas</p>
+              </div>
+            </div>
+            <div id="agent-stores-list" class="agent-stores-list"></div>
+          </section>
+
+          <section class="agent-main-panel">
+            <article class="import-panel">
+              <div class="section-title-row">
+                <div>
+                  <h2>Ficha de tienda</h2>
+                  <p id="agent-store-detail-caption" class="muted">Seleccione una tienda para ver su detalle.</p>
+                </div>
+              </div>
+              <div id="agent-store-detail" class="detail-grid agent-store-detail-grid"></div>
+              <div class="toolbar-actions agent-detail-actions">
+                <button id="open-visit-page-button" class="secondary-button" type="button">Abrir visita</button>
+                <button id="open-order-entry-button" type="button">Iniciar pedido</button>
+              </div>
+            </article>
+
+            <article class="import-panel">
+              <div class="section-title-row">
+                <div>
+                  <h2>Registrar visita</h2>
+                  <p class="muted">Venta, cobro o seguimiento desde la tienda seleccionada.</p>
+                </div>
+              </div>
+              <form id="agent-visit-form" class="agent-visit-form">
+                <div class="pricing-grid">
+                  <label class="field">
+                    <span>Motivo</span>
+                    <select name="motive" required>
+                      <option value="VENTA">Venta</option>
+                      <option value="COBRO">Cobro</option>
+                      <option value="SEGUIMIENTO">Seguimiento</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>Resultado</span>
+                    <select name="result" required>
+                      <option value="EXITOSA">Exitosa</option>
+                      <option value="PENDIENTE">Pendiente</option>
+                      <option value="SIN_CONTACTO">Sin contacto</option>
+                      <option value="REPROGRAMADA">Reprogramada</option>
+                    </select>
+                  </label>
+                  <label class="field field-wide">
+                    <span>Proxima visita sugerida</span>
+                    <input name="suggestedNextVisitAt" type="datetime-local" />
+                  </label>
+                  <label class="field field-wide">
+                    <span>Comentario</span>
+                    <input name="comment" type="text" maxlength="2000" placeholder="Que paso en la visita" />
+                  </label>
+                </div>
+                <div class="toolbar-actions">
+                  <button id="submit-agent-visit-button" type="submit">Guardar visita</button>
+                </div>
+              </form>
+            </article>
+
+            <section class="agent-secondary-grid">
+              <article class="import-panel">
+                <div class="section-title-row">
+                  <div>
+                    <h2>Historial de compras</h2>
+                    <p class="muted">Compras y saldo pendiente de esta tienda.</p>
+                  </div>
+                </div>
+                <div id="agent-purchase-history" class="agent-history-list"></div>
+              </article>
+
+              <article class="import-panel">
+                <div class="section-title-row">
+                  <div>
+                    <h2>Productos y sugeridos</h2>
+                    <p class="muted">Venta disponible y sugerencias de otras tiendas del mismo cliente.</p>
+                  </div>
+                </div>
+                <div id="agent-products-list" class="agent-products-list"></div>
+              </article>
+            </section>
+
+
+          </section>
+        </section>
+
+        <button id="open-agent-map-button" class="agent-floating-map-button" type="button" aria-haspopup="dialog" aria-controls="agent-map-modal">
+          Ver mapa
+        </button>
+
+        <div id="agent-map-modal" class="modal-backdrop hidden" role="presentation">
+          <section class="modal-card agent-map-modal-card" role="dialog" aria-modal="true" aria-labelledby="agent-map-title">
+            <header class="section-title-row">
+              <div>
+                <p class="eyebrow">Cobertura visible</p>
+                <h2 id="agent-map-title">Mapa de clientes asignados</h2>
+                <p id="agent-map-caption" class="muted">Seleccione una tienda para ver su contexto.</p>
+              </div>
+              <button id="close-agent-map-button" class="secondary-button" type="button" aria-label="Cerrar mapa">Cerrar</button>
+            </header>
+            <div class="agent-map-toolbar">
+              <label class="field">
+                <span>Buscar cliente asignado</span>
+                <input id="agent-map-client-filter" type="search" placeholder="Cliente o tienda" />
+              </label>
+            </div>
+            <div class="agent-map-layout">
+              <div id="agent-map-client-list" class="agent-map-client-list"></div>
+              <div id="agent-map" class="routes-map"></div>
+            </div>
+          </section>
+        </div>
+
+        <div id="agent-goals-modal" class="modal-backdrop hidden" role="presentation">
+          <section class="modal-card agent-goals-modal-card" role="dialog" aria-modal="true" aria-labelledby="agent-goals-title">
+            <header class="section-title-row">
+              <div>
+                <p class="eyebrow">Progreso comercial</p>
+                <h2 id="agent-goals-title">Mis metas</h2>
+                <p class="muted">Metas activas asignadas al agente autenticado.</p>
+              </div>
+              <button id="close-agent-goals-button" class="secondary-button" type="button" aria-label="Cerrar metas">Cerrar</button>
+            </header>
+            <div id="agent-goals-list" class="role-list"></div>
+          </section>
+        </div>
+
+        <p id="agent-message" class="message" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/agent/workspace.js"></script>
+  </body>
+</html>
+
+

@@ -1,0 +1,36 @@
+feature: p4-closeout-hardening
+spec_version: 1
+status: approved
+implementation_status: approved
+canonical_spec_dir: inventory-api/specs/p4-closeout-hardening
+repository_spec_dir_note: root-level specs copy may also exist; this package satisfies repository-internal references under inventory-api/docs/
+planning_agent_id: sdd-planning-agent-708aed
+scope:
+  includes:
+    - documental-traceability-closeout
+    - monetary-calculation-hardening
+    - authorization-governance
+    - ci-versioning
+    - test-autodiscovery
+    - cd-build-and-publish-without-deploy
+  excludes:
+    - full-rbac-redesign
+    - automatic-environment-deploy
+    - unrelated-refactors
+primary_documents:
+  requirements: requirements.md
+  current_state: current-state.md
+  architecture: architecture.md
+  implementation_plan: implementation-plan.md
+  tasks: tasks.md
+supplemental_documents:
+  advisor_review: advisor-review.md
+  domain_analysis: domain-analysis.md
+  traceability: traceability.md
+  risks: risks.md
+  decisions: decisions.md
+related_docs:
+  - ../../docs/architecture.md
+  - ../../docs/runtime-scope-baseline.md
+  - ../../docs/audit/current-code-audit.md
+implementation_readiness: ready-subject-to-standard-human-review

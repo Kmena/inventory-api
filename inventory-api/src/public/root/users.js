@@ -6,7 +6,16 @@ const form = document.getElementById('user-form');
 const message = document.getElementById('users-message');
 const createButton = document.getElementById('create-user-button');
 const usersBody = document.getElementById('users-body');
+const roleHelpPanel = document.getElementById('role-help-panel');
 let availableRoles = [];
+
+const roleDescriptions = {
+  sales_agent: 'Agente comercial: consulta clientes asignados, rutas y metas propias. El cobro depende de los permisos del rol.',
+  sales_supervisor: 'Supervisor comercial: consulta la informacion comercial completa y puede asignar rutas y metas.',
+  sales: 'Rol legado de ventas. Conviene migrar nuevos usuarios a agente o supervisor comercial.',
+  admin: 'Administrador de la empresa con acceso total al panel administrativo, incluida la asignacion de rutas.',
+  warehouse: 'Usuario operativo de bodega con acceso a inventario y compras.',
+};
 
 if (!session?.token || session?.user?.role?.code !== 'admin' || !session?.user?.companyId) {
   window.location.href = '/';
@@ -35,6 +44,25 @@ function renderRoleOptions(roles) {
   roleSelect.innerHTML = roles
     .map((role) => `<option value="${role.id}">${role.name}</option>`)
     .join('');
+  updateRoleHelp();
+}
+
+function updateRoleHelp() {
+  const selectedRoleId = form.elements.roleId.value;
+  const selectedRole = availableRoles.find((role) => role.id === selectedRoleId);
+  if (!selectedRole) {
+    roleHelpPanel.textContent = '';
+    roleHelpPanel.className = 'message';
+    return;
+  }
+
+  const commercialPermissions = (selectedRole.permissions || []).map((permission) => permission.code)
+    .filter((code) => code.startsWith('sales.') || code.startsWith('collections.') || code.startsWith('customer.activities') || code.startsWith('clients.view'));
+  const description = roleDescriptions[selectedRole.code]
+    || `Rol ${selectedRole.name}. Permisos comerciales detectados: ${commercialPermissions.length || 0}.`;
+
+  roleHelpPanel.textContent = description;
+  roleHelpPanel.className = 'message';
 }
 
 async function loadRoles() {
@@ -86,6 +114,8 @@ logoutButton.addEventListener('click', () => {
   window.location.href = '/';
 });
 
+form.elements.roleId.addEventListener('change', updateRoleHelp);
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   message.textContent = '';
@@ -117,6 +147,7 @@ form.addEventListener('submit', async (event) => {
     form.reset();
     if (availableRoles.length) {
       form.elements.roleId.value = availableRoles[0].id;
+      updateRoleHelp();
     }
     message.textContent = 'Usuario creado correctamente';
     await loadUsers();

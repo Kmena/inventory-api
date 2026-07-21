@@ -13,6 +13,36 @@ function getNumber(value, fallback) {
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
+function parseTrustProxy(value) {
+  const normalizedValue = String(value || '').trim();
+
+  if (!normalizedValue) {
+    return false;
+  }
+
+  const lowerValue = normalizedValue.toLowerCase();
+  if (['false', '0', 'no', 'off'].includes(lowerValue)) {
+    return false;
+  }
+
+  if (['true', 'yes', 'on'].includes(lowerValue)) {
+    return true;
+  }
+
+  if (/^\d+$/.test(normalizedValue)) {
+    return Number(normalizedValue);
+  }
+
+  if (normalizedValue.includes(',')) {
+    return normalizedValue
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return normalizedValue;
+}
+
 function resolveJwtSecret() {
   const configuredSecret = String(process.env.JWT_SECRET || '').trim();
 
@@ -37,9 +67,11 @@ module.exports = {
   nodeEnv,
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:2500',
   bcryptRounds: getNumber(process.env.BCRYPT_ROUNDS, 12),
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   jwtSecret: resolveJwtSecret(),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
   haciendaTaxpayerLookupUrl:
     process.env.HACIENDA_TAXPAYER_LOOKUP_URL || 'https://api.hacienda.go.cr/fe/ae?identificacion={identification}',
   geocodingSearchUrl: process.env.GEOCODING_SEARCH_URL || 'https://nominatim.openstreetmap.org/search',
+  parseTrustProxy,
 };

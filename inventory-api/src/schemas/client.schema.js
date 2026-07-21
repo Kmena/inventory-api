@@ -1,6 +1,13 @@
 // @ts-nocheck -- Zod enum tuple typing for dynamic arrays is deferred from this initial P0 type-check gate.
 const { z } = require('zod');
 const { CLIENT_DOCUMENT_TYPES } = require('../lib/client-document-types');
+const {
+  CLIENT_DOCUMENT_MAX_FILE_SIZE_BYTES,
+  CLIENT_DOCUMENT_ALLOWED_MIME_TYPES,
+  CLIENT_DOCUMENT_EXTENSION_MIME_MAP,
+  GovernedFileValidationError,
+  validateGovernedBase64FilePayload,
+} = require('../lib/sensitive-file-governance');
 
 const createClientSchema = z.object({
   companyId: z.coerce.bigint(),
@@ -70,9 +77,39 @@ const uploadClientDocumentSchema = z.object({
   documentType: z.enum(CLIENT_DOCUMENT_TYPES.map((type) => type.value)),
   documentNumber: z.string().trim().max(120).optional(),
   fileName: z.string().trim().min(1).max(255),
-  mimeType: z.string().trim().max(120).optional(),
+  mimeType: z.enum(CLIENT_DOCUMENT_ALLOWED_MIME_TYPES).optional(),
   fileContentBase64: z.string().trim().min(1),
   notes: z.string().trim().max(1000).optional(),
+}).superRefine((value, ctx) => {
+  try {
+    validateGovernedBase64FilePayload({
+      fileName: value.fileName,
+      mimeType: value.mimeType,
+      fileContentBase64: value.fileContentBase64,
+      maxFileSizeBytes: CLIENT_DOCUMENT_MAX_FILE_SIZE_BYTES,
+      allowedMimeTypes: CLIENT_DOCUMENT_ALLOWED_MIME_TYPES,
+      extensionMimeMap: CLIENT_DOCUMENT_EXTENSION_MIME_MAP,
+      allowMimeTypeInference: true,
+      invalidMimeTypeMessage: 'El documento debe ser PDF, imagen o archivo Word compatible',
+      mimeExtensionMismatchMessage: 'El tipo MIME del documento no coincide con la extension del archivo',
+      maxFileSizeMessage: 'Cada documento debe pesar 5 MB o menos',
+    });
+  } catch (error) {
+    if (!(error instanceof GovernedFileValidationError)) {
+      throw error;
+    }
+
+    const normalizedMessage = String(error.message || '').toLowerCase();
+    const path = normalizedMessage.includes('mime') || normalizedMessage.includes('extension')
+      ? ['mimeType']
+      : ['fileContentBase64'];
+
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path,
+      message: error.message,
+    });
+  }
 });
 
 const createClientReferenceSchema = z.object({

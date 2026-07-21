@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Revision de facturas</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Inventori</p>
+          <h2>Empresa</h2>
+        </div>
+        <nav class="sidebar-nav" aria-label="Navegacion principal">
+          <a class="sidebar-link" href="/root/dashboard.html">Dashboard</a>
+          <a class="sidebar-link" href="/root/users.html">Usuarios</a>
+          <a class="sidebar-link" href="/root/roles.html">Roles</a>
+          <a class="sidebar-link" href="/root/warehouses.html">Bodegas</a>
+          <a class="sidebar-link" href="/root/products.html">Productos</a>
+          <a class="sidebar-link" href="/root/zones.html">Zonas</a>
+          <a class="sidebar-link" href="/root/routes.html">Rutas</a>
+          <a class="sidebar-link" href="/root/clients.html">Clientes</a>
+          <a class="sidebar-link active" href="/root/invoice-inconsistencies.html">Revision de facturas</a>
+        </nav>
+      </aside>
+
+      <section class="card app-content">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Revision administrativa</p>
+            <h1>Facturas con aclaracion pendiente</h1>
+            <p id="invoice-review-session" class="muted">Sesion activa</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="refresh-invoice-review-button" class="secondary-button" type="button">Actualizar</button>
+            <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+          </div>
+        </header>
+
+        <p id="invoice-review-message" class="message" aria-live="polite"></p>
+
+        <section class="dashboard-grid executive-dashboard-grid" aria-label="Resumen de inconsistencias">
+          <article class="dashboard-tile">
+            <span>Total de inconsistencias</span>
+            <strong id="invoice-review-total">0</strong>
+          </article>
+          <article class="dashboard-tile">
+            <span>Asignacion de tienda</span>
+            <strong id="invoice-review-assignment">0</strong>
+          </article>
+        </section>
+
+        <section class="executive-summary">
+          <div class="section-title-row">
+            <div>
+              <h2>Facturas a revisar</h2>
+              <p class="muted">Estas facturas no se mostraran al agente hasta que un supervisor regularice la asignacion confiable de cliente y tienda.</p>
+            </div>
+          </div>
+          <div id="invoice-review-list" class="role-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/root/root-sidebar.js"></script>
+    <script src="/root/invoice-inconsistencies.js"></script>
+  </body>
+</html>

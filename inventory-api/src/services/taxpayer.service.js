@@ -73,7 +73,13 @@ async function lookupTaxpayer({ identification, documentType }) {
     throw createHttpError(502, 'Hacienda no respondio correctamente', 'hacienda_error');
   }
 
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (_error) {
+    throw createHttpError(502, 'Hacienda devolvio una respuesta invalida', 'hacienda_error');
+  }
+
   const taxpayer = normalizeTaxpayer(data, normalizedIdentification, documentType);
   if (!taxpayer) {
     throw createHttpError(404, 'No se encontraron datos tributarios para esa identificacion', 'not_found');

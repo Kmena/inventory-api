@@ -31,11 +31,11 @@ test('client DELETE route keeps admin-only authorization', async () => {
   assert.equal(allowedError, undefined);
 });
 
-test('payment DELETE route keeps admin-only authorization', async () => {
+test('payment DELETE route keeps explicit reverse-permission authorization', async () => {
   const guard = getDeleteRouteGuard(paymentRoutes, '/:id');
   let nextError = null;
 
-  await guard({ auth: { role: 'sales' } }, {}, (error) => {
+  await guard({ auth: { role: 'admin', permissions: ['collections.payments.approve'] } }, {}, (error) => {
     nextError = error;
   });
 
@@ -43,7 +43,7 @@ test('payment DELETE route keeps admin-only authorization', async () => {
   assert.equal(nextError?.code, 'forbidden');
 
   let allowedError = 'not-called';
-  await guard({ auth: { role: 'admin' } }, {}, (error) => {
+  await guard({ auth: { role: 'custom-office', permissions: ['collections.payments.reverse'] } }, {}, (error) => {
     allowedError = error;
   });
   assert.equal(allowedError, undefined);

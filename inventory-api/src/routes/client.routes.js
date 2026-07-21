@@ -1,7 +1,7 @@
 const express = require('express');
 
 const authenticate = require('../middlewares/authenticate');
-const authorize = require('../middlewares/authorize');
+const { authorizeAccessPolicy } = require('../security/access-policies');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
 const { parsePaginationQuery } = require('../lib/pagination');
@@ -13,31 +13,32 @@ const {
   createClientReferenceSchema,
 } = require('../schemas/client.schema');
 const clientService = require('../services/client.service');
+const { highPayloadParsers } = require('../middlewares/request-payload');
 
 const router = express.Router();
 router.use(authenticate);
 
-router.get('/', authorize('admin', 'sales'), async (req, res, next) => {
+router.get('/', authorizeAccessPolicy('client.list'), async (req, res, next) => {
   try { return res.json(await clientService.listClients(req.auth, parsePaginationQuery(req.query))); } catch (error) { return next(error); }
 });
 
-router.get('/company', authorize('admin', 'sales'), async (req, res, next) => {
+router.get('/company', authorizeAccessPolicy('client.list-company'), async (req, res, next) => {
   try { return res.json(await clientService.listCompanyClients(req.auth, parsePaginationQuery(req.query))); } catch (error) { return next(error); }
 });
 
-router.get('/classifications/company', authorize('admin', 'sales'), async (req, res, next) => {
+router.get('/classifications/company', authorizeAccessPolicy('client.classifications.list-company'), async (req, res, next) => {
   try { return res.json(await clientService.listCompanyClassifications(req.auth)); } catch (error) { return next(error); }
 });
 
-router.get('/document-types', authorize('admin', 'sales'), async (_req, res, next) => {
+router.get('/document-types', authorizeAccessPolicy('client.document-types.list'), async (_req, res, next) => {
   try { return res.json(clientService.listClientDocumentTypes()); } catch (error) { return next(error); }
 });
 
-router.post('/company', authorize('admin', 'sales'), validate(createCompanyClientSchema), async (req, res, next) => {
+router.post('/company', authorizeAccessPolicy('client.create-company'), validate(createCompanyClientSchema), async (req, res, next) => {
   try { return res.status(201).json(await clientService.createCompanyClient(req.body, req.auth)); } catch (error) { return next(error); }
 });
 
-router.post('/company/:clientId/stores', authorize('admin', 'sales'), validate(createClientStoreSchema), async (req, res, next) => {
+router.post('/company/:clientId/stores', authorizeAccessPolicy('client.store.create'), validate(createClientStoreSchema), async (req, res, next) => {
   try {
     return res.status(201).json(
       await clientService.createCompanyClientStore(parseBigIntId(req.params.clientId, 'clientId'), req.body, req.auth),
@@ -45,7 +46,7 @@ router.post('/company/:clientId/stores', authorize('admin', 'sales'), validate(c
   } catch (error) { return next(error); }
 });
 
-router.post('/:clientId/documents', authorize('admin', 'sales'), validate(uploadClientDocumentSchema), async (req, res, next) => {
+router.post('/:clientId/documents', ...highPayloadParsers, authorizeAccessPolicy('client.document.upload'), validate(uploadClientDocumentSchema), async (req, res, next) => {
   try {
     return res.status(201).json(
       await clientService.createCompanyClientDocument(parseBigIntId(req.params.clientId, 'clientId'), req.body, req.auth),
@@ -53,7 +54,7 @@ router.post('/:clientId/documents', authorize('admin', 'sales'), validate(upload
   } catch (error) { return next(error); }
 });
 
-router.post('/:clientId/references', authorize('admin', 'sales'), validate(createClientReferenceSchema), async (req, res, next) => {
+router.post('/:clientId/references', authorizeAccessPolicy('client.reference.create'), validate(createClientReferenceSchema), async (req, res, next) => {
   try {
     return res.status(201).json(
       await clientService.createCompanyClientReference(parseBigIntId(req.params.clientId, 'clientId'), req.body, req.auth),
@@ -61,7 +62,7 @@ router.post('/:clientId/references', authorize('admin', 'sales'), validate(creat
   } catch (error) { return next(error); }
 });
 
-router.get('/:clientId/documents/:documentId/download', authorize('admin', 'sales'), async (req, res, next) => {
+router.get('/:clientId/documents/:documentId/download', authorizeAccessPolicy('client.document.download'), async (req, res, next) => {
   try {
     const download = await clientService.getCompanyClientDocumentDownload(
       parseBigIntId(req.params.clientId, 'clientId'),
@@ -73,19 +74,19 @@ router.get('/:clientId/documents/:documentId/download', authorize('admin', 'sale
   } catch (error) { return next(error); }
 });
 
-router.get('/:id', authorize('admin', 'sales'), async (req, res, next) => {
+router.get('/:id', authorizeAccessPolicy('client.detail'), async (req, res, next) => {
   try { return res.json(await clientService.getClient(parseBigIntId(req.params.id), req.auth)); } catch (error) { return next(error); }
 });
 
-router.post('/', authorize('admin', 'sales'), validate(createCompanyClientSchema), async (req, res, next) => {
+router.post('/', authorizeAccessPolicy('client.create-legacy'), validate(createCompanyClientSchema), async (req, res, next) => {
   try { return res.status(201).json(await clientService.createCompanyClient(req.body, req.auth)); } catch (error) { return next(error); }
 });
 
-router.put('/:id', authorize('admin', 'sales'), validate(updateClientSchema), async (req, res, next) => {
+router.put('/:id', authorizeAccessPolicy('client.update'), validate(updateClientSchema), async (req, res, next) => {
   try { return res.json(await clientService.updateClient(parseBigIntId(req.params.id), req.body, req.auth)); } catch (error) { return next(error); }
 });
 
-router.delete('/:id', authorize('admin'), async (req, res, next) => {
+router.delete('/:id', authorizeAccessPolicy('client.delete'), async (req, res, next) => {
   try {
     await clientService.removeClient(parseBigIntId(req.params.id), req.auth);
     return res.status(204).send();

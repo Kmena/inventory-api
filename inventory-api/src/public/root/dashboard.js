@@ -30,7 +30,7 @@ function renderDashboard(dashboard) {
 }
 
 async function loadDashboard() {
-  const response = await fetch('/api/companies/root/dashboard', {
+  const response = await fetch('/api/companies/company/dashboard', {
     headers: { Authorization: `Bearer ${session.token}` },
   });
   const data = await response.json();

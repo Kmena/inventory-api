@@ -17,8 +17,12 @@
           <a class="sidebar-link" href="/root/dashboard.html">Dashboard</a>
           <a class="sidebar-link active" href="/root/users.html">Usuarios</a>
           <a class="sidebar-link" href="/root/roles.html">Roles</a>
+          <a class="sidebar-link" href="/root/warehouses.html">Bodegas</a>
+          <a class="sidebar-link" href="/root/products.html">Productos</a>
           <a class="sidebar-link" href="/root/zones.html">Zonas</a>
+          <a class="sidebar-link" href="/root/routes.html">Rutas</a>
           <a class="sidebar-link" href="/root/clients.html">Clientes</a>
+          <a class="sidebar-link" href="/root/invoice-inconsistencies.html">Revision de facturas</a>
         </nav>
       </aside>
 
@@ -35,6 +39,7 @@
         <section class="import-panel">
           <div>
             <h2>Crear usuario</h2>
+            <p class="muted">Seleccione el rol segun el perfil operativo del usuario.</p>
           </div>
 
           <form id="user-form" class="pricing-grid">
@@ -65,6 +70,8 @@
               <input name="password" type="password" minlength="8" required />
             </label>
           </form>
+
+          <div id="role-help-panel" class="message"></div>
 
           <div class="import-actions">
             <button id="create-user-button" type="submit" form="user-form">Crear usuario</button>
@@ -99,6 +106,7 @@
       </section>
     </main>
 
+    <script src="/root/root-sidebar.js"></script>
     <script src="/root/users.js"></script>
   </body>
 </html>

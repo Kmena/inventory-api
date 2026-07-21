@@ -40,6 +40,10 @@ function withStubs(stubsByModule, run) {
     });
 }
 
+function createPassThroughTransactionStub() {
+  return async (work) => work({ kind: 'tx' });
+}
+
 function createRequest() {
   return {
     method: 'POST',
@@ -189,8 +193,27 @@ test('paymentService.removePayment records a payment reversal audit event', asyn
   await withStubs(
     [
       [paymentRepository, {
-        findCompanyPaymentById: async () => ({ id: 21n, invoiceId: 5n, amount: 99, status: 'ACTIVE' }),
+        transaction: createPassThroughTransactionStub(),
+        findCompanyPaymentById: async () => ({
+          id: 21n,
+          invoiceId: 5n,
+          amount: 99,
+          status: 'APPROVED',
+          invoice: { id: 5n, client: { companyId: 1n } },
+          receipts: [],
+        }),
         reverseCompanyPayment: async () => ({ count: 1 }),
+      }],
+      [invoiceRepository, {
+        findCompanyInvoiceForFinancialSync: async () => ({
+          id: 5n,
+          amount: 99,
+          status: 'PAID',
+          paidAt: new Date('2026-07-20T10:00:00Z'),
+          client: { companyId: 1n },
+          payments: [],
+        }),
+        updateCompanyInvoiceFinancialState: async () => ({ id: 5n, status: 'PENDING', paidAt: null }),
       }],
       [audit, {
         recordAuditEventIfAvailable: async (payload) => {
@@ -199,7 +222,7 @@ test('paymentService.removePayment records a payment reversal audit event', asyn
       }],
     ],
     async () => {
-      await paymentService.removePayment(21n, { companyId: '1', sub: '10' }, createRequest());
+      await paymentService.removePayment(21n, { companyId: '1', sub: '10', permissions: ['collections.payments.reverse'] }, createRequest());
     },
   );
 
@@ -278,7 +301,7 @@ test('companyService.registerCompany records a company audit event', async () =>
       }],
     ],
     async () => {
-      await companyService.registerCompany({ name: 'Acme' }, createRequest());
+      await companyService.registerCompany({ name: 'Acme' }, { role: 'root', companyId: null }, createRequest());
     },
   );
 

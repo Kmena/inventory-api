@@ -32,6 +32,8 @@ const permissionDefinitions = [
   ['collections.manage.own', 'collections', 'manage_own', 'Registrar cobros propios del agente'],
   ['collections.view.all', 'collections', 'view_all', 'Ver cobros del equipo comercial'],
   ['collections.assign', 'collections', 'assign', 'Asignar tareas de cobro'],
+  ['collections.payments.approve', 'collections', 'payments_approve', 'Aprobar, rechazar y revisar pagos registrados'],
+  ['collections.payments.reverse', 'collections', 'payments_reverse', 'Reversar pagos aprobados'],
 ];
 
 const rolePermissionMap = {
@@ -44,6 +46,7 @@ const rolePermissionMap = {
     'sales.routes.view.own',
     'sales.goals.view.own',
     'customer.activities.manage',
+    'collections.manage.own',
   ],
   sales_supervisor: [
     'clients.view',

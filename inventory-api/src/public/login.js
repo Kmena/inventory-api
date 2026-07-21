@@ -11,17 +11,48 @@ const ROLE_HOME = {
 function getHomeForSession(session) {
   const roleCode = session?.user?.role?.code;
   const permissions = session?.user?.permissions || [];
+  const isOperationalAgent = roleCode === 'sales_agent'
+    || (
+      permissions.includes('sales.routes.view.own')
+      && permissions.includes('sales.orders.create')
+      && permissions.includes('customer.activities.manage')
+      && !permissions.includes('sales.routes.assign')
+      && !permissions.includes('sales.routes.view.all')
+    );
+
   if (roleCode === 'root') {
     return '/root/index.html';
   }
   if (roleCode === 'admin' && session?.user?.companyId) {
     return '/root/dashboard.html';
   }
+  if (roleCode === 'sales_supervisor') {
+    return '/root/routes.html';
+  }
   if (permissions.includes('warehouse.access')) {
     return '/warehouse/products.html';
   }
+  if (isOperationalAgent) {
+    return '/agent/workspace.html';
+  }
 
   return ROLE_HOME[roleCode] || '/no-access.html';
+}
+
+function getFriendlyLoginMessage(statusCode, fallbackMessage) {
+  if (statusCode === 401) {
+    return 'Usuario o contrasena incorrectos.';
+  }
+
+  if (statusCode === 403) {
+    return fallbackMessage || 'Tu usuario no tiene acceso en este momento.';
+  }
+
+  if (statusCode === 503) {
+    return 'El servicio no esta disponible en este momento. Intente de nuevo en unos minutos.';
+  }
+
+  return fallbackMessage || 'No se pudo iniciar sesion. Intente de nuevo.';
 }
 
 const existingSession = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
@@ -49,16 +80,21 @@ form.addEventListener('submit', async (event) => {
       body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (_error) {
+      data = null;
+    }
 
     if (!response.ok) {
-      throw new Error(data.message || 'No se pudo iniciar sesión');
+      throw new Error(getFriendlyLoginMessage(response.status, data?.message));
     }
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     window.location.href = getHomeForSession(data);
   } catch (error) {
-    message.textContent = error.message || 'Ocurrió un error inesperado';
+    message.textContent = error.message || 'Ocurrio un error inesperado.';
     message.classList.add('error');
   } finally {
     loginButton.disabled = false;

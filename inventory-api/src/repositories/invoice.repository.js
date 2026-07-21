@@ -2,7 +2,11 @@ const prisma = require('../lib/prisma');
 
 /** @typedef {import('@prisma/client').Prisma.InvoiceOrderByWithRelationInput} InvoiceOrderByWithRelationInput */
 
-function findCompanyInvoices(companyId, pagination = null) {
+function transaction(work) {
+  return prisma.$transaction(work);
+}
+
+function findCompanyInvoices(companyId, pagination = null, db = prisma) {
   const where = {
     client: { companyId },
   };
@@ -10,16 +14,16 @@ function findCompanyInvoices(companyId, pagination = null) {
   const include = { client: true, order: true, payments: true };
 
   if (!pagination) {
-    return prisma.invoice.findMany({
+    return db.invoice.findMany({
       where,
       orderBy,
       include,
     });
   }
 
-  return prisma.$transaction([
-    prisma.invoice.count({ where }),
-    prisma.invoice.findMany({
+  return db.$transaction([
+    db.invoice.count({ where }),
+    db.invoice.findMany({
       where,
       orderBy,
       skip: pagination.skip,
@@ -29,8 +33,8 @@ function findCompanyInvoices(companyId, pagination = null) {
   ]).then(([totalItems, items]) => ({ totalItems, items }));
 }
 
-function findCompanyInvoiceById(id, companyId) {
-  return prisma.invoice.findFirst({
+function findCompanyInvoiceById(id, companyId, db = prisma) {
+  return db.invoice.findFirst({
     where: {
       id,
       client: { companyId },
@@ -39,8 +43,8 @@ function findCompanyInvoiceById(id, companyId) {
   });
 }
 
-function findInvoicesForDebtReview(companyId) {
-  return prisma.invoice.findMany({
+function findInvoicesForDebtReview(companyId, db = prisma) {
+  return db.invoice.findMany({
     where: {
       client: { companyId },
     },
@@ -57,15 +61,15 @@ function findInvoicesForDebtReview(companyId) {
   });
 }
 
-function createInvoice(data) {
-  return prisma.invoice.create({
+function createInvoice(data, db = prisma) {
+  return db.invoice.create({
     data,
     include: { client: true, order: true, payments: true },
   });
 }
 
-async function updateCompanyInvoice(id, companyId, data) {
-  const result = await prisma.invoice.updateMany({
+async function updateCompanyInvoice(id, companyId, data, db = prisma) {
+  const result = await db.invoice.updateMany({
     where: {
       id,
       client: { companyId },
@@ -77,7 +81,7 @@ async function updateCompanyInvoice(id, companyId, data) {
     return null;
   }
 
-  return prisma.invoice.findFirst({
+  return db.invoice.findFirst({
     where: {
       id,
       client: { companyId },
@@ -86,8 +90,8 @@ async function updateCompanyInvoice(id, companyId, data) {
   });
 }
 
-function cancelCompanyInvoice(id, companyId) {
-  return prisma.invoice.updateMany({
+function cancelCompanyInvoice(id, companyId, db = prisma) {
+  return db.invoice.updateMany({
     where: {
       id,
       status: { not: 'CANCELLED' },
@@ -99,11 +103,49 @@ function cancelCompanyInvoice(id, companyId) {
   });
 }
 
+function findCompanyInvoiceForFinancialSync(id, companyId, db = prisma) {
+  return db.invoice.findFirst({
+    where: {
+      id,
+      client: { companyId },
+    },
+    include: {
+      client: true,
+      order: true,
+      payments: {
+        orderBy: [{ approvedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      },
+    },
+  });
+}
+
+async function updateCompanyInvoiceFinancialState(id, companyId, data, db = prisma) {
+  const result = await db.invoice.updateMany({
+    where: {
+      id,
+      client: { companyId },
+    },
+    data: {
+      status: data.status,
+      paidAt: data.paidAt,
+    },
+  });
+
+  if (result.count === 0) {
+    return null;
+  }
+
+  return findCompanyInvoiceForFinancialSync(id, companyId, db);
+}
+
 module.exports = {
+  transaction,
   findCompanyInvoices,
   findCompanyInvoiceById,
   findInvoicesForDebtReview,
+  findCompanyInvoiceForFinancialSync,
   createInvoice,
   updateCompanyInvoice,
+  updateCompanyInvoiceFinancialState,
   cancelCompanyInvoice,
 };

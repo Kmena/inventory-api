@@ -9,9 +9,6 @@ const clientReferenceForm = document.getElementById('client-reference-form');
 const clientDocumentForm = document.getElementById('client-document-form');
 const message = document.getElementById('clients-message');
 const createClientButton = document.getElementById('create-client-button');
-const addStoreButton = document.getElementById('add-store-button');
-const addRepresentativeButton = document.getElementById('add-representative-button');
-const addClientReferenceButton = document.getElementById('add-client-reference-button');
 const addClientDocumentButton = document.getElementById('add-client-document-button');
 const lookupTaxpayerButton = document.getElementById('lookup-taxpayer-button');
 const refreshButton = document.getElementById('refresh-clients-button');
@@ -64,7 +61,6 @@ let storeMap;
 let storeMarker;
 const clientsShared = window.RootClientsShared;
 const COSTA_RICA_CENTER = clientsShared.COSTA_RICA_CENTER;
-const COSTA_RICA_BOUNDS = clientsShared.COSTA_RICA_BOUNDS;
 let mapState = { centerLat: COSTA_RICA_CENTER.latitude, centerLng: COSTA_RICA_CENTER.longitude };
 
 if (!session?.token || session?.user?.role?.code !== 'admin' || !session?.user?.companyId) {

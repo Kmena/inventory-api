@@ -67,14 +67,16 @@ Esta base ya incluye:
 - movimientos de inventario para entradas, ajustes, reservas, liberaciones y salidas
 - flujo dedicado de facturacion: crear pedido, aprobar condiciones, revisar credito, generar proforma, facturar y registrar XML/respuesta de Hacienda
 - UI demo de bodega para importar productos desde Excel por bloques
-- dashboard root para crear, listar, activar y deshabilitar empresas
-- dashboard ejecutivo para administradores de empresa
-- sidebar de administracion con acceso a dashboard, usuarios y roles
+- dashboard root para crear, listar, activar y deshabilitar empresas globales
+- dashboard ejecutivo para administradores de empresa dentro de su tenant, expuesto en el alias semántico `/api/companies/company/dashboard` y conservando compatibilidad con el path legacy `/api/companies/root/dashboard`
+- sidebar de administracion con acceso a dashboard, usuarios y roles de empresa
 - creacion de usuarios dentro de la empresa del administrador
 - roles personalizados por empresa con seleccion de permisos
 - autorizacion por permisos finos para bodega, productos e inventario
 
 ## Dominios cubiertos en el schema actual
+
+> Importante: esta sección describe lo que está **modelado en Prisma**. No debe interpretarse automáticamente como un módulo runtime completo ni como una API operable ya soportada.
 
 El schema Prisma actual ya modela:
 
@@ -95,29 +97,83 @@ El schema Prisma actual ya modela:
 - facturas y pagos
 - ordenes e items de produccion
 
+## Baseline de alcance runtime
+
+Para congelar el alcance real del repositorio, use como referencia principal:
+
+- `docs/runtime-scope-baseline.md`
+- `docs/domain-evolution-baseline.md`
+- `docs/runtime-endpoint-catalog.md`
+- `docs/runtime-ui-api-contract-map.md`
+- `docs/ui-guidelines.md`
+
+Ese baseline separa explícitamente:
+
+- capacidades implementadas y verificables en runtime
+- capacidades documentadas pero no soportadas todavía como módulo operable
+- capacidades parciales o condicionadas
+- endpoints legacy o rutas preservadas por compatibilidad
+- contratos observables entre la UI embebida y la API
+
+## Frontera real backend/frontend
+
+La separación real actual del repositorio es la siguiente:
+
+- `src/routes/`, `src/services/`, `src/repositories/`, `src/lib/` y `src/middlewares/` forman el backend ejecutable
+- `src/public/` forma parte del runtime real porque `src/app.js` lo sirve con `express.static(...)`
+- no existe en este repositorio un proyecto frontend separado, con build independiente o pipeline autónomo verificable
+- por lo tanto, la UI embebida no debe tratarse como demo descartable: es una superficie soportada del backend y sus contratos deben mantenerse gobernados junto con la API
+
+Use estos documentos como referencia contractual:
+
+- `docs/runtime-endpoint-catalog.md`
+- `docs/runtime-ui-api-contract-map.md`
+- `docs/ui-guidelines.md`
+- `docs/production-baseline.md`
+
+## Quality gates versionados
+
+El repositorio incluye un workflow mínimo de GitHub Actions en:
+
+- `.github/workflows/quality-gates.yml`
+
+Ese workflow ejecuta el baseline reproducible de calidad sin requerir secretos de despliegue:
+
+1. `npm ci`
+2. `npm run build`
+3. `npm run verify`
+
+Su objetivo es validar instalación, generación de Prisma y los gates versionados del repositorio en `push`, `pull_request` y `workflow_dispatch`.
+
+## CD parcial versionado sin deploy
+
+El repositorio incluye además un workflow controlado de build/publicación en:
+
+- `.github/workflows/build-and-publish.yml`
+
+Características del flujo:
+
+- se activa solo por tag `v*` o por `workflow_dispatch`
+- ejecuta `npm ci`, `npm run build` y `npm run verify` antes de empaquetar
+- construye una imagen Docker versionada
+- publica artefactos reproducibles en GitHub Actions mediante `upload-artifact`
+- no realiza despliegue automático a ningún ambiente
+- no requiere secretos de registry para el baseline actual
+
+Artefactos publicados por corrida:
+
+- imagen Docker comprimida (`.docker-image.tar.gz`)
+- checksum SHA-256
+- metadata JSON de release
+
 ## Gaps frente al PRD/ERD
 
 Aunque el backend ya es funcional, todavia no cubre completo el alcance del PRD. Los puntos principales pendientes son:
 
-- `Warehouse` y stock real por bodega
-- tipos de bodega (`QUARANTINE`, `PROCESS`, `FINISHED_GOODS`, `GENERAL`)
-- bandera para definir si una bodega puede despachar ventas
-- `WarehouseStock` para balance por producto y bodega
-- transferencias entre bodegas
-- lotes obligatorios con estrategia configurable de salida
-- ficha de cuarentena, aprobación QA y autorización de movimientos por etapa
-- alertas por vencimiento de lote, falla QA y salidas extraordinarias
-- `ApprovalRequest` para aprobaciones criticas
-- `Permission`, `RolePermission` y `ApprovalTypePermission` para permisos configurables
-- `AuditLog` transversal
-- roles `supervisor` y `executive`
-- aprobacion por credito excedido
-- zonas/subzonas/rutas comerciales y asignacion de agentes
-- subclasificacion obligatoria por producto
-- precio general y ajustes comerciales por promocion, bonificacion o regalia
-- soft delete o desactivacion logica de catalogos con historial, especialmente productos terminados
-- produccion real con estados propios, doble aprobacion, consumo, salida y merma
-- reportes, dashboards, exportacion PDF/Excel y alertas de stock minimo/vencimiento/salidas extraordinarias
+- motor transversal completo de `ApprovalRequest` y aprobaciones críticas del PRD más allá del baseline mínimo ya integrado
+- producción real operable con estados propios, doble aprobación, consumo, salida y merma expuesta como módulo usable
+- reportes y exportaciones como superficie runtime completa
+- cualquier otra capacidad descrita solo por PRD/ERD sin ruta, servicio y flujo runtime verificable
 
 ## Estructura
 
@@ -128,11 +184,12 @@ Aunque el backend ya es funcional, todavia no cubre completo el alcance del PRD.
 - `src/schemas/` -> validaciones Zod
 - `src/middlewares/` -> autenticacion, autorizacion y validacion
 - `src/lib/` -> utilidades compartidas
-- `src/public/` -> UI demo local
+- `src/public/` -> UI estática embebida servida por el mismo backend; forma parte del runtime soportado
 - `prisma/` -> schema, migraciones y seed
 - `docs/` -> PRD, ERD y documentacion tecnica
 - `Dockerfile` -> imagen base
-- `docker-compose.yml` -> app + postgres
+- `docker-compose.dev.yml` -> stack canónico de desarrollo local
+- `docker-compose.yml` -> alias transicional dev-only hacia el flujo canónico
 
 ## Runtime soportado
 
@@ -140,10 +197,70 @@ Contrato explícito actual del repositorio:
 
 - Node.js `20.x`
 - `package.json` declara `"engines": { "node": ">=20 <21" }`
-- `.github/workflows/p0-quality-gates.yml` ejecuta los gates obligatorios con Node 20
+- la evidencia soportada del repositorio se valida localmente con los scripts versionados en `package.json` sobre Node 20
 - `Dockerfile` base usa `node:20-bullseye-slim`
 
 Fuera de este rango no se considera entorno soportado para la evidencia obligatoria de cierre P0. En esta implementación se observó drift local con Node 24, por lo que las validaciones canónicas deben ejecutarse con Node 20.
+
+## Baseline productivo verificable
+
+El repositorio incluye ahora un baseline productivo mínimo y versionado en:
+
+- `Dockerfile`
+- `docker-compose.prod.yml`
+- `.env.production.example`
+- `scripts/validate-production-baseline.js`
+- `docs/production-baseline.md`
+
+Flujo resumido:
+
+1. copiar `.env.production.example` a `.env.production`
+2. ejecutar `npm run validate:production-baseline`
+3. ejecutar `docker compose -f docker-compose.prod.yml build`
+4. ejecutar `docker compose -f docker-compose.prod.yml up -d db`
+5. ejecutar `docker compose -f docker-compose.prod.yml run --rm migrate`
+6. ejecutar `docker compose -f docker-compose.prod.yml up -d app`
+7. verificar `/health` y `/health/ready`
+
+Límites explícitos del baseline:
+
+- no sustituye una estrategia cloud específica
+- no incluye TLS, reverse proxy ni backups automatizados
+- no debe interpretarse como production-ready total fuera de lo versionado
+
+## Baseline mínimo de hardening para autenticación, payloads, browser runtime y OpenAPI factual
+
+El runtime actual aplica un endurecimiento incremental verificable en backend y UI embebida:
+
+- throttling proxy-aware/shared-store-ready en `POST /api/auth/login`
+- ventana de observación para login: 15 minutos
+- bloqueo temporal tras 5 fallos autenticables por combinación `IP + username`
+- throttling adicional segmentado para lookups autenticados costosos:
+  - `GET /api/geocoding/search`
+  - `GET /api/taxpayers/lookup`
+- política explícita de `trust proxy` configurable por entorno en `src/config.js` / `src/app.js`
+- abstracción `ThrottleStore` con implementación actual `InMemoryThrottleStore`, preparada para un backend compartido futuro sin introducir Redis todavía
+- política de payload por clases con excepciones finas por endpoint:
+  - payload pequeño por defecto: `256kb`
+  - payload medio para superficies CRUD estructuradas: `1mb`
+  - payload alto `25mb` solo para excepciones justificadas:
+    - `POST /api/clients/:clientId/documents`
+    - `POST /api/products/import`
+    - `POST /api/payments`
+    - `PUT /api/payments/:id`
+- quality gates browser-first sobre `src/public`:
+  - `npm run lint:public-runtime`
+  - `npm run validate:public-runtime`
+  - contratos críticos de login, sesión protegida, navegación y fetch autenticado para pantallas priorizadas
+- OpenAPI factual parcial ampliado en `docs/openapi/runtime-baseline.openapi.json`, con validación automática contra rutas montadas
+
+Límites explícitos de este hardening:
+
+- la implementación activa del throttling sigue siendo local mientras no se apruebe un store compartido real para multiinstancia
+- las excepciones de payload alto se mantienen por compatibilidad con documentos, importaciones y comprobantes base64 actualmente soportados
+- los checks de `src/public` siguen siendo estáticos/browser-first; no ejecutan un navegador real
+- el OpenAPI sigue siendo parcial y factual; no documenta todo el monolito
+- sigue siendo recomendable endurecer también en infraestructura externa cuando exista
 
 ## Arranque local
 
@@ -164,6 +281,29 @@ npx.cmd prisma generate
 npx.cmd prisma migrate dev --name init
 ```
 
+Si Prisma falla de forma intermitente en Windows con errores tipo `EPERM`, locks sobre `query_engine-windows.dll.node` o problemas al regenerar el client, siga la guía operativa dedicada:
+
+- `docs/windows-prisma-troubleshooting.md`
+
+Resumen corto de mitigación local:
+
+1. cierre procesos Node/Prisma que puedan tener abierto el engine (`npm run dev`, `node --test`, shells duplicados, watchers, IDEs con terminal activa)
+2. prefiera `npm.cmd` / `npx.cmd` en vez de `npm` / `npx` cuando el shell lo requiera
+3. regenere Prisma Client con:
+
+```powershell
+npx.cmd prisma generate
+```
+
+4. si persiste el lock, elimine el contenido temporal de `node_modules/.prisma/client` y vuelva a ejecutar `npx.cmd prisma generate`
+5. revise antivirus/Windows Defender/exclusiones si el DLL vuelve a quedar bloqueado
+6. solo despues reintente `npm run build`, migraciones o tests dependientes de Prisma
+
+Importante:
+
+- esta guia reduce friccion local, pero no garantiza eliminar todas las causas ambientales del file-lock
+- si el problema reaparece durante validaciones, documentelo como falla ambiental y no lo atribuya automaticamente al cambio funcional en curso
+
 ## Quality gates
 
 ## Contract summary
@@ -172,16 +312,19 @@ Los scripts soportados del repositorio para validación del backend son:
 
 | Script | Tipo | Propósito | Obligatorio en baseline P1 |
 |---|---|---|---|
-| `npm run lint` | gate individual | validación estática del backend, scripts y tests | Sí |
+| `npm run lint` | gate individual | validación estática del backend, scripts, tests y `src/public/**/*.js` | Sí |
+| `npm run lint:public-runtime` | gate individual | lint browser-first explícito para `src/public/**/*.js` | Sí |
 | `npm run typecheck` | gate individual | verificación de tipos JS con `tsc --noEmit` sobre alcance aprobado | Sí |
+| `npm run validate:public-runtime` | gate individual | validación de sintaxis JS + referencias locales HTML en `src/public/` | Sí |
 | `npm run build` | gate individual | generación de Prisma Client requerida por runtime | Sí |
 | `npm run test` | gate individual | suites automatizadas obligatorias del backend | Sí |
-| `npm run verify` | gate agregado | ejecución fail-fast de `lint + typecheck + build + test` | Sí |
+| `npm run verify` | gate agregado | ejecución fail-fast de `lint + typecheck + lint:public-runtime + validate:public-runtime + build + test` | Sí |
 | `npm run validate:agent-workspace` | diagnóstico | validación adicional de workspace/agente fuera del gate obligatorio | No |
 
 Reglas de uso del contrato actual:
 
 - `verify` reutiliza exactamente los mismos scripts obligatorios definidos de forma individual.
+- `src/public` ya no depende solo del gate sintáctico: queda cubierto además por `lint:public-runtime` y por validación de referencias HTML locales.
 - `validate:agent-workspace` permanece como diagnóstico opcional mientras no forme parte del gate obligatorio aprobado.
 - La evidencia canónica del repositorio debe seguir ejecutándose con Node 20, aunque localmente puedan observarse otros runtimes.
 
@@ -193,15 +336,15 @@ El gate inicial de lint se ejecuta con:
 npm run lint
 ```
 
-Alcance inicial obligatorio para P0:
+Alcance obligatorio actual:
 
 - `src/**/*.js`
 - `scripts/**/*.js`
 - `tests/**/*.js`
+- `src/public/**/*.js`
 
-Exclusiones explícitas en esta primera iteración:
+Exclusiones explícitas del lint general:
 
-- `src/public/**`
 - `node_modules/**`
 - `storage/**`
 - `back_end/**`
@@ -209,7 +352,7 @@ Exclusiones explícitas en esta primera iteración:
 - `prisma/migrations/**`
 - archivos `*.log`
 
-Este alcance prioriza el backend ejecutable y los scripts de validación del P0. El frontend estático bajo `src/public/` queda fuera del primer gate de lint y se podrá incorporar en una iteración posterior con reglas específicas de navegador.
+La UI embebida deja de ser una excepción muda: `src/public/**` participa del lint general con configuración browser-first y además conserva su gate explícito `npm run lint:public-runtime`.
 
 ### Typecheck
 
@@ -237,7 +380,7 @@ Alcance inicial obligatorio para P0:
 - `scripts/generate-local-project-map.js`
 - `scripts/migrate-client-documents-to-private-storage.js`
 
-Exclusiones explícitas en esta primera iteración:
+Exclusiones explícitas en esta iteración del typecheck general:
 
 - `src/public/**`
 - `src/repositories/**`
@@ -249,6 +392,8 @@ Exclusiones explícitas en esta primera iteración:
 - `storage/**`
 - `back_end/**`
 - `front_end/**`
+
+La postura aprobada para `src/public/` sigue siendo incremental: se mantiene fuera del typecheck general orientado a backend/Node, pero deja de estar subgobernada porque `npm run lint:public-runtime` valida JS browser-first, `npm run validate:public-runtime` cubre sintaxis y referencias HTML locales, y `tests/public-surface-characterization.test.js` preserva sus contratos runtime críticos.
 
 Además, algunos hotspots con tipado Prisma/Zod quedaron marcados con `// @ts-nocheck` de forma localizada y documentada para mantener un gate real sin rediseñar los repositorios en esta iteración P0.
 
@@ -319,45 +464,135 @@ Prerequisitos:
 
 ## Arranque con Docker
 
-Si ya creo y aplico la migracion inicial con Prisma desde su maquina local, puede levantar el proyecto con:
+Para la clasificación oficial dev/local vs productivo, use también:
+
+- `docs/runtime-deployment-reality.md`
+
+El flujo oficial de Docker Compose comprometido en este repositorio es **solo para desarrollo local**.
+
+Archivo canónico:
+
+- `docker-compose.dev.yml`
+
+Comando oficial desde `inventory-api/`:
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.dev.yml up --build
 ```
+
+El archivo `docker-compose.yml` se conserva solo como alias transicional dev-only. No debe tratarse como manifiesto productivo ni como ruta canónica nueva.
+
+Antes de levantar Compose:
+
+1. copie `.env.example` a `.env`
+2. reemplace los placeholders locales de `POSTGRES_PASSWORD`, `DATABASE_URL` y `JWT_SECRET`
+3. aplique las migraciones Prisma requeridas para su entorno
 
 El contenedor de la app no ejecuta migraciones automaticamente al arrancar. Primero aplique migraciones con Prisma y luego levante Docker.
 
-Importante para validacion de replay P0:
+Importante para validacion de replay P2:
 
-- la imagen comprometida actual copia `src/` y `prisma/`, pero no copia `scripts/`
-- por eso `npm run prisma:apply-committed-migrations` no esta disponible dentro del contenedor `app` en el baseline actual
-- la secuencia canonica y su clasificacion vigente se documentan en `prisma/migration-instructions.md`
-- el ultimo replay compose preservado en `specs/p0-extra-inclusion/` quedo clasificado como `Failed / Environment blocked`; no trate el simple arranque de `/health` como prueba de replay exitoso
+- el Compose canónico usa variables externas desde `.env`; no quedan secretos operativos inline en el manifiesto versionado
+- la imagen Docker publica un `HEALTHCHECK` que consulta `GET /health/ready`
+- `GET /health` se mantiene como liveness backward compatible
+- `GET /health/ready` valida disponibilidad mínima de base de datos para readiness
+- la secuencia canónica de replay, constraints y auditoría se documenta en `prisma/migration-instructions.md`
+- para evidencia reproducible use `docker compose --env-file .env.example -f docker-compose.dev.yml ...` y no mezcle comandos paralelos sobre la misma base disposable
 
-Si cambia la imagen base, Prisma o dependencias del contenedor, use reconstruccion completa:
+Si cambia la imagen base, Prisma o dependencias del contenedor, use reconstruccion completa sobre el archivo canónico:
 
 ```bash
-docker compose down
-docker compose build --no-cache
-docker compose up
+docker compose -f docker-compose.dev.yml down
+docker compose -f docker-compose.dev.yml build --no-cache
+docker compose -f docker-compose.dev.yml up
 ```
+
+## Validación operativa P2
+
+Checklist mínimo recomendado desde `inventory-api/`:
+
+```bash
+docker compose --env-file .env.example -f docker-compose.dev.yml config
+npm run lint
+npm run typecheck
+npm run build
+npm test
+```
+
+Guía detallada de replay y migraciones:
+- `prisma/migration-instructions.md`
+
+Resumen operativo:
+- desarrollo local canónico: `docker compose -f docker-compose.dev.yml up --build`
+- liveness HTTP: `GET /health`
+- readiness / healthcheck de contenedor: `GET /health/ready`
+- replay de constraints: base disposable + `npm run prisma:apply-committed-migrations` + `tests/p2-hardening-constraints.test.js`
+- auditoría transversal: eventos persistidos en `audit_events` para login, denegaciones de seguridad/autorización, pedidos, pagos, facturas, inventario sensible y cambios administrativos priorizados
+- estrategia productiva: no debe considerarse cerrada solo por estos artefactos; revise `docs/runtime-deployment-reality.md`
+
+## Auditoría transversal P2
+
+Cobertura inicial implementada:
+
+- `auth.login` para login exitoso y rechazado
+- `security.authentication`, `security.authorization.role` y `security.authorization.permission` para denegaciones de seguridad
+- `orders.create`, `orders.update`, `orders.approve`, `orders.cancel`, `orders.dispatch`, `orders.delete`
+- `payments.create`, `payments.update`, `payments.reverse`
+- `invoices.create`, `invoices.update`, `invoices.cancel`
+- `companies.create`, `companies.root.create`, `companies.root.status.update`
+- `users.create`, `users.company.create`
+- `roles.company.create`
+- `inventory.stock_entry.register`, `inventory.lot.qa.update`, `inventory.stock.adjust`
+
+Garantías de esta iteración:
+
+- se registra `requestId`, actor, recurso, acción y resultado cuando el contexto existe
+- no se persisten contraseñas, hashes, tokens ni secretos en `metadata`, `before_state` o `after_state`
+- las denegaciones de seguridad operan con estrategia fail-open defensiva si la persistencia de auditoría no está disponible
+
+## Matriz operativa de actores administrativos
+
+La siguiente tabla refleja el comportamiento **verificado en runtime** para las acciones administrativas sensibles. Distingue hechos actuales del código y notas de compatibilidad.
+
+| Actor | Endpoint / acción | Alcance actual | Observaciones |
+|---|---|---|---|
+| Root global (`role = root`, `companyId = null`) | `GET /api/companies` | Global | Endpoint legacy preservado por compatibilidad. Solo root puede listar empresas. |
+| Root global (`role = root`, `companyId = null`) | `POST /api/companies` | Global | Endpoint legacy preservado por compatibilidad. Solo root puede crear empresas. |
+| Root global (`role = root`, `companyId = null`) | `GET /api/companies/root/companies` | Global | Flujo explícito root-only para listado ampliado de empresas. |
+| Root global (`role = root`, `companyId = null`) | `POST /api/companies/root/companies` | Global | Flujo explícito root-only para registrar empresa, config fiscal y admin inicial. |
+| Root global (`role = root`, `companyId = null`) | `PATCH /api/companies/root/companies/:companyId/status` | Global | Activación/desactivación global de empresas. |
+| Admin de empresa (`role = admin`, `companyId != null`) | `GET /api/companies/company/dashboard` | Tenant propio | Ruta semántica recomendada para el dashboard ejecutivo del admin de empresa. |
+| Admin de empresa (`role = admin`, `companyId != null`) | `GET /api/companies/root/dashboard` | Tenant propio | Alias legacy conservado por compatibilidad durante la migración. |
+| Root global (`role = root`, `companyId = null`) | `GET /api/users` / `POST /api/users` | Global | Administración global de usuarios. |
+| Admin de empresa (`role = admin`, `companyId != null`) | `GET /api/users/company` / `POST /api/users/company` | Tenant propio | Gestión de usuarios de su empresa autenticada. |
+| Admin de empresa (`role = admin`, `companyId != null`) | `GET /api/roles/permissions` | Tenant propio | Consulta catálogo de permisos para armar roles internos. |
+| Admin de empresa (`role = admin`, `companyId != null`) | `GET /api/roles/company` / `POST /api/roles/company` | Tenant propio | Gestión de roles personalizados dentro de la empresa autenticada. |
+
+Notas de compatibilidad:
+
+- `GET /api/companies` y `POST /api/companies` se mantienen como endpoints legacy, pero ya no aceptan admins de empresa.
+- `GET /api/companies/company/dashboard` es el path semántico recomendado para la administración interna de empresa.
+- `GET /api/companies/root/dashboard` se conserva como alias legacy engañoso para no romper clientes o bookmarks existentes; no representa un dashboard root global.
+- La separación entre root global y admin de empresa no depende solo del nombre del rol; también depende de si el actor autenticado tiene `companyId`.
 
 ## Endpoints
 
 ### Publicos
 
 - `GET /health`
+- `GET /health/ready`
 - `POST /api/auth/login`
 
 ### Protegidos con JWT
 
 - `GET /api/auth/me`
-- `GET /api/companies`
-- `POST /api/companies`
-- `GET /api/companies/root/companies`
-- `POST /api/companies/root/companies`
-- `PATCH /api/companies/root/companies/:companyId/status`
-- `GET /api/companies/root/dashboard`
+- `GET /api/companies` (root global; endpoint legacy compatible)
+- `POST /api/companies` (root global; endpoint legacy compatible)
+- `GET /api/companies/root/companies` (root global)
+- `POST /api/companies/root/companies` (root global)
+- `PATCH /api/companies/root/companies/:companyId/status` (root global)
+- `GET /api/companies/company/dashboard` (admin de empresa sobre su propio tenant; path semántico recomendado)
+- `GET /api/companies/root/dashboard` (admin de empresa sobre su propio tenant; alias legacy)
 - `GET /api/roles/permissions`
 - `GET /api/roles/company`
 - `POST /api/roles/company`

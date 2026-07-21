@@ -4,7 +4,7 @@ const cors = require('cors');
 
 const { createRequestLogger, logRequestError } = require('./lib/logging');
 const { createRequestContextMiddleware } = require('./lib/request-context');
-const { corsOrigin, nodeEnv } = require('./config');
+const { corsOrigin, nodeEnv, trustProxy } = require('./config');
 const healthRouter = require('./routes/health.routes');
 const authRouter = require('./routes/auth.routes');
 const companyRouter = require('./routes/company.routes');
@@ -23,8 +23,13 @@ const agentRouter = require('./routes/agent.routes');
 const taxpayerRouter = require('./routes/taxpayer.routes');
 const geocodingRouter = require('./routes/geocoding.routes');
 const economicActivityRouter = require('./routes/economic-activity.routes');
+const {
+  smallPayloadParsers,
+  mediumPayloadParsers,
+} = require('./middlewares/request-payload');
 
 const app = express();
+app.set('trust proxy', trustProxy);
 app.set('json replacer', (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
 
 function getFriendlyError(error) {
@@ -79,29 +84,27 @@ function setSecurityHeaders(_req, res, next) {
 app.use(cors({ origin: corsOrigin }));
 app.use(setSecurityHeaders);
 app.use(createRequestContextMiddleware());
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(createRequestLogger(nodeEnv));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/health', healthRouter);
-app.use('/api/auth', authRouter);
-app.use('/api/companies', companyRouter);
-app.use('/api/roles', roleRouter);
-app.use('/api/users', userRouter);
-app.use('/api/clients', clientRouter);
-app.use('/api/products', productRouter);
-app.use('/api/orders', orderRouter);
-app.use('/api/invoices', invoiceRouter);
-app.use('/api/payments', paymentRouter);
-app.use('/api/inventory', inventoryRouter);
-app.use('/api/warehouses', warehouseRouter);
-app.use('/api/regions', regionRouter);
-app.use('/api/sales-routes', salesRouteRouter);
-app.use('/api/agent', agentRouter);
-app.use('/api/taxpayers', taxpayerRouter);
-app.use('/api/geocoding', geocodingRouter);
-app.use('/api/economic-activities', economicActivityRouter);
+app.use('/api/auth', ...smallPayloadParsers, authRouter);
+app.use('/api/companies', ...mediumPayloadParsers, companyRouter);
+app.use('/api/roles', ...mediumPayloadParsers, roleRouter);
+app.use('/api/users', ...mediumPayloadParsers, userRouter);
+app.use('/api/clients', ...mediumPayloadParsers, clientRouter);
+app.use('/api/products', ...mediumPayloadParsers, productRouter);
+app.use('/api/orders', ...mediumPayloadParsers, orderRouter);
+app.use('/api/invoices', ...mediumPayloadParsers, invoiceRouter);
+app.use('/api/payments', ...mediumPayloadParsers, paymentRouter);
+app.use('/api/inventory', ...mediumPayloadParsers, inventoryRouter);
+app.use('/api/warehouses', ...mediumPayloadParsers, warehouseRouter);
+app.use('/api/regions', ...mediumPayloadParsers, regionRouter);
+app.use('/api/sales-routes', ...mediumPayloadParsers, salesRouteRouter);
+app.use('/api/agent', ...mediumPayloadParsers, agentRouter);
+app.use('/api/taxpayers', ...smallPayloadParsers, taxpayerRouter);
+app.use('/api/geocoding', ...smallPayloadParsers, geocodingRouter);
+app.use('/api/economic-activities', ...mediumPayloadParsers, economicActivityRouter);
 
 app.use((error, req, res, _next) => {
   const friendlyError = getFriendlyError(error);

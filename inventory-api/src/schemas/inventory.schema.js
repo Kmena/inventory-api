@@ -36,9 +36,15 @@ const adjustStockSchema = z.object({
   lotId: z.coerce.bigint().optional().nullable(),
 });
 
+const updateInventoryAlertStatusSchema = z.object({
+  status: z.enum(['ACKNOWLEDGED', 'RESOLVED']),
+  note: z.string().trim().min(3).max(500).optional(),
+});
+
 module.exports = {
   createStockEntrySchema,
   updateLotQaSchema,
   adjustStockSchema,
+  updateInventoryAlertStatusSchema,
 };
 

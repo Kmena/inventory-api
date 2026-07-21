@@ -6,7 +6,8 @@ const { createHttpError } = require('../lib/errors');
 const companyRepository = require('../repositories/company.repository');
 const audit = require('../lib/audit');
 
-async function listCompanies() {
+async function listCompanies(auth) {
+  assertRootCreator(auth);
   return companyRepository.findAllCompanies();
 }
 
@@ -21,7 +22,9 @@ async function listCompaniesForRoot(auth) {
   return companyRepository.findAllCompaniesForRoot();
 }
 
-async function registerCompany(payload, req = null) {
+async function registerCompany(payload, auth, req = null) {
+  assertRootCreator(auth);
+
   const company = await companyRepository.createCompany(payload);
   await audit.recordAuditEventIfAvailable({
     req,
