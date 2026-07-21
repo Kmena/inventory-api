@@ -50,3 +50,9 @@ __pycache__/
 **/docs/**/*.html
 !**/docs/**/README.md
 plan/*
+
+*/docs/*.txt
+/openspec/*
+/specs/*
+/docs/*
+.codex/*

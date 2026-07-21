@@ -7,30 +7,17 @@ const { createHttpError } = require('../lib/errors');
 const { CLIENT_DOCUMENT_TYPES } = require('../lib/client-document-types');
 const {
   sanitizeClientDocumentFileName,
-  getClientDocumentExtension,
   buildProtectedClientDocumentUrl,
   buildPrivateClientDocumentPath,
 } = require('../lib/client-document-storage');
+const {
+  CLIENT_DOCUMENT_MAX_FILE_SIZE_BYTES,
+  CLIENT_DOCUMENT_ALLOWED_MIME_TYPES,
+  CLIENT_DOCUMENT_EXTENSION_MIME_MAP,
+  GovernedFileValidationError,
+  validateGovernedBase64FilePayload,
+} = require('../lib/sensitive-file-governance');
 const { buildPaginatedResponse } = require('../lib/pagination');
-
-const MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-]);
-const EXTENSION_MIME_MAP = {
-  '.pdf': 'application/pdf',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.png': 'image/png',
-  '.webp': 'image/webp',
-  '.doc': 'application/msword',
-  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-};
 
 function assertCompanyUser(auth) {
   if (!auth.companyId) {
@@ -82,32 +69,32 @@ async function listCompanyClients(auth, pagination = null) {
 
 function validateClientDocumentPayload(payload) {
   const safeName = sanitizeClientDocumentFileName(payload.fileName);
-  const extension = getClientDocumentExtension(safeName);
-  const mimeType = payload.mimeType || EXTENSION_MIME_MAP[extension] || 'application/octet-stream';
-  if (!ALLOWED_MIME_TYPES.has(mimeType)) {
-    throw createHttpError(400, 'El documento debe ser PDF, imagen o archivo Word compatible', 'validation_error');
-  }
 
-  let buffer;
   try {
-    buffer = Buffer.from(payload.fileContentBase64, 'base64');
-  } catch (_error) {
-    throw createHttpError(400, 'El archivo adjunto no es valido', 'validation_error');
-  }
+    const { buffer, mimeType } = validateGovernedBase64FilePayload({
+      fileName: safeName,
+      mimeType: payload.mimeType,
+      fileContentBase64: payload.fileContentBase64,
+      maxFileSizeBytes: CLIENT_DOCUMENT_MAX_FILE_SIZE_BYTES,
+      allowedMimeTypes: CLIENT_DOCUMENT_ALLOWED_MIME_TYPES,
+      extensionMimeMap: CLIENT_DOCUMENT_EXTENSION_MIME_MAP,
+      allowMimeTypeInference: true,
+      invalidMimeTypeMessage: 'El documento debe ser PDF, imagen o archivo Word compatible',
+      mimeExtensionMismatchMessage: 'El tipo MIME del documento no coincide con la extension del archivo',
+      maxFileSizeMessage: 'Cada documento debe pesar 5 MB o menos',
+    });
 
-  if (!buffer.length) {
-    throw createHttpError(400, 'El archivo adjunto esta vacio', 'validation_error');
+    return {
+      buffer,
+      fileName: safeName,
+      mimeType,
+    };
+  } catch (error) {
+    if (error instanceof GovernedFileValidationError) {
+      throw createHttpError(400, error.message, 'validation_error');
+    }
+    throw error;
   }
-
-  if (buffer.length > MAX_DOCUMENT_SIZE_BYTES) {
-    throw createHttpError(400, 'Cada documento debe pesar 5 MB o menos', 'validation_error');
-  }
-
-  return {
-    buffer,
-    fileName: safeName,
-    mimeType,
-  };
 }
 
 async function persistPrivateClientDocumentFile({ companyId, clientId, documentId, fileName, buffer }) {

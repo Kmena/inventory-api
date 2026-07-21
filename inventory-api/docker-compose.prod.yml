@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  migrate:
+    build: .
+    restart: "no"
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-2500}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      HACIENDA_TAXPAYER_LOOKUP_URL: ${HACIENDA_TAXPAYER_LOOKUP_URL:-https://api.hacienda.go.cr/fe/ae?identificacion={identification}}
+      GEOCODING_SEARCH_URL: ${GEOCODING_SEARCH_URL:-https://nominatim.openstreetmap.org/search}
+    command: ["npm", "run", "prisma:deploy"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-2500}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      HACIENDA_TAXPAYER_LOOKUP_URL: ${HACIENDA_TAXPAYER_LOOKUP_URL:-https://api.hacienda.go.cr/fe/ae?identificacion={identification}}
+      GEOCODING_SEARCH_URL: ${GEOCODING_SEARCH_URL:-https://nominatim.openstreetmap.org/search}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-2500}:2500"
+    volumes:
+      - app_storage:/app/storage
+
+volumes:
+  postgres_data:
+  app_storage:

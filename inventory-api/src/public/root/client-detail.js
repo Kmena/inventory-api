@@ -24,8 +24,6 @@ if (clientDetailShared.redirectUnauthorized(session)) {
     creditPanel: document.getElementById('tab-credit'),
   };
 
-  let currentClient = null;
-
   elements.sessionLabel.textContent = `Sesion activa: ${session.user.fullName} (${session.user.username})`;
 
   const setMessage = (text, isError = false) => clientDetailShared.setMessage(elements.message, text, isError);
@@ -43,7 +41,6 @@ if (clientDetailShared.redirectUnauthorized(session)) {
       throw new Error(client.message || 'No se pudo cargar el cliente');
     }
 
-    currentClient = client;
     clientDetailRenderers.renderClient(elements, client);
     clientDetailReferences.renderReferences(elements.referencesPanel, client, {
       session,

@@ -24,9 +24,13 @@ function withRepositoryStubs(stubsByModule, run) {
     });
 }
 
+function createPassThroughTransactionStub() {
+  return async (work) => work({ kind: 'tx' });
+}
+
 test('listPayments rejects authenticated users without company scope', async () => {
   await assert.rejects(
-    () => paymentService.listPayments({ companyId: null }),
+    () => paymentService.listPayments({ companyId: null, permissions: ['collections.manage.own'] }),
     (error) => {
       assert.equal(error.statusCode, 403);
       assert.equal(error.code, 'forbidden');
@@ -36,20 +40,39 @@ test('listPayments rejects authenticated users without company scope', async () 
 });
 
 test('listPayments queries only payments within the authenticated company', async () => {
-  let receivedCompanyId = null;
+  let receivedArguments = null;
 
   const payments = await withRepositoryStubs(
     [[paymentRepository, {
-      findCompanyPayments: async (companyId) => {
-        receivedCompanyId = companyId;
-        return [{ id: 1n, amount: 150 }];
+      findCompanyPayments: async (companyId, _pagination, options) => {
+        receivedArguments = { companyId, options };
+        return [{ id: 1n, amount: 150, receipts: [] }];
       },
     }]],
-    () => paymentService.listPayments({ companyId: '22' }),
+    () => paymentService.listPayments({ companyId: '22', permissions: ['sales.manage'] }),
   );
 
-  assert.equal(receivedCompanyId, 22n);
-  assert.deepEqual(payments, [{ id: 1n, amount: 150 }]);
+  assert.deepEqual(receivedArguments, { companyId: 22n, options: {} });
+  assert.deepEqual(payments, [{ id: 1n, amount: 150, receipts: [] }]);
+});
+
+test('listPayments scopes own-collection users to submittedByUserId', async () => {
+  let receivedArguments = null;
+
+  await withRepositoryStubs(
+    [[paymentRepository, {
+      findCompanyPayments: async (companyId, _pagination, options) => {
+        receivedArguments = { companyId, options };
+        return [];
+      },
+    }]],
+    () => paymentService.listPayments({ companyId: '22', sub: '90', permissions: ['collections.manage.own'] }),
+  );
+
+  assert.deepEqual(receivedArguments, {
+    companyId: 22n,
+    options: { submittedByUserId: 90n },
+  });
 });
 
 test('getPayment returns not found when payment belongs to another tenant', async () => {
@@ -59,7 +82,7 @@ test('getPayment returns not found when payment belongs to another tenant', asyn
     }]],
     async () => {
       await assert.rejects(
-        () => paymentService.getPayment(9n, { companyId: '44' }),
+        () => paymentService.getPayment(9n, { companyId: '44', permissions: ['sales.manage'] }),
         (error) => {
           assert.equal(error.statusCode, 404);
           assert.equal(error.code, 'not_found');
@@ -70,31 +93,38 @@ test('getPayment returns not found when payment belongs to another tenant', asyn
   );
 });
 
-test('getPayment scopes detail lookup using the authenticated company', async () => {
+test('getPayment scopes detail lookup using the authenticated company and own-submitter scope when needed', async () => {
   let receivedLookup = null;
 
   const payment = await withRepositoryStubs(
     [[paymentRepository, {
-      findCompanyPaymentById: async (paymentId, companyId) => {
-        receivedLookup = { paymentId, companyId };
-        return { id: paymentId, amount: 90 };
+      findCompanyPaymentById: async (paymentId, companyId, options) => {
+        receivedLookup = { paymentId, companyId, options };
+        return { id: paymentId, amount: 90, receipts: [] };
       },
     }]],
-    () => paymentService.getPayment(7n, { companyId: '80' }),
+    () => paymentService.getPayment(7n, { companyId: '80', sub: '11', permissions: ['collections.manage.own'] }),
   );
 
-  assert.deepEqual(receivedLookup, { paymentId: 7n, companyId: 80n });
-  assert.deepEqual(payment, { id: 7n, amount: 90 });
+  assert.deepEqual(receivedLookup, {
+    paymentId: 7n,
+    companyId: 80n,
+    options: { submittedByUserId: 11n },
+  });
+  assert.deepEqual(payment, { id: 7n, amount: 90, receipts: [] });
 });
 
 test('createPayment rejects an invoice from another tenant', async () => {
   await withRepositoryStubs(
     [[invoiceRepository, {
-      findCompanyInvoiceById: async () => null,
+      findCompanyInvoiceForFinancialSync: async () => null,
     }]],
     async () => {
       await assert.rejects(
-        () => paymentService.createPayment({ invoiceId: 8n, amount: 50, paymentMethod: 'CASH' }, { companyId: '4' }),
+        () => paymentService.createPayment(
+          { invoiceId: 8n, amount: 50, paymentMethod: 'CASH', reference: 'RC-1' },
+          { companyId: '4', permissions: ['collections.manage.own'] },
+        ),
         (error) => {
           assert.equal(error.statusCode, 400);
           assert.equal(error.code, 'validation_error');
@@ -111,40 +141,59 @@ test('updatePayment validates invoice reference and scopes write to the authenti
   const updatedPayment = await withRepositoryStubs(
     [
       [paymentRepository, {
-        findCompanyPaymentById: async () => ({ id: 6n, invoiceId: 2n, amount: 10 }),
+        findCompanyPaymentById: async () => ({
+          id: 6n,
+          invoiceId: 2n,
+          amount: 10,
+          status: 'PENDING_APPROVAL',
+          reference: 'REF-1',
+          invoice: { id: 2n, client: { companyId: 14n } },
+          receipts: [],
+        }),
         updateCompanyPayment: async (paymentId, companyId, payload) => {
           receivedUpdate = { paymentId, companyId, payload };
-          return { id: paymentId, ...payload };
+          return {
+            id: paymentId,
+            status: 'PENDING_APPROVAL',
+            invoice: { id: 3n, client: { companyId } },
+            receipts: [],
+            ...payload,
+          };
         },
       }],
       [invoiceRepository, {
-        findCompanyInvoiceById: async (invoiceId, companyId) => ({ id: invoiceId, client: { companyId } }),
+        findCompanyInvoiceForFinancialSync: async (invoiceId, companyId) => ({ id: invoiceId, client: { companyId }, status: 'PENDING', payments: [] }),
       }],
     ],
-    () => paymentService.updatePayment(6n, { invoiceId: 3n, amount: 15 }, { companyId: '14' }),
+    () => paymentService.updatePayment(
+      6n,
+      { invoiceId: 3n, amount: 15, reference: 'REF-2' },
+      { companyId: '14', sub: '88', permissions: ['collections.manage.own'] },
+    ),
   );
 
   assert.deepEqual(receivedUpdate, {
     paymentId: 6n,
     companyId: 14n,
-    payload: { invoiceId: 3n, amount: 15 },
+    payload: { invoiceId: 3n, amount: 15, reference: 'REF-2' },
   });
-  assert.deepEqual(updatedPayment, { id: 6n, invoiceId: 3n, amount: 15 });
+  assert.equal(updatedPayment.invoiceId, 3n);
+  assert.equal(updatedPayment.amount, 15);
 });
 
 test('removePayment rejects deleting a payment outside the authenticated tenant', async () => {
-  let deleteCalled = false;
+  let reverseCalled = false;
 
   await withRepositoryStubs(
     [[paymentRepository, {
       findCompanyPaymentById: async () => null,
       reverseCompanyPayment: async () => {
-        deleteCalled = true;
+        reverseCalled = true;
       },
     }]],
     async () => {
       await assert.rejects(
-        () => paymentService.removePayment(99n, { companyId: '19', sub: '200' }),
+        () => paymentService.removePayment(99n, { companyId: '19', sub: '200', permissions: ['collections.payments.reverse'] }),
         (error) => {
           assert.equal(error.statusCode, 404);
           assert.equal(error.code, 'not_found');
@@ -154,21 +203,42 @@ test('removePayment rejects deleting a payment outside the authenticated tenant'
     },
   );
 
-  assert.equal(deleteCalled, false);
+  assert.equal(reverseCalled, false);
 });
 
 test('removePayment converts DELETE compatibility flow into payment reversal', async () => {
   let receivedReverseCall = null;
 
   const result = await withRepositoryStubs(
-    [[paymentRepository, {
-      findCompanyPaymentById: async () => ({ id: 13n, invoiceId: 7n, amount: 90, status: 'ACTIVE' }),
-      reverseCompanyPayment: async (paymentId, companyId, payload) => {
-        receivedReverseCall = { paymentId, companyId, payload };
-        return { count: 1 };
-      },
-    }]],
-    () => paymentService.removePayment(13n, { companyId: '19', sub: '200' }),
+    [
+      [paymentRepository, {
+        transaction: createPassThroughTransactionStub(),
+        findCompanyPaymentById: async (paymentId) => ({
+          id: paymentId,
+          invoiceId: 7n,
+          amount: 90,
+          status: 'APPROVED',
+          invoice: { id: 7n, client: { companyId: 19n } },
+          receipts: [],
+        }),
+        reverseCompanyPayment: async (paymentId, companyId, payload) => {
+          receivedReverseCall = { paymentId, companyId, payload };
+          return { count: 1 };
+        },
+      }],
+      [invoiceRepository, {
+        findCompanyInvoiceForFinancialSync: async () => ({
+          id: 7n,
+          amount: 90,
+          status: 'PAID',
+          paidAt: new Date('2026-07-20T10:00:00Z'),
+          client: { companyId: 19n },
+          payments: [],
+        }),
+        updateCompanyInvoiceFinancialState: async () => ({ id: 7n, status: 'PENDING', paidAt: null }),
+      }],
+    ],
+    () => paymentService.removePayment(13n, { companyId: '19', sub: '200', permissions: ['collections.payments.reverse'] }),
   );
 
   assert.equal(receivedReverseCall.paymentId, 13n);
@@ -182,11 +252,11 @@ test('removePayment converts DELETE compatibility flow into payment reversal', a
 test('removePayment rejects repeated reversal attempts with controlled conflict', async () => {
   await withRepositoryStubs(
     [[paymentRepository, {
-      findCompanyPaymentById: async () => ({ id: 13n, invoiceId: 7n, amount: 90, status: 'REVERSED' }),
+      findCompanyPaymentById: async () => ({ id: 13n, invoiceId: 7n, amount: 90, status: 'REVERSED', invoice: { id: 7n, client: { companyId: 19n } }, receipts: [] }),
     }]],
     async () => {
       await assert.rejects(
-        () => paymentService.removePayment(13n, { companyId: '19', sub: '200' }),
+        () => paymentService.removePayment(13n, { companyId: '19', sub: '200', permissions: ['collections.payments.reverse'] }),
         (error) => {
           assert.equal(error.statusCode, 409);
           assert.equal(error.code, 'conflict');

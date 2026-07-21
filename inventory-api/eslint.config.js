@@ -14,11 +14,40 @@ const commonJsGlobals = {
   fetch: 'readonly',
 };
 
+const browserGlobals = {
+  window: 'readonly',
+  document: 'readonly',
+  localStorage: 'readonly',
+  sessionStorage: 'readonly',
+  navigator: 'readonly',
+  location: 'readonly',
+  history: 'readonly',
+  fetch: 'readonly',
+  URL: 'readonly',
+  URLSearchParams: 'readonly',
+  Blob: 'readonly',
+  FormData: 'readonly',
+  FileReader: 'readonly',
+  HTMLElement: 'readonly',
+  Node: 'readonly',
+  Event: 'readonly',
+  CustomEvent: 'readonly',
+  setTimeout: 'readonly',
+  clearTimeout: 'readonly',
+  setInterval: 'readonly',
+  clearInterval: 'readonly',
+  alert: 'readonly',
+  confirm: 'readonly',
+  File: 'readonly',
+  console: 'readonly',
+  XLSX: 'readonly',
+  L: 'readonly',
+};
+
 module.exports = [
   {
     ignores: [
       'node_modules/**',
-      'src/public/**',
       'storage/**',
       'back_end/**',
       'front_end/**',
@@ -29,10 +58,26 @@ module.exports = [
   js.configs.recommended,
   {
     files: ['src/**/*.js', 'scripts/**/*.js', 'tests/**/*.js'],
+    ignores: ['src/public/**/*.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'commonjs',
       globals: commonJsGlobals,
+    },
+    rules: {
+      'no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+      }],
+    },
+  },
+  {
+    files: ['src/public/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'script',
+      globals: browserGlobals,
     },
     rules: {
       'no-unused-vars': ['error', {

@@ -37,8 +37,13 @@ enum InvoiceStatus {
 }
 
 enum PaymentLifecycleStatus {
-  ACTIVE
+  DRAFT
+  PENDING_APPROVAL
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
   REVERSED
+  CANCELLED
 }
 
 enum VisitMotive {
@@ -1019,22 +1024,56 @@ model Invoice {
 }
 
 model Payment {
-  id               BigInt                 @id @default(autoincrement())
-  invoiceId        BigInt                 @map("invoice_id")
-  amount           Decimal                @db.Decimal(14, 2)
-  paymentMethod    PaymentType            @map("payment_method")
-  status           PaymentLifecycleStatus @default(ACTIVE)
-  reference        String?
-  reversalReason   String?                @map("reversal_reason")
-  reversedAt       DateTime?              @map("reversed_at")
-  reversedByUserId BigInt?                @map("reversed_by_user_id")
-  createdAt        DateTime               @default(now()) @map("created_at")
-  updatedAt        DateTime               @updatedAt @map("updated_at")
-  invoice          Invoice                @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id                BigInt                 @id @default(autoincrement())
+  invoiceId         BigInt                 @map("invoice_id")
+  amount            Decimal                @db.Decimal(14, 2)
+  paymentMethod     PaymentType            @map("payment_method")
+  status            PaymentLifecycleStatus @default(APPROVED)
+  reference         String?
+  submittedAt       DateTime               @default(now()) @map("submitted_at")
+  submittedByUserId BigInt?                @map("submitted_by_user_id")
+  underReviewAt     DateTime?              @map("under_review_at")
+  underReviewByUserId BigInt?              @map("under_review_by_user_id")
+  reviewReason      String?                @map("review_reason")
+  approvedAt        DateTime?              @map("approved_at")
+  approvedByUserId  BigInt?                @map("approved_by_user_id")
+  rejectedAt        DateTime?              @map("rejected_at")
+  rejectedByUserId  BigInt?                @map("rejected_by_user_id")
+  rejectionReason   String?                @map("rejection_reason")
+  reversalReason    String?                @map("reversal_reason")
+  reversedAt        DateTime?              @map("reversed_at")
+  reversedByUserId  BigInt?                @map("reversed_by_user_id")
+  cancelledAt       DateTime?              @map("cancelled_at")
+  cancelledByUserId BigInt?                @map("cancelled_by_user_id")
+  cancellationReason String?               @map("cancellation_reason")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  invoice           Invoice                @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  receipts          PaymentReceipt[]
 
   @@index([invoiceId, status])
   @@index([status])
+  @@index([submittedAt])
+  @@index([approvedAt])
   @@map("payments")
+}
+
+model PaymentReceipt {
+  id               BigInt   @id @default(autoincrement())
+  paymentId        BigInt   @map("payment_id")
+  storageRef       String   @map("storage_ref")
+  originalFileName String   @map("original_file_name")
+  mimeType         String   @map("mime_type")
+  fileSizeBytes    BigInt   @map("file_size_bytes")
+  isCurrent        Boolean  @default(true) @map("is_current")
+  uploadedAt       DateTime @default(now()) @map("uploaded_at")
+  uploadedByUserId BigInt?  @map("uploaded_by_user_id")
+  replacedAt       DateTime? @map("replaced_at")
+  note             String?
+  payment          Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, isCurrent])
+  @@map("payment_receipts")
 }
 
 model RecipeIngredient {

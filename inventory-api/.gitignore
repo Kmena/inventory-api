@@ -19,5 +19,6 @@ Thumbs.db
 *.temp
 prisma/dev.db
 *.pdf
-.docs/*
+*/docs/*
 *.png
+.codex/*

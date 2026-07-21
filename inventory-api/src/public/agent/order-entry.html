@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Pedido desde tienda</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="agent-shell">
+      <section class="card agent-flow-page">
+        <header class="page-header agent-flow-header">
+          <div>
+            <p class="eyebrow">Pedido desde tienda</p>
+            <h1>Crear pedido borrador</h1>
+            <p id="order-session" class="muted">Sesion activa</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="order-back-button" class="secondary-button" type="button">Volver</button>
+          </div>
+        </header>
+
+        <section id="order-store-summary" class="detail-grid agent-store-detail-grid"></section>
+
+        <article class="import-panel">
+          <div class="section-title-row">
+            <div>
+              <h2>Contexto del pedido</h2>
+              <p class="muted">El pedido queda ligado a la tienda origen y sigue el flujo normal de aprobacion.</p>
+            </div>
+          </div>
+
+          <form id="order-form" class="agent-order-form">
+            <div class="pricing-grid">
+              <label class="field">
+                <span>Responsable</span>
+                <input name="responsible" type="text" maxlength="255" placeholder="Nombre del responsable" />
+              </label>
+              <article class="detail-item">
+                <span>Despacho y transporte</span>
+                <strong>Definido por encargados</strong>
+              </article>
+              <label class="field field-wide">
+                <span>Notas</span>
+                <textarea name="notes" rows="3" maxlength="2000" placeholder="Notas del pedido"></textarea>
+              </label>
+            </div>
+
+            <div class="section-title-row">
+              <div>
+                <h2>Productos disponibles</h2>
+                <p class="muted">Ingrese cantidades en los productos que desea agregar al pedido.</p>
+              </div>
+            </div>
+            <div id="order-products-grid" class="agent-products-grid"></div>
+
+            <div class="toolbar-actions">
+              <button id="submit-order-button" type="submit">Crear pedido borrador</button>
+            </div>
+          </form>
+        </article>
+
+        <p id="order-message" class="message" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="/agent/order-entry.js"></script>
+  </body>
+</html>

@@ -15,8 +15,10 @@ erDiagram
 
     ZONE ||--o{ SUB_ZONE : has
     SALES_ROUTE ||--o{ SALES_ROUTE_SUB_ZONE : groups
+    SALES_ROUTE ||--o{ SALES_ROUTE_ASSIGNMENT : assigned_to
     SUB_ZONE ||--o{ SALES_ROUTE_SUB_ZONE : included_in
     SUB_ZONE ||--o{ CLIENT_STORE_PROFILE : locates_store
+    USER ||--o{ SALES_ROUTE_ASSIGNMENT : covers
     CLIENT ||--o{ CLIENT_STORE_PROFILE : operates_store
     CLIENT_STORE_PROFILE ||--o{ CLIENT_STORE_REPRESENTATIVE : has_people
 
@@ -62,6 +64,7 @@ erDiagram
 
     CLIENT ||--o{ SALES_ORDER : places
     CLIENT_STORE_PROFILE ||--o{ SALES_ORDER : receives_order
+    CLIENT_STORE_PROFILE ||--o{ ROUTE_VISIT_LOG : visited_store
     SALES_ROUTE ||--o{ SALES_ORDER : classifies_order
     USER ||--o{ SALES_ORDER : creates
     SALES_ORDER ||--o{ SALES_ORDER_ITEM : contains
@@ -198,6 +201,8 @@ erDiagram
       string code
       string name
       string description
+      int visit_frequency_days
+      int near_limit_days
       boolean is_active
     }
 
@@ -205,6 +210,48 @@ erDiagram
       bigint id PK
       bigint sales_route_id FK
       bigint sub_zone_id FK
+      boolean is_active
+    }
+
+    SALES_ROUTE_ASSIGNMENT {
+      bigint id PK
+      bigint sales_route_id FK
+      bigint user_id FK
+      datetime assigned_from
+      datetime assigned_to
+      string status
+      boolean is_active
+    }
+
+    CLIENT_STORE_PROFILE {
+      bigint id PK
+      bigint client_id FK
+      bigint sub_zone_id FK
+      string store_name
+      string legal_name
+      string store_type
+      decimal latitude
+      decimal longitude
+      string location_reference
+      string address
+      string opening_hours
+      datetime created_at
+      boolean is_active
+    }
+
+    CLIENT_STORE_REPRESENTATIVE {
+      bigint id PK
+      bigint client_store_profile_id FK
+      string full_name
+      string identification_number
+      string position
+      string store_role
+      string email
+      string phone
+      string mobile
+      datetime birthday
+      string important_dates_note
+      string comment
       boolean is_active
     }
 
@@ -502,6 +549,20 @@ erDiagram
       decimal total_amount
     }
 
+    ROUTE_VISIT_LOG {
+      bigint id PK
+      bigint client_id FK
+      bigint client_store_profile_id FK
+      bigint sales_route_id FK
+      bigint agent_user_id FK
+      datetime visit_started_at
+      datetime visit_ended_at
+      string visit_motive
+      string visit_result
+      string comment
+      datetime suggested_next_visit_at
+    }
+
     PAYMENT {
       bigint id PK
       bigint client_id FK
@@ -551,3 +612,4 @@ erDiagram
       string response_message
       datetime created_at
     }
+

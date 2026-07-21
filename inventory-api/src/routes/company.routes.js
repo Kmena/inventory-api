@@ -1,7 +1,7 @@
 const express = require('express');
 
 const authenticate = require('../middlewares/authenticate');
-const authorize = require('../middlewares/authorize');
+const { authorizeAccessPolicy } = require('../security/access-policies');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
 const {
@@ -14,16 +14,16 @@ const companyService = require('../services/company.service');
 const router = express.Router();
 router.use(authenticate);
 
-router.get('/', authorize('admin'), async (_req, res, next) => {
+router.get('/', authorizeAccessPolicy('company.list-global'), async (req, res, next) => {
   try {
-    const companies = await companyService.listCompanies();
+    const companies = await companyService.listCompanies(req.auth);
     return res.json(companies);
   } catch (error) {
     return next(error);
   }
 });
 
-router.get('/root/companies', authorize('root'), async (req, res, next) => {
+router.get('/root/companies', authorizeAccessPolicy('company.root-companies.list'), async (req, res, next) => {
   try {
     const companies = await companyService.listCompaniesForRoot(req.auth);
     return res.json(companies);
@@ -32,18 +32,21 @@ router.get('/root/companies', authorize('root'), async (req, res, next) => {
   }
 });
 
-router.get('/root/dashboard', authorize('admin'), async (req, res, next) => {
+async function handleExecutiveDashboard(req, res, next) {
   try {
     const dashboard = await companyService.getExecutiveDashboard(req.auth);
     return res.json(dashboard);
   } catch (error) {
     return next(error);
   }
-});
+}
+
+router.get('/root/dashboard', authorizeAccessPolicy('company.dashboard'), handleExecutiveDashboard);
+router.get('/company/dashboard', authorizeAccessPolicy('company.dashboard'), handleExecutiveDashboard);
 
 router.patch(
   '/root/companies/:companyId/status',
-  authorize('root'),
+  authorizeAccessPolicy('company.root-companies.update-status'),
   validate(updateRootCompanyStatusSchema),
   async (req, res, next) => {
     try {
@@ -56,16 +59,16 @@ router.patch(
   }
 );
 
-router.post('/', authorize('admin'), validate(createCompanySchema), async (req, res, next) => {
+router.post('/', authorizeAccessPolicy('company.list-global'), validate(createCompanySchema), async (req, res, next) => {
   try {
-    const company = await companyService.registerCompany(req.body, req);
+    const company = await companyService.registerCompany(req.body, req.auth, req);
     return res.status(201).json(company);
   } catch (error) {
     return next(error);
   }
 });
 
-router.post('/root/companies', authorize('root'), validate(createRootCompanySchema), async (req, res, next) => {
+router.post('/root/companies', authorizeAccessPolicy('company.root-companies.create'), validate(createRootCompanySchema), async (req, res, next) => {
   try {
     const company = await companyService.registerRootCompany(req.body, req.auth, req);
     return res.status(201).json(company);

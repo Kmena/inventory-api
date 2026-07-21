@@ -161,9 +161,9 @@ test('updateInvoice validates references and scopes write to the authenticated c
   assert.deepEqual(receivedUpdate, {
     invoiceId: 6n,
     companyId: 14n,
-    payload: { clientId: 3n, orderId: 9n, number: 'F-020-A', dueAt: undefined, paidAt: undefined },
+    payload: { clientId: 3n, orderId: 9n, number: 'F-020-A', dueAt: undefined },
   });
-  assert.deepEqual(updatedInvoice, { id: 6n, clientId: 3n, orderId: 9n, number: 'F-020-A', dueAt: undefined, paidAt: undefined });
+  assert.deepEqual(updatedInvoice, { id: 6n, clientId: 3n, orderId: 9n, number: 'F-020-A', dueAt: undefined });
 });
 
 test('removeInvoice rejects deleting an invoice outside the authenticated tenant', async () => {
@@ -246,8 +246,8 @@ test('listInvoiceDebtInconsistencies ignores reversed payments in pending calcul
           clientStore: { id: 9n, name: 'Tienda 9', clientId: 99n },
         },
         payments: [
-          { id: 1n, amount: 20, status: 'ACTIVE' },
-          { id: 2n, amount: 30, status: 'REVERSED' },
+          { id: 1n, amount: 20, status: 'APPROVED', approvedAt: new Date('2026-07-15T01:00:00Z'), createdAt: new Date('2026-07-15T01:00:00Z') },
+          { id: 2n, amount: 30, status: 'REVERSED', approvedAt: new Date('2026-07-15T02:00:00Z'), createdAt: new Date('2026-07-15T02:00:00Z') },
         ],
       }]),
     }]],

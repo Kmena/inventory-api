@@ -6,6 +6,14 @@ const {
 } = require('./sales-route.service');
 const orderService = require('./order.service');
 const inventoryService = require('./inventory.service');
+const {
+  ZERO_MONEY,
+  sumMoney,
+  subtractMoney,
+  compareMoney,
+  maxZeroMoney,
+  toMoneyNumber,
+} = require('../lib/money');
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const INVOICE_PENDING_DAYS = 30;
@@ -110,21 +118,21 @@ function shouldExposeInvoiceToAgent(invoice, order, store) {
   return hasReliableInvoiceAssignment(invoice, order, store) && hasReliablePaymentApplication(invoice);
 }
 
-function getAppliedAmount(invoice) {
-  return Number((invoice.payments || []).reduce((total, payment) => total + Number(payment.amount || 0), 0).toFixed(2));
+function getAppliedAmountDecimal(invoice) {
+  return sumMoney((invoice.payments || []).map((payment) => payment.amount));
 }
 
-function getPendingAmount(invoice, appliedAmount = getAppliedAmount(invoice)) {
-  return Number(Math.max(0, Number(invoice.amount || 0) - appliedAmount).toFixed(2));
+function getPendingAmountDecimal(invoice, appliedAmount = getAppliedAmountDecimal(invoice)) {
+  return maxZeroMoney(subtractMoney(invoice.amount || ZERO_MONEY, appliedAmount));
 }
 
 function hasVerifiedAppliedPaymentWithinWindow(invoice) {
   const cutoff = new Date(invoice.issuedAt).getTime() + (INVOICE_PENDING_DAYS * DAY_IN_MS);
-  return (invoice.payments || []).some((payment) => Number(payment.amount || 0) > 0 && new Date(payment.createdAt).getTime() <= cutoff);
+  return (invoice.payments || []).some((payment) => compareMoney(payment.amount || ZERO_MONEY, ZERO_MONEY) > 0 && new Date(payment.createdAt).getTime() <= cutoff);
 }
 
 function getAgentInvoiceStatus(invoice, appliedAmount, pendingAmount) {
-  if (pendingAmount <= 0) {
+  if (compareMoney(pendingAmount, ZERO_MONEY) <= 0) {
     return 'PAGADA';
   }
 
@@ -133,7 +141,7 @@ function getAgentInvoiceStatus(invoice, appliedAmount, pendingAmount) {
     return 'VENCIDA';
   }
 
-  if (appliedAmount > 0 && hasVerifiedAppliedPaymentWithinWindow(invoice)) {
+  if (compareMoney(appliedAmount, ZERO_MONEY) > 0 && hasVerifiedAppliedPaymentWithinWindow(invoice)) {
     return 'PARCIAL';
   }
 
@@ -145,8 +153,10 @@ function serializeInvoiceDebt(invoice, order, store) {
     return null;
   }
 
-  const appliedAmount = getAppliedAmount(invoice);
-  const pendingAmount = getPendingAmount(invoice, appliedAmount);
+  const appliedAmountDecimal = getAppliedAmountDecimal(invoice);
+  const pendingAmountDecimal = getPendingAmountDecimal(invoice, appliedAmountDecimal);
+  const appliedAmount = toMoneyNumber(appliedAmountDecimal);
+  const pendingAmount = toMoneyNumber(pendingAmountDecimal);
 
   return {
     id: invoice.id,
@@ -154,32 +164,33 @@ function serializeInvoiceDebt(invoice, order, store) {
     number: invoice.number,
     issuedAt: invoice.issuedAt,
     dueAt: invoice.dueAt,
-    originalAmount: Number(invoice.amount || 0),
+    originalAmount: toMoneyNumber(invoice.amount || ZERO_MONEY),
     appliedAmount,
     pendingAmount,
-    status: getAgentInvoiceStatus(invoice, appliedAmount, pendingAmount),
+    status: getAgentInvoiceStatus(invoice, appliedAmountDecimal, pendingAmountDecimal),
   };
 }
 
 function summarizeStoreInvoices(store) {
   const summary = {
-    visiblePendingBalance: 0,
+    visiblePendingBalance: ZERO_MONEY,
   };
 
   for (const order of store.orders || []) {
     for (const invoice of order.invoices || []) {
-      const appliedAmount = getAppliedAmount(invoice);
-      const pendingAmount = getPendingAmount(invoice, appliedAmount);
+      const appliedAmount = getAppliedAmountDecimal(invoice);
+      const pendingAmount = getPendingAmountDecimal(invoice, appliedAmount);
       const visibleToAgent = shouldExposeInvoiceToAgent(invoice, order, store);
 
       if (visibleToAgent) {
-        summary.visiblePendingBalance += pendingAmount;
+        summary.visiblePendingBalance = summary.visiblePendingBalance.plus(pendingAmount);
       }
     }
   }
 
-  summary.visiblePendingBalance = Number(summary.visiblePendingBalance.toFixed(2));
-  return summary;
+  return {
+    visiblePendingBalance: toMoneyNumber(summary.visiblePendingBalance),
+  };
 }
 
 function serializeRepresentative(representative) {
@@ -333,14 +344,14 @@ function serializePurchaseHistory(store) {
       .map((invoice) => serializeInvoiceDebt(invoice, order, store))
       .filter(Boolean);
 
-    const pendingBalance = invoices.reduce((total, invoice) => total + invoice.pendingAmount, 0);
+    const pendingBalance = sumMoney(invoices.map((invoice) => invoice.pendingAmount));
 
     return {
       orderId: order.id,
       createdAt: order.createdAt,
       status: order.status,
       total: Number(order.total || 0),
-      pendingBalance: Number(pendingBalance.toFixed(2)),
+      pendingBalance: toMoneyNumber(pendingBalance),
       invoiceNumbers: invoices.map((invoice) => invoice.number),
       invoices,
       items: (order.items || []).map((item) => ({

@@ -31,7 +31,17 @@ async function searchPlaces(query) {
     throw createHttpError(502, 'El buscador de mapas no respondio correctamente', 'geocoding_error');
   }
 
-  const results = await response.json();
+  let results;
+  try {
+    results = await response.json();
+  } catch (_error) {
+    throw createHttpError(502, 'El buscador de mapas devolvio una respuesta invalida', 'geocoding_error');
+  }
+
+  if (!Array.isArray(results)) {
+    throw createHttpError(502, 'El buscador de mapas devolvio una respuesta invalida', 'geocoding_error');
+  }
+
   return results.map((item) => ({
     name: item.display_name,
     latitude: Number(item.lat),

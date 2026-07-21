@@ -4,131 +4,87 @@ const inventoryRepository = require('../repositories/inventory.repository');
 const { createHttpError } = require('../lib/errors');
 const { buildPaginatedResponse } = require('../lib/pagination');
 const audit = require('../lib/audit');
+const {
+  guatemalaDateKey,
+  normalizeLotDates,
+  lotDateKey,
+  isLotExpired,
+  deriveLotUsability,
+} = require('./inventory-lot-policy.service');
+const {
+  authScope,
+  number,
+  getInventoryContext,
+  changeWarehouseStock,
+  changeLotStock,
+  createMovement,
+  resolveUniqueInternalLotNumber,
+  reserveLots,
+  assertOrderHasOperationalWarehouse,
+  getActiveAllocations,
+} = require('./inventory-transaction-support.service');
 
-const BUSINESS_TIME_ZONE = 'America/Guatemala';
-const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const INVENTORY_ALERT_READ_PERMISSIONS = ['inventory.view', 'inventory.manage', 'inventory.qa.manage'];
+const INVENTORY_ALERT_UPDATE_PERMISSIONS = ['inventory.manage', 'inventory.qa.manage'];
 
-function guatemalaDateKey(value = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: BUSINESS_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(value);
+function hasAnyPermission(auth, permissions) {
+  const userPermissions = auth?.permissions || [];
+  return permissions.some((permission) => userPermissions.includes(permission));
 }
 
-function toGuatemalaStartOfDay(dateKey) {
-  return new Date(`${dateKey}T00:00:00-06:00`);
-}
-
-function defaultLotDateValue(defaultToNow) {
-  return defaultToNow ? new Date() : null;
-}
-
-function dateKeyFromAcceptedLotInput(value, fieldLabel) {
-  const normalized = String(value).trim();
-  if (DATE_ONLY_PATTERN.test(normalized)) {
-    return normalized;
+function assertHasInventoryAlertPermission(auth, permissions, message) {
+  if (!hasAnyPermission(auth, permissions)) {
+    throw createHttpError(403, message, 'forbidden');
   }
-
-  const parsed = new Date(normalized);
-  if (Number.isNaN(parsed.getTime())) {
-    throw createHttpError(400, `La fecha de ${fieldLabel} no tiene un formato valido. Use YYYY-MM-DD o un datetime ISO.`, 'validation_error');
-  }
-
-  const calendarDatePrefix = normalized.slice(0, 10);
-  if (DATE_ONLY_PATTERN.test(calendarDatePrefix)) {
-    return calendarDatePrefix;
-  }
-
-  return guatemalaDateKey(parsed);
 }
 
-function normalizeLotDateInput(value, fieldLabel, options = {}) {
-  const { defaultToNow = false, normalizeToStartOfDay = true } = options;
-  if (value === undefined || value === null || value === '') {
-    return defaultLotDateValue(defaultToNow);
-  }
-
-  const normalized = String(value).trim();
-  if (!normalized) {
-    return defaultLotDateValue(defaultToNow);
-  }
-
-  const dateKey = dateKeyFromAcceptedLotInput(normalized, fieldLabel);
-  if (!normalizeToStartOfDay) {
-    return new Date(normalized);
-  }
-
-  return toGuatemalaStartOfDay(dateKey);
-}
-
-function lotDateKey(value) {
-  if (!value) return '';
-  if (DATE_ONLY_PATTERN.test(String(value))) return String(value);
-  const parsed = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '';
-  return guatemalaDateKey(parsed);
-}
-
-function isLotExpired(expirationDate, referenceDate = new Date()) {
-  const expirationKey = lotDateKey(expirationDate);
-  return Boolean(expirationKey && expirationKey <= guatemalaDateKey(referenceDate));
-}
-
-function deriveLotUsability(lot, referenceDate = new Date()) {
-  const expired = isLotExpired(lot?.expirationDate ?? lot, referenceDate);
-  const sellable = !expired && lot?.status === 'AVAILABLE' && lot?.qaStatus === 'APPROVED';
+function serializeInventoryAlert(alert) {
   return {
-    expired,
-    sellable,
-    expirationDateKey: lotDateKey(lot?.expirationDate ?? lot),
+    id: alert.id,
+    alertType: alert.alertType,
+    severity: alert.severity,
+    status: alert.status,
+    message: alert.message,
+    metadata: alert.metadata || null,
+    createdAt: alert.createdAt,
+    resolvedAt: alert.resolvedAt,
+    product: alert.product || null,
+    lot: alert.lot || null,
+    warehouse: alert.warehouse || null,
+    availableActions: alert.status === 'OPEN'
+      ? ['ACKNOWLEDGED', 'RESOLVED']
+      : alert.status === 'ACKNOWLEDGED'
+        ? ['RESOLVED']
+        : [],
   };
 }
 
-function validateLotDateRelationships({ entryDate, productionDate, expirationDate }) {
-  const entryKey = lotDateKey(entryDate);
-  const productionKey = lotDateKey(productionDate);
-  const expirationKey = lotDateKey(expirationDate);
+function mergeInventoryAlertMetadata(existingMetadata, statusTransition) {
+  const baseMetadata = existingMetadata && typeof existingMetadata === 'object' && !Array.isArray(existingMetadata)
+    ? existingMetadata
+    : {};
+  const statusHistory = Array.isArray(baseMetadata.statusHistory) ? [...baseMetadata.statusHistory] : [];
+  statusHistory.push(statusTransition);
 
-  if (productionKey && expirationKey && productionKey > expirationKey) {
-    throw createHttpError(400, 'La fecha de produccion no puede ser posterior a la fecha de vencimiento.', 'validation_error');
-  }
-  if (entryKey && expirationKey && entryKey >= expirationKey) {
-    throw createHttpError(400, 'La fecha de ingreso debe ser anterior a la fecha de vencimiento.', 'validation_error');
-  }
-  if (productionKey && entryKey && productionKey > entryKey) {
-    throw createHttpError(400, 'La fecha de produccion no puede ser posterior a la fecha de ingreso.', 'validation_error');
-  }
-}
-
-function normalizeLotDates(payload) {
-  const productionDate = normalizeLotDateInput(payload.productionDate, 'produccion');
-  const expirationDate = normalizeLotDateInput(payload.expirationDate, 'vencimiento');
-  const entryDate = normalizeLotDateInput(payload.entryDate, 'ingreso', { defaultToNow: true });
-
-  validateLotDateRelationships({ entryDate, productionDate, expirationDate });
-
-  if (isLotExpired(expirationDate, entryDate)) {
-    throw createHttpError(400, 'No se puede registrar un lote cuya fecha de vencimiento ya inicio.', 'validation_error');
-  }
-
-  return { productionDate, expirationDate, entryDate };
-}
-
-function authScope(auth) {
-  if (!auth?.companyId || !auth?.sub) {
-    throw createHttpError(403, 'Se requiere un usuario asociado a una empresa', 'forbidden');
-  }
   return {
-    companyId: BigInt(auth.companyId),
-    userId: BigInt(auth.sub),
+    ...baseMetadata,
+    lastStatusChange: statusTransition,
+    statusHistory,
   };
 }
 
-function number(value) {
-  return Number(value || 0);
+function assertInventoryAlertTransition(currentStatus, targetStatus) {
+  const allowedTransitions = {
+    OPEN: ['ACKNOWLEDGED', 'RESOLVED'],
+    ACKNOWLEDGED: ['RESOLVED'],
+    RESOLVED: [],
+  };
+
+  if (!allowedTransitions[currentStatus]?.includes(targetStatus)) {
+    throw createHttpError(409, 'La alerta no permite la transicion solicitada', 'conflict');
+  }
 }
+
 
 async function listMovements(auth, filters = {}, pagination = null) {
   const { companyId } = authScope(auth);
@@ -149,189 +105,90 @@ async function listStocks(auth, filters = {}) {
   return { items, lots };
 }
 
-async function getInventoryContext(tx, auth, warehouseId, productId, options = {}) {
+async function listInventoryAlerts(auth, filters = {}, pagination = null) {
+  const { companyId } = authScope(auth);
+  assertHasInventoryAlertPermission(auth, INVENTORY_ALERT_READ_PERMISSIONS, 'No tiene permisos para revisar alertas de inventario');
+
+  const alerts = await inventoryRepository.findInventoryAlerts(companyId, filters, pagination);
+  if (Array.isArray(alerts)) {
+    return alerts.map(serializeInventoryAlert);
+  }
+
+  return buildPaginatedResponse(
+    alerts.items.map(serializeInventoryAlert),
+    pagination,
+    alerts.totalItems,
+  );
+}
+
+async function getInventoryAlert(alertId, auth) {
+  const { companyId } = authScope(auth);
+  assertHasInventoryAlertPermission(auth, INVENTORY_ALERT_READ_PERMISSIONS, 'No tiene permisos para revisar alertas de inventario');
+
+  const alert = await inventoryRepository.findInventoryAlertById(alertId, companyId);
+  if (!alert) {
+    throw createHttpError(404, 'Alerta de inventario no encontrada para la empresa', 'not_found');
+  }
+
+  return serializeInventoryAlert(alert);
+}
+
+async function updateInventoryAlertStatus(alertId, payload, auth, req = null) {
   const { companyId, userId } = authScope(auth);
-  const [inventory, warehouse, product] = await Promise.all([
-    tx.inventory.findUnique({ where: { companyId } }),
-    tx.warehouse.findFirst({ where: { id: warehouseId, companyId } }),
-    tx.product.findFirst({ where: { id: productId, companyId } }),
-  ]);
+  assertHasInventoryAlertPermission(auth, INVENTORY_ALERT_UPDATE_PERMISSIONS, 'No tiene permisos para gestionar alertas de inventario');
 
-  if (!inventory) throw createHttpError(409, 'La empresa no tiene inventario configurado', 'conflict');
-  if (!warehouse) throw createHttpError(404, 'Bodega no encontrada para la empresa', 'not_found');
-  if (!warehouse.isActive) throw createHttpError(409, 'La bodega esta inactiva', 'conflict');
-  if (options.requireSellable && (!warehouse.isSellableSource || warehouse.isVirtual)) {
-    throw createHttpError(409, 'La bodega no esta habilitada como fuente de venta', 'conflict');
+  const existingAlert = await inventoryRepository.findInventoryAlertById(alertId, companyId);
+  if (!existingAlert) {
+    throw createHttpError(404, 'Alerta de inventario no encontrada para la empresa', 'not_found');
   }
-  if (!product) throw createHttpError(404, 'Producto no encontrado para la empresa', 'not_found');
 
-  return { companyId, userId, inventory, warehouse, product };
-}
+  assertInventoryAlertTransition(existingAlert.status, payload.status);
 
-async function changeWarehouseStock(tx, context, quantityDelta = 0, reservedDelta = 0) {
-  const key = {
-    warehouseId_productId: {
-      warehouseId: context.warehouse.id,
-      productId: context.product.id,
-    },
+  const changedAt = new Date();
+  const statusTransition = {
+    fromStatus: existingAlert.status,
+    toStatus: payload.status,
+    changedAt: changedAt.toISOString(),
+    changedByUserId: userId.toString(),
+    note: payload.note || null,
   };
-  let current = await tx.warehouseStock.findUnique({ where: key });
 
-  if (!current) {
-    if (quantityDelta < 0 || reservedDelta !== 0) {
-      throw createHttpError(409, 'No existe stock del producto en la bodega', 'conflict');
-    }
-    current = await tx.warehouseStock.create({
-      data: {
-        inventoryId: context.inventory.id,
-        warehouseId: context.warehouse.id,
-        productId: context.product.id,
-        quantity: quantityDelta,
-      },
-    });
-    return { before: 0, after: number(current.quantity), record: current };
+  const updatedAlert = await inventoryRepository.updateInventoryAlert(alertId, companyId, {
+    status: payload.status,
+    resolvedAt: payload.status === 'RESOLVED' ? changedAt : existingAlert.resolvedAt,
+    metadata: mergeInventoryAlertMetadata(existingAlert.metadata, statusTransition),
+  });
+
+  if (!updatedAlert) {
+    throw createHttpError(409, 'La alerta no pudo actualizarse', 'conflict');
   }
 
-  const before = number(current.quantity);
-  const reservedBefore = number(current.reservedQuantity);
-  const where = { id: current.id };
-
-  if (quantityDelta < 0 && reservedDelta === 0) {
-    where.quantity = { gte: reservedBefore + Math.abs(quantityDelta) };
-    where.reservedQuantity = current.reservedQuantity;
-  } else if (reservedDelta > 0) {
-    where.quantity = { gte: reservedBefore + reservedDelta };
-    where.reservedQuantity = current.reservedQuantity;
-  } else {
-    if (quantityDelta < 0) where.quantity = { gte: Math.abs(quantityDelta) };
-    if (reservedDelta < 0) where.reservedQuantity = { gte: Math.abs(reservedDelta) };
-  }
-
-  const updated = await tx.warehouseStock.updateMany({
-    where,
-    data: {
-      ...(quantityDelta > 0 ? { quantity: { increment: quantityDelta } } : {}),
-      ...(quantityDelta < 0 ? { quantity: { decrement: Math.abs(quantityDelta) } } : {}),
-      ...(reservedDelta > 0 ? { reservedQuantity: { increment: reservedDelta } } : {}),
-      ...(reservedDelta < 0 ? { reservedQuantity: { decrement: Math.abs(reservedDelta) } } : {}),
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'inventory.alert.status.update',
+    resourceType: 'inventory_alert',
+    resourceId: alertId,
+    outcome: 'SUCCESS',
+    beforeState: {
+      id: existingAlert.id,
+      status: existingAlert.status,
+      resolvedAt: existingAlert.resolvedAt,
+    },
+    afterState: {
+      id: updatedAlert.id,
+      status: updatedAlert.status,
+      resolvedAt: updatedAlert.resolvedAt,
+    },
+    metadata: {
+      note: payload.note || null,
+      fromStatus: existingAlert.status,
+      toStatus: payload.status,
     },
   });
 
-  if (updated.count !== 1) {
-    throw createHttpError(409, 'El stock cambio durante la operacion o no es suficiente', 'conflict');
-  }
-
-  current = await tx.warehouseStock.findUnique({ where: { id: current.id } });
-  return { before, after: number(current.quantity), record: current };
+  return serializeInventoryAlert(updatedAlert);
 }
 
-async function changeLotStock(tx, context, lot, quantityDelta = 0, reservedDelta = 0) {
-  const key = {
-    warehouseId_lotId: {
-      warehouseId: context.warehouse.id,
-      lotId: lot.id,
-    },
-  };
-  let current = await tx.warehouseLotStock.findUnique({ where: key });
-
-  if (!current) {
-    if (quantityDelta <= 0 || reservedDelta !== 0) {
-      throw createHttpError(409, 'El lote no tiene stock en la bodega', 'conflict');
-    }
-    current = await tx.warehouseLotStock.create({
-      data: {
-        warehouseId: context.warehouse.id,
-        lotId: lot.id,
-        productId: context.product.id,
-        quantity: quantityDelta,
-      },
-    });
-    return { before: 0, after: number(current.quantity), record: current };
-  }
-
-  if (current.productId !== context.product.id) {
-    throw createHttpError(409, 'El lote no corresponde al producto', 'conflict');
-  }
-
-  const before = number(current.quantity);
-  const reservedBefore = number(current.reservedQuantity);
-  const where = { id: current.id };
-
-  if (quantityDelta < 0 && reservedDelta === 0) {
-    where.quantity = { gte: reservedBefore + Math.abs(quantityDelta) };
-    where.reservedQuantity = current.reservedQuantity;
-  } else if (reservedDelta > 0) {
-    where.quantity = { gte: reservedBefore + reservedDelta };
-    where.reservedQuantity = current.reservedQuantity;
-  } else {
-    if (quantityDelta < 0) where.quantity = { gte: Math.abs(quantityDelta) };
-    if (reservedDelta < 0) where.reservedQuantity = { gte: Math.abs(reservedDelta) };
-  }
-
-  const updated = await tx.warehouseLotStock.updateMany({
-    where,
-    data: {
-      ...(quantityDelta > 0 ? { quantity: { increment: quantityDelta } } : {}),
-      ...(quantityDelta < 0 ? { quantity: { decrement: Math.abs(quantityDelta) } } : {}),
-      ...(reservedDelta > 0 ? { reservedQuantity: { increment: reservedDelta } } : {}),
-      ...(reservedDelta < 0 ? { reservedQuantity: { decrement: Math.abs(reservedDelta) } } : {}),
-    },
-  });
-
-  if (updated.count !== 1) {
-    throw createHttpError(409, 'El saldo del lote cambio o no es suficiente', 'conflict');
-  }
-
-  current = await tx.warehouseLotStock.findUnique({ where: { id: current.id } });
-  return { before, after: number(current.quantity), record: current };
-}
-
-async function createMovement(tx, context, data) {
-  return tx.stockMovement.create({
-    data: {
-      companyId: context.companyId,
-      warehouseId: context.warehouse.id,
-      productId: context.product.id,
-      userId: context.userId,
-      lotId: data.lotId ?? null,
-      movementType: data.movementType,
-      quantity: data.quantity,
-      quantityBefore: data.quantityBefore,
-      quantityAfter: data.quantityAfter,
-      reasonCode: data.reasonCode,
-      movementGroupId: data.movementGroupId ?? null,
-      sourceType: data.sourceType ?? null,
-      sourceId: data.sourceId ?? null,
-      note: data.note ?? null,
-    },
-    include: { product: true, lot: true, warehouse: true },
-  });
-}
-
-async function resolveUniqueInternalLotNumber(tx, companyId, requestedNumber) {
-  let candidate = requestedNumber;
-  let suffix = 0;
-
-  while (await tx.lot.findFirst({
-    where: {
-      internalLotNumber: candidate,
-      product: { companyId },
-    },
-    select: { id: true },
-  })) {
-    suffix += 1;
-    if (suffix > 999) {
-      throw createHttpError(409, 'No fue posible generar un numero de lote interno unico', 'conflict');
-    }
-    candidate = `${requestedNumber}-R${String(suffix).padStart(2, '0')}`;
-  }
-
-  return {
-    requested: requestedNumber,
-    assigned: candidate,
-    collision: suffix > 0,
-  };
-}
 
 async function registerStockEntryInTransaction(tx, payload, auth) {
   const context = await getInventoryContext(tx, auth, payload.warehouseId, payload.productId);
@@ -644,57 +501,6 @@ async function adjustStock(payload, auth, req = null) {
   return result;
 }
 
-function sortFefo(items) {
-  return items.sort((left, right) => {
-    const a = lotDateKey(left.lot?.expirationDate) || '9999-12-31';
-    const b = lotDateKey(right.lot?.expirationDate) || '9999-12-31';
-    return a.localeCompare(b) || Number(left.id - right.id);
-  });
-}
-
-async function reserveLots(tx, context, quantity) {
-  const rawCandidates = await tx.warehouseLotStock.findMany({
-    where: {
-      warehouseId: context.warehouse.id,
-      productId: context.product.id,
-      quantity: { gt: 0 },
-      lot: {
-        status: 'AVAILABLE',
-        qaStatus: 'APPROVED',
-      },
-    },
-    include: { lot: true },
-  });
-  const candidates = sortFefo(rawCandidates.filter((candidate) => deriveLotUsability(candidate.lot).sellable));
-
-  let remaining = quantity;
-  const allocations = [];
-
-  for (const candidate of candidates) {
-    if (remaining <= 0) break;
-    const available = number(candidate.quantity) - number(candidate.reservedQuantity);
-    const take = Math.min(available, remaining);
-    if (take <= 0) continue;
-
-    const changed = await changeLotStock(tx, context, candidate.lot, 0, take);
-    allocations.push({ lot: candidate.lot, quantity: take, lotStock: changed.record });
-    remaining -= take;
-  }
-
-  if (remaining > 0.000001) {
-    throw createHttpError(409, `No hay lotes disponibles suficientes para ${context.product.name}`, 'conflict');
-  }
-
-  return allocations;
-}
-
-function assertOrderHasOperationalWarehouse(order) {
-  if (order?.warehouseId) {
-    return;
-  }
-
-  throw createHttpError(409, 'El pedido aun no tiene una bodega operativa asignada. Defina la bodega y el lote durante la salida antes de aprobar o despachar.', 'conflict');
-}
 
 async function reserveStockForOrder(orderId, auth, req = null) {
   const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
@@ -777,32 +583,6 @@ async function reserveStockForOrder(orderId, auth, req = null) {
   return updatedOrder;
 }
 
-async function getActiveAllocations(tx, order) {
-  const movements = await tx.stockMovement.findMany({
-    where: {
-      companyId: order.companyId,
-      warehouseId: order.warehouseId,
-      sourceType: 'order',
-      sourceId: order.id,
-      movementType: { in: ['RESERVE', 'RELEASE', 'OUT'] },
-    },
-    orderBy: { id: 'asc' },
-  });
-
-  const balances = new Map();
-  for (const movement of movements) {
-    const key = `${movement.productId.toString()}:${movement.lotId?.toString() || 'none'}`;
-    const signed = movement.movementType === 'RESERVE' ? number(movement.quantity) : -number(movement.quantity);
-    const current = balances.get(key) || {
-      productId: movement.productId,
-      lotId: movement.lotId,
-      quantity: 0,
-    };
-    current.quantity += signed;
-    balances.set(key, current);
-  }
-  return [...balances.values()].filter((item) => item.quantity > 0.000001);
-}
 
 async function releaseStockReservation(orderId, cancel, auth, req = null) {
   const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
@@ -978,6 +758,9 @@ async function dispatchOrder(orderId, auth, req = null) {
 module.exports = {
   listMovements,
   listStocks,
+  listInventoryAlerts,
+  getInventoryAlert,
+  updateInventoryAlertStatus,
   registerStockEntry,
   registerStockEntryInTransaction,
   updateLotQa,

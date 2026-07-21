@@ -1,7 +1,7 @@
 const express = require('express');
 
 const authenticate = require('../middlewares/authenticate');
-const authorize = require('../middlewares/authorize');
+const { authorizeAccessPolicy } = require('../security/access-policies');
 const validate = require('../middlewares/validate');
 const { parsePaginationQuery } = require('../lib/pagination');
 const { createUserSchema, createCompanyUserSchema } = require('../schemas/user.schema');
@@ -10,7 +10,7 @@ const userService = require('../services/user.service');
 const router = express.Router();
 router.use(authenticate);
 
-router.get('/', authorize('root'), async (req, res, next) => {
+router.get('/', authorizeAccessPolicy('user.list-global'), async (req, res, next) => {
   try {
     const users = await userService.listUsers(parsePaginationQuery(req.query));
     return res.json(users);
@@ -19,7 +19,7 @@ router.get('/', authorize('root'), async (req, res, next) => {
   }
 });
 
-router.get('/company', authorize('admin'), async (req, res, next) => {
+router.get('/company', authorizeAccessPolicy('user.list-company'), async (req, res, next) => {
   try {
     const users = await userService.listCompanyUsers(req.auth, parsePaginationQuery(req.query));
     return res.json(users);
@@ -28,7 +28,7 @@ router.get('/company', authorize('admin'), async (req, res, next) => {
   }
 });
 
-router.post('/company', authorize('admin'), validate(createCompanyUserSchema), async (req, res, next) => {
+router.post('/company', authorizeAccessPolicy('user.create-company'), validate(createCompanyUserSchema), async (req, res, next) => {
   try {
     const user = await userService.registerCompanyUser(req.body, req.auth, req);
     return res.status(201).json(user);
@@ -37,7 +37,7 @@ router.post('/company', authorize('admin'), validate(createCompanyUserSchema), a
   }
 });
 
-router.post('/', authorize('root'), validate(createUserSchema), async (req, res, next) => {
+router.post('/', authorizeAccessPolicy('user.create-global'), validate(createUserSchema), async (req, res, next) => {
   try {
     const user = await userService.registerUser(req.body, req);
     return res.status(201).json(user);
