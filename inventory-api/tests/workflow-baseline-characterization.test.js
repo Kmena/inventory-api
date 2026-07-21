@@ -17,6 +17,7 @@ test('operational smoke workflow validates production baseline inputs, compose s
 
   assert.match(workflowSource, /^\s{2}operational-smoke:\s*$/m);
   assert.match(workflowSource, /npm run validate:production-baseline/);
+  assert.match(workflowSource, /cat > \.env\.production <<EOF/);
   assert.match(workflowSource, /docker compose -f docker-compose\.prod\.yml config/);
   assert.match(workflowSource, /docker build -t inventory-api:operational-smoke \./);
   assert.doesNotMatch(workflowSource, /deploy/i);

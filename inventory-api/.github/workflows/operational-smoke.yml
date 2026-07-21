@@ -48,6 +48,21 @@ jobs:
       - name: Validate production baseline inputs
         run: npm run validate:production-baseline
 
+      - name: Materialize temporary production env file for Compose smoke
+        shell: bash
+        run: |
+          cat > .env.production <<EOF
+          NODE_ENV=${NODE_ENV}
+          PORT=${PORT}
+          DATABASE_URL=${DATABASE_URL}
+          POSTGRES_DB=${POSTGRES_DB}
+          POSTGRES_USER=${POSTGRES_USER}
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          CORS_ORIGIN=${CORS_ORIGIN}
+          APP_BASE_URL=${APP_BASE_URL}
+          JWT_SECRET=${JWT_SECRET}
+          EOF
+
       - name: Validate production compose syntax
         run: docker compose -f docker-compose.prod.yml config
 

@@ -6,6 +6,7 @@
 - se completó `TASK-004` de `specs/p5-audit-score-hardening` descomponiendo servicios críticos de pagos, pedidos e inventario en módulos auxiliares probados para reducir mezcla de responsabilidades y mejorar mantenibilidad.
 - se completó `TASK-005` de `specs/p5-audit-score-hardening` agregando smoke runtime HTTP para `src/public`, gobernanza local de workflows y un workflow operativo versionado `operational-smoke.yml` sin deploy.
 - se completó `TASK-006` de `specs/p5-audit-score-hardening` generando la re-auditoría paralela `inventory-api/docs/audit/p5-final-reaudit.md` con breakdown >= 8.5 por rubro y evidencia trazable de cierre.
+- se corrigió el workflow `inventory-api/.github/workflows/operational-smoke.yml` para materializar un `.env.production` temporal antes del smoke de `docker compose`, evitando el fallo por `env_file` ausente en CI.
 
 Todos los cambios relevantes de este proyecto se documentan en este archivo.
 
