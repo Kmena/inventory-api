@@ -79,13 +79,12 @@
 | Logging hardening | Present | Present in `src/lib/logging.js`, `src/app.js`, `src/config.js` and tests | Confirmed statically |
 | Reproducible automated tests | `npm test` available | Present in `inventory-api/package.json` | Confirmed statically |
 | Re-execution of tests in this closure pass | Executed when possible | Follow-up package `specs/p0-extra-inclusion/` recorded passing mandatory gate evidence in supported runtime | Resolved by follow-up package |
-| Clean DB migration replay | Evidence required | Follow-up package documented canonical replay sequence, successful migration invocation, and unresolved seed/bootstrap environment inconsistency | Partially resolved by follow-up package |
-| Lint/typecheck/build | Execute when available | Implemented and validated by follow-up package `specs/p0-extra-inclusion/` | Resolved by follow-up package |
-| Real GitHub Actions evidence | Durable run reference required | Captured in follow-up package: run `29287056129`, job `86942014049`, outcome `failure` at lint gate | Resolved by follow-up package |
+| Clean DB migration replay | Evidence required | Follow-up packages preserved failed attempts and approved child package `specs/p0-replay-blocker-fix/` recorded successful canonical replay evidence | Resolved |
+| Lint/typecheck/build | Execute when available | Implemented and rerun successfully under Node 20 by follow-up package `specs/p0-extra-closure-followup/` | Resolved locally; parent closure still open |
+| Real GitHub Actions evidence | Durable run reference required | Captured in follow-up packages: preserved failed runs `29287056129` and `29288885694`, plus successful run `29383737072` / job `87252601412` | Resolved |
 | Supported Node runtime contract | Explicit repository declaration required | Captured in follow-up package via `package.json` engines, README, CI, and Docker alignment | Resolved by follow-up package |
 ### Closure conclusion
 - Traceability between findings, tasks and code artifacts is **strong**.
-- This specific closure review session still had incomplete direct re-execution evidence.
-- Follow-up approved package `specs/p0-extra-inclusion/` resolved the missing repository quality-gate closure items and recorded final supported-runtime evidence.
+- Follow-up packages `specs/p0-extra-inclusion/` and `specs/p0-extra-closure-followup/` now provide direct supported-runtime local rerun evidence plus preserved real-CI and replay evidence.
 - Original-package closure status in isolation: **`P0 Incomplete`**.
-- Combined closure status with approved follow-up package: **quality-gate gaps resolved, real GitHub Actions evidence linked, explicit Node runtime contract declared, and clean-DB replay still operationally inconclusive due to documented seed/bootstrap environment inconsistency**.
+- Combined closure status with approved follow-up packages: **quality-gate gaps resolved locally, real GitHub Actions evidence resolved with preserved historical failures, explicit Node runtime contract declared, and clean-DB replay resolved with preserved historical failed attempts plus successful canonical replay evidence**.

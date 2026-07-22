@@ -1,12 +1,22 @@
 # Changelog
 
+## 2026-07-15 - replay resolution back-propagation
+- Back-propagated approved replay-fix results from `specs/p0-replay-blocker-fix/` into the parent P0 package.
+- Preserved historical failed and unstable replay attempts while recording successful canonical replay evidence as the final closure condition.
+- Updated parent closure interpretation from failed/incomplete to completed.
+
+## 2026-07-15
+- Updated parent-package closure documentation to record successful real GitHub Actions run `29383737072` / job `87252601412` for commit `5c16b2c91e22b49085e1cb7f72a3ae58bd1bf50f`.
+- Preserved earlier failed GitHub Actions runs `29287056129` and `29288885694` as historical negative evidence rather than deleting them.
+- Narrowed the remaining closure blocker to the clean database replay inconsistency.
+
 ## 2026-07-13
 - Completed closure back-propagation from `specs/p0-extra-inclusion/` into the original `p0-project-stabilization` package.
-- Recorded durable GitHub Actions evidence: run `29287056129`, job `86942014049`, with real `failure` outcome at the lint gate.
+- Recorded durable GitHub Actions evidence: preserved failed runs `29287056129` and `29288885694`, including the newer failed `quality-gates` job `86947744464`.
 - Recorded explicit supported-runtime contract alignment across `package.json`, README, CI, and Docker (Node 20.x / `>=20 <21`).
-- Updated original P0 documents to reflect the canonical clean-DB replay sequence and its still-open seed/bootstrap environment inconsistency.
+- Updated original P0 documents to reflect the fresh compose-aligned clean-DB replay attempt and its reproduced target-database disappearance anomaly.
 - Added a dedicated post-implementation `closure-report.md` for the original package.
-- Preserved the earlier closure review as a historical snapshot while clarifying the combined interpretation after the approved follow-up package.
+- Preserved the earlier closure review as a historical snapshot while clarifying the combined interpretation after the approved follow-up packages.
 
 ## 2026-07-12
 - Aprobado el paquete `specs/p0-project-stabilization/` para implementación.

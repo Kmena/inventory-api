@@ -14,7 +14,8 @@
 - Observed drift:
   - the repository contains pre-existing uncommitted changes in P7-relevant files, including `inventory-api/src/lib/throttle-store.js`, `inventory-api/tests/throttle-store.test.js`, and `inventory-api/docs/openapi/runtime-baseline.openapi.json`;
   - the root-level canonical spec package exists under `specs/p7-9-5-risk-closure/` while a historical copy also exists under `inventory-api/specs/p7-9-5-risk-closure/`;
-  - historical references to `inventory-api/docs/runtime-endpoint-catalog.md` and `inventory-api/docs/audit/p6-9_5-blockers.md` are not present in the visible workspace and are treated as documented historical drift, not as blocking prerequisites.
+  - `inventory-api/docs/runtime-endpoint-catalog.md` is present in the visible workspace and forms part of the implemented P7 evidence set;
+  - historical references to `inventory-api/docs/audit/p6-9_5-blockers.md` are not present in the visible workspace and are treated as documented historical drift, not as blocking prerequisites.
 - Compatibility assessment:
   - the current runtime still exposes the `RawUnsafe` usage profile described by the approved current-state analysis;
   - the missing historical docs do not block TASK-001 because the approved advisor review downgraded them to drift notes.
@@ -181,7 +182,7 @@
 - The payment-receipt flow now has executable characterization for receipt-file persistence, DB failure compensation, failed payment rollback and replacement cleanup branches required by `FR-003`/`AC-002`.
 - The runtime now emits governed heavy-endpoint metadata for the approved prioritized route set without logging payload bodies.
 - A machine-readable heavy-endpoint baseline and drift test suite now satisfy the initial factual-governance requirement for `FR-004`/`FR-005`/`AC-003`.
-- The repository now has an explicit machine-readable contract manifest and a human-readable runtime catalog so every mounted router operation is classified as OpenAPI-covered or intentionally excluded, satisfying `FR-006`/`FR-007`/`AC-004`.
+- The repository now has an explicit machine-readable contract manifest and a human-readable runtime catalog (`inventory-api/docs/runtime-endpoint-catalog.md`) so every mounted router operation is classified as OpenAPI-covered or intentionally excluded, satisfying `FR-006`/`FR-007`/`AC-004`.
 - The repository now has a consolidated P7 evidence entrypoint in `docs/p7-risk-closure-evidence.md`, with reproducible validation commands and explicit explanation of the 2 expected environment-gated skips, satisfying `AC-005`.
 - Lint, typecheck, build and the full automated test suite pass after the new characterization, heavy-endpoint governance, contract-governance and evidence-consolidation coverage.
 

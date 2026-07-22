@@ -1,228 +1,396 @@
 # Implementation Report
-## 1. Specification
-- Feature: `p0-extra-inclusion`
-- Path: `specs/p0-extra-inclusion`
 
-## 2. Approval status
-- `metadata.yaml` indicates `approval_status: approved`.
-- `implementation_status` was `pending` at the start of execution.
+## 1. Report status
+This document is preserved as **historical implementation and validation evidence** for `specs/p0-extra-inclusion/`.
 
-## 3. Pre-implementation baseline
-- Repository drift: Compatible
-  - The feature package exists at `specs/p0-extra-inclusion/`.
-  - The coding standard requested by the user maps to `inventory-api/docs/coding-standards.md`.
-  - `validate:agent-workspace` exists as a repository script and currently fails; the planning package had identified it as present but not yet independently executed.
-- Commands executed before any production-code change:
-  - `npm test -- --silent` (cwd: `inventory-api`) → passed, exit `0`, affected module scope: `tests/`, `src/lib/logging.js`, `src/services/client.service.js`, `src/services/invoice.service.js`, `src/services/payment.service.js`, `src/routes/client.routes.js`, related repositories and protected document flow.
-  - `npm run validate:agent-workspace` (cwd: `inventory-api`) → failed, exit `1`, affected module scope: `scripts/validate-agent-workspace.js`, agent workspace flows. Classified as pre-existing baseline failure until scoped by later tasks; not part of the mandatory P0 automated test gate yet.
-  - `npm run prisma:generate` (cwd: `inventory-api`) → passed, exit `0`, affected module scope: Prisma client generation and Prisma-backed modules.
-  - `npm run lint` (cwd: `inventory-api`) → failed, exit `1`, missing script. Classified as P0 Blocker / missing capability.
-  - `npm run typecheck` (cwd: `inventory-api`) → failed, exit `1`, missing script. Classified as P0 Blocker / missing capability.
-  - `npm run build` (cwd: `inventory-api`) → failed, exit `1`, missing script. Classified as P0 Blocker / missing capability.
-  - `npm run start` (cwd: `inventory-api`, background) + `GET http://localhost:2500/health` → startup and health check passed, health exit `0`, response `200 {"ok":true,"service":"inventory-api"}`.
-- Baseline conclusion:
-  - Tests: available and passing.
-  - Additional validation script: available but failing.
-  - Prisma generation: available and passing.
-  - Lint/typecheck/build: missing as repository-level gates.
+It is **not** the final closure report for the audited revision of this package.
 
-## 4. Tasks selected
-- Completed task: `TASK-P0X-001: Establish quality-gate baseline`
-- Completed task: `TASK-P0X-002: Add or correct lint quality gate`
-- Completed task: `TASK-P0X-003: Add or correct type-check quality gate`
-- Completed task: `TASK-P0X-004: Add or correct build quality gate`
-- Completed task: `TASK-P0X-005: Stabilize mandatory automated test gate`
-- Completed task: `TASK-P0X-006: Add aggregated verification command`
-- Completed task: `TASK-P0X-007: Integrate mandatory quality gates into CI`
-- Completed task: `TASK-P0X-008: Execute final P0 extra validation from a clean environment`
-- Completed task: `TASK-P0X-009: Update original P0 closure documentation`
-- Completed task: `TASK-P0X-010: Produce clean database replay evidence`
-- Completed task: `TASK-P0X-012: Define explicit supported Node.js version contract`
-- Completed task: `TASK-P0X-013: Update original P0 closure documentation`
-- Related requirements:
-  - `FR-QG-001`
-  - `FR-QG-002`
-  - `FR-QG-003`
-  - `FR-QG-004`
-  - `FR-QG-005`
-  - `FR-QG-006`
-  - `FR-QG-009`
-  - `AC-QG-002`
-  - `AC-QG-003`
-  - `AC-QG-004`
-  - `AC-QG-005`
-  - `AC-QG-007`
-  - `AC-QG-008`
+Current authoritative closure interpretation is:
+- `planning_status: completed`
+- `implementation_status: implemented`
+- `validation_status: failed`
+- `closure_status: failed`
 
-## 5. Files changed
-- `inventory-api/prisma/migration-instructions.md`
-- `inventory-api/package.json`
-- `inventory-api/package-lock.json`
-- `inventory-api/eslint.config.js`
-- `inventory-api/README.md`
-- `inventory-api/tsconfig.typecheck.json`
-- `inventory-api/src/lib/errors.js`
-- `inventory-api/src/services/auth.service.js`
-- `inventory-api/src/services/client.service.js`
-- `inventory-api/src/services/order.service.js`
-- `inventory-api/src/services/sales-route.service.js`
-- `inventory-api/src/services/user.service.js`
-- `inventory-api/src/repositories/client.repository.js`
-- `inventory-api/src/repositories/product.repository.js`
-- `inventory-api/src/repositories/sales-route.repository.js`
-- `inventory-api/src/schemas/client.schema.js`
-- `inventory-api/src/schemas/warehouse.schema.js`
-- `inventory-api/scripts/validate-agent-workspace.js`
+The audited revision introduced a new task model (`TASK-P0X-001` through `TASK-P0X-012`) focused on truthful closure. Therefore, this report must be read as evidence input for those tasks, not as proof that the audited closure work is complete.
+
+## 2. Historical implementation scope already present in the repository
+Repository inspection confirms the following technical elements already exist:
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+- `npm run test`
+- `npm run verify`
 - `.github/workflows/p0-quality-gates.yml`
-- `specs/p0-extra-inclusion/current-state.md`
-- `specs/p0-extra-inclusion/implementation-report.md`
+- explicit Node runtime contract in:
+  - `inventory-api/package.json`
+  - `inventory-api/README.md`
+  - `inventory-api/Dockerfile`
+  - `.github/workflows/p0-quality-gates.yml`
+- replay documentation in `inventory-api/prisma/migration-instructions.md`
+
+These elements are technically implemented, but their presence does not establish audited closure by itself.
+
+## 3. Historical execution evidence preserved from prior implementation work
+### 3.1 Local quality-gate evidence previously recorded
+The historical report preserved evidence of the following supported-runtime local executions:
+- `npm run lint` → passed under Node 20
+- `npm run typecheck` → passed under Node 20
+- `npm run build` → passed under Node 20
+- `npm run test` → passed under Node 20
+- `npm run verify` → passed under Node 20
+
+### 3.2 Optional diagnostic evidence preserved
+- `npm run validate:agent-workspace` → failed and remains classified as an optional diagnostic check rather than a mandatory P0 closure gate.
+
+### 3.3 Runtime drift evidence preserved
+Historical evidence also recorded local runtime drift outside the supported Node 20 contract:
+- Node 24 environment showed tool/runtime failures after `npm ci`
+- these failures were classified as environment drift, not as canonical closure validation
+
+## 4. Real GitHub Actions evidence preserved
+Historical evidence preserved a real GitHub Actions run:
+- **Run URL:** `https://github.com/Kmena/inventory-api/actions/runs/29287056129`
+- **Job URL:** `https://github.com/Kmena/inventory-api/actions/runs/29287056129/job/86942014049?pr=20`
+- **Observed outcome:** `failure`
+- **Recorded failure point:** `npm run lint`
+
+Follow-up execution later captured a newer real GitHub Actions run:
+- **Run URL:** `https://github.com/Kmena/inventory-api/actions/runs/29288885694`
+- **Job URL:** `https://github.com/Kmena/inventory-api/actions/runs/29288885694/job/86947744464`
+- **Branch:** `19-p0-extra-quality-gates-inclusion`
+- **Commit:** `b86f09ec289b470d0ef8fbde46bfec7b2da3b79b`
+- **Observed outcome:** `failure`
+- **Job conclusion:** `quality-gates` → `failure`
+
+A later real GitHub Actions run now provides successful CI evidence:
+- **Run URL:** `https://github.com/Kmena/inventory-api/actions/runs/29383737072`
+- **Job URL:** `https://github.com/Kmena/inventory-api/actions/runs/29383737072/job/87252601412?pr=22`
+- **Branch:** `19-p0-extra-quality-gates-inclusion`
+- **Commit:** `5c16b2c91e22b49085e1cb7f72a3ae58bd1bf50f`
+- **Observed outcome:** `success`
+- **Job conclusion:** `quality-gates` → `success`
+
+Earlier failed runs remain preserved and must not be deleted or hidden by later successes.
+
+## 5. Clean database replay evidence preserved
+Historical evidence preserved two replay attempts:
+
+### 5.1 Host-local replay attempt
+- Classification: **Inconclusive**
+- Summary: host-local replay against `localhost:5432` showed environment drift and could not be treated as canonical closure evidence.
+
+### 5.2 Compose-aligned replay attempt
+- Migration invocation using committed Docker/Prisma artifacts reported success.
+- Seed/bootstrap attempt failed because the target database did not exist for the inspected server state.
+- Classification: **Failed / Environment blocked**
+
+### 5.3 Follow-up compose replay attempt
+The approved follow-up package executed a fresh canonical replay using disposable database `tracksys_replay_followup_20260713` and recorded:
+- service `db` initially listed the new database successfully;
+- `docker compose run --rm -e DATABASE_URL=postgresql://tracksys:tracksys@db:5432/tracksys_replay_followup_20260713?schema=public app npx prisma migrate deploy` reported success and claimed all 22 migrations were applied;
+- immediate inspection from service `db` then failed with `FATAL:  database "tracksys_replay_followup_20260713" does not exist`;
+- `npm run prisma:seed` failed because the same database did not exist;
+- final listing from service `db` confirmed the disposable target was absent.
+
+Classification: **Failed / Environment blocked**
+
+This means clean replay remains unresolved for closure purposes.
+
+## 6. Current audited interpretation of the preserved evidence
+The preserved historical evidence supports these facts:
+- mandatory gate scripts exist;
+- local supported-runtime pass evidence exists for the mandatory gates;
+- explicit runtime contract exists and points to Node 20;
+- CI workflow exists and uses repository-owned scripts;
+- real CI success evidence now exists;
+- replay documentation exists.
+
+The same preserved evidence also proves closure remains open because:
+- historical real CI failures existed and remain preserved;
+- clean replay did not achieve a full passed result;
+- documentation drift existed between technical implementation and truthful closure status.
+
+## 7. Mapping historical evidence to current audited tasks
+| Current task | How this report supports it | Current interpretation |
+|---|---|---|
+| TASK-P0X-001 | Provides historical implementation facts, CI failure evidence, replay incompleteness and drift inputs | Evidence source only |
+| TASK-P0X-002 | Provides historical command/config execution context for lint, typecheck, build, test and verify | Evidence source only |
+| TASK-P0X-003 | Provides runtime-alignment evidence for Node 20 contract | Evidence source only |
+| TASK-P0X-004 | Provides real failed and successful GitHub Actions evidence | Evidence source only |
+| TASK-P0X-005 | Provides canonical replay context and replay-problem history | Evidence source only |
+| TASK-P0X-006 | Provides prior replay attempts that must be preserved | Evidence source only |
+| TASK-P0X-007 | Provides examples of documentation drift requiring reconciliation | Evidence source only |
+| TASK-P0X-008 | Provides initial evidence items that must be registered and preserved | Evidence source only |
+| TASK-P0X-009 | Provides historical local gate-pass evidence but does not replace required final execution records | Evidence source only |
+| TASK-P0X-010 | Provides known failed CI evidence and the later successful CI run that must remain linked together | Evidence source only |
+| TASK-P0X-011 | Provides extension evidence that must be back-propagated truthfully to the parent P0 | Evidence source only |
+| TASK-P0X-012 | Provides part of the final closure inputs, but not a passing closure result | Evidence source only |
+
+## 8. Evidence identifiers aligned with the current audited package
+- `EVID-CI-001` → real failed GitHub Actions run
+- `EVID-CI-002` → newer real failed GitHub Actions run
+- `EVID-CI-003` → successful real GitHub Actions run
+- `EVID-DB-001` → host-local replay attempt, inconclusive
+- `EVID-DB-002` → compose-aligned replay attempt, failed / blocked
+- `EVID-DB-003` → fresh compose-aligned replay attempt, failed / blocked
+- `EVID-TEST-001` → historical supported-runtime local test pass
+- `EVID-VERIFY-001` → historical supported-runtime local verify pass
+- `EVID-RUNTIME-001` → aligned Node 20 runtime contract across package metadata, README, Docker and CI
+
+## 9. What this report does not prove
+This report does **not** prove:
+- that the current audited task set is complete;
+- that clean replay has passed successfully;
+- that replay-related closure blockers are resolved;
+- that the extension package may be marked closed;
+- that the parent P0 may be marked closed.
+
+## 10. Next required documents for closure work
+The audited closure workflow now depends on:
 - `specs/p0-extra-inclusion/tasks.md`
+- `specs/p0-extra-inclusion/traceability.md`
+- `specs/p0-extra-inclusion/validation-evidence.md`
+- `specs/p0-extra-inclusion/current-state.md`
+- `specs/p0-project-stabilization/closure-report.md`
+
+## 11. Current truthful status
+- Technical implementation elements: **present**
+- Local supported-runtime gate evidence: **present historically and rerun in follow-up package `specs/p0-extra-closure-followup/`**
+- Real CI success evidence: **present** (`29383737072`)
+- Real CI failure evidence: **present and preserved across multiple runs**
+- Clean replay passed evidence: **not present**
+- Clean replay failed/blocked evidence: **present across multiple preserved attempts**
+- Extension closure: **open**
+- Parent-P0 closure through this extension: **open**
+
+## 12. Follow-up rerun evidence recorded after audited revision
+The approved follow-up package `specs/p0-extra-closure-followup/` reran the mandatory local quality gates in the supported Node 20 runtime and recorded:
+- `npx -y node@20 -v` → `v20.20.2`
+- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run lint` → pass, exit `0`
+- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run typecheck` → pass, exit `0`
+- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run build` → pass, exit `0`
+- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run test` → pass, exit `0`
+- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run verify` → pass, exit `0`
+- `node -e "const pkg=require('./package.json'); console.log(pkg.scripts.verify)"` → confirmed fail-fast chain `npm run lint && npm run typecheck && npm run build && npm run test`
+
+These reruns strengthen local supported-runtime evidence, but they do not close the extension because clean replay evidence remains unresolved.
+
+## 13. Follow-up real CI rerun evidence
+The approved follow-up package `specs/p0-extra-closure-followup/` captured a failed real GitHub Actions workflow run:
+- workflow: `p0-quality-gates`
+- event: `pull_request`
+- run ID: `29288885694`
+- branch: `19-p0-extra-quality-gates-inclusion`
+- commit: `b86f09ec289b470d0ef8fbde46bfec7b2da3b79b`
+- status: `completed`
+- conclusion: `failure`
+- job ID: `86947744464`
+- job name: `quality-gates`
+- job conclusion: `failure`
+
+This preserved run remains part of the negative evidence set, but it is now superseded by a later successful real CI run rather than representing the latest CI truth state.
+
+## 14. Follow-up fresh clean replay evidence
+The approved follow-up package also executed a fresh clean replay attempt under the repository-owned compose stack:
+- app runtime: `Node v20.20.2`
+- database engine: `PostgreSQL 16.14`
+- disposable database: `tracksys_replay_followup_20260713`
+- create database step: passed
+- migrate deploy step: passed and reported 22 migrations applied
+- post-migration inspection from service `db`: failed because the target database did not exist
+- seed step: failed because the target database did not exist
+- final database listing from service `db`: target absent
+
+This reproduces the same operational inconsistency already preserved historically. Therefore the replay is no longer merely incomplete; it now has a fresh, reproducible, compose-aligned **failed / environment blocked** classification that still prevents truthful closure even after CI succeeded.
+
+## 15. Task closure update for TASK-P0X-001 through TASK-P0X-003
+### Tasks completed
+- `TASK-P0X-001` — Reconcile the audited current state
+- `TASK-P0X-002` — Formalize the quality-gate contract
+- `TASK-P0X-003` — Align runtime contract
+- `TASK-P0X-004` — Validate and correct CI quality-gate integration
+- `TASK-P0X-005` — Define the canonical clean database replay
+- `TASK-P0X-006` — Execute and record a clean database replay
+- `TASK-P0X-007` — Resolve documentation drift
+- `TASK-P0X-008` — Establish validation evidence registry
+- `TASK-P0X-009` — Run all mandatory quality gates
+- `TASK-P0X-010` — Obtain a real CI validation result
+
+### Basis for completion
+- `TASK-P0X-001` is satisfied because the package now explicitly distinguishes technical implementation from validated closure, lists documentation drift, preserves failed CI evidence, and classifies replay truthfully as failed / environment blocked.
+- `TASK-P0X-002` is satisfied because `specs/p0-extra-inclusion/quality-gates-analysis.md` defines command purpose, configuration source, scope, exclusions, required environment, expected exit behavior, mandatory/optional classification, and required evidence for lint, typecheck, build, test, and verify.
+- `TASK-P0X-003` is satisfied because the supported Node runtime is identified from repository evidence, `engines.node` is defined as `>=20 <21`, README documents Node 20.x, Docker uses Node 20, CI uses Node 20, and historical runtime drift remains preserved rather than hidden.
+- `TASK-P0X-004` is satisfied because the workflow path, triggers, runtime, install command, executed scripts, cache behavior, and absence of database services are documented; failed CI runs remain preserved; and a later successful real workflow run now exists as closure-satisfying CI evidence.
+- `TASK-P0X-005` is satisfied because the canonical replay path now explicitly defines disposable database creation, committed migration application using repository-owned tooling, committed seed execution, startup or `/health` smoke validation, cleanup/reset behavior, and truthful result classifications.
+- `TASK-P0X-006` is satisfied because a real replay attempt was executed end to end from disposable-database creation through migration attempt, seed attempt, smoke validation, and cleanup, with every command and exit code preserved and the final failed/environment-blocked classification recorded.
+- `TASK-P0X-007` is satisfied because README, current-state analysis, quality-gates analysis, replay instructions, traceability, and changelog language now match the actual repository commands, Node 20 runtime contract, CI workflow behavior, and preserved replay classification rather than implying replay success.
+- `TASK-P0X-008` is satisfied because the evidence registry now defines identifiers, statuses, required fields, and durable links from evidence items to tasks and requirements while preserving failed and superseded attempts.
+- `TASK-P0X-009` is satisfied because `lint`, `typecheck`, `build`, `test`, and `verify` were executed again in supported runtime `Node v20.20.2`, each exit code was recorded, a failed `verify` run preserved fail-fast propagation from a mandatory child command, and a later passing rerun was preserved without hiding the earlier failure.
+- `TASK-P0X-010` is satisfied because preserved real GitHub Actions evidence already exists for current HEAD commit `5c16b2c91e22b49085e1cb7f72a3ae58bd1bf50f`: workflow run `29383737072` passed under Node 20 while earlier failed runs `29287056129` and `29288885694` remain preserved and linked.
+
+### Validation approach used for these task closures
+- Repository/specification document comparison
+- Runtime-source comparison across `package.json`, README, Dockerfile, and GitHub Actions workflow
+- Workflow-to-script comparison against `.github/workflows/p0-quality-gates.yml`
+- Replay-documentation review against `inventory-api/prisma/migration-instructions.md`, `inventory-api/docker-compose.yml`, `inventory-api/Dockerfile`, `inventory-api/package.json`, `inventory-api/prisma/seed.js`, `inventory-api/scripts/apply-committed-migrations.js`, and `/health` route implementation
+- Traceability and evidence review against `specs/p0-extra-inclusion/traceability.md` and `specs/p0-extra-inclusion/validation-evidence.md`
+
+### Outcome
+These task completions do not change the overall closure result of the extension package. Clean replay remains unresolved, so the package closure remains failed.
+
+## 19. TASK-P0X-010 execution record
+### Selected task
+- `TASK-P0X-010` — Obtain a real CI validation result
+
+### Remote-execution capability check
+- `gh --version` → exit `1` (`gh` not installed in this environment)
+- `gh auth status` → exit `1` (`gh` not installed in this environment)
+- This environment therefore could not dispatch or inspect a new workflow run interactively.
+
+### Authoritative real CI evidence used
+- Workflow: `.github/workflows/p0-quality-gates.yml`
+- Successful run: `29383737072`
+- Job: `87252601412`
+- Commit: `5c16b2c91e22b49085e1cb7f72a3ae58bd1bf50f`
+- Branch: `19-p0-extra-quality-gates-inclusion`
+- Runtime: Node `20`
+- Install command: `npm ci`
+- Executed scripts: `npm run lint`, `npm run typecheck`, `npm run build`, `npm run test`
+- Final status: `success`
+
+### Preserved negative CI evidence
+- Failed run `29287056129` remained preserved as `EVID-CI-001`
+- Failed run `29288885694` remained preserved as `EVID-CI-002`
+- Successful run `29383737072` remained preserved as `EVID-CI-003`
+
+### Acceptance-criteria assessment
+- Workflow execution is linked to a commit.
+- Node version is recorded.
+- Mandatory scripts executed in the real workflow.
+- Final workflow status is recorded.
+- Failed jobs remain visible.
+- Closure continues to require a successful run or explicit approved exception; in this case, the successful run already exists.
+
+### Truthful outcome
+- Real CI validation is satisfied for the current HEAD commit through preserved authoritative evidence.
+- No new remote run was executed from this environment because GitHub CLI access is unavailable here.
+- Overall package closure remains failed because replay is still the blocking condition.
+
+## 18. TASK-P0X-009 execution record
+### Selected task
+- `TASK-P0X-009` — Run all mandatory quality gates
+
+### Supported runtime
+- `npx -y node@20 -v` → `v20.20.2` (exit `0`)
+- Branch: `19-p0-extra-quality-gates-inclusion`
+- Commit: `5c16b2c91e22b49085e1cb7f72a3ae58bd1bf50f`
+
+### Commands executed
+1. `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run lint` → exit `0`
+2. `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run typecheck` → exit `0`
+3. `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run build` → exit `0`
+4. `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run test -- --silent` → exit `1`
+5. `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run test` → exit `0`
+6. `node -e "const pkg=require('./package.json'); console.log(pkg.scripts.verify)"` → exit `0`
+7. `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run verify` → exit `1`
+8. `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run test -- tests/client-document-security.test.js` → exit `0`
+9. `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run test` → exit `0`
+10. `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run verify` → exit `0`
+
+### Classification notes
+- Command 4 is **not** classified as a repository gate failure. The repository `test` script uses explicit `node --test` file arguments, and the appended `--silent` became an invalid path-like argument (`--silent`) for this script shape.
+- Command 7 is classified as a real failed `verify` run. `verify` executed `lint`, `typecheck`, and `build`, then failed when child command `test` failed one assertion in `tests/client-document-security.test.js`.
+- Commands 8, 9, and 10 show that the same suite and the aggregate `verify` command passed on rerun in the same supported runtime, so the preserved failed run is treated as intermittent/flaky evidence rather than a deterministic persistent failure.
+
+### Acceptance-criteria assessment
+- Every mandatory command was executed in the supported environment.
+- Every exit code was recorded.
+- Scope and exclusions remained those defined by `package.json`, `eslint.config.js`, and `tsconfig.typecheck.json`.
+- Failures were classified truthfully and not reported as passes.
+- `verify` fail-fast propagation was evidenced by the failed run that stopped with non-zero exit after child `test` failed.
+- Fresh evidence records were created in `validation-evidence.md`.
+
+### Truthful outcome
+- Local mandatory quality gates are evidenced under supported runtime.
+- A preserved intermittent failed `verify` run exists and is superseded by a later passing rerun.
+- Overall package closure remains failed because replay is still the blocking condition.
+
+## 17. TASK-P0X-007 execution record
+### Selected task
+- `TASK-P0X-007` — Resolve documentation drift
+
+### Related requirements
+- `FR-P0X-007` Runtime alignment
+- `FR-P0X-010` Original P0 propagation
+- `FR-P0X-011` Negative evidence preservation
+- `FR-P0X-012` Truthful closure classification
+
+### Files reviewed and aligned
+- `inventory-api/package.json`
+- `inventory-api/README.md`
+- `.github/workflows/p0-quality-gates.yml`
+- `inventory-api/Dockerfile`
+- `inventory-api/prisma/migration-instructions.md`
+- `specs/p0-extra-inclusion/current-state.md`
+- `specs/p0-extra-inclusion/quality-gates-analysis.md`
 - `specs/p0-extra-inclusion/traceability.md`
 - `specs/p0-extra-inclusion/changelog.md`
 
-## 6. Architecture decisions followed
-- `DEC-QG-001`: original P0 remains open until mandatory quality gates exist and pass.
-- `DEC-QG-002`: existing `npm test` is treated as the baseline mandatory automated test gate.
-- `DEC-QG-004`: build is defined explicitly for the current JavaScript backend as Prisma Client generation.
-- `DEC-QG-006`: generated and irrelevant files were explicitly excluded from lint/typecheck scope where documented.
-- `DEC-QG-009`: mandatory versus optional test suites were explicitly distinguished.
-- Validation architecture remained at the repository script layer; no business architecture redesign was introduced.
+### Drift reconciled
+- README runtime and quality-gate commands remain aligned with `package.json` and the Node 20 contract.
+- CI documentation remains aligned with the actual workflow, which runs `lint`, `typecheck`, `build`, and `test`, but not `verify` directly.
+- Replay documentation now states the actual baseline behavior observed in `EVID-DB-004`: the committed `app` image does not include `scripts/apply-committed-migrations.js`, so the canonical compose migration step currently fails.
+- Package-level documents now distinguish clearly between aligned documentation and unresolved operational closure blockers.
 
-## 7. Coding-standard validation
-- Changes stayed focused on the lint gate and its minimum supporting fixes.
-- Existing failures were recorded explicitly and not hidden.
-- No unrelated refactoring was introduced.
-- Lint fixes were limited to unused-variable cleanup and configuration for explicit Node/CommonJS globals.
-- Type-check fixes were limited to one typed error helper, one auth-service return shaping fix, and localized `// @ts-nocheck` markers for current Prisma/Zod hotspots.
+### Validation approach
+- document-to-document comparison against `package.json`, `Dockerfile`, workflow YAML, and replay evidence
+- evidence-to-document consistency review using `EVID-RUNTIME-001` and `EVID-DB-004`
+- post-edit consistency review across README, current-state analysis, and replay instructions
 
-## 8. Tests added or updated
-- No new automated tests were added for `TASK-P0X-010`.
-- Existing regression suite remained unchanged.
+### Truthful outcome
+- Documentation drift for the audited package is now resolved.
+- Overall package closure remains failed because replay execution is still failed / environment blocked.
 
-## 9. Commands executed
-- `npm test -- --silent`
-- `npm run validate:agent-workspace`
-- `npm run prisma:generate`
-- `npm run lint`
-- `npm run typecheck`
-- `npm run build`
-- `npm run start`
-- `GET http://localhost:2500/health`
-- `node -e "const pkg=require('./package.json'); console.log(JSON.stringify(pkg.scripts,null,2))"`
-- `npm install --save-dev eslint@9`
-- `npm run lint`
-- `npm test -- --silent`
-- `npm install --save-dev typescript @types/node`
-- `npm run typecheck`
-- `npm run lint`
-- `npm test -- --silent`
-- `npm run build`
-- `npm run typecheck`
-- `npm run lint`
-- `npm test -- --silent`
-- `npm run verify`
-- `npx -y js-yaml .github/workflows/p0-quality-gates.yml > NUL`
-- `npm run verify`
-- `npm ci`
-- `node -v && npm -v`
-- `npx -y node@20 -v`
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run lint`
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run typecheck`
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run build`
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run test`
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run verify`
-- `docker compose ps`
-- `powershell -Command "$env:DATABASE_URL='postgresql://tracksys:tracksys@localhost:5432/tracksys?schema=public'; npx prisma validate"`
-- `node --check prisma/seed.js`
-- `docker exec inventory-api-db-1 sh -lc "psql -U tracksys -d postgres -c 'DROP DATABASE IF EXISTS tracksys_p0x_replay_seq;' && psql -U tracksys -d postgres -c 'CREATE DATABASE tracksys_p0x_replay_seq;' && psql -U tracksys -d postgres -c '\l tracksys_p0x_replay_seq'"`
-- `powershell -Command "$env:DATABASE_URL='postgresql://tracksys:tracksys@localhost:5432/tracksys_p0x_replay_seq?schema=public'; npx prisma migrate deploy"`
-- `powershell -Command "$env:DATABASE_URL='postgresql://tracksys:tracksys@localhost:5432/tracksys_p0x_replay_seq?schema=public'; npx -y node@20 \"C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js\" run prisma:seed"`
-- `docker compose exec -T db sh -lc "psql -U tracksys -d postgres -c 'DROP DATABASE IF EXISTS tracksys_p0x_replay_run;' && psql -U tracksys -d postgres -c 'CREATE DATABASE tracksys_p0x_replay_run;' && psql -U tracksys -d postgres -c '\l tracksys_p0x_replay_run'"`
-- `docker compose run --rm -e DATABASE_URL=postgresql://tracksys:tracksys@db:5432/tracksys_p0x_replay_run?schema=public app npx prisma migrate deploy`
-- `docker compose run --rm -e DATABASE_URL=postgresql://tracksys:tracksys@db:5432/tracksys_p0x_replay_run?schema=public app npm run prisma:seed`
-- `node -e "const pkg=require('./package.json'); console.log(JSON.stringify(pkg.engines))"`
-- `node -e "const fs=require('fs'); const pkg=require('./package.json'); const readme=fs.readFileSync('README.md','utf8'); console.log(JSON.stringify({engines:pkg.engines, readmeHasNode20:readme.includes('Node.js `20.x`'), dockerHasNode20:fs.readFileSync('Dockerfile','utf8').includes('node:20-bullseye-slim')}))"`
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run verify`
-- `grep node-version: 20 in .github/workflows/p0-quality-gates.yml`
+## 16. TASK-P0X-006 execution record
+### Selected task
+- `TASK-P0X-006` — Execute and record a clean database replay
 
-## 10. Validation results
-- Real GitHub Actions run captured for `TASK-P0X-011`: `https://github.com/Kmena/inventory-api/actions/runs/29287056129`
-- Associated job evidence: `https://github.com/Kmena/inventory-api/actions/runs/29287056129/job/86942014049?pr=20`
-- Workflow outcome: `failure` during `npm run lint`, which still satisfies the task's evidence-capture objective.
-- `npm test -- --silent` → passed in baseline.
-- `npm run validate:agent-workspace` → failed with seeded-store expectation mismatch (`AL_DIA` expected, `VENCIDA` actual).
-- `npm run prisma:generate` → passed.
-- Baseline `npm run lint` → failed because the script did not exist.
-- Baseline `npm run typecheck` → failed because the script did not exist.
-- Baseline `npm run build` → failed because the script did not exist.
-- `npm run start` + `/health` → passed.
-- `npm install --save-dev eslint@9` → passed.
-- Final `npm run lint` → passed.
-- Post-lint regression `npm test -- --silent` → passed.
-- `npm install --save-dev typescript @types/node` → passed.
-- Final `npm run typecheck` → passed.
-- Post-typecheck `npm run lint` → passed.
-- Post-typecheck regression `npm test -- --silent` → passed.
-- Final `npm run build` → passed and generated Prisma Client.
-- Post-build `npm run typecheck` → passed.
-- Post-build `npm run lint` → passed.
-- Post-build regression `npm test -- --silent` → passed.
-- `npm run verify` → passed with fail-fast sequence `lint -> typecheck -> build -> test`.
-- `npx -y js-yaml .github/workflows/p0-quality-gates.yml > NUL` → passed.
-- Post-CI-definition `npm run verify` → passed.
-- `npm ci` → passed.
-- `node -v && npm -v` → confirmed local drift environment `Node 24.16.0 / npm 11.13.0`.
-- `npx -y node@20 -v` → confirmed supported runtime availability (`v20.20.2`).
-- Local `npm run lint` after `npm ci` under Node 24 → failed with ESLint runtime module-loading issue; classified as environment-specific drift.
-- Local `npm run build` after `npm ci` under Node 24 → failed with Prisma runtime binary lookup issue; classified as environment-specific drift.
-- Local `npm run verify` after `npm ci` under Node 24 → failed because lint failed first; classified as environment-specific drift.
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run lint` → passed.
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run typecheck` → passed.
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run build` → passed.
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run test` → passed.
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run verify` → passed.
-- `docker compose ps` → confirmed existing `app` and `db` services running.
-- `powershell -Command "$env:DATABASE_URL='postgresql://tracksys:tracksys@localhost:5432/tracksys?schema=public'; npx prisma validate"` → passed.
-- `node --check prisma/seed.js` → passed syntax check.
-- Host-local replay against `localhost:5432` showed environment drift: `prisma migrate deploy` reported success against disposable DB names, but those databases were not consistently visible from the inspected compose `db` service afterward.
-- Compose-aligned replay recorded a stable command sequence using committed Docker/Prisma artifacts.
-- `docker compose run --rm -e DATABASE_URL=postgresql://tracksys:tracksys@db:5432/tracksys_p0x_replay_run?schema=public app npx prisma migrate deploy` → reported success and applied all 22 committed migrations.
-- `docker compose run --rm -e DATABASE_URL=postgresql://tracksys:tracksys@db:5432/tracksys_p0x_replay_run?schema=public app npm run prisma:seed` → failed; Prisma reported target database did not exist for the inspected server.
-- `TASK-P0X-010` outcome: replay sequence documented, migration invocation evidenced, seed/bootstrap failure classified as target-environment inconsistency blocking clean replay closure.
-- `node -e "const pkg=require('./package.json'); console.log(JSON.stringify(pkg.engines))"` → confirmed explicit runtime contract `{ "node": ">=20 <21" }`.
-- Runtime-alignment probe across `package.json`, `README.md`, and `Dockerfile` → passed.
-- `npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run verify` → passed after explicit Node contract declaration.
-- Workflow alignment review → `.github/workflows/p0-quality-gates.yml` remains pinned to Node 20.
+### Environment baseline
+- Supported runtime probe: `npx -y node@20 -v` → `v20.20.2` (exit `0`)
+- Docker: `docker version` → client/server `27.3.1` (exit `0`)
+- Docker Compose: `docker compose version` → `v2.29.7-desktop.1` (exit `0`)
+- Compose services: `docker compose config --services` → `db`, `app` (exit `0`)
+- Database engine: `PostgreSQL 16.14` from service `db` (exit `0`)
 
-## 11. Existing failures
-- `validate:agent-workspace` currently fails in baseline execution and is documented as optional diagnostic validation outside the mandatory P0 test gate.
-- Clean database replay remains operationally blocked: the target database used for replay is not stable across observed environment boundaries in this session, so seed/bootstrap cannot complete reliably.
+### Commands executed
+1. `docker compose build app` → exit `0`
+2. `docker compose up -d db` → exit `0`
+3. `docker compose exec -T db sh -lc "psql -U tracksys -d postgres -Atc 'SELECT version();'"` → exit `0`
+4. `docker compose exec -T db sh -lc "psql -U tracksys -d postgres -c 'DROP DATABASE IF EXISTS tracksys_replay_validation;' && psql -U tracksys -d postgres -c 'CREATE DATABASE tracksys_replay_validation;'"` → exit `0`
+5. `docker compose exec -T db sh -lc "psql -U tracksys -d postgres -Atc \"SELECT datname FROM pg_database WHERE datname='tracksys_replay_validation';\""` → exit `0`, empty stdout on this specific probe
+6. `docker compose exec -T db sh -lc "psql -U tracksys -d postgres -Atc 'SELECT datname FROM pg_database ORDER BY datname;'"` → exit `0`, disposable DB visible in full listing
+7. `docker compose run --rm -e DATABASE_URL=postgresql://tracksys:tracksys@db:5432/tracksys_replay_validation?schema=public app npm run prisma:apply-committed-migrations` → exit `1`
+8. `docker compose exec -T db sh -lc "psql -U tracksys -d tracksys_replay_validation -Atc \"SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name;\""` → exit `0`, empty stdout
+9. `docker compose run --rm -e DATABASE_URL=postgresql://tracksys:tracksys@db:5432/tracksys_replay_validation?schema=public app npm run prisma:seed` → exit `1`
+10. `docker compose run --rm -e DATABASE_URL=postgresql://tracksys:tracksys@db:5432/tracksys_replay_validation?schema=public -e PORT=2500 app node -e "const http=require('http'); const app=require('./src/app'); const server=app.listen(2500,()=>{ http.get('http://127.0.0.1:2500/health',res=>{ console.log('health-status', res.statusCode); server.close(()=>process.exit(res.statusCode===200?0:1)); }).on('error',err=>{ console.error(err); server.close(()=>process.exit(1)); }); });"` → exit `0`
+11. `docker compose exec -T db sh -lc "psql -U tracksys -d postgres -c 'DROP DATABASE IF EXISTS tracksys_replay_validation;'"` → exit `0`
 
-## 12. New failures
-- None introduced in the supported Node 20 validation path.
-- Node 24-specific tool/runtime failures were observed after `npm ci`, but they are classified as environment drift rather than product regressions because the supported Node 20 path passes.
-- No new product-code failure was introduced by TASK-P0X-010; the observed replay blocker is classified as an operational environment/target inconsistency that already prevented closure evidence.
-- Real GitHub Actions execution for TASK-P0X-011 failed in the mandatory `lint` gate with unused-variable errors in `src/services/auth.service.js`, `src/services/client.service.js`, `src/services/order.service.js`, and `src/services/user.service.js`.
-- The failure is now durably linked through run `29287056129` and job `86942014049`.
+### Observed results
+- The disposable database was created successfully.
+- A direct single-database existence probe returned empty stdout even though the subsequent full listing showed `tracksys_replay_validation` present.
+- The canonical migration step failed immediately because the committed app image did not contain `/app/scripts/apply-committed-migrations.js`.
+- Physical table inspection after the failed migration step returned no tables in `public`.
+- Seed failed with Prisma error `P2021` because table `public.Role` did not exist.
+- `/health` smoke validation returned `200`, proving the process can start even though replayed schema initialization failed.
 
-## 13. Deviations from the approved plan
-- No architecture deviation.
-- The initial lint scope intentionally excludes `src/public/**` in this first P0 iteration. This was documented explicitly in `inventory-api/README.md` and `inventory-api/eslint.config.js` to avoid mixing browser-specific rules into the backend closure gate without approved frontend-specific lint rules.
+### Truthful classification
+- Latest replay run classification: **Failed / Environment blocked**
+- Reason:
+  - the repository-owned canonical migration step could not execute successfully inside the committed `app` image;
+  - no physical schema was created in the disposable target;
+  - seed failed due missing tables;
+  - startup smoke alone is insufficient to treat replay as passed.
 
-## 14. Remaining risks
-- `validate:agent-workspace` may represent either a pre-existing defect or outdated expectation and requires explicit scope classification in later work.
-- Real GitHub Actions execution evidence is now durably recorded, but the captured run still reflects a real `failure` at the lint gate and should not be misread as CI success.
-- `src/public/**` is not yet included in the lint/typecheck gates and will need a browser-specific follow-up if it becomes mandatory for closure scope.
-- Several Prisma/Zod hotspots currently rely on localized `// @ts-nocheck` markers and should be revisited in a later hardening iteration.
-- The current build definition validates Prisma Client generation but does not yet validate container image creation or post-build startup as part of the formal build gate.
-- CI workflow syntax was validated locally and the workflow was later executed in GitHub Actions, where the captured run failed at the lint gate.
-- Local developer environments using Node 24 may see tooling/runtime failures after clean install unless they align with the supported Node 20 baseline.
-- Clean replay currently depends on resolving the environment inconsistency between the replay target declared in `DATABASE_URL` and the server state observable from the compose `db` service.
-
-## 15. Manual validation
-- Verified `GET /health` returns HTTP 200 after `npm run start`.
-- Verified the supported runtime contract now matches package metadata, README, Docker base image, and CI workflow version.
-
-## 16. Next executable task
-- No further approved tasks remain in `specs/p0-extra-inclusion/`.
-- Separate follow-up work may still be needed to correct the CI lint failures observed in run `29287056129` and to investigate the clean replay environment inconsistency if those are promoted into a new approved package.
+### Evidence linkage
+- Recorded as `EVID-DB-004` in `specs/p0-extra-inclusion/validation-evidence.md`
+- Preserves and supersedes earlier replay attempts `EVID-DB-001`, `EVID-DB-002`, and `EVID-DB-003` without deleting them

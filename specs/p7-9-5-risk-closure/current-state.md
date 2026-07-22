@@ -11,7 +11,8 @@ El sistema inspeccionado es un monolito Node.js/Express con capas de rutas, serv
 - `inventory-api/src/lib/logging.js`: logging request-level actual.
 - `inventory-api/docs/openapi/runtime-baseline.openapi.json`: contrato OpenAPI factual parcial.
 - `inventory-api/tests/*.test.js`: caracterización, seguridad, gobernanza y smoke tests.
-- **Missing in current visible workspace:** no se observó `inventory-api/docs/runtime-endpoint-catalog.md` ni `inventory-api/docs/audit/p6-9_5-blockers.md`; cualquier referencia histórica a esos artefactos debe tratarse como drift documental y no como evidencia confirmada actual.
+- `inventory-api/docs/runtime-endpoint-catalog.md`: catálogo humano versionado del runtime, presente en el workspace actual.
+- **Missing in current visible workspace:** no se observó `inventory-api/docs/audit/p6-9_5-blockers.md`; cualquier referencia histórica a ese artefacto debe tratarse como drift documental y no como evidencia confirmada actual.
 
 ## 3. Current components
 ### 3.1 SQL raw inseguro actualmente observable
@@ -57,7 +58,7 @@ El sistema inspeccionado es un monolito Node.js/Express con capas de rutas, serv
 
 **Compatibilidad documentada:** esta primera fase sigue siendo representativa, no una captura productiva completa.
 - El baseline usa fixtures representativas y métricas lógicas versionadas.
-- Aún no existe un catálogo runtime exhaustivo equivalente a `runtime-endpoint-catalog.md`; la gobernanza pesada se apoya en el baseline explícito de endpoints priorizados.
+- El baseline es suficiente para P7 como evidencia de drift, pero no equivale a observabilidad productiva completa.
 
 **Confirmado:** ya existe gobernanza de payload de entrada por clases.
 - `src/middlewares/request-payload.js` define límites `256kb`, `1mb` y `25mb`.
@@ -65,8 +66,8 @@ El sistema inspeccionado es un monolito Node.js/Express con capas de rutas, serv
 
 ### 3.4 Contrato runtime vs OpenAPI
 **Actualizado tras TASK-007:** OpenAPI sigue siendo explícitamente parcial, pero ahora está acompañado por un manifiesto contractual exhaustivo de exclusiones.
-- `inventory-api/docs/openapi/runtime-baseline.openapi.json` declara `x-coverage-scope.coverage = "partial"`.
-- El mismo artefacto ahora referencia explícitamente:
+- `inventory-api/docs/openapi/runtime-baseline.openapi.json` declara `x-coverage-scope.coverage = \"partial\"`.
+- El mismo artefacto referencia explícitamente:
   - `docs/runtime-contract-manifest.json` como fuente de exclusiones intencionales;
   - `docs/runtime-endpoint-catalog.md` como catálogo humano del runtime y del criterio de clasificación.
 - `inventory-api/tests/openapi-contract-consistency.test.js` valida que cada operación documentada tenga `x-runtime-source` y coincida con `inventory-api/src/app.js` + su archivo de rutas.
@@ -165,7 +166,7 @@ Confirmado en `inventory-api/src/app.js`. Tras TASK-007, el workspace visible ya
 - Persisten usos `RawUnsafe` fuera del runtime crítico, principalmente en scripts operativos, una suite de constraints física y documentación de migraciones.
 - El OpenAPI parcial ya no opera aislado: el universo de rutas montadas queda clasificado junto con `docs/runtime-contract-manifest.json`. Sigue siendo parcial por decisión aprobada.
 - El sistema ya gobierna un baseline inicial de endpoints pesados, pero la primera fase sigue siendo representativa y no impone budgets rígidos ni captura productiva exhaustiva.
-- Existen flujos DB/filesystem con cleanup best-effort o multi-step rollback sin caracterización suficiente de todos los fallos parciales.
+- Existen flujos DB/filesystem con cleanup best-effort o multi-step rollback; la caracterización ya cubre los escenarios críticos, pero siguen visibles defectos residuales con inconsistencia persistente que requieren remediación para cerrar P7.
 - Varias rutas de alto costo continúan sin paginación obligatoria.
 
 ## 10. Technical debt related to the change
@@ -208,4 +209,5 @@ Confirmado en `inventory-api/src/app.js`. Tras TASK-007, el workspace visible ya
 - `inventory-api/tests/client-document-security.test.js`
 - `inventory-api/tests/payment-receipt-security.test.js`
 - `inventory-api/tests/public-surface-characterization.test.js`
-- **Missing in current workspace but historically referenced:** `inventory-api/docs/runtime-endpoint-catalog.md`, `inventory-api/docs/audit/p6-9_5-blockers.md`
+- `inventory-api/docs/runtime-endpoint-catalog.md`
+- **Missing in current workspace but historically referenced:** `inventory-api/docs/audit/p6-9_5-blockers.md`

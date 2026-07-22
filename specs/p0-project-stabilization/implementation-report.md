@@ -223,12 +223,19 @@
 - Independent non-regression execution was not possible in this specific review session.
 
 ## 18. Follow-up closure addendum from `specs/p0-extra-inclusion`
-- Approved follow-up package `specs/p0-extra-inclusion/` has now been implemented.
+- Approved follow-up source package `specs/p0-extra-inclusion/` has now been operationally executed through `specs/p0-extra-closure-followup/` and back-propagated into this parent package.
 - Added repository quality gates: `npm run lint`, `npm run typecheck`, `npm run build`, `npm run verify`.
 - Added CI workflow: `.github/workflows/p0-quality-gates.yml`.
-- Final supported-runtime validation was executed after `npm ci` using Node 20 for `lint`, `typecheck`, `build`, `test`, and `verify`.
-- A local Node 24 drift was observed during clean-environment validation; it was classified as environment drift because the supported Node 20 path passed.
-- Real GitHub Actions evidence is now durably linked at run `29287056129` with associated job `86942014049`; the captured outcome was `failure` at the lint gate and is preserved as evidence rather than rewritten as success.
+- Final supported-runtime validation was executed under Node 20 for `lint`, `typecheck`, `build`, `test`, and `verify`, all passing locally.
+- Real GitHub Actions evidence is now durably linked across preserved failed runs `29287056129` and `29288885694`, plus successful run `29383737072` / job `87252601412` for commit `5c16b2c91e22b49085e1cb7f72a3ae58bd1bf50f`.
 - Supported runtime is now explicit through `package.json` engines, README runtime contract, CI Node 20 pinning, and Docker base-image alignment.
-- Clean replay evidence was expanded with a canonical replay sequence and recorded migration execution, while seed/bootstrap remained operationally blocked by target-environment inconsistency.
-- As a result, the original closure blockers related to missing repository quality gates are resolved by the approved follow-up package, but the replay inconsistency and captured CI failure remain documented operational facts.
+- Clean replay evidence was first expanded with failed and unstable attempts, and was later resolved by approved child package `specs/p0-replay-blocker-fix/`, which corrected built-image migration support and recorded successful canonical replay evidence on `tracksys_replay_task2`.
+- As a result, the original closure blockers related to missing repository quality gates, real-CI evidence, and replay completion are resolved by the approved follow-up work while preserving all earlier negative evidence.
+
+## 19. Back-propagated closure state after follow-up execution
+- Combined parent-package interpretation:
+  - local supported-runtime quality gates: **passed**
+  - supported Node runtime contract: **explicit and aligned**
+  - real GitHub Actions evidence: **present and successful, with preserved historical failures**
+  - clean replay evidence: **present and passed, with historical failed attempts preserved**
+- Truthful closure conclusion for the parent package is **Completed**, because mandatory clean-replay closure conditions are now satisfied and the evidence chain remains preserved.
