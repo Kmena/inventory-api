@@ -44,8 +44,7 @@ test('company user creation remains company-admin-only', async () => {
 });
 
 test('role administration router keeps admin gate for company role listing', async () => {
-  assert.ok(roleRoutes.stack.length >= 2, 'role router should include authenticate and admin gate middlewares');
-  const adminGuard = roleRoutes.stack[1].handle;
+  const adminGuard = getRouteGuard(roleRoutes, '/company', 'get');
 
   const deniedError = await runGuard(adminGuard, { role: 'sales', companyId: '7' });
   assert.equal(deniedError?.statusCode, 403);

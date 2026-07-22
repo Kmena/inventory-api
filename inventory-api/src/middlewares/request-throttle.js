@@ -15,26 +15,18 @@ function buildScopedKey(scope, req, buildKey) {
   return `${scope}::${keySuffix}`;
 }
 
-function getOrCreateEntryWithStore(store, key, now) {
-  const entry = store.get(key);
-  if (entry) {
-    return entry;
+function normalizeEntryForWindow(entry, now, windowMs) {
+  if (!entry || ((now - entry.windowStartedAt) >= windowMs)) {
+    return {
+      windowStartedAt: now,
+      hits: 0,
+    };
   }
 
-  const nextEntry = {
-    windowStartedAt: now,
-    hits: 0,
+  return {
+    windowStartedAt: entry.windowStartedAt,
+    hits: entry.hits,
   };
-  store.set(key, nextEntry);
-  return nextEntry;
-}
-
-function resetEntryIfWindowExpired(store, key, entry, now, windowMs) {
-  if ((now - entry.windowStartedAt) >= windowMs) {
-    entry.windowStartedAt = now;
-    entry.hits = 0;
-    store.set(key, entry);
-  }
 }
 
 function createRequestThrottle({ scope, maxRequests, windowMs, message, buildKey = null, store = requestThrottleStore }) {
@@ -42,21 +34,28 @@ function createRequestThrottle({ scope, maxRequests, windowMs, message, buildKey
     throw new Error('scope is required for request throttling');
   }
 
-  return function enforceRequestThrottle(req, res, next) {
-    const now = Date.now();
-    const key = buildScopedKey(scope, req, buildKey);
-    const entry = getOrCreateEntryWithStore(store, key, now);
-    resetEntryIfWindowExpired(store, key, entry, now, windowMs);
-    entry.hits += 1;
-    store.set(key, entry);
+  return async function enforceRequestThrottle(req, res, next) {
+    try {
+      const now = Date.now();
+      const key = buildScopedKey(scope, req, buildKey);
+      const entry = await store.update(key, (currentEntry) => {
+        const nextEntry = normalizeEntryForWindow(currentEntry, now, windowMs);
+        nextEntry.hits += 1;
+        return nextEntry;
+      }, {
+        expiresAt: new Date(now + windowMs),
+      });
 
-    if (entry.hits <= maxRequests) {
-      return next();
+      if (entry.hits <= maxRequests) {
+        return next();
+      }
+
+      const retryAfterSeconds = Math.max(1, Math.ceil((entry.windowStartedAt + windowMs - now) / 1000));
+      res.setHeader('Retry-After', String(retryAfterSeconds));
+      return next(createHttpError(429, message, 'too_many_requests'));
+    } catch (error) {
+      return next(error);
     }
-
-    const retryAfterSeconds = Math.max(1, Math.ceil((entry.windowStartedAt + windowMs - now) / 1000));
-    res.setHeader('Retry-After', String(retryAfterSeconds));
-    return next(createHttpError(429, message, 'too_many_requests'));
   };
 }
 

@@ -1,7 +1,7 @@
 const express = require('express');
 
 const authenticate = require('../middlewares/authenticate');
-const authorize = require('../middlewares/authorize');
+const { authorizeAccessPolicy } = require('../security/access-policies');
 const validate = require('../middlewares/validate');
 const { parsePaginationQuery } = require('../lib/pagination');
 const { createCompanyRoleSchema } = require('../schemas/role.schema');
@@ -9,9 +9,8 @@ const roleService = require('../services/role.service');
 
 const router = express.Router();
 router.use(authenticate);
-router.use(authorize('admin'));
 
-router.get('/permissions', async (req, res, next) => {
+router.get('/permissions', authorizeAccessPolicy('role.permissions.list'), async (req, res, next) => {
   try {
     const permissions = await roleService.listPermissions(req.auth);
     return res.json(permissions);
@@ -20,7 +19,7 @@ router.get('/permissions', async (req, res, next) => {
   }
 });
 
-router.get('/company', async (req, res, next) => {
+router.get('/company', authorizeAccessPolicy('role.company.list'), async (req, res, next) => {
   try {
     const roles = await roleService.listAssignableRoles(req.auth, parsePaginationQuery(req.query));
     return res.json(roles);
@@ -29,7 +28,7 @@ router.get('/company', async (req, res, next) => {
   }
 });
 
-router.post('/company', validate(createCompanyRoleSchema), async (req, res, next) => {
+router.post('/company', authorizeAccessPolicy('role.company.create'), validate(createCompanyRoleSchema), async (req, res, next) => {
   try {
     const role = await roleService.createCompanyRole(req.body, req.auth, req);
     return res.status(201).json(role);

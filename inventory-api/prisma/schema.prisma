@@ -1173,4 +1173,14 @@ model OrderStoreBackfillAudit {
   @@map("order_store_backfill_audit")
 }
 
+model ThrottleEntry {
+  scopeKey   String   @id @map("scope_key") @db.Text
+  payloadJson String  @map("payload_json") @db.Text
+  expiresAt  DateTime? @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([expiresAt])
+  @@map("throttle_entries")
+}
 

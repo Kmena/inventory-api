@@ -13,7 +13,10 @@
     "lint:public-runtime": "eslint src/public --max-warnings 0",
     "validate:public-runtime": "node scripts/validate-public-runtime.js",
     "validate:workflow-baseline": "node scripts/validate-workflow-baseline.js",
-    "verify": "npm run lint && npm run typecheck && npm run lint:public-runtime && npm run validate:public-runtime && npm run validate:workflow-baseline && npm run build && npm run test",
+    "validate:operational-readiness": "node scripts/validate-operational-readiness.js",
+    "playwright:install": "playwright install chromium",
+    "test:e2e:browser": "node --test tests/browser-e2e.e2e.js",
+    "verify": "npm run lint && npm run typecheck && npm run lint:public-runtime && npm run validate:public-runtime && npm run validate:workflow-baseline && npm run validate:operational-readiness && npm run build && npm run test",
     "test": "node scripts/run-tests.js",
     "map:local": "node scripts/generate-local-project-map.js",
     "validate:agent-workspace": "node scripts/validate-agent-workspace.js",
@@ -40,6 +43,7 @@
   "devDependencies": {
     "@types/node": "^26.1.1",
     "eslint": "^9.39.5",
+    "playwright": "^1.55.0",
     "prisma": "^5.22.0",
     "typescript": "^7.0.2"
   },

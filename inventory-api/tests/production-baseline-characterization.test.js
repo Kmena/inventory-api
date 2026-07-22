@@ -31,7 +31,9 @@ test('production baseline documentation covers validation, migrations and health
   const readmeSource = read(readmePath);
 
   assert.match(docSource, /npm run validate:production-baseline/);
+  assert.match(docSource, /npm run validate:operational-readiness/);
   assert.match(docSource, /docker compose -f docker-compose.prod.yml run --rm migrate/);
+  assert.match(docSource, /production-operations-runbook\.md/);
   assert.match(docSource, /\/health\/ready/);
   assert.match(readmeSource, /production-baseline\.md/);
 });
@@ -57,4 +59,14 @@ test('validate-production-baseline passes with explicit production environment v
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /Production baseline validation passed/);
+});
+
+test('validate-operational-readiness passes when runbook and workflow evidence stay versioned', () => {
+  const result = spawnSync('node', ['scripts/validate-operational-readiness.js'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /Operational readiness validation passed/);
 });

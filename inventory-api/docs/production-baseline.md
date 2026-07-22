@@ -8,7 +8,9 @@ Este documento define el baseline productivo **mínimo y verificable** soportado
 - `docker-compose.prod.yml`
 - `.env.production.example`
 - `scripts/validate-production-baseline.js`
+- `scripts/validate-operational-readiness.js`
 - `scripts/validate-workflow-baseline.js`
+- `docs/production-operations-runbook.md`
 - `src/routes/health.routes.js`
 - `prisma/schema.prisma`
 - `.github/workflows/operational-smoke.yml`
@@ -39,6 +41,7 @@ Desde `inventory-api/`:
 cp .env.production.example .env.production
 # editar .env.production
 npm run validate:production-baseline
+npm run validate:operational-readiness
 ```
 
 ### 2. Validar sintaxis Compose del baseline productivo
@@ -82,6 +85,7 @@ Alcance del workflow:
 - `npm run build`
 - `node scripts/validate-workflow-baseline.js`
 - `npm run validate:production-baseline`
+- `npm run validate:operational-readiness`
 - materialización temporal de `.env.production` en el runner para satisfacer `env_file` del compose smoke
 - `docker compose -f docker-compose.prod.yml config`
 - `docker build -t inventory-api:operational-smoke .`
@@ -90,7 +94,8 @@ Límites explícitos:
 - no hace deploy
 - no publica imágenes
 - no sustituye validaciones de migración con base real
-- funciona como evidencia operativa mínima adicional y smoke versionado del baseline productivo
+- no ejecuta restore real automático contra una base persistente de referencia
+- funciona como evidencia operativa adicional versionada y smoke del baseline productivo
 
 ## Checklist local de smoke operacional
 Desde `inventory-api/` con Docker disponible:
@@ -99,6 +104,7 @@ Desde `inventory-api/` con Docker disponible:
 cp .env.production.example .env.production
 # editar .env.production
 npm run validate:production-baseline
+npm run validate:operational-readiness
 docker compose -f docker-compose.prod.yml config
 docker build -t inventory-api:operational-smoke .
 ```
@@ -119,6 +125,11 @@ docker build -t inventory-api:operational-smoke .
 ### Health / readiness
 - `Dockerfile` expone `HEALTHCHECK` contra `/health/ready`.
 - El runtime también conserva `/health` como liveness simple.
+
+### Restore / runbook / observabilidad mínima
+- `docs/production-operations-runbook.md` documenta backup lógico, restore validation y checklist posterior al restore.
+- `scripts/validate-operational-readiness.js` valida que el runbook, las señales de observabilidad mínima y el workflow operativo sigan presentes.
+- El runtime ya emite `X-Request-Id`, logging estructurado fuera de development y contexto útil de error/request.
 
 ### Persistencia
 - PostgreSQL persiste en el volumen `postgres_data`.
@@ -146,7 +157,7 @@ Límites explícitos del workflow:
 
 ## Límites conocidos
 - No incluye TLS, reverse proxy ni certificados.
-- No incluye backups automatizados ni restauración validada.
-- No incluye observabilidad externa ni agregación de logs.
+- No incluye backups automatizados programados ni restore drill automático con datos reales persistidos.
+- No incluye observabilidad externa ni agregación de logs SaaS; sí preserva señales mínimas versionadas de health, requestId y logging estructurado.
 - No reemplaza una estrategia cloud específica.
 - `docker-compose.prod.yml` es un baseline mínimo verificable, no una certificación de production-ready total.

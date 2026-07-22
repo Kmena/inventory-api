@@ -17,61 +17,51 @@ function buildThrottleKey(req) {
   return `${clientIp}::${normalizeUsername(req.body?.username)}`;
 }
 
-function getOrCreateEntry(store, key, now) {
-  const existingEntry = store.get(key);
-  if (!existingEntry) {
-    const entry = {
+function normalizeEntryForWindow(entry, now) {
+  if (!entry || ((now - entry.firstFailedAt) > LOGIN_THROTTLE_WINDOW_MS)) {
+    return {
       failedAttempts: 0,
       firstFailedAt: now,
       blockedUntil: null,
     };
-    store.set(key, entry);
-    return entry;
   }
 
-  return existingEntry;
-}
-
-function resetEntryIfWindowExpired(store, key, entry, now) {
-  if ((now - entry.firstFailedAt) > LOGIN_THROTTLE_WINDOW_MS) {
-    entry.failedAttempts = 0;
-    entry.firstFailedAt = now;
-    entry.blockedUntil = null;
-    store.set(key, entry);
-  }
+  return {
+    failedAttempts: entry.failedAttempts,
+    firstFailedAt: entry.firstFailedAt,
+    blockedUntil: entry.blockedUntil,
+  };
 }
 
 function clearLoginThrottleEntry(store, key) {
-  store.delete(key);
+  return store.delete(key);
 }
 
 function createLoginThrottle({ store = loginThrottleStore } = {}) {
-  function enforceLoginThrottle(req, res, next) {
-    const key = buildThrottleKey(req);
-    const now = Date.now();
-    const entry = store.get(key);
+  async function enforceLoginThrottle(req, res, next) {
+    try {
+      const key = buildThrottleKey(req);
+      const now = Date.now();
+      const entry = await store.get(key);
 
-    if (!entry) {
-      return next();
+      if (!entry || !entry.blockedUntil || entry.blockedUntil <= now) {
+        return next();
+      }
+
+      const retryAfterSeconds = Math.max(1, Math.ceil((entry.blockedUntil - now) / 1000));
+      res.setHeader('Retry-After', String(retryAfterSeconds));
+      return next(createHttpError(429, 'Demasiados intentos de inicio de sesión. Intente de nuevo más tarde.', 'too_many_requests'));
+    } catch (error) {
+      return next(error);
     }
-
-    resetEntryIfWindowExpired(store, key, entry, now);
-
-    if (!entry.blockedUntil || entry.blockedUntil <= now) {
-      return next();
-    }
-
-    const retryAfterSeconds = Math.max(1, Math.ceil((entry.blockedUntil - now) / 1000));
-    res.setHeader('Retry-After', String(retryAfterSeconds));
-    return next(createHttpError(429, 'Demasiados intentos de inicio de sesión. Intente de nuevo más tarde.', 'too_many_requests'));
   }
 
-  function registerLoginThrottleResult(req, { successful, errorCode = null }) {
+  async function registerLoginThrottleResult(req, { successful, errorCode = null }) {
     const key = buildThrottleKey(req);
     const now = Date.now();
 
     if (successful) {
-      clearLoginThrottleEntry(store, key);
+      await clearLoginThrottleEntry(store, key);
       return;
     }
 
@@ -79,15 +69,18 @@ function createLoginThrottle({ store = loginThrottleStore } = {}) {
       return;
     }
 
-    const entry = getOrCreateEntry(store, key, now);
-    resetEntryIfWindowExpired(store, key, entry, now);
-    entry.failedAttempts += 1;
+    await store.update(key, (currentEntry) => {
+      const nextEntry = normalizeEntryForWindow(currentEntry, now);
+      nextEntry.failedAttempts += 1;
 
-    if (entry.failedAttempts >= LOGIN_THROTTLE_MAX_FAILURES) {
-      entry.blockedUntil = now + LOGIN_THROTTLE_BLOCK_MS;
-    }
+      if (nextEntry.failedAttempts >= LOGIN_THROTTLE_MAX_FAILURES) {
+        nextEntry.blockedUntil = now + LOGIN_THROTTLE_BLOCK_MS;
+      }
 
-    store.set(key, entry);
+      return nextEntry;
+    }, {
+      expiresAt: new Date(now + Math.max(LOGIN_THROTTLE_WINDOW_MS, LOGIN_THROTTLE_BLOCK_MS)),
+    });
   }
 
   return {
