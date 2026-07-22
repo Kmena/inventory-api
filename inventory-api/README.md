@@ -130,6 +130,21 @@ Use estos documentos como referencia contractual:
 - `docs/runtime-ui-api-contract-map.md`
 - `docs/ui-guidelines.md`
 - `docs/production-baseline.md`
+- `docs/p7-risk-closure-evidence.md`
+
+## Evidencia P7 de cierre de riesgos
+
+Para revisar el cierre incremental de riesgos P7 sin reinterpretar el alcance, use como punto de entrada:
+
+- `docs/p7-risk-closure-evidence.md`
+
+Ese artefacto resume:
+
+- endurecimiento runtime de `RawUnsafe`;
+- caracterización de fallos parciales DB/filesystem;
+- baseline y drift governance de endpoints pesados priorizados;
+- formalización contractual entre runtime montado y OpenAPI parcial;
+- riesgos residuales aceptados y comandos de validación reproducible.
 
 ## Quality gates versionados
 
@@ -574,6 +589,20 @@ Notas de compatibilidad:
 - `GET /api/companies/company/dashboard` es el path semántico recomendado para la administración interna de empresa.
 - `GET /api/companies/root/dashboard` se conserva como alias legacy engañoso para no romper clientes o bookmarks existentes; no representa un dashboard root global.
 - La separación entre root global y admin de empresa no depende solo del nombre del rol; también depende de si el actor autenticado tiene `companyId`.
+
+## Validación documental y contractual relevante
+
+Para revalidar la evidencia operativa y contractual relacionada con P7 desde `inventory-api/`:
+
+```bash
+node --test tests/heavy-endpoint-governance.test.js tests/logging.test.js
+node --test tests/openapi-contract-consistency.test.js tests/runtime-contract-governance.test.js
+npm run test -- --silent
+```
+
+Notas:
+- la suite completa puede mostrar `2 skipped` esperados cuando faltan `P2_CONSTRAINTS_DATABASE_URL` y `P2_AUDIT_DATABASE_URL`;
+- esos skips corresponden a pruebas de integración environment-gated y no invalidan la evidencia P7 cerrada en esta fase.
 
 ## Endpoints
 

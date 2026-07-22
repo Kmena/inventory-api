@@ -4,6 +4,7 @@ const cors = require('cors');
 
 const { createRequestLogger, logRequestError } = require('./lib/logging');
 const { createRequestContextMiddleware } = require('./lib/request-context');
+const { createHeavyEndpointMetricsMiddleware } = require('./middlewares/heavy-endpoint-metrics');
 const { corsOrigin, nodeEnv, trustProxy } = require('./config');
 const healthRouter = require('./routes/health.routes');
 const authRouter = require('./routes/auth.routes');
@@ -84,6 +85,7 @@ function setSecurityHeaders(_req, res, next) {
 app.use(cors({ origin: corsOrigin }));
 app.use(setSecurityHeaders);
 app.use(createRequestContextMiddleware());
+app.use(createHeavyEndpointMetricsMiddleware());
 app.use(createRequestLogger(nodeEnv));
 app.use(express.static(path.join(__dirname, 'public')));
 

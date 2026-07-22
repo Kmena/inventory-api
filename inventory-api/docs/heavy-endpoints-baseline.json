@@ -1,0 +1,174 @@
+{
+  "version": 1,
+  "generationMode": "representative-fixtures",
+  "endpoints": [
+    {
+      "key": "agent-stores-list",
+      "method": "GET",
+      "routePattern": "/api/agent/stores",
+      "payloadClass": "medium",
+      "responseShape": "summary-plus-collection",
+      "resultCountStrategy": "stores",
+      "costDrivers": [
+        "agent-coverage-scan",
+        "summary-aggregation",
+        "store-card-serialization"
+      ],
+      "baselineMetrics": {
+        "endpointKey": "agent-stores-list",
+        "routePattern": "/api/agent/stores",
+        "payloadClass": "medium",
+        "responseShape": "summary-plus-collection",
+        "responseBytes": 266,
+        "resultCount": 2
+      }
+    },
+    {
+      "key": "agent-store-detail",
+      "method": "GET",
+      "routePattern": "/api/agent/stores/:storeId",
+      "payloadClass": "medium",
+      "responseShape": "deep-object",
+      "resultCountStrategy": "single-resource",
+      "costDrivers": [
+        "deep-nested-resource",
+        "purchase-history",
+        "sellable-products-snapshot"
+      ],
+      "baselineMetrics": {
+        "endpointKey": "agent-store-detail",
+        "routePattern": "/api/agent/stores/:storeId",
+        "payloadClass": "medium",
+        "responseShape": "deep-object",
+        "responseBytes": 402,
+        "resultCount": 1
+      }
+    },
+    {
+      "key": "clients-list",
+      "method": "GET",
+      "routePattern": "/api/clients",
+      "payloadClass": "medium",
+      "responseShape": "paginated-collection",
+      "resultCountStrategy": "items",
+      "costDrivers": [
+        "tenant-scoped-list",
+        "nested-client-serialization",
+        "pagination-optional"
+      ],
+      "baselineMetrics": {
+        "endpointKey": "clients-list",
+        "routePattern": "/api/clients",
+        "payloadClass": "medium",
+        "responseShape": "paginated-collection",
+        "responseBytes": 158,
+        "resultCount": 2
+      }
+    },
+    {
+      "key": "company-clients-list",
+      "method": "GET",
+      "routePattern": "/api/clients/company",
+      "payloadClass": "medium",
+      "responseShape": "paginated-collection",
+      "resultCountStrategy": "items",
+      "costDrivers": [
+        "tenant-scoped-list",
+        "nested-client-serialization",
+        "company-dashboard-dependency"
+      ],
+      "baselineMetrics": {
+        "endpointKey": "company-clients-list",
+        "routePattern": "/api/clients/company",
+        "payloadClass": "medium",
+        "responseShape": "paginated-collection",
+        "responseBytes": 205,
+        "resultCount": 3
+      }
+    },
+    {
+      "key": "invoice-inconsistencies-list",
+      "method": "GET",
+      "routePattern": "/api/invoices/inconsistencies",
+      "payloadClass": "medium",
+      "responseShape": "summary-plus-collection",
+      "resultCountStrategy": "invoices",
+      "costDrivers": [
+        "financial-state-review",
+        "cross-entity-consistency-check",
+        "summary-aggregation"
+      ],
+      "baselineMetrics": {
+        "endpointKey": "invoice-inconsistencies-list",
+        "routePattern": "/api/invoices/inconsistencies",
+        "payloadClass": "medium",
+        "responseShape": "summary-plus-collection",
+        "responseBytes": 210,
+        "resultCount": 2
+      }
+    },
+    {
+      "key": "inventory-stocks-list",
+      "method": "GET",
+      "routePattern": "/api/inventory/stocks",
+      "payloadClass": "medium",
+      "responseShape": "split-collection",
+      "resultCountStrategy": "items-plus-lots",
+      "costDrivers": [
+        "warehouse-stock-scan",
+        "lot-stock-scan",
+        "dual-collection-response"
+      ],
+      "baselineMetrics": {
+        "endpointKey": "inventory-stocks-list",
+        "routePattern": "/api/inventory/stocks",
+        "payloadClass": "medium",
+        "responseShape": "split-collection",
+        "responseBytes": 259,
+        "resultCount": 5
+      }
+    },
+    {
+      "key": "payments-list",
+      "method": "GET",
+      "routePattern": "/api/payments",
+      "payloadClass": "medium",
+      "responseShape": "paginated-collection",
+      "resultCountStrategy": "items",
+      "costDrivers": [
+        "tenant-scoped-list",
+        "receipt-metadata-serialization",
+        "ownership-scope-filtering"
+      ],
+      "baselineMetrics": {
+        "endpointKey": "payments-list",
+        "routePattern": "/api/payments",
+        "payloadClass": "medium",
+        "responseShape": "paginated-collection",
+        "responseBytes": 197,
+        "resultCount": 2
+      }
+    },
+    {
+      "key": "products-import",
+      "method": "POST",
+      "routePattern": "/api/products/import",
+      "payloadClass": "high",
+      "responseShape": "mutation-summary",
+      "resultCountStrategy": "mutation-summary",
+      "costDrivers": [
+        "high-request-payload",
+        "batch-upsert-loop",
+        "inventory-side-effects"
+      ],
+      "baselineMetrics": {
+        "endpointKey": "products-import",
+        "routePattern": "/api/products/import",
+        "payloadClass": "high",
+        "responseShape": "mutation-summary",
+        "responseBytes": 192,
+        "resultCount": 3
+      }
+    }
+  ]
+}

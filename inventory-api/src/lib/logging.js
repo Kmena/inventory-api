@@ -8,8 +8,17 @@ function toStructuredLog(payload) {
   return JSON.stringify(payload);
 }
 
-function createRequestLogMessage({ nodeEnv, requestId, method, path, statusCode, durationMs, errorCode }) {
-  return toStructuredLog({
+function createRequestLogMessage({
+  nodeEnv,
+  requestId,
+  method,
+  path,
+  statusCode,
+  durationMs,
+  errorCode,
+  heavyEndpointMetrics = null,
+}) {
+  const basePayload = {
     level: 'info',
     environment: nodeEnv,
     requestId: requestId || '-',
@@ -18,6 +27,20 @@ function createRequestLogMessage({ nodeEnv, requestId, method, path, statusCode,
     statusCode,
     durationMs,
     errorCode: errorCode || '-',
+  };
+
+  if (!heavyEndpointMetrics?.endpointKey) {
+    return toStructuredLog(basePayload);
+  }
+
+  return toStructuredLog({
+    ...basePayload,
+    endpointKey: heavyEndpointMetrics.endpointKey,
+    routePattern: heavyEndpointMetrics.routePattern,
+    payloadClass: heavyEndpointMetrics.payloadClass,
+    responseShape: heavyEndpointMetrics.responseShape,
+    responseBytes: heavyEndpointMetrics.responseBytes,
+    resultCount: heavyEndpointMetrics.resultCount,
   });
 }
 
@@ -40,6 +63,7 @@ function createRequestLogger(nodeEnv) {
       statusCode: statusToken ? Number(statusToken) : 0,
       durationMs: durationToken ? Number.parseFloat(durationToken) : 0,
       errorCode: res.locals?.errorCode,
+      heavyEndpointMetrics: res.locals?.heavyEndpointMetrics,
     });
   });
 }

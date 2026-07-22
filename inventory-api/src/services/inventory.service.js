@@ -85,6 +85,9 @@ function assertInventoryAlertTransition(currentStatus, targetStatus) {
   }
 }
 
+async function acquireCompanyInventoryAdvisoryLock(tx, companyId) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${companyId})`;
+}
 
 async function listMovements(auth, filters = {}, pagination = null) {
   const { companyId } = authScope(auth);
@@ -192,7 +195,7 @@ async function updateInventoryAlertStatus(alertId, payload, auth, req = null) {
 
 async function registerStockEntryInTransaction(tx, payload, auth) {
   const context = await getInventoryContext(tx, auth, payload.warehouseId, payload.productId);
-  await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock($1)', context.companyId);
+  await acquireCompanyInventoryAdvisoryLock(tx, context.companyId);
   const requestedInternalLotNumber = payload.internalLotNumber || payload.lotNumber;
 
   if (!requestedInternalLotNumber) {

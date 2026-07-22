@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const appPath = path.join(__dirname, '..', 'src', 'app.js');
 const openApiPath = path.join(__dirname, '..', 'docs', 'openapi', 'runtime-baseline.openapi.json');
+const runtimeContractManifestPath = path.join(__dirname, '..', 'docs', 'runtime-contract-manifest.json');
 
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
@@ -20,11 +21,16 @@ function buildRouteRegex(method, expressPath) {
 
 test('OpenAPI baseline stays explicitly partial and machine-readable while covering more runtime domains', () => {
   const openApi = JSON.parse(read(openApiPath));
+  const runtimeContractManifest = JSON.parse(read(runtimeContractManifestPath));
   const domains = JSON.stringify(openApi['x-coverage-scope'].domains);
 
   assert.equal(openApi.openapi, '3.0.3');
   assert.equal(openApi.info.title, 'inventory-api runtime baseline');
+  assert.equal(openApi.info.version, '0.5.0');
   assert.equal(openApi['x-coverage-scope'].coverage, 'partial');
+  assert.equal(openApi['x-coverage-scope'].contractClassification?.excludedOperationsArtifact, 'docs/runtime-contract-manifest.json');
+  assert.equal(openApi['x-coverage-scope'].contractClassification?.runtimeCatalogArtifact, 'docs/runtime-endpoint-catalog.md');
+  assert.equal(runtimeContractManifest.classificationMode, 'openapi-covered-plus-explicit-exclusions');
   assert.match(domains, /auth/i);
   assert.match(domains, /companies\/users\/roles/i);
   assert.match(domains, /clients/i);
@@ -49,17 +55,26 @@ test('OpenAPI baseline keeps legacy company dashboard alias and preferred alias'
   assert.ok(preferredAlias);
   assert.match(legacyAlias.summary, /legacy.*compañía|legacy.*compania/i);
   assert.match(legacyAlias.description, /no un dashboard root global/i);
+  assert.equal(legacyAlias['x-compatibility']?.status, 'legacy-alias');
+  assert.equal(legacyAlias['x-compatibility']?.preferredPath, '/api/companies/company/dashboard');
   assert.match(preferredAlias.summary, /preferido.*compañía|preferido.*compania/i);
 });
 
-test('OpenAPI baseline covers expanded auth, client, agent, integration and phase-2 operational surfaces', () => {
+test('OpenAPI baseline covers expanded auth, client, agent, integration and phase-4 operational surfaces', () => {
   const openApi = JSON.parse(read(openApiPath));
 
   assert.ok(openApi.paths['/api/auth/login']?.post);
   assert.ok(openApi.paths['/api/auth/me']?.get);
+  assert.ok(openApi.paths['/api/companies']?.get);
+  assert.ok(openApi.paths['/api/companies']?.post);
   assert.ok(openApi.paths['/api/roles/company']?.get);
   assert.ok(openApi.paths['/api/users/company']?.post);
   assert.ok(openApi.paths['/api/clients/company']?.get);
+  assert.ok(openApi.paths['/api/clients/classifications/company']?.get);
+  assert.ok(openApi.paths['/api/clients/document-types']?.get);
+  assert.ok(openApi.paths['/api/clients/company/{clientId}/stores']?.post);
+  assert.ok(openApi.paths['/api/clients/{clientId}/references']?.post);
+  assert.ok(openApi.paths['/api/clients']?.post);
   assert.ok(openApi.paths['/api/clients/{clientId}/documents/{documentId}/download']?.get);
   assert.ok(openApi.paths['/api/agent/dashboard']?.get);
   assert.ok(openApi.paths['/api/agent/stores/{storeId}/orders']?.post);
@@ -70,11 +85,19 @@ test('OpenAPI baseline covers expanded auth, client, agent, integration and phas
   assert.ok(openApi.paths['/api/orders']?.post);
   assert.ok(openApi.paths['/api/invoices']?.get);
   assert.ok(openApi.paths['/api/invoices/inconsistencies']?.get);
+  assert.ok(openApi.paths['/api/payments/{id}/receipts/{receiptId}/download']?.get);
+  assert.ok(openApi.paths['/api/inventory/stocks']?.get);
+  assert.ok(openApi.paths['/api/inventory/movements']?.get);
+  assert.ok(openApi.paths['/api/inventory/entries']?.post);
+  assert.ok(openApi.paths['/api/inventory/lots/{id}/qa']?.patch);
+  assert.ok(openApi.paths['/api/inventory/adjustments']?.post);
   assert.ok(openApi.paths['/api/warehouses/company']?.get);
   assert.ok(openApi.paths['/api/regions/company/{regionId}/subregions']?.post);
   assert.ok(openApi.paths['/api/sales-routes/company/{routeId}']?.put);
   assert.ok(openApi.paths['/api/sales-routes/company/agents/{userId}/goals']?.put);
   assert.equal(openApi.paths['/api/auth/login'].post.security, undefined);
+  assert.equal(openApi.paths['/api/clients'].post['x-compatibility']?.status, 'legacy-alias');
+  assert.equal(openApi.paths['/api/payments/{id}'].delete['x-compatibility']?.status, 'compatibility-delete-reverse');
   assert.match(openApi.paths['/api/geocoding/search'].get.summary, /throttle/i);
   assert.match(openApi.paths['/api/taxpayers/lookup'].get.summary, /throttle/i);
 });

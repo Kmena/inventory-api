@@ -6,7 +6,10 @@ const inventoryService = require('../src/services/inventory.service');
 
 function createInventoryTransactionStub() {
   return {
-    $executeRawUnsafe: async () => {},
+    executedStatements: [],
+    $executeRaw: async function executeRaw(strings, ...values) {
+      this.executedStatements.push({ strings, values });
+    },
     inventory: {
       findUnique: async () => ({ id: 1n }),
     },
@@ -103,6 +106,8 @@ test('registerStockEntryInTransaction normalizes ISO datetime lot inputs consist
     inventoryService.lotDateKey(acceptedIsoDateTimeResult.lot.expirationDate),
     '2026-07-16',
   );
+  assert.equal(tx.executedStatements.length, 2);
+  assert.match(tx.executedStatements[0].strings.join('?'), /pg_advisory_xact_lock/);
 });
 
 test('inventory stock entry schema rejects unsupported lot date formats predictably', () => {
