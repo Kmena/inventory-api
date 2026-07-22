@@ -1,0 +1,69 @@
+const fs = require('node:fs');
+const path = require('node:path');
+
+const repositoryRoot = path.join(__dirname, '..');
+const runbookPath = path.join(repositoryRoot, 'docs', 'production-operations-runbook.md');
+const productionBaselinePath = path.join(repositoryRoot, 'docs', 'production-baseline.md');
+const workflowPath = path.join(repositoryRoot, '.github', 'workflows', 'operational-smoke.yml');
+const loggingPath = path.join(repositoryRoot, 'src', 'lib', 'logging.js');
+const requestContextPath = path.join(repositoryRoot, 'src', 'lib', 'request-context.js');
+
+function read(filePath) {
+  return fs.readFileSync(filePath, 'utf8');
+}
+
+function assertPattern(source, pattern, message, failures) {
+  if (!pattern.test(source)) {
+    failures.push(message);
+  }
+}
+
+function main() {
+  const failures = [];
+
+  for (const requiredPath of [runbookPath, productionBaselinePath, workflowPath, loggingPath, requestContextPath]) {
+    if (!fs.existsSync(requiredPath)) {
+      failures.push(`Missing required operational readiness file: ${path.relative(repositoryRoot, requiredPath)}`);
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(`Operational readiness validation failed:\n- ${failures.join('\n- ')}`);
+  }
+
+  const runbookSource = read(runbookPath);
+  const productionBaselineSource = read(productionBaselinePath);
+  const workflowSource = read(workflowPath);
+  const loggingSource = read(loggingPath);
+  const requestContextSource = read(requestContextPath);
+
+  assertPattern(runbookSource, /## Procedimiento de backup lógico/, 'Runbook must document logical backup procedure.', failures);
+  assertPattern(runbookSource, /pg_dump/, 'Runbook must include pg_dump backup command.', failures);
+  assertPattern(runbookSource, /## Procedimiento de restore validation/, 'Runbook must document restore validation.', failures);
+  assertPattern(runbookSource, /psql/, 'Runbook must include psql restore command.', failures);
+  assertPattern(runbookSource, /## Señales operativas mínimas versionadas/, 'Runbook must document versioned operational signals.', failures);
+  assertPattern(runbookSource, /requestId/, 'Runbook must reference requestId traceability.', failures);
+  assertPattern(runbookSource, /\/health\/ready/, 'Runbook must reference readiness verification.', failures);
+  assertPattern(runbookSource, /no hay backups automáticos programados/i, 'Runbook must preserve explicit operational limits.', failures);
+
+  assertPattern(productionBaselineSource, /production-operations-runbook\.md/, 'Production baseline must reference the operations runbook.', failures);
+  assertPattern(productionBaselineSource, /validate:operational-readiness/, 'Production baseline must include operational readiness validation command.', failures);
+
+  assertPattern(workflowSource, /npm run validate:operational-readiness/, 'Operational smoke workflow must validate operational readiness.', failures);
+  assertPattern(loggingSource, /requestId/, 'Structured logging baseline must preserve requestId fields.', failures);
+  assertPattern(requestContextSource, /requestId/, 'Request context middleware must preserve requestId generation.', failures);
+
+  if (failures.length > 0) {
+    throw new Error(`Operational readiness validation failed:\n- ${failures.join('\n- ')}`);
+  }
+
+  process.stdout.write('Operational readiness validation passed.\n');
+}
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  main,
+};
