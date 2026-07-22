@@ -12,12 +12,7 @@ const governedDirectories = [
   'tests',
   'prisma',
 ];
-const expectedRawUnsafeFiles = [
-  'prisma/migration-instructions.md',
-  'scripts/apply-committed-migrations.js',
-  'scripts/diagnose-hardening-constraints.js',
-  'tests/p2-hardening-constraints.test.js',
-];
+const expectedRawUnsafeFiles = [];
 
 function collectFiles(directory) {
   const entries = fs.readdirSync(directory, { withFileTypes: true });
@@ -62,10 +57,9 @@ test('RawUnsafe inventory stays aligned with governed repository surfaces', () =
   assert.deepEqual(discoveredFiles, expectedRawUnsafeFiles);
 });
 
-test('RawUnsafe inventory document lists every governed occurrence', () => {
+test('RawUnsafe inventory document records the final closure state for governed repository surfaces', () => {
   const inventoryContents = fs.readFileSync(rawUnsafeInventoryPath, 'utf8');
 
-  for (const relativeFilePath of expectedRawUnsafeFiles) {
-    assert.match(inventoryContents, new RegExp(relativeFilePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  }
+  assert.match(inventoryContents, /no free-form `RawUnsafe` usage remains in `inventory-api\/src\/`/);
+  assert.match(inventoryContents, /No active `RawUnsafe` occurrences remain in the governed repository surfaces/);
 });

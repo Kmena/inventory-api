@@ -59,9 +59,10 @@ test('createPayment stores receipt evidence outside the public directory and exp
         }),
       }],
       [paymentRepository, {
+        reservePaymentId: async () => 21n,
+        transaction: async (work) => work({}),
         createPayment: async (payload) => {
           createdPayment = {
-            id: 21n,
             ...payload,
             invoice: { id: 14n, client: { companyId: 91n } },
             receipts: [],
@@ -143,11 +144,10 @@ test('createPayment rejects receipt files whose MIME type does not match the fil
   );
 });
 
-test('createPayment removes the created payment and the private file when receipt DB persistence fails after file storage', async () => {
+test('createPayment rolls back inside the transaction and leaves no private file when receipt persistence fails', async () => {
   await fs.rm(path.join(PRIVATE_PAYMENT_RECEIPTS_ROOT, '91'), { recursive: true, force: true });
 
   let createdPayment = null;
-  let deletedPaymentId = null;
   const expectedStorageRef = '1721600000000-voucher.pdf';
 
   await withRepositoryStubs(
@@ -163,9 +163,10 @@ test('createPayment removes the created payment and the private file when receip
         }),
       }],
       [paymentRepository, {
+        reservePaymentId: async () => 22n,
+        transaction: async (work) => work({}),
         createPayment: async (payload) => {
           createdPayment = {
-            id: 22n,
             ...payload,
             invoice: { id: 14n, client: { companyId: 91n } },
             receipts: [],
@@ -174,10 +175,6 @@ test('createPayment removes the created payment and the private file when receip
         },
         createPaymentReceipt: async () => {
           throw new Error('receipt db unavailable');
-        },
-        deleteCompanyPayment: async (paymentId) => {
-          deletedPaymentId = paymentId;
-          return { count: 1 };
         },
       }],
       [Date, {
@@ -207,7 +204,7 @@ test('createPayment removes the created payment and the private file when receip
     },
   );
 
-  assert.equal(deletedPaymentId, 22n);
+  assert.equal(createdPayment.id, 22n);
   const absolutePath = buildPrivatePaymentReceiptPath({
     companyId: 91n,
     paymentId: 22n,
@@ -216,7 +213,7 @@ test('createPayment removes the created payment and the private file when receip
   await assert.rejects(() => fs.access(absolutePath), /ENOENT/);
 });
 
-test('createPayment currently surfaces payment cleanup failure after receipt persistence fails', async () => {
+test('createPayment no longer depends on payment deletion cleanup when receipt persistence fails inside the transaction', async () => {
   await fs.rm(path.join(PRIVATE_PAYMENT_RECEIPTS_ROOT, '91'), { recursive: true, force: true });
 
   const expectedStorageRef = '1721600000001-voucher.pdf';
@@ -234,8 +231,9 @@ test('createPayment currently surfaces payment cleanup failure after receipt per
         }),
       }],
       [paymentRepository, {
+        reservePaymentId: async () => 23n,
+        transaction: async (work) => work({}),
         createPayment: async (payload) => ({
-          id: 23n,
           ...payload,
           invoice: { id: 14n, client: { companyId: 91n } },
           receipts: [],
@@ -244,7 +242,7 @@ test('createPayment currently surfaces payment cleanup failure after receipt per
           throw new Error('receipt db unavailable');
         },
         deleteCompanyPayment: async () => {
-          throw new Error('payment rollback failed');
+          throw new Error('deleteCompanyPayment should not be called for transactional receipt failures');
         },
       }],
       [Date, {
@@ -264,7 +262,12 @@ test('createPayment currently surfaces payment cleanup failure after receipt per
           sub: '8',
           permissions: ['collections.manage.own'],
         }),
-        /payment rollback failed/,
+        (error) => {
+          assert.equal(error.statusCode, 500);
+          assert.equal(error.code, 'internal_server_error');
+          assert.equal(error.message, 'No se pudo guardar la evidencia del pago');
+          return true;
+        },
       );
     },
   );
@@ -277,7 +280,7 @@ test('createPayment currently surfaces payment cleanup failure after receipt per
   await assert.rejects(() => fs.access(absolutePath), /ENOENT/);
 });
 
-test('createPaymentReceiptEvidence currently tolerates cleanup failure and may leave an orphan private receipt file', async () => {
+test('createPaymentReceiptEvidence leaves no private file behind when receipt persistence fails before file storage', async () => {
   await fs.rm(path.join(PRIVATE_PAYMENT_RECEIPTS_ROOT, '91'), { recursive: true, force: true });
 
   const payment = { id: 24n, invoice: { client: { companyId: 91n } } };
@@ -293,6 +296,7 @@ test('createPaymentReceiptEvidence currently tolerates cleanup failure and may l
   await withRepositoryStubs(
     [
       [paymentRepository, {
+        transaction: async (work) => work({}),
         createPaymentReceipt: async () => {
           throw new Error('receipt db unavailable');
         },
@@ -302,7 +306,7 @@ test('createPaymentReceiptEvidence currently tolerates cleanup failure and may l
       }],
       [fs, {
         unlink: async () => {
-          throw new Error('unlink failed');
+          throw new Error('unlink should not be called when receipt persistence fails before file storage');
         },
       }],
     ],
@@ -323,8 +327,7 @@ test('createPaymentReceiptEvidence currently tolerates cleanup failure and may l
     paymentId: 24n,
     storageRef: expectedStorageRef,
   });
-  const persistedContent = await fs.readFile(absolutePath, 'utf8');
-  assert.equal(persistedContent, 'comprobante huerfano');
+  await assert.rejects(() => fs.access(absolutePath), /ENOENT/);
 
   await fs.rm(path.join(PRIVATE_PAYMENT_RECEIPTS_ROOT, '91'), { recursive: true, force: true });
 });

@@ -79,8 +79,8 @@ test('createCompanyClientDocument persists files outside the public directory an
   const createdDocument = await withModuleStubs(
     [[clientRepository, {
       findCompanyClientById: async () => ({ id: 5n, companyId: 9n }),
+      reserveClientDocumentId: async () => 12n,
       createClientDocument: async (documentPayload) => ({
-        id: 12n,
         clientId: 5n,
         ...documentPayload,
       }),
@@ -124,10 +124,10 @@ test('createCompanyClientDocument removes the DB record when file persistence fa
     [
       [clientRepository, {
         findCompanyClientById: async () => ({ id: 5n, companyId: 9n }),
+        reserveClientDocumentId: async () => 13n,
         createClientDocument: async (documentPayload) => {
           operations.push({ step: 'create-db-record', fileUrl: documentPayload.fileUrl });
           return {
-            id: 13n,
             clientId: 5n,
             ...documentPayload,
           };
@@ -162,7 +162,7 @@ test('createCompanyClientDocument removes the DB record when file persistence fa
 
   assert.equal(deleteDocumentId, 13n);
   assert.deepEqual(operations, [
-    { step: 'create-db-record', fileUrl: 'pending://client-document' },
+    { step: 'create-db-record', fileUrl: '/api/clients/5/documents/13/download' },
     { step: 'write-file-failed' },
     { step: 'delete-db-record', documentId: 13n },
   ]);
@@ -184,10 +184,10 @@ test('createCompanyClientDocument reports cleanup failure when file persistence 
     [
       [clientRepository, {
         findCompanyClientById: async () => ({ id: 5n, companyId: 9n }),
+        reserveClientDocumentId: async () => 14n,
         createClientDocument: async (documentPayload) => {
           operations.push({ step: 'create-db-record', fileUrl: documentPayload.fileUrl });
           return {
-            id: 14n,
             clientId: 5n,
             ...documentPayload,
           };
@@ -221,7 +221,7 @@ test('createCompanyClientDocument reports cleanup failure when file persistence 
   );
 
   assert.deepEqual(operations, [
-    { step: 'create-db-record', fileUrl: 'pending://client-document' },
+    { step: 'create-db-record', fileUrl: '/api/clients/5/documents/14/download' },
     { step: 'write-file-failed' },
     { step: 'delete-db-record-failed' },
   ]);
@@ -235,39 +235,34 @@ test('createCompanyClientDocument reports cleanup failure when file persistence 
   await assert.rejects(() => fs.access(privateFilePath), /ENOENT/);
 });
 
-test('createCompanyClientDocument currently leaves the private file and pending DB record when the final DB update fails', async () => {
-  const payload = buildClientDocumentPayload({ fileName: 'fallo-update-final.pdf' });
+test('createCompanyClientDocument reserves the document id up front and no longer depends on a final DB update after file persistence', async () => {
+  const payload = buildClientDocumentPayload({ fileName: 'sin-update-final.pdf' });
   const operations = [];
   let createdDocumentSnapshot = null;
 
   await fs.rm(path.join(PRIVATE_CLIENT_DOCUMENTS_ROOT, '9'), { recursive: true, force: true });
 
-  await withModuleStubs(
+  const createdDocument = await withModuleStubs(
     [[clientRepository, {
       findCompanyClientById: async () => ({ id: 5n, companyId: 9n }),
+      reserveClientDocumentId: async () => 15n,
       createClientDocument: async (documentPayload) => {
         createdDocumentSnapshot = {
-          id: 15n,
           clientId: 5n,
           ...documentPayload,
         };
-        operations.push({ step: 'create-db-record', fileUrl: documentPayload.fileUrl });
+        operations.push({ step: 'create-db-record', fileUrl: documentPayload.fileUrl, id: documentPayload.id });
         return createdDocumentSnapshot;
       },
       updateClientDocument: async () => {
-        operations.push({ step: 'update-db-record-failed' });
-        throw new Error('db update failed');
+        operations.push({ step: 'update-db-record-unexpected' });
+        throw new Error('updateClientDocument should not be called once the id is reserved up front');
       },
       deleteClientDocument: async () => {
         operations.push({ step: 'delete-db-record-unexpected' });
       },
     }]],
-    async () => {
-      await assert.rejects(
-        () => clientService.createCompanyClientDocument(5n, payload, { companyId: '9' }),
-        /db update failed/,
-      );
-    },
+    () => clientService.createCompanyClientDocument(5n, payload, { companyId: '9' }),
   );
 
   const privateFilePath = buildPrivateClientDocumentPath({
@@ -279,10 +274,10 @@ test('createCompanyClientDocument currently leaves the private file and pending 
   const storedContent = await fs.readFile(privateFilePath, 'utf8');
 
   assert.equal(storedContent, 'documento privado');
-  assert.equal(createdDocumentSnapshot.fileUrl, 'pending://client-document');
+  assert.equal(createdDocument.fileUrl, '/api/clients/5/documents/15/download');
+  assert.equal(createdDocumentSnapshot.fileUrl, '/api/clients/5/documents/15/download');
   assert.deepEqual(operations, [
-    { step: 'create-db-record', fileUrl: 'pending://client-document' },
-    { step: 'update-db-record-failed' },
+    { step: 'create-db-record', fileUrl: '/api/clients/5/documents/15/download', id: 15n },
   ]);
 
   await fs.rm(path.join(PRIVATE_CLIENT_DOCUMENTS_ROOT, '9'), { recursive: true, force: true });

@@ -29,11 +29,11 @@ test('createCompanyClientDocument infers MIME type from the file extension when 
   const result = await withRepositoryStubs(
     [[clientRepository, {
       findCompanyClientById: async () => ({ id: 15n, companyId: 91n }),
+      reserveClientDocumentId: async () => 44n,
       createClientDocument: async (payload) => {
         capturedPayload = payload;
-        return { id: 44n, ...payload };
+        return { ...payload };
       },
-      updateClientDocument: async (_id, payload) => ({ id: 44n, clientId: 15n, fileName: 'contrato.pdf', mimeType: 'application/pdf', ...payload }),
       deleteClientDocument: async () => ({ count: 1 }),
     }]],
     () => clientService.createCompanyClientDocument(15n, {
