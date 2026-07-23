@@ -10,7 +10,8 @@ const {
 } = require('../src/lib/heavy-endpoint-governance');
 const { createHeavyEndpointMetricsMiddleware } = require('../src/middlewares/heavy-endpoint-metrics');
 
-const baselinePath = path.join(__dirname, '..', 'docs', 'heavy-endpoints-baseline.json');
+const { skipIfMissing } = require('./internal-docs-optional');
+const baselinePath = path.join(__dirname, '..', 'internal-docs', 'heavy-endpoints-baseline.json');
 
 function createRepresentativeFixtures() {
   return {
@@ -171,7 +172,11 @@ test('heavy-endpoint metrics middleware captures governed JSON metrics without c
   });
 });
 
-test('heavy-endpoints baseline document stays aligned with the governed representative fixtures', () => {
+test('heavy-endpoints baseline document stays aligned with the governed representative fixtures', (t) => {
+  if (skipIfMissing(t, ['internal-docs/heavy-endpoints-baseline.json'], 'internal-docs heavy endpoint baseline is optional in public repo mode')) {
+    return;
+  }
+
   const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
   const representativeFixtures = createRepresentativeFixtures();
   const expectedEntries = PRIORITIZED_HEAVY_ENDPOINTS.map((entry) => ({

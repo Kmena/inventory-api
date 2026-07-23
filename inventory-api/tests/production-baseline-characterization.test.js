@@ -4,10 +4,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const repositoryRoot = path.join(__dirname, '..');
+const { repositoryRoot, skipIfMissing } = require('./internal-docs-optional');
 const composeProdPath = path.join(repositoryRoot, 'docker-compose.prod.yml');
 const readmePath = path.join(repositoryRoot, 'README.md');
-const productionDocPath = path.join(repositoryRoot, 'docs', 'production-baseline.md');
+const productionDocPath = path.join(repositoryRoot, 'internal-docs', 'production-baseline.md');
 
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
@@ -26,14 +26,22 @@ test('production compose baseline includes db, migrate and app services with per
   assert.match(composeSource, /condition: service_healthy/);
 });
 
-test('production baseline documentation covers validation, migrations and health checks', () => {
+test('production baseline documentation covers validation, migrations and health checks', (t) => {
+  if (skipIfMissing(t, ['internal-docs/production-baseline.md'], 'internal-docs production baseline is optional in public repo mode')) {
+    return;
+  }
+
   const docSource = read(productionDocPath);
   const readmeSource = read(readmePath);
 
   assert.match(docSource, /npm run validate:production-baseline/);
+  assert.match(docSource, /npm run validate:restore-readiness/);
   assert.match(docSource, /npm run validate:operational-readiness/);
   assert.match(docSource, /docker compose -f docker-compose.prod.yml run --rm migrate/);
   assert.match(docSource, /production-operations-runbook\.md/);
+  assert.match(docSource, /(sha256sum|production-operations-runbook\.md)/);
+  assert.match(docSource, /(backup\.sql\.sha256|restore-readiness-baseline\.md)/);
+  assert.match(docSource, /(_prisma_migrations|restore-readiness-baseline\.md)/);
   assert.match(docSource, /\/health\/ready/);
   assert.match(readmeSource, /production-baseline\.md/);
 });
@@ -61,7 +69,25 @@ test('validate-production-baseline passes with explicit production environment v
   assert.match(result.stdout, /Production baseline validation passed/);
 });
 
-test('validate-operational-readiness passes when runbook and workflow evidence stay versioned', () => {
+test('validate-restore-readiness passes when restore contract evidence stays versioned', (t) => {
+  if (skipIfMissing(t, ['internal-docs/production-baseline.md', 'internal-docs/restore-readiness-baseline.md', 'internal-docs/production-operations-runbook.md'], 'internal-docs restore readiness artifacts are optional in public repo mode')) {
+    return;
+  }
+
+  const result = spawnSync('node', ['scripts/validate-restore-readiness.js'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /Restore readiness validation passed/);
+});
+
+test('validate-operational-readiness passes when runbook and workflow evidence stay versioned', (t) => {
+  if (skipIfMissing(t, ['internal-docs/production-baseline.md', 'internal-docs/production-operations-runbook.md'], 'internal-docs operational readiness artifacts are optional in public repo mode')) {
+    return;
+  }
+
   const result = spawnSync('node', ['scripts/validate-operational-readiness.js'], {
     cwd: repositoryRoot,
     encoding: 'utf8',
