@@ -48,6 +48,9 @@ jobs:
       - name: Validate production baseline inputs
         run: npm run validate:production-baseline
 
+      - name: Validate restore readiness evidence
+        run: npm run validate:restore-readiness
+
       - name: Validate operational readiness evidence
         run: npm run validate:operational-readiness
 
@@ -71,3 +74,7 @@ jobs:
 
       - name: Build production image smoke artifact
         run: docker build -t inventory-api:operational-smoke .
+
+      - name: Clean up temporary production env file
+        if: always()
+        run: rm -f .env.production
