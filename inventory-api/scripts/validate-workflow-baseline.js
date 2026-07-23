@@ -8,10 +8,17 @@ const workflowRules = [
   {
     relativePath: 'quality-gates.yml',
     checks: [
-      { description: 'defines a verify job', pattern: /^\s{2}verify:\s*$/m },
+      { description: 'defines a static-checks job', pattern: /^\s{2}static-checks:\s*$/m },
+      { description: 'defines a contract-validations job', pattern: /^\s{2}contract-validations:\s*$/m },
+      { description: 'defines a test-suite job', pattern: /^\s{2}test-suite:\s*$/m },
+      { description: 'defines a browser-e2e job', pattern: /^\s{2}browser-e2e:\s*$/m },
       { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
-      { description: 'generates Prisma client before verification', pattern: /run:\s+npm run build/ },
-      { description: 'runs repository quality gates', pattern: /run:\s+npm run verify/ },
+      { description: 'generates Prisma client before checks', pattern: /run:\s+npm run build/ },
+      { description: 'runs ESLint', pattern: /run:\s+npm run lint/ },
+      { description: 'runs TypeScript typecheck', pattern: /run:\s+npm run typecheck/ },
+      { description: 'validates workflow baseline', pattern: /run:\s+npm run validate:workflow-baseline/ },
+      { description: 'runs repository test suite', pattern: /run:\s+npm run test/ },
+      { description: 'runs browser E2E critical flows', pattern: /run:\s+npm run test:e2e:browser/ },
     ],
   },
   {
