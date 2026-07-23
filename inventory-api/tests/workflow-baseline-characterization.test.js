@@ -46,5 +46,5 @@ test('validate-workflow-baseline passes when the versioned workflows preserve th
   });
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /Validated 3 workflow baseline files/);
+  assert.match(result.stdout, /Validated 6 workflow baseline files/);
 });

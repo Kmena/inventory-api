@@ -6,18 +6,37 @@ const workflowsDirectory = path.join(repositoryRoot, '.github', 'workflows');
 
 const workflowRules = [
   {
-    relativePath: 'quality-gates.yml',
+    relativePath: 'static-checks.yml',
     checks: [
       { description: 'defines a static-checks job', pattern: /^\s{2}static-checks:\s*$/m },
-      { description: 'defines a contract-validations job', pattern: /^\s{2}contract-validations:\s*$/m },
-      { description: 'defines a test-suite job', pattern: /^\s{2}test-suite:\s*$/m },
-      { description: 'defines a browser-e2e job', pattern: /^\s{2}browser-e2e:\s*$/m },
       { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
       { description: 'generates Prisma client before checks', pattern: /run:\s+npm run build/ },
       { description: 'runs ESLint', pattern: /run:\s+npm run lint/ },
       { description: 'runs TypeScript typecheck', pattern: /run:\s+npm run typecheck/ },
+      { description: 'lints embedded public runtime', pattern: /run:\s+npm run lint:public-runtime/ },
+    ],
+  },
+  {
+    relativePath: 'contract-validations.yml',
+    checks: [
+      { description: 'defines a contract-validations job', pattern: /^\s{2}contract-validations:\s*$/m },
+      { description: 'validates embedded public runtime', pattern: /run:\s+npm run validate:public-runtime/ },
       { description: 'validates workflow baseline', pattern: /run:\s+npm run validate:workflow-baseline/ },
+      { description: 'validates operational readiness', pattern: /run:\s+npm run validate:operational-readiness/ },
+    ],
+  },
+  {
+    relativePath: 'repository-tests.yml',
+    checks: [
+      { description: 'defines a repository-tests job', pattern: /^\s{2}repository-tests:\s*$/m },
       { description: 'runs repository test suite', pattern: /run:\s+npm run test/ },
+    ],
+  },
+  {
+    relativePath: 'browser-e2e.yml',
+    checks: [
+      { description: 'defines a browser-e2e job', pattern: /^\s{2}browser-e2e:\s*$/m },
+      { description: 'installs Chromium for browser E2E', pattern: /playwright install --with-deps chromium/ },
       { description: 'runs browser E2E critical flows', pattern: /run:\s+npm run test:e2e:browser/ },
     ],
   },
@@ -35,8 +54,10 @@ const workflowRules = [
     checks: [
       { description: 'defines an operational smoke job', pattern: /^\s{2}operational-smoke:\s*$/m },
       { description: 'validates production baseline variables', pattern: /npm run validate:production-baseline/ },
+      { description: 'validates restore readiness evidence', pattern: /npm run validate:restore-readiness/ },
       { description: 'validates operational readiness evidence', pattern: /npm run validate:operational-readiness/ },
       { description: 'materializes a temporary production env file for compose smoke', pattern: /cat > \.env\.production <<EOF/ },
+      { description: 'cleans temporary production env materialization', pattern: /rm -f \.env\.production/ },
       { description: 'validates compose syntax', pattern: /docker compose -f docker-compose\.prod\.yml config/ },
       { description: 'builds the production image without deploy', pattern: /docker build -t inventory-api:operational-smoke \./ },
     ],
