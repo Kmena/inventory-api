@@ -37,6 +37,43 @@ test('createRequestLogMessage keeps minimal non-dev request context', () => {
   });
 });
 
+test('createRequestLogMessage includes governed heavy-endpoint metrics only when available', () => {
+  const message = createRequestLogMessage({
+    nodeEnv: 'staging',
+    requestId: 'req-456',
+    method: 'GET',
+    path: '/api/inventory/stocks?warehouseId=1',
+    statusCode: 200,
+    durationMs: 18.2,
+    errorCode: '-',
+    heavyEndpointMetrics: {
+      endpointKey: 'inventory-stocks-list',
+      routePattern: '/api/inventory/stocks',
+      payloadClass: 'medium',
+      responseShape: 'split-collection',
+      responseBytes: 259,
+      resultCount: 5,
+    },
+  });
+
+  assert.deepEqual(JSON.parse(message), {
+    level: 'info',
+    environment: 'staging',
+    requestId: 'req-456',
+    method: 'GET',
+    path: '/api/inventory/stocks?warehouseId=1',
+    statusCode: 200,
+    durationMs: 18.2,
+    errorCode: '-',
+    endpointKey: 'inventory-stocks-list',
+    routePattern: '/api/inventory/stocks',
+    payloadClass: 'medium',
+    responseShape: 'split-collection',
+    responseBytes: 259,
+    resultCount: 5,
+  });
+});
+
 test('buildErrorLogEntry returns original error in development', () => {
   const error = new Error('boom');
   error.code = 'internal_server_error';

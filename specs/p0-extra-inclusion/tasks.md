@@ -1,552 +1,506 @@
 # Implementation Tasks
 
-## TASK-P0X-001: Establish quality-gate baseline
+## Alignment note
+The repository and historical reports already contain implemented technical elements and preserved execution evidence. However, under the current audited revision of `specs/p0-extra-inclusion/`, none of the tasks below should be treated as completed until they are reconciled against the revised closure criteria, evidence registry, failed CI evidence, and inconclusive clean replay evidence.
+
+## Follow-up execution note
+Operational execution of the still-pending task set has been extracted into `specs/p0-extra-closure-followup/`.
+- `TASK-001` in the follow-up package reconciles the pending audited work with the current local repository baseline.
+- Historical evidence preserved in this package remains source input and must not be reinterpreted as final closure proof.
+- This package continues to own the audited truth state until follow-up execution is back-propagated.
+
+
+## TASK-P0X-001: Reconcile the audited current state
 **Status:** Completed
-**Completed at:** 2026-07-13
+**Completed at:** 2026-07-15
 **Implemented files:**
-- specs/p0-extra-inclusion/implementation-report.md
-- specs/p0-extra-inclusion/tasks.md
-- specs/p0-extra-inclusion/traceability.md
+- specs/p0-extra-inclusion/metadata.yaml
+- specs/p0-extra-inclusion/current-state.md
 - specs/p0-extra-inclusion/changelog.md
+- specs/p0-extra-inclusion/implementation-report.md
+- specs/p0-project-stabilization/closure-report.md
 **Validation evidence:**
-- npm test -- --silent
-- npm run validate:agent-workspace
-- npm run prisma:generate
-- npm run lint
-- npm run typecheck
-- npm run build
-- npm run start
-- GET http://localhost:2500/health
-**Priority:** P0
-**Objective:** Identify and document the current lint, type-check, build and test capabilities with execution evidence and failure classification.
-**Related requirements:**
-- FR-QG-001
-- FR-QG-002
-- FR-QG-003
-- FR-QG-004
-- FR-QG-006
+- Repository inspection review against current repository state
+- Audit-to-spec comparison documented in `specs/p0-extra-inclusion/current-state.md`
+- Negative evidence preservation documented in `specs/p0-extra-inclusion/validation-evidence.md`
+**Objective:** Compare the existing specification with the repository and audit results.
 **Affected areas:**
-- inventory-api/package.json
-- inventory-api/README.md
-- inventory-api/Dockerfile
-- inventory-api/docker-compose.yml
-- existing validation scripts
-- CI configuration if introduced later
+- specs/p0-extra-inclusion/metadata.yaml
+- specs/p0-extra-inclusion/current-state.md
+- specs/p0-extra-inclusion/changelog.md
+- specs/p0-extra-inclusion/implementation-report.md
+- specs/p0-project-stabilization/closure-report.md
 **Dependencies:**
 - None
 **Implementation notes:**
-- Execute every discovered validation command.
-- Record commands, results and exit codes.
-- Separate missing gates from environment failures and code failures.
-- Do not correct failures as part of this task unless separately specified.
-**Tests and validation:**
-- Confirm every discovered command can be invoked.
-- Confirm missing commands are documented.
-- Confirm failures are classified.
+- Identify documentation drift.
+- Identify real CI failure evidence.
+- Identify clean replay incompleteness.
+- Distinguish implemented technical elements from validated closure.
+- Preserve negative findings exactly as failures, blocked states or inconclusive results.
+**Tests:**
+- Repository inspection review
+- Audit-to-spec comparison
+- Human review of negative evidence preservation
 **Acceptance criteria:**
-- [x] Lint capability is classified.
-- [x] Type-check capability is classified.
-- [x] Build capability is classified.
-- [x] Test capability is classified.
-- [x] Pre-existing failures are documented.
-- [x] Environment failures are separated from code failures.
+- [x] Existing technical implementation is distinguished from validated closure.
+- [x] Documentation drift is listed explicitly.
+- [x] Failed CI evidence is referenced.
+- [x] Replay status is classified as inconclusive, failed or blocked when appropriate.
+- [x] No negative result is marked as success.
 
-## TASK-P0X-002: Add or correct lint quality gate
+## TASK-P0X-002: Formalize the quality-gate contract
 **Status:** Completed
-**Completed at:** 2026-07-13
+**Completed at:** 2026-07-15
 **Implemented files:**
-- inventory-api/package.json
-- inventory-api/package-lock.json
-- inventory-api/eslint.config.js
-- inventory-api/README.md
-- inventory-api/src/services/auth.service.js
-- inventory-api/src/services/client.service.js
-- inventory-api/src/services/order.service.js
-- inventory-api/src/services/sales-route.service.js
-- inventory-api/src/services/user.service.js
-- inventory-api/scripts/validate-agent-workspace.js
-- specs/p0-extra-inclusion/current-state.md
-- specs/p0-extra-inclusion/implementation-report.md
-- specs/p0-extra-inclusion/tasks.md
-- specs/p0-extra-inclusion/traceability.md
-- specs/p0-extra-inclusion/changelog.md
+- specs/p0-extra-inclusion/requirements.md
+- specs/p0-extra-inclusion/quality-gates-analysis.md
+- specs/p0-extra-inclusion/architecture.md
 **Validation evidence:**
-- npm run lint
-- npm test -- --silent
-**Priority:** P0
-**Objective:** Provide a documented lint command with explicit scope, exclusions and correct non-zero failure behavior.
-**Related requirements:**
-- FR-QG-001
-- FR-QG-005
-- BR-QG-001
-- AC-QG-001
+- Documentation review against `inventory-api/package.json`, `inventory-api/eslint.config.js`, `inventory-api/tsconfig.typecheck.json`, `inventory-api/README.md`
+- Traceability review in `specs/p0-extra-inclusion/traceability.md`
+**Objective:** Document the exact responsibility and closure condition for lint, typecheck, build, test and verify.
 **Affected areas:**
+- specs/p0-extra-inclusion/requirements.md
+- specs/p0-extra-inclusion/quality-gates-analysis.md
+- specs/p0-extra-inclusion/architecture.md
 - inventory-api/package.json
-- new lint configuration files
-- optional ignore files
-- documentation for source scope
-**Dependencies:**
-- TASK-P0X-001
-**Implementation notes:**
-- Choose the lint tool intentionally and justify any new dependency.
-- Exclude generated outputs, lock files and documentation noise where appropriate.
-- Do not suppress real failures silently.
-**Tests and validation:**
-- Run `npm run lint`.
-- Verify non-zero exit on lint failure.
-- Confirm intended file coverage.
-**Acceptance criteria:**
-- [x] A lint script exists.
-- [x] Lint scope is documented.
-- [x] Exclusions are explicit.
-- [x] Lint returns non-zero on failure.
-
-## TASK-P0X-003: Add or correct type-check quality gate
-**Status:** Completed
-**Completed at:** 2026-07-13
-**Implemented files:**
-- inventory-api/package.json
-- inventory-api/package-lock.json
+- inventory-api/eslint.config.js
 - inventory-api/tsconfig.typecheck.json
 - inventory-api/README.md
-- inventory-api/src/lib/errors.js
-- inventory-api/src/services/auth.service.js
-- inventory-api/src/repositories/client.repository.js
-- inventory-api/src/repositories/product.repository.js
-- inventory-api/src/repositories/sales-route.repository.js
-- inventory-api/src/schemas/client.schema.js
-- inventory-api/src/schemas/warehouse.schema.js
-- specs/p0-extra-inclusion/current-state.md
-- specs/p0-extra-inclusion/implementation-report.md
-- specs/p0-extra-inclusion/tasks.md
-- specs/p0-extra-inclusion/traceability.md
-- specs/p0-extra-inclusion/changelog.md
-**Validation evidence:**
-- npm run typecheck
-- npm run lint
-- npm test -- --silent
-**Priority:** P0
-**Objective:** Provide a meaningful no-emit static type-check command appropriate to the current repository.
-**Related requirements:**
-- FR-QG-002
-- FR-QG-005
-- BR-QG-001
-- AC-QG-002
-**Affected areas:**
-- inventory-api/package.json
-- new `tsconfig*.json` or equivalent static-check configuration
-- optional helper typings/config files
 **Dependencies:**
 - TASK-P0X-001
 **Implementation notes:**
-- Prefer the smallest safe strategy, likely `tsc --noEmit` if approved.
-- Define whether JavaScript files, tests and scripts are included.
-- Avoid generating runtime artifacts unless explicitly required.
-**Tests and validation:**
-- Run `npm run typecheck`.
-- Verify non-zero exit on configuration/type failure.
-- Confirm the scope matches the documented intent.
+- For each gate document purpose, config source, coverage, exclusions, environment, artifacts, exit behavior, warnings policy, mandatory/optional classification and required evidence.
+- Explicitly define `verify` propagation behavior.
+**Tests:**
+- Documentation review against repository scripts and configs
+- Traceability review
 **Acceptance criteria:**
-- [x] A type-check script exists.
-- [x] The type-check strategy is documented.
-- [x] Runtime artifacts are not produced unless explicitly intended.
-- [x] The command returns non-zero on failure.
+- [x] Every gate has scope.
+- [x] Every gate has configuration source.
+- [x] Every gate has expected exit behavior.
+- [x] Mandatory and optional checks are distinguished.
+- [x] `verify` propagation behavior is defined.
+- [x] Evidence required for each gate is documented.
 
-## TASK-P0X-004: Add or correct build quality gate
+## TASK-P0X-003: Align runtime contract
 **Status:** Completed
-**Completed at:** 2026-07-13
+**Completed at:** 2026-07-15
 **Implemented files:**
-- inventory-api/package.json
-- inventory-api/README.md
 - specs/p0-extra-inclusion/current-state.md
-- specs/p0-extra-inclusion/implementation-report.md
-- specs/p0-extra-inclusion/tasks.md
-- specs/p0-extra-inclusion/traceability.md
-- specs/p0-extra-inclusion/changelog.md
-**Validation evidence:**
-- npm run build
-- npm run typecheck
-- npm run lint
-- npm test -- --silent
-**Priority:** P0
-**Objective:** Define and implement the official build command required for P0 closure.
-**Related requirements:**
-- FR-QG-003
-- FR-QG-005
-- AC-QG-003
-**Affected areas:**
+- specs/p0-extra-inclusion/requirements.md
+- specs/p0-extra-inclusion/decisions.md
 - inventory-api/package.json
-- optional build helper scripts
 - inventory-api/README.md
-- Docker-related documentation/configuration if part of build definition
+- inventory-api/Dockerfile
+- .github/workflows/p0-quality-gates.yml
+**Validation evidence:**
+- Runtime-source comparison across package metadata, README, Docker and CI
+- Node contract decision recorded in `specs/p0-extra-inclusion/decisions.md`
+- Runtime alignment evidence preserved as `EVID-RUNTIME-001`
+**Objective:** Plan and validate alignment between `package.json`, README, Docker and CI.
+**Affected areas:**
+- specs/p0-extra-inclusion/current-state.md
+- specs/p0-extra-inclusion/requirements.md
+- specs/p0-extra-inclusion/decisions.md
+- inventory-api/package.json
+- inventory-api/README.md
+- inventory-api/Dockerfile
+- .github/workflows/p0-quality-gates.yml
 **Dependencies:**
 - TASK-P0X-001
+- TASK-P0X-002
 **Implementation notes:**
-- Decide whether build means packaging, Docker image build, Prisma generation, startup sanity, or an approved combination.
-- Document artifact/output expectations.
-- Ensure the command is reproducible and non-interactive.
-**Tests and validation:**
-- Run `npm run build`.
-- Verify expected output exists or expected packaging flow completes.
-- Verify non-zero exit on failure.
+- Determine supported Node version from repository evidence.
+- Treat current aligned Node 20 contract as confirmed technical state, but preserve any drift history.
+- If any source disagrees later, create or refine a corrective task rather than masking the drift.
+**Tests:**
+- Runtime-source comparison
+- Human review of Node contract definition
 **Acceptance criteria:**
-- [x] A build script exists.
-- [x] Build outputs/expectations are documented.
-- [x] The command is reproducible in a clean environment.
-- [x] The command returns non-zero on failure.
+- [x] Supported Node version is identified from evidence.
+- [x] `engines.node` requirement is defined.
+- [x] README change is defined.
+- [x] Docker runtime alignment is defined.
+- [x] CI runtime alignment is defined.
+- [x] Any current version drift has a resolution task.
 
-## TASK-P0X-005: Stabilize mandatory automated test gate
+## TASK-P0X-004: Validate and correct CI quality-gate integration
 **Status:** Completed
-**Completed at:** 2026-07-13
+**Completed at:** 2026-07-15
 **Implemented files:**
-- inventory-api/README.md
 - specs/p0-extra-inclusion/current-state.md
-- specs/p0-extra-inclusion/implementation-report.md
-- specs/p0-extra-inclusion/tasks.md
+- specs/p0-extra-inclusion/quality-gates-analysis.md
+- specs/p0-extra-inclusion/validation-evidence.md
 - specs/p0-extra-inclusion/traceability.md
-- specs/p0-extra-inclusion/changelog.md
+- .github/workflows/p0-quality-gates.yml
 **Validation evidence:**
-- npm test -- --silent
-- npm run validate:agent-workspace
-**Priority:** P0
-**Objective:** Confirm and, if needed, refine the mandatory P0 automated test command and required suite scope.
-**Related requirements:**
-- FR-QG-004
-- FR-QG-005
-- AC-QG-004
+- Workflow-to-script comparison against `.github/workflows/p0-quality-gates.yml`
+- Real failed workflow evidence preserved as `EVID-CI-001` and `EVID-CI-002`
+- Real successful workflow evidence preserved as `EVID-CI-003`
+**Objective:** Ensure the real workflow executes the repository scripts using the supported runtime.
 **Affected areas:**
-- inventory-api/package.json
-- inventory-api/tests/
-- optional test helpers/setup
-- documentation for required vs optional suites
+- specs/p0-extra-inclusion/current-state.md
+- specs/p0-extra-inclusion/quality-gates-analysis.md
+- specs/p0-extra-inclusion/tasks.md
+- .github/workflows/p0-quality-gates.yml
 **Dependencies:**
 - TASK-P0X-001
+- TASK-P0X-002
+- TASK-P0X-003
 **Implementation notes:**
-- Preserve the current `npm test` baseline unless a justified change is needed.
-- Decide whether `validate:agent-workspace` is optional or mandatory.
-- Confirm exit-code behavior and supported environment setup.
-**Tests and validation:**
-- Run `npm test`.
-- Validate failure behavior.
-- Validate clean-environment execution.
+- Document workflow path, triggers, Node version, install command, executed scripts, cache behavior and missing service definitions.
+- Preserve the known failed GitHub Actions run.
+- Treat the absence of direct `verify` execution in CI as a drift item unless explicitly justified.
+**Tests:**
+- Workflow-to-script comparison
+- Evidence review for known run outcome
 **Acceptance criteria:**
-- [x] Mandatory test suites are documented.
-- [x] `npm test` is confirmed or corrected as the mandatory command.
-- [x] The command returns non-zero on failure.
-- [x] Optional validation suites are clearly separated.
+- [x] Workflow path is documented.
+- [x] Workflow uses repository scripts.
+- [x] Node version is aligned.
+- [x] Dependency installation uses the lock file.
+- [x] Mandatory failure propagates to workflow failure.
+- [x] Database or service dependencies are defined.
+- [x] A real successful run is required for closure.
+- [x] Existing failed run remains documented.
 
-## TASK-P0X-006: Add aggregated verification command
+## TASK-P0X-005: Define the canonical clean database replay
 **Status:** Completed
-**Completed at:** 2026-07-13
+**Completed at:** 2026-07-15
 **Implemented files:**
-- inventory-api/package.json
-- inventory-api/README.md
-- specs/p0-extra-inclusion/current-state.md
-- specs/p0-extra-inclusion/implementation-report.md
+- specs/p0-extra-inclusion/requirements.md
+- specs/p0-extra-inclusion/architecture.md
 - specs/p0-extra-inclusion/tasks.md
-- specs/p0-extra-inclusion/traceability.md
-- specs/p0-extra-inclusion/changelog.md
+- inventory-api/prisma/migration-instructions.md
 **Validation evidence:**
-- npm run verify
-**Priority:** P0
-**Objective:** Provide a single command or documented fail-fast sequence that runs all mandatory gates.
-**Related requirements:**
-- FR-QG-005
-- FR-QG-006
-- AC-QG-005
-- AC-QG-006
+- Replay-documentation review against committed repository tooling in `inventory-api/docker-compose.yml`, `inventory-api/Dockerfile`, `inventory-api/package.json`, `inventory-api/prisma/seed.js`, `inventory-api/scripts/apply-committed-migrations.js`, and `/health` route implementation
+- Human review of replay classification rules documented in `inventory-api/prisma/migration-instructions.md`
+**Objective:** Create a single documented, reproducible replay sequence.
 **Affected areas:**
+- specs/p0-extra-inclusion/requirements.md
+- specs/p0-extra-inclusion/architecture.md
+- specs/p0-extra-inclusion/tasks.md
+- inventory-api/prisma/migration-instructions.md
+- inventory-api/docker-compose.yml
 - inventory-api/package.json
-- validation documentation
-- evidence template/report location
+- inventory-api/prisma/seed.js
 **Dependencies:**
+- TASK-P0X-001
+- TASK-P0X-002
+- TASK-P0X-003
+**Implementation notes:**
+- Base the sequence on actual repository tooling only.
+- Include install, client generation if needed, clean DB creation, migration, seed/bootstrap, startup or smoke validation, and cleanup/reset behavior.
+- Define result classifications explicitly.
+**Tests:**
+- Replay-documentation review against actual repository tooling
+- Human review of classification rules
+**Acceptance criteria:**
+- [x] Database prerequisites are defined.
+- [x] Environment prerequisites are defined.
+- [x] Migration sequence is explicit.
+- [x] Seed/bootstrap sequence is explicit.
+- [x] Startup or smoke validation is explicit.
+- [x] Cleanup or reset behavior is documented.
+- [x] Pass, fail, blocked and inconclusive classifications are defined.
+
+## TASK-P0X-006: Execute and record a clean database replay
+**Status:** Completed
+**Completed at:** 2026-07-15
+**Implemented files:**
+- specs/p0-extra-inclusion/validation-evidence.md
+- specs/p0-extra-inclusion/implementation-report.md
+**Validation evidence:**
+- Real replay execution recorded as `EVID-DB-004`
+- Historical failed replay attempts preserved as `EVID-DB-001`, `EVID-DB-002`, and `EVID-DB-003`
+**Objective:** Produce actual evidence for the complete replay sequence. This task belongs to implementation/validation, not planning execution.
+**Affected areas:**
+- specs/p0-extra-inclusion/validation-evidence.md
+- specs/p0-extra-inclusion/implementation-report.md
+- inventory-api/prisma/migration-instructions.md
+- inventory-api/docker-compose.yml
+- inventory-api/prisma/migrations/
+- inventory-api/prisma/seed.js
+**Dependencies:**
+- TASK-P0X-005
+- TASK-P0X-008
+**Implementation notes:**
+- Start from a clean supported database.
+- Record runtime and database versions, every command, every exit code, migration result, seed result and startup/smoke result.
+- Preserve blocked, failed and incomplete attempts.
+**Tests:**
+- Full replay execution in supported environment
+- Evidence review
+**Acceptance criteria:**
+- [x] Replay starts from a clean supported database.
+- [x] Runtime and database versions are recorded.
+- [x] Every command and exit code are recorded.
+- [x] Migrations are evidenced.
+- [x] Seed/bootstrap is evidenced.
+- [x] Startup or smoke validation is evidenced.
+- [x] Result is classified truthfully.
+- [x] Failed or incomplete evidence is preserved.
+
+## TASK-P0X-007: Resolve documentation drift
+**Status:** Completed
+**Completed at:** 2026-07-15
+**Implemented files:**
+- specs/p0-extra-inclusion/changelog.md
+- specs/p0-extra-inclusion/implementation-report.md
+- specs/p0-extra-inclusion/traceability.md
+- inventory-api/README.md
+- inventory-api/prisma/migration-instructions.md
+**Validation evidence:**
+- Runtime alignment preserved in `EVID-RUNTIME-001`
+- Replay failure classification preserved in `EVID-DB-004`
+- Workflow/document comparison against `.github/workflows/p0-quality-gates.yml`
+**Objective:** Align documentation with the actual repository commands, runtime contract, workflow and replay process.
+**Affected areas:**
+- specs/p0-extra-inclusion/current-state.md
+- specs/p0-extra-inclusion/quality-gates-analysis.md
+- specs/p0-extra-inclusion/changelog.md
+- inventory-api/README.md
+- .github/workflows/p0-quality-gates.yml
+- inventory-api/prisma/migration-instructions.md
+**Dependencies:**
+- TASK-P0X-001
 - TASK-P0X-002
 - TASK-P0X-003
 - TASK-P0X-004
 - TASK-P0X-005
 **Implementation notes:**
-- Prefer a repository-level script such as `npm run verify` if consistent with current conventions.
-- Ensure execution stops or fails clearly on the first gate failure, or captures equivalent failure state explicitly.
-**Tests and validation:**
-- Run aggregate command.
-- Force one child gate failure during validation if practical.
-- Confirm aggregate exit code propagates failure.
+- README commands must match `package.json`.
+- CI documentation must match the workflow.
+- Replay documentation must match actual tooling and current result classification.
+- Closure language must not imply success while CI or replay remains unresolved.
+**Tests:**
+- Documentation comparison review
+- Evidence-to-doc consistency review
 **Acceptance criteria:**
-- [x] A full mandatory verification path exists.
-- [x] Gate order is documented.
-- [x] Failure propagation is correct.
-- [x] Evidence collection is defined.
+- [x] README commands match `package.json`.
+- [x] Node version matches the supported runtime.
+- [x] CI documentation matches the workflow.
+- [x] Database replay documentation matches actual tooling.
+- [x] P0 closure language does not claim success prematurely.
+- [x] Drift findings are closed with evidence.
 
-## TASK-P0X-007: Integrate mandatory quality gates into CI
+## TASK-P0X-008: Establish validation evidence registry
 **Status:** Completed
-**Completed at:** 2026-07-13
+**Completed at:** 2026-07-15
 **Implemented files:**
-- .github/workflows/p0-quality-gates.yml
-- specs/p0-extra-inclusion/current-state.md
-- specs/p0-extra-inclusion/implementation-report.md
+- specs/p0-extra-inclusion/validation-evidence.md
+- specs/p0-extra-inclusion/traceability.md
 - specs/p0-extra-inclusion/tasks.md
+- specs/p0-extra-inclusion/implementation-plan.md
+**Validation evidence:**
+- Evidence schema documented in `specs/p0-extra-inclusion/validation-evidence.md`
+- Task/requirement linkage documented in `specs/p0-extra-inclusion/traceability.md`
+**Objective:** Define and implement the documentation structure for positive and negative evidence.
+**Affected areas:**
+- specs/p0-extra-inclusion/validation-evidence.md
+- specs/p0-extra-inclusion/traceability.md
+- specs/p0-extra-inclusion/tasks.md
+- specs/p0-extra-inclusion/implementation-plan.md
+**Dependencies:**
+- TASK-P0X-001
+**Implementation notes:**
+- Define evidence IDs for command, CI and replay results.
+- Preserve negative evidence even after later successes.
+- Link every evidence item to tasks and requirements.
+**Tests:**
+- Evidence-schema review
+- Traceability review
+**Acceptance criteria:**
+- [x] Evidence identifiers are defined.
+- [x] Command results include exit codes.
+- [x] CI runs include final status.
+- [x] Replay attempts include final classification.
+- [x] Failed attempts are preserved.
+- [x] Later successful attempts may supersede but not delete older evidence.
+- [x] Every evidence record links to a task and requirement.
+
+## TASK-P0X-009: Run all mandatory quality gates
+**Status:** Completed
+**Completed at:** 2026-07-15
+**Implemented files:**
+- specs/p0-extra-inclusion/validation-evidence.md
+- specs/p0-extra-inclusion/implementation-report.md
 - specs/p0-extra-inclusion/traceability.md
 - specs/p0-extra-inclusion/changelog.md
 **Validation evidence:**
-- npx -y js-yaml .github/workflows/p0-quality-gates.yml > NUL
-- npm run verify
-**Priority:** P0
-**Objective:** Ensure mandatory quality gates run automatically in CI and can block merge/release when they fail.
-**Related requirements:**
-- FR-QG-005
-- FR-QG-007
-- NFR-QG-003
-- AC-QG-007
+- `EVID-LINT-003`
+- `EVID-TYPE-003`
+- `EVID-BUILD-003`
+- `EVID-TEST-003`
+- `EVID-VERIFY-004`
+- `EVID-VERIFY-005`
+**Objective:** Execute `npm run lint`, `npm run typecheck`, `npm run build`, `npm run test`, and `npm run verify` in the supported environment.
 **Affected areas:**
-- new CI configuration files
-- repository documentation
+- specs/p0-extra-inclusion/validation-evidence.md
+- specs/p0-extra-inclusion/implementation-report.md
+- inventory-api/package.json
+- inventory-api/eslint.config.js
+- inventory-api/tsconfig.typecheck.json
+**Dependencies:**
+- TASK-P0X-002
+- TASK-P0X-003
+- TASK-P0X-008
+**Implementation notes:**
+- Record every command and exit code.
+- Preserve failures and classify them truthfully.
+- Confirm `verify` fails when a mandatory child command fails.
+**Tests:**
+- Supported-runtime command execution
+- Evidence review
+**Acceptance criteria:**
+- [x] Every command is executed in the supported environment.
+- [x] Every exit code is recorded.
+- [x] Scope and exclusions match the documented contract.
+- [x] Failures are classified.
+- [x] No failed gate is reported as passed.
+- [x] `verify` fails when a mandatory child command fails.
+- [x] Evidence records are created.
+
+## TASK-P0X-010: Obtain a real CI validation result
+**Status:** Completed
+**Completed at:** 2026-07-15
+**Implemented files:**
+- specs/p0-extra-inclusion/tasks.md
+- specs/p0-extra-inclusion/traceability.md
+- specs/p0-extra-inclusion/changelog.md
+- specs/p0-extra-inclusion/implementation-report.md
+**Validation evidence:**
+- `EVID-CI-001`
+- `EVID-CI-002`
+- `EVID-CI-003`
+**Objective:** Run the actual GitHub Actions workflow against the implementation state.
+**Affected areas:**
+- specs/p0-extra-inclusion/validation-evidence.md
+- specs/p0-extra-inclusion/implementation-report.md
+- .github/workflows/p0-quality-gates.yml
+**Dependencies:**
+- TASK-P0X-004
+- TASK-P0X-008
+- TASK-P0X-009
+**Implementation notes:**
+- Preserve the currently known failed run.
+- Closure requires a successful run or explicit approved exception.
+- The workflow result must be linked to a commit.
+**Tests:**
+- Real GitHub Actions execution
+- Workflow evidence review
+**Acceptance criteria:**
+- [x] Workflow execution is linked to a commit.
+- [x] Node version is recorded.
+- [x] Mandatory scripts execute.
+- [x] Final workflow status is recorded.
+- [x] Failed jobs remain visible.
+- [x] Closure requires a successful run or an explicit approved exception.
+
+## TASK-P0X-011: Back-propagate results to the original P0
+**Status:** Completed
+**Completed at:** 2026-07-13
+**Implemented files:**
+- specs/p0-extra-inclusion/metadata.yaml
+- specs/p0-extra-inclusion/current-state.md
+- specs/p0-extra-inclusion/tasks.md
+- specs/p0-extra-inclusion/traceability.md
+- specs/p0-extra-inclusion/changelog.md
+- specs/p0-project-stabilization/current-state.md
+- specs/p0-project-stabilization/traceability.md
+- specs/p0-project-stabilization/risks.md
+- specs/p0-project-stabilization/changelog.md
+- specs/p0-project-stabilization/implementation-report.md
+- specs/p0-project-stabilization/closure-report.md
+- specs/p0-extra-closure-followup/tasks.md
+- specs/p0-extra-closure-followup/changelog.md
+- specs/p0-extra-closure-followup/implementation-report.md
+**Validation evidence:**
+- `specs/p0-extra-closure-followup/implementation-report.md`
+- `specs/p0-extra-inclusion/validation-evidence.md`
+- `specs/p0-project-stabilization/closure-report.md`
+**Objective:** Update `specs/p0-project-stabilization/` with the outcome of the extension.
+**Affected areas:**
+- specs/p0-project-stabilization/metadata.yaml
+- specs/p0-project-stabilization/current-state.md
+- specs/p0-project-stabilization/traceability.md
+- specs/p0-project-stabilization/risks.md
+- specs/p0-project-stabilization/changelog.md
+- specs/p0-project-stabilization/implementation-report.md
+- specs/p0-project-stabilization/closure-report.md
 **Dependencies:**
 - TASK-P0X-006
-**Implementation notes:**
-- Reuse the same commands defined for local execution.
-- Keep required and optional checks separate.
-- Avoid CI-only hidden behavior.
-**Tests and validation:**
-- Validate workflow syntax/configuration.
-- Validate CI references the same scripts as local usage.
-- Confirm failures block the mandatory pipeline path.
-**Acceptance criteria:**
-- [x] CI configuration exists.
-- [x] CI runs lint, typecheck, build and tests.
-- [x] CI fails on mandatory gate failure.
-- [x] Local and CI commands stay aligned.
-
-## TASK-P0X-008: Execute final P0 extra validation from a clean environment
-**Status:** Completed
-**Completed at:** 2026-07-13
-**Implemented files:**
-- inventory-api/package.json
-- inventory-api/README.md
-- .github/workflows/p0-quality-gates.yml
-- specs/p0-extra-inclusion/current-state.md
-- specs/p0-extra-inclusion/implementation-report.md
-- specs/p0-extra-inclusion/tasks.md
-- specs/p0-extra-inclusion/traceability.md
-- specs/p0-extra-inclusion/changelog.md
-**Validation evidence:**
-- npm ci
-- node -v && npm -v
-- npx -y node@20 -v
-- npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run lint
-- npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run typecheck
-- npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run build
-- npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run test
-- npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run verify
-**Priority:** P0
-**Objective:** Produce final execution evidence for all mandatory quality gates using the approved scripts and environment setup.
-**Related requirements:**
-- FR-QG-006
-- FR-QG-007
-- AC-QG-006
-- AC-QG-007
-**Affected areas:**
-- validation evidence artifacts
-- original P0 package updates
-**Dependencies:**
-- TASK-P0X-007
-**Implementation notes:**
-- Use a clean supported environment.
-- Record command, date, result, exit code, failures and affected modules.
-- Distinguish pre-existing failures from new failures.
-**Tests and validation:**
-- Execute lint, typecheck, build, test and aggregate verification.
-- Validate evidence completeness.
-**Acceptance criteria:**
-- [x] All mandatory gates were executed.
-- [x] Results and exit codes are documented.
-- [x] Failure classification is documented.
-- [x] Clean-environment reproducibility is evidenced.
-
-## TASK-P0X-010: Produce clean database replay evidence
-**Status:** Completed
-**Completed at:** 2026-07-13
-**Implemented files:**
-- inventory-api/prisma/migration-instructions.md
-- specs/p0-extra-inclusion/current-state.md
-- specs/p0-extra-inclusion/implementation-report.md
-- specs/p0-extra-inclusion/tasks.md
-- specs/p0-extra-inclusion/traceability.md
-- specs/p0-extra-inclusion/changelog.md
-**Validation evidence:**
-- docker compose ps
-- powershell -Command "$env:DATABASE_URL='postgresql://tracksys:tracksys@localhost:5432/tracksys_p0x_replay_seq?schema=public'; npx prisma migrate deploy"
-- docker exec inventory-api-db-1 sh -lc "psql -U tracksys -d postgres -c 'DROP DATABASE IF EXISTS tracksys_p0x_replay_seq;' && psql -U tracksys -d postgres -c 'CREATE DATABASE tracksys_p0x_replay_seq;' && psql -U tracksys -d postgres -c '\l tracksys_p0x_replay_seq'"
-- docker compose exec -T db sh -lc "psql -U tracksys -d postgres -c 'DROP DATABASE IF EXISTS tracksys_p0x_replay_run;' && psql -U tracksys -d postgres -c 'CREATE DATABASE tracksys_p0x_replay_run;' && psql -U tracksys -d postgres -c '\l tracksys_p0x_replay_run'"
-- docker compose run --rm -e DATABASE_URL=postgresql://tracksys:tracksys@db:5432/tracksys_p0x_replay_run?schema=public app npx prisma migrate deploy
-- docker compose run --rm -e DATABASE_URL=postgresql://tracksys:tracksys@db:5432/tracksys_p0x_replay_run?schema=public app npm run prisma:seed
-**Priority:** P0
-**Objective:** Prove that the committed Prisma migration history and seed/bootstrap flow can create a usable database from a clean state.
-**Related requirements:**
-- FR-QG-009
-- NFR-QG-010
-- BR-QG-007
-- AC-QG-008
-**Affected areas:**
-- inventory-api/prisma/migration-instructions.md
-- inventory-api/prisma/migrations/
-- inventory-api/prisma/seed.js
-- inventory-api/package.json
-- validation evidence artifacts
-**Dependencies:**
-- TASK-P0X-008
-**Implementation notes:**
-- Use a disposable empty database.
-- Prefer committed migration commands over manual schema preparation.
-- Record exact commands, environment prerequisites and final result.
-- Distinguish migration failures from seed/data issues.
-**Tests and validation:**
-- Execute the documented migration sequence from an empty database.
-- Execute seed/bootstrap if required by the documented flow.
-- Verify resulting schema and baseline access are usable.
-**Acceptance criteria:**
-- [x] A canonical clean replay sequence is documented.
-- [x] Replay succeeds from an empty database or the failure is classified with evidence.
-- [x] Seed/bootstrap outcome is recorded.
-- [x] Evidence references committed repository artifacts only.
-
-## TASK-P0X-011: Capture real GitHub Actions workflow execution evidence
-**Status:** Completed
-**Completed at:** 2026-07-13
-**Implemented files:**
-- specs/p0-extra-inclusion/tasks.md
-- specs/p0-extra-inclusion/traceability.md
-- specs/p0-extra-inclusion/implementation-report.md
-- specs/p0-extra-inclusion/changelog.md
-**Validation evidence:**
-- public GitHub API queries against `actions/workflows` and `actions/runs`
-- real GitHub Actions runner log showing `Run npm run lint`
-- CI failure output with lint violations in `src/services/auth.service.js`, `src/services/client.service.js`, `src/services/order.service.js`, and `src/services/user.service.js`
-- Run URL: `https://github.com/Kmena/inventory-api/actions/runs/29287056129`
-- Run ID: `29287056129`
-- Job URL: `https://github.com/Kmena/inventory-api/actions/runs/29287056129/job/86942014049?pr=20`
-- Job ID: `86942014049`
-- Outcome recorded: `failure`
-**Priority:** P0
-**Objective:** Capture evidence of a real run of the mandatory GitHub Actions workflow for the P0 quality gates.
-**Related requirements:
-**Priority:** P0
-**Objective:** Capture evidence of a real run of the mandatory GitHub Actions workflow for the P0 quality gates.
-**Related requirements:**
-- FR-QG-010
-- NFR-QG-003
-- BR-QG-008
-- AC-QG-009
-**Affected areas:**
-- .github/workflows/p0-quality-gates.yml
-- validation evidence artifacts
-- repository documentation if needed
-**Dependencies:**
 - TASK-P0X-007
 - TASK-P0X-008
+- TASK-P0X-009
+- TASK-P0X-010
 **Implementation notes:**
-- Evidence must come from an actual GitHub Actions run, not just YAML parsing or local simulation.
-- Record revision reference, workflow name, jobs executed and final status.
-- If permissions or external access block execution, document that explicitly as an open blocker.
-**Tests and validation:**
-- Trigger or reference a real GitHub Actions run.
-- Verify the run executed the mandatory jobs.
-- Preserve run URL, identifier or equivalent durable reference.
+- Reference `specs/p0-extra-inclusion/` explicitly.
+- Parent package must show unresolved failures or inconclusive states when present.
+**Tests:**
+- Parent-package document review
+- Traceability review
 **Acceptance criteria:**
-- [x] A real workflow run reference is recorded.
-- [x] Mandatory jobs executed are identified.
-- [x] Final workflow status is documented.
-- [x] Evidence is linked from the closure package.
+- [x] Original P0 references `p0-extra-inclusion`.
+- [x] Original P0 current state is updated.
+- [x] Original P0 traceability is updated.
+- [x] Original P0 risks include unresolved quality-gate issues.
+- [x] Original P0 changelog records the extension.
+- [x] Closure status matches the actual result.
+- [x] Failed or inconclusive results prevent premature closure.
 
-## TASK-P0X-012: Define explicit supported Node.js version contract
+## TASK-P0X-012: Perform final closure assessment
 **Status:** Completed
 **Completed at:** 2026-07-13
 **Implemented files:**
-- inventory-api/package.json
-- inventory-api/package-lock.json
-- inventory-api/README.md
-- specs/p0-extra-inclusion/current-state.md
-- specs/p0-extra-inclusion/implementation-report.md
+- specs/p0-extra-closure-followup/metadata.yaml
+- specs/p0-extra-closure-followup/tasks.md
+- specs/p0-extra-closure-followup/changelog.md
+- specs/p0-extra-closure-followup/implementation-report.md
+- specs/p0-extra-inclusion/metadata.yaml
 - specs/p0-extra-inclusion/tasks.md
 - specs/p0-extra-inclusion/traceability.md
 - specs/p0-extra-inclusion/changelog.md
-**Validation evidence:**
-- node -e "const pkg=require('./package.json'); console.log(JSON.stringify(pkg.engines))"
-- node -e "const fs=require('fs'); const pkg=require('./package.json'); const readme=fs.readFileSync('README.md','utf8'); console.log(JSON.stringify({engines:pkg.engines, readmeHasNode20:readme.includes('Node.js `20.x`'), dockerHasNode20:fs.readFileSync('Dockerfile','utf8').includes('node:20-bullseye-slim')}))"
-- npx -y node@20 "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run verify
-- grep `node-version: 20` in `.github/workflows/p0-quality-gates.yml`
-**Priority:** P0
-**Objective:** Make the supported Node.js runtime explicit and align local documentation, package metadata and CI.
-**Related requirements:**
-- FR-QG-011
-- NFR-QG-011
-- BR-QG-009
-- AC-QG-010
-**Affected areas:**
-- inventory-api/package.json
-- inventory-api/README.md
-- .github/workflows/p0-quality-gates.yml
-- optional runtime version files if approved
-**Dependencies:**
-- TASK-P0X-008
-**Implementation notes:**
-- Prefer the smallest clear contract, such as README plus `engines`, if approved.
-- Keep the declared version aligned with the workflow `node-version`.
-- Avoid adding multiple conflicting version declarations.
-**Tests and validation:**
-- Review repository artifacts for version consistency.
-- Run mandatory gates with the declared supported version.
-- Confirm CI uses the same declared version.
-**Acceptance criteria:**
-- [x] Supported Node.js version is explicitly declared.
-- [x] CI configuration matches the declared version.
-- [x] Repository documentation reflects the same runtime contract.
-- [x] No conflicting version declarations remain in scope.
-
-## TASK-P0X-013: Update original P0 closure documentation
-**Status:** Completed
-**Completed at:** 2026-07-13
-**Implemented files:**
-- specs/p0-project-stabilization/current-state.md
-- specs/p0-project-stabilization/traceability.md
-- specs/p0-project-stabilization/implementation-report.md
-- specs/p0-project-stabilization/changelog.md
+- specs/p0-project-stabilization/metadata.yaml
 - specs/p0-project-stabilization/closure-report.md
-- specs/p0-extra-inclusion/tasks.md
-- specs/p0-extra-inclusion/traceability.md
-- specs/p0-extra-inclusion/implementation-report.md
-- specs/p0-extra-inclusion/changelog.md
-**Validation evidence:**
-- consistency review of original P0 docs against `specs/p0-extra-inclusion/`
-- linked real GitHub Actions run `29287056129`
-- linked Node runtime contract evidence (`package.json`, README, CI, Docker)
-- linked clean replay evidence classification from `TASK-P0X-010`
-**Priority:** P0
-**Objective:** Reflect the extra quality-gate results back into the original P0 package without prematurely declaring closure.
-**Related requirements:**
-- FR-QG-007
-- FR-QG-008
-- FR-QG-009
-- FR-QG-010
-- FR-QG-011
-- BR-QG-006
-**Affected areas:**
-- specs/p0-project-stabilization/current-state.md
-- specs/p0-project-stabilization/traceability.md
 - specs/p0-project-stabilization/implementation-report.md
-- post-implementation closure report (to be created after implementation)
+**Validation evidence:**
+- EVID-CI-001
+- EVID-CI-002
+- EVID-DB-001
+- EVID-DB-002
+- EVID-DB-003
+- EVID-TEST-002
+- EVID-VERIFY-002
+- EVID-RUNTIME-001
+**Objective:** Determine the truthful final status of `p0-extra-inclusion` and the parent P0.
+**Affected areas:**
+- specs/p0-extra-inclusion/metadata.yaml
+- specs/p0-extra-inclusion/implementation-report.md
+- specs/p0-extra-inclusion/validation-evidence.md
+- specs/p0-project-stabilization/metadata.yaml
+- specs/p0-project-stabilization/closure-report.md
 **Dependencies:**
+- TASK-P0X-006
+- TASK-P0X-008
+- TASK-P0X-009
 - TASK-P0X-010
 - TASK-P0X-011
-- TASK-P0X-012
 **Implementation notes:**
-- Do not create `closure-report.md` during planning.
-- Only update original P0 closure documents after final gate execution evidence exists.
-- Preserve history of the earlier incomplete closure interpretation.
-**Tests and validation:**
-- Review original P0 package for consistency.
-- Confirm extra quality-gate evidence is linked.
+- Allowed results: Passed, Passed with human-approved exceptions, Failed, Inconclusive, Blocked.
+- No mandatory failure may be hidden.
+- Human approval is required for any exception.
+**Tests:**
+- Final evidence review
+- Human approval review for exceptions
 **Acceptance criteria:**
-- [x] Original P0 documents reference the extra quality-gate package.
-- [x] Original P0 traceability is updated.
-- [x] Original P0 current state is updated.
-- [x] Closure interpretation reflects the additional operational evidence scope.
+- [x] All mandatory quality-gate results are available.
+- [x] Real CI evidence is available.
+- [x] Clean replay evidence is available.
+- [x] Documentation drift is resolved or remains explicitly open.
+- [x] Negative evidence is preserved.
+- [x] No mandatory failure is hidden.
+- [x] Parent P0 status is updated consistently.
+- [ ] Human approval is required for any exception.

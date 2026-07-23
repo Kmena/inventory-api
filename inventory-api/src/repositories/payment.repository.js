@@ -69,6 +69,13 @@ function findCompanyPaymentById(id, companyId, options = {}, db = prisma) {
   });
 }
 
+async function reservePaymentId() {
+  const rows = await prisma.$queryRaw`
+    SELECT nextval(pg_get_serial_sequence('payments', 'id')) AS id
+  `;
+  return BigInt(rows[0].id);
+}
+
 function createPayment(data, db = prisma) {
   return db.payment.create({
     data,
@@ -228,6 +235,7 @@ module.exports = {
   findCompanyPayments,
   findCompanyPaymentById,
   findCompanyPaymentReceiptById,
+  reservePaymentId,
   createPayment,
   deleteCompanyPayment,
   updateCompanyPayment,

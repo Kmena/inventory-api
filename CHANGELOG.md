@@ -1,5 +1,11 @@
 # Changelog
 
+- se completaron `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `TASK-005`, `TASK-006`, `TASK-007` y `TASK-008` de `specs/p7-9-5-risk-closure` con inventario y estrategia de remediación de `RawUnsafe`, eliminación del patrón libre en runtime (`throttle-store` e inventory advisory lock), caracterización automatizada de fallos parciales en documentos privados y comprobantes, instrumentación/baseline gobernada para endpoints pesados priorizados, formalización contractual exhaustiva entre rutas montadas y OpenAPI parcial, y consolidación final de evidencia P7 audit-ready en README y documentación dedicada.
+
+- se explicitó la canonicidad documental de P6 apuntando `inventory-api/docs/architecture.md` al paquete raíz `specs/p6-audit-excellence-program`, se alineó el baseline HTML del audit y se documentó formalmente que `TASK-006` de P6 no puede cerrarse porque la evidencia actual sostiene `9.2/10`, no `9.5/10`.
+
+- se alineó `inventory-api/tests/p2-hardening-constraints.test.js` con el lifecycle vigente de pagos (`ACTIVE -> APPROVED`), preservando el runtime actual y registrando la trazabilidad canónica en `specs/p2-payment-lifecycle-test-alignment/`.
+
 - se completó `TASK-001` de `specs/p5-audit-score-hardening` consolidando el paquete canónico P5, registrando baseline pre-implementación y actualizando la trazabilidad documental del programa.
 - se completó `TASK-002` de `specs/p5-audit-score-hardening` construyendo la matriz por rubro del audit con score objetivo, deuda principal, tareas planificadas y evidencia requerida para la re-auditoría.
 - se completó `TASK-003` de `specs/p5-audit-score-hardening` documentando y validando el hardening transversal ya presente de throttling compartido, gobernanza sensible de uploads, dinero decimal seguro y políticas centralizadas, además de alinear `payment.schema.js` con la gobernanza compartida.
@@ -7,6 +13,12 @@
 - se completó `TASK-005` de `specs/p5-audit-score-hardening` agregando smoke runtime HTTP para `src/public`, gobernanza local de workflows y un workflow operativo versionado `operational-smoke.yml` sin deploy.
 - se completó `TASK-006` de `specs/p5-audit-score-hardening` generando la re-auditoría paralela `inventory-api/docs/audit/p5-final-reaudit.md` con breakdown >= 8.5 por rubro y evidencia trazable de cierre.
 - se corrigió el workflow `inventory-api/.github/workflows/operational-smoke.yml` para materializar un `.env.production` temporal antes del smoke de `docker compose`, evitando el fallo por `env_file` ausente en CI.
+
+- se completó `TASK-001` de `specs/p6-audit-excellence-program` consolidando el paquete canónico P6, verificando su aprobación y registrando el baseline pre-implementación hacia la meta 9.5.
+- se completó `TASK-002` de `specs/p6-audit-excellence-program` construyendo la matriz por rubro hacia 9.5 con fortalezas consolidadas, brechas residuales, evidencia requerida y condición de cierre.
+- se completó `TASK-003` de `specs/p6-audit-excellence-program` con throttling distribuido respaldado por Prisma, convergencia adicional de autorización sobre superficies administrativas/operativas críticas e inventario explícito de compatibilidad legacy.
+- se completó `TASK-004` de `specs/p6-audit-excellence-program` con una suite browser/E2E real basada en Playwright para login, navegación protegida, dashboard ejecutivo y runtime warehouse con logout por 401, integrada al workflow `quality-gates`.
+- se completó `TASK-005` de `specs/p6-audit-excellence-program` ampliando OpenAPI factual sobre superficies críticas adicionales, formalizando metadatos de compatibilidad legacy y agregando un runbook operativo versionado con validación automatizada de readiness operativa y restore documentado.
 
 Todos los cambios relevantes de este proyecto se documentan en este archivo.
 

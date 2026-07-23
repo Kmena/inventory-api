@@ -28,6 +28,7 @@ const workflowRules = [
     checks: [
       { description: 'defines an operational smoke job', pattern: /^\s{2}operational-smoke:\s*$/m },
       { description: 'validates production baseline variables', pattern: /npm run validate:production-baseline/ },
+      { description: 'validates operational readiness evidence', pattern: /npm run validate:operational-readiness/ },
       { description: 'materializes a temporary production env file for compose smoke', pattern: /cat > \.env\.production <<EOF/ },
       { description: 'validates compose syntax', pattern: /docker compose -f docker-compose\.prod\.yml config/ },
       { description: 'builds the production image without deploy', pattern: /docker build -t inventory-api:operational-smoke \./ },

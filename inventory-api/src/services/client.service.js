@@ -202,13 +202,15 @@ async function createCompanyClientDocument(clientId, payload, auth) {
   }
 
   const file = validateClientDocumentPayload(payload);
+  const documentId = await clientRepository.reserveClientDocumentId();
   const createdDocument = await clientRepository.createClientDocument({
+    id: documentId,
     clientId,
     documentType: payload.documentType,
     documentNumber: payload.documentNumber,
     fileName: file.fileName,
     mimeType: file.mimeType,
-    fileUrl: 'pending://client-document',
+    fileUrl: buildProtectedClientDocumentUrl(clientId, documentId),
     status: 'ACTIVE',
     notes: payload.notes,
   });
@@ -217,13 +219,13 @@ async function createCompanyClientDocument(clientId, payload, auth) {
     await persistPrivateClientDocumentFile({
       companyId,
       clientId,
-      documentId: createdDocument.id,
+      documentId,
       fileName: file.fileName,
       buffer: file.buffer,
     });
   } catch {
     try {
-      await clientRepository.deleteClientDocument(createdDocument.id);
+      await clientRepository.deleteClientDocument(documentId);
     } catch (_cleanupError) {
       throw createHttpError(
         500,
@@ -235,11 +237,7 @@ async function createCompanyClientDocument(clientId, payload, auth) {
     throw createHttpError(500, 'No se pudo guardar el documento del cliente', 'internal_server_error');
   }
 
-  const updatedDocument = await clientRepository.updateClientDocument(createdDocument.id, {
-    fileUrl: buildProtectedClientDocumentUrl(clientId, createdDocument.id),
-  });
-
-  return serializeClientDocument(updatedDocument);
+  return serializeClientDocument(createdDocument);
 }
 
 async function getCompanyClientDocumentDownload(clientId, documentId, auth) {

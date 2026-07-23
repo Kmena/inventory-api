@@ -153,6 +153,13 @@ function createClientStore(data) {
   });
 }
 
+async function reserveClientDocumentId() {
+  const rows = await prisma.$queryRaw`
+    SELECT nextval(pg_get_serial_sequence('client_documents', 'id')) AS id
+  `;
+  return BigInt(rows[0].id);
+}
+
 function createClientDocument(data) {
   return prisma.clientDocument.create({
     data,
@@ -254,6 +261,7 @@ module.exports = {
   updateCompanyClient,
   softDeleteCompanyClient,
   createClientStore,
+  reserveClientDocumentId,
   createClientDocument,
   updateClientDocument,
   deleteClientDocument,

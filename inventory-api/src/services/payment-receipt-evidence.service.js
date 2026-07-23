@@ -50,12 +50,8 @@ async function persistPaymentReceiptFile({ companyId, paymentId, storageRef, buf
   return absolutePath;
 }
 
-async function deletePaymentReceiptFileQuietly({ companyId, paymentId, storageRef }) {
-  try {
-    await fs.unlink(buildPrivatePaymentReceiptPath({ companyId, paymentId, storageRef }));
-  } catch {
-    // best-effort cleanup
-  }
+async function deletePaymentReceiptFile({ companyId, paymentId, storageRef }) {
+  await fs.unlink(buildPrivatePaymentReceiptPath({ companyId, paymentId, storageRef }));
 }
 
 function validatePaymentReceiptPayload(receiptFile) {
@@ -80,34 +76,70 @@ function validatePaymentReceiptPayload(receiptFile) {
   }
 }
 
-async function createPaymentReceiptEvidence(payment, receiptFile, auth) {
-  if (!receiptFile) {
-    return null;
-  }
-
+function buildPaymentReceiptPersistencePlan(payment, receiptFile, auth) {
   const companyId = BigInt(payment.invoice.client.companyId);
   const storageRef = buildStorageReference(receiptFile.fileName);
   const { buffer: fileBuffer, mimeType } = receiptFile._validatedReceiptPayload || validatePaymentReceiptPayload(receiptFile);
 
-  await persistPaymentReceiptFile({
+  return {
     companyId,
     paymentId: payment.id,
     storageRef,
-    buffer: fileBuffer,
-  });
+    fileBuffer,
+    mimeType,
+    originalFileName: receiptFile.fileName,
+    uploadedByUserId: getActorUserId(auth),
+    note: receiptFile.note || null,
+  };
+}
+
+async function createPaymentReceiptEvidence(payment, receiptFile, auth, db = null) {
+  if (!receiptFile) {
+    return null;
+  }
+
+  const plan = buildPaymentReceiptPersistencePlan(payment, receiptFile, auth);
+  let filePersisted = false;
+
+  const createEvidence = async (databaseClient) => {
+    const receipt = await paymentRepository.createPaymentReceipt({
+      paymentId: plan.paymentId,
+      storageRef: plan.storageRef,
+      originalFileName: plan.originalFileName,
+      mimeType: plan.mimeType,
+      fileSizeBytes: BigInt(plan.fileBuffer.length),
+      uploadedByUserId: plan.uploadedByUserId,
+      note: plan.note,
+    }, databaseClient);
+
+    await persistPaymentReceiptFile({
+      companyId: plan.companyId,
+      paymentId: plan.paymentId,
+      storageRef: plan.storageRef,
+      buffer: plan.fileBuffer,
+    });
+    filePersisted = true;
+    return receipt;
+  };
 
   try {
-    return await paymentRepository.createPaymentReceipt({
-      paymentId: payment.id,
-      storageRef,
-      originalFileName: receiptFile.fileName,
-      mimeType,
-      fileSizeBytes: BigInt(fileBuffer.length),
-      uploadedByUserId: getActorUserId(auth),
-      note: receiptFile.note || null,
-    });
+    if (db) {
+      return await createEvidence(db);
+    }
+    return await paymentRepository.transaction((tx) => createEvidence(tx));
   } catch (error) {
-    await deletePaymentReceiptFileQuietly({ companyId, paymentId: payment.id, storageRef });
+    if (filePersisted) {
+      try {
+        await deletePaymentReceiptFile({
+          companyId: plan.companyId,
+          paymentId: plan.paymentId,
+          storageRef: plan.storageRef,
+        });
+      } catch {
+        throw createHttpError(500, 'No se pudo guardar la evidencia del pago ni limpiar el archivo privado', 'internal_server_error');
+      }
+    }
+
     throw error;
   }
 }
@@ -117,36 +149,45 @@ async function replacePaymentReceiptEvidence(payment, receiptFile, auth) {
     return null;
   }
 
-  const companyId = BigInt(payment.invoice.client.companyId);
-  const storageRef = buildStorageReference(receiptFile.fileName);
-  const { buffer: fileBuffer, mimeType } = receiptFile._validatedReceiptPayload || validatePaymentReceiptPayload(receiptFile);
-
-  await persistPaymentReceiptFile({
-    companyId,
-    paymentId: payment.id,
-    storageRef,
-    buffer: fileBuffer,
-  });
+  const plan = buildPaymentReceiptPersistencePlan(payment, receiptFile, auth);
+  let filePersisted = false;
 
   try {
     await paymentRepository.transaction(async (tx) => {
       await paymentRepository.markPaymentReceiptsAsReplaced(payment.id, new Date(), tx);
       await paymentRepository.createPaymentReceipt({
         paymentId: payment.id,
-        storageRef,
-        originalFileName: receiptFile.fileName,
-        mimeType,
-        fileSizeBytes: BigInt(fileBuffer.length),
-        uploadedByUserId: getActorUserId(auth),
-        note: receiptFile.note || null,
+        storageRef: plan.storageRef,
+        originalFileName: plan.originalFileName,
+        mimeType: plan.mimeType,
+        fileSizeBytes: BigInt(plan.fileBuffer.length),
+        uploadedByUserId: plan.uploadedByUserId,
+        note: plan.note,
       }, tx);
+      await persistPaymentReceiptFile({
+        companyId: plan.companyId,
+        paymentId: plan.paymentId,
+        storageRef: plan.storageRef,
+        buffer: plan.fileBuffer,
+      });
+      filePersisted = true;
     });
   } catch (error) {
-    await deletePaymentReceiptFileQuietly({ companyId, paymentId: payment.id, storageRef });
+    if (filePersisted) {
+      try {
+        await deletePaymentReceiptFile({
+          companyId: plan.companyId,
+          paymentId: plan.paymentId,
+          storageRef: plan.storageRef,
+        });
+      } catch {
+        throw createHttpError(500, 'No se pudo reemplazar el comprobante del pago ni limpiar el archivo privado', 'internal_server_error');
+      }
+    }
     throw error;
   }
 
-  return paymentRepository.findCompanyPaymentById(payment.id, companyId);
+  return paymentRepository.findCompanyPaymentById(payment.id, plan.companyId);
 }
 
 module.exports = {

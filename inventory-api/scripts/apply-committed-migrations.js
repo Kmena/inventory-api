@@ -42,12 +42,12 @@ async function verifyPhysicalSchema() {
   const prisma = new PrismaClient();
 
   try {
-    const tableRows = await prisma.$queryRawUnsafe(`
+    const tableRows = await prisma.$queryRaw`
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'
       ORDER BY table_name
-    `);
+    `;
 
     if (!Array.isArray(tableRows) || tableRows.length === 0) {
       throw new Error('La aplicacion secuencial de migraciones no dejo tablas fisicas en schema public.');

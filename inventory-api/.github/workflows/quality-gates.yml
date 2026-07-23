@@ -33,3 +33,9 @@ jobs:
 
       - name: Run repository quality gates
         run: npm run verify
+
+      - name: Install Chromium for browser E2E
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser E2E critical flows
+        run: npm run test:e2e:browser

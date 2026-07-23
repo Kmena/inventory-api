@@ -1,39 +1,73 @@
 # Traceability Matrix
 
-| Requirement | Current gap | Architecture response | Task | Validation | Closure evidence |
-| ----------- | ----------- | --------------------- | ---- | ---------- | ---------------- |
-| FR-QG-001 | No lint command or config found | Add lint script and config with explicit scope/exclusions | TASK-P0X-002 | `npm run lint` | Implemented in `inventory-api/package.json` and `inventory-api/eslint.config.js`; validated with passing `npm run lint` |
-| FR-QG-002 | No typecheck command or config found | Add no-emit static type-check strategy | TASK-P0X-003 | `npm run typecheck` | Implemented in `inventory-api/package.json` and `inventory-api/tsconfig.typecheck.json`; validated with passing `npm run typecheck` |
-| FR-QG-003 | No repository build gate exists | Define production build/packaging script | TASK-P0X-004 | `npm run build` | Implemented in `inventory-api/package.json`; validated with passing `npm run build` |
-| FR-QG-004 | Test command exists but closure scope is not fully formalized | Preserve/refine mandatory automated test gate | TASK-P0X-005 | `npm test` | Implemented as documented mandatory gate in README; optional `validate:agent-workspace` kept separate |
-| FR-QG-005 | No aggregate verification path exists | Add `verify` or equivalent fail-fast sequence | TASK-P0X-006 | `npm run verify` or approved equivalent | Implemented as `npm run verify`; validated with passing fail-fast sequence |
-| FR-QG-006 | No standard evidence format exists | Define evidence convention and final execution recording | TASK-P0X-001, TASK-P0X-006, TASK-P0X-008 | Execution log + evidence artifact | TASK-P0X-001 baseline recorded in `specs/p0-extra-inclusion/implementation-report.md` |
-| FR-QG-007 | Original P0 cannot be closed with missing gates or missing operational evidence | CI enforcement + final closure validation + original P0 update | TASK-P0X-007, TASK-P0X-008, TASK-P0X-010, TASK-P0X-011, TASK-P0X-012, TASK-P0X-013 | CI run + final validation review | Completed with original P0 back-propagation docs updated, while preserving recorded CI failure and replay inconsistency as operational facts |
-| FR-QG-008 | Original P0 implementation report still says closure is incomplete due to missing gates | Link quality-gate package back to original P0 closure docs | TASK-P0X-013 | Updated original P0 docs | Completed via updates to original `current-state.md`, `traceability.md`, `implementation-report.md`, `changelog.md`, and new `closure-report.md` |
-| FR-QG-009 | No clean database replay evidence is linked in the package | Add replay validation flow using committed Prisma artifacts | TASK-P0X-010 | Clean DB replay execution | Implemented with documented canonical sequence; migration invocation passed but seed/bootstrap remained blocked by target-environment inconsistency |
-| FR-QG-010 | Workflow YAML exists but real GitHub Actions run evidence is missing | Capture actual GitHub Actions execution evidence | TASK-P0X-011 | GitHub Actions run record | Completed with run URL `https://github.com/Kmena/inventory-api/actions/runs/29287056129`, job URL `https://github.com/Kmena/inventory-api/actions/runs/29287056129/job/86942014049?pr=20`, and recorded `failure` outcome at the lint gate |
-| FR-QG-011 | Node 20 is configured in CI but supported runtime is not explicitly declared as repository contract | Add explicit runtime support declaration aligned with CI | TASK-P0X-012 | Version consistency review + gate run | Implemented with `package.json` engines, README runtime contract, and existing CI/Docker alignment |
-| AC-QG-001 | Missing lint gate | Lint command and scope | TASK-P0X-002 | `npm run lint` exit behavior | Passed in TASK-P0X-002; non-zero failure behavior confirmed during baseline when script was absent |
-| AC-QG-002 | Missing type-check gate | Static no-emit type-check command | TASK-P0X-003 | `npm run typecheck` exit behavior | Passed in TASK-P0X-003; non-zero failure behavior confirmed during baseline when script was absent |
-| AC-QG-003 | Missing build gate | Approved build script and artifact definition | TASK-P0X-004 | `npm run build` | Passed in TASK-P0X-004; build output documented as Prisma Client generation |
-| AC-QG-004 | Tests not yet linked to full closure policy | Mandatory test-gate scope definition | TASK-P0X-005 | `npm test` | Passed in TASK-P0X-005; mandatory suite documented and optional validation separated |
-| AC-QG-005 | No aggregate gate | Fail-fast orchestration | TASK-P0X-006 | Aggregate command/sequence | Passed in TASK-P0X-006 with documented gate order |
-| AC-QG-006 | Evidence not standardized | Evidence collection convention | TASK-P0X-008 | Recorded command/date/result/exit code | Passed in TASK-P0X-008 with final clean-environment evidence recorded |
-| AC-QG-007 | P0 closure remains incomplete | CI + final closure review | TASK-P0X-007, TASK-P0X-008, TASK-P0X-013 | Final closure package update | Completed as documentation back-propagation, without converting the captured CI failure or replay inconsistency into false success claims |
-| AC-QG-008 | No clean database replay evidence exists | Database replay validation flow | TASK-P0X-010 | Executed migration/bootstrap evidence | Passed by evidence classification: canonical sequence documented, migration invocation recorded, seed/bootstrap failure classified |
-| AC-QG-009 | No real workflow execution evidence exists | GitHub Actions run evidence capture | TASK-P0X-011 | Workflow run reference | Completed with durable run and job references plus recorded workflow failure outcome |
-| AC-QG-010 | Runtime support contract is implicit only | Explicit Node.js support declaration | TASK-P0X-012 | README/package/CI alignment review | Implemented; Node 20.x declared and aligned with CI |
+## 1. Alignment summary
+This traceability file is aligned with the audited revision of `specs/p0-extra-inclusion/`.
 
-## Notes
-- Original P0 reviewed: `requirements.md`, `current-state.md`, `implementation-plan.md`, `tasks.md`, `implementation-report.md`, `traceability.md`, `decisions.md`.
-- Confirmed current automated test command: `npm test` in `inventory-api/package.json`.
-- Earlier baseline missing commands (`lint`, `typecheck`, `build`) have now been implemented.
-- Additional operational closure gaps were added to scope: clean DB replay, real GitHub Actions execution evidence, and explicit Node.js support declaration.
-- TASK-P0X-001 execution evidence:
-  - `npm test -- --silent` → pass, exit `0`
-  - `npm run validate:agent-workspace` → fail, exit `1`, pre-existing baseline failure to classify in later tasks
-  - `npm run prisma:generate` → pass, exit `0`
-  - `npm run lint` / `typecheck` / `build` → fail, exit `1`, missing scripts
-  - `npm run start` + `/health` → pass
-- TASK-P0X-008 final evidence confirms mandatory gates in a supported Node 20 runtime after `npm ci`.
-- Original P0 document back-propagation must be revalidated in TASK-P0X-013 after the added operational evidence is completed.
+- `tasks.md` defines the authoritative audited task model: `TASK-P0X-001` through `TASK-P0X-012`.
+- Operational execution of the pending audited work has been extracted into `specs/p0-extra-closure-followup/`.
+- `implementation-report.md` is preserved as historical evidence input, not as proof of completed closure.
+- `validation-evidence.md` defines the durable evidence registry structure.
+- The extension and the parent P0 were previously open until failed and inconclusive conditions were resolved; replay resolution is now back-propagated from `specs/p0-replay-blocker-fix/`.
+
+## 2. Audit finding → Requirement → Decision → Task → Evidence → Current result
+| Finding | Requirement | Planning decision | Task | Command or workflow | Evidence required | Current result |
+|---|---|---|---|---|---|---|
+| Documentation drift | FR-P0X-010, FR-P0X-012 | DEC-P0X-001, DEC-P0X-008 | TASK-P0X-001, TASK-P0X-007, TASK-P0X-011 | Repository docs and parent P0 docs | Updated docs and comparison | TASK-P0X-001 and TASK-P0X-007 completed; package documentation aligned; final closure still open due replay |
+| Failed real CI run | FR-P0X-006, FR-P0X-011, FR-P0X-012 | DEC-P0X-004, DEC-P0X-007 | TASK-P0X-004, TASK-P0X-008, TASK-P0X-010, TASK-P0X-012 | `.github/workflows/p0-quality-gates.yml` | Workflow run reference and status | TASK-P0X-004 and TASK-P0X-010 completed; successful CI evidence preserved alongside historical failed runs |
+| Incomplete clean replay | FR-P0X-008, FR-P0X-009, FR-P0X-012 | DEC-P0X-005, DEC-P0X-006 | TASK-P0X-005, TASK-P0X-006, TASK-P0X-008, TASK-P0X-012 | Replay sequence using Docker + Prisma | Replay log with classification | Historical failed attempts preserved; approved child package `specs/p0-replay-blocker-fix/` now provides successful canonical replay evidence |
+| Negative evidence preservation | FR-P0X-011 | DEC-P0X-007 | TASK-P0X-001, TASK-P0X-008, TASK-P0X-012 | Evidence registry | Evidence registry entries | TASK-P0X-008 completed; negative evidence preserved across historical and follow-up runs |
+| Script presence may be mistaken for closure | FR-P0X-001, FR-P0X-002, FR-P0X-003, FR-P0X-004, FR-P0X-005, FR-P0X-012 | DEC-P0X-001 | TASK-P0X-001, TASK-P0X-002, TASK-P0X-009 | package scripts | Per-gate execution evidence | TASK-P0X-009 completed; fresh supported-runtime gate evidence recorded; final closure still open due replay |
+| Verify not directly evidenced in CI | FR-P0X-005, FR-P0X-006 | DEC-P0X-003, DEC-P0X-004 | TASK-P0X-002, TASK-P0X-004, TASK-P0X-009, TASK-P0X-010 | `npm run verify`, workflow | Verify gate evidence and CI comparison | TASK-P0X-010 completed using real CI evidence for child scripts; direct CI verify execution still absent as narrower drift item |
+| Runtime drift risk | FR-P0X-007 | DEC-P0X-002 | TASK-P0X-003, TASK-P0X-007 | package.json, README, Docker, workflow | Runtime alignment review | TASK-P0X-003 and TASK-P0X-007 completed; runtime documentation aligned; closure still open due replay |
+
+## 3. Requirement → Task → Evidence mapping
+| Requirement | Task | Evidence required | Current closure status |
+|---|---|---|---|
+| FR-P0X-001 | TASK-P0X-002, TASK-P0X-009 | `EVID-LINT-*` | TASK-P0X-009 completed; local validation passed; combined closure failed |
+| FR-P0X-002 | TASK-P0X-002, TASK-P0X-009 | `EVID-TYPE-*` | TASK-P0X-009 completed; local validation passed; combined closure failed |
+| FR-P0X-003 | TASK-P0X-002, TASK-P0X-009 | `EVID-BUILD-*` | TASK-P0X-009 completed; local validation passed; combined closure failed |
+| FR-P0X-004 | TASK-P0X-002, TASK-P0X-009 | `EVID-TEST-*` | TASK-P0X-009 completed; local validation passed; combined closure failed |
+| FR-P0X-005 | TASK-P0X-002, TASK-P0X-009, TASK-P0X-010 | `EVID-VERIFY-*` | TASK-P0X-009 completed; local validation passed with preserved intermittent failed verify run; combined closure failed |
+| FR-P0X-006 | TASK-P0X-004, TASK-P0X-010 | `EVID-CI-*` | TASK-P0X-004 and TASK-P0X-010 completed; resolved for CI evidence; combined closure still failed due replay |
+| FR-P0X-007 | TASK-P0X-003, TASK-P0X-007 | `EVID-RUNTIME-*` | TASK-P0X-003 and TASK-P0X-007 completed; resolved technically and documentarily; combined closure failed |
+| FR-P0X-008 | TASK-P0X-005, TASK-P0X-006 | `EVID-DB-*`, `EVID-RBF-003` | Historical failed evidence preserved; resolved by successful canonical replay in child package |
+| FR-P0X-009 | TASK-P0X-006, TASK-P0X-008 | `EVID-DB-*`, `EVID-RBF-003` | Historical failed / environment-blocked evidence preserved; final replay truth now passed |
+| FR-P0X-010 | TASK-P0X-011 | Parent package update review | Completed through follow-up back-propagation |
+| FR-P0X-011 | TASK-P0X-001, TASK-P0X-008, TASK-P0X-010, TASK-P0X-012 | Evidence registry and preserved failed attempts | TASK-P0X-008 completed; negative evidence preserved |
+| FR-P0X-012 | TASK-P0X-012 | Final closure assessment | Completed after replay-fix propagation |
+
+## 4. Historical evidence preserved and aligned
+| Evidence ID | Source | Related current tasks | Result | Resolution status |
+|---|---|---|---|---|
+| EVID-CI-001 | `specs/p0-extra-inclusion/implementation-report.md` real workflow run `29287056129` | TASK-P0X-004, TASK-P0X-008, TASK-P0X-010, TASK-P0X-012 | Failed at lint | Superseded but preserved |
+| EVID-CI-002 | `specs/p0-extra-closure-followup/implementation-report.md` real workflow run `29288885694` | TASK-P0X-004, TASK-P0X-010, TASK-P0X-012 | Failed | Superseded but preserved |
+| EVID-CI-003 | GitHub Actions real workflow run `29383737072` | TASK-P0X-004, TASK-P0X-010, TASK-P0X-012 | Passed on commit `5c16b2c91e22b49085e1cb7f72a3ae58bd1bf50f` under Node 20 | Resolved |
+| EVID-DB-001 | `specs/p0-extra-inclusion/implementation-report.md` host-local replay attempt | TASK-P0X-005, TASK-P0X-006, TASK-P0X-008, TASK-P0X-012 | Inconclusive due to environment drift | Superseded but preserved |
+| EVID-DB-002 | `specs/p0-extra-inclusion/implementation-report.md` compose-aligned replay attempt | TASK-P0X-005, TASK-P0X-006, TASK-P0X-008, TASK-P0X-012 | Migrations reported success; seed failed / environment blocked | Superseded but preserved |
+| EVID-DB-003 | `specs/p0-extra-closure-followup/implementation-report.md` fresh compose replay `tracksys_replay_followup_20260713` | TASK-P0X-006, TASK-P0X-012 | Failed / environment blocked; target database disappeared after reported migration success | Superseded but preserved |
+| EVID-DB-004 | `specs/p0-extra-inclusion/implementation-report.md` compose replay `tracksys_replay_validation` | TASK-P0X-006, TASK-P0X-012 | Failed / environment blocked; committed app image lacks migration script and seed fails on missing tables | Superseded but preserved |
+| EVID-RBF-003 | `specs/p0-replay-blocker-fix/validation-evidence.md` canonical replay `tracksys_replay_task2` | TASK-P0X-006, TASK-P0X-012 | Passed with 47 tables, successful seed and `/health` 200 | Resolved |
+| EVID-TEST-001 | `specs/p0-extra-inclusion/implementation-report.md` historical supported-runtime local `npm run test` pass | TASK-P0X-009, TASK-P0X-012 | Historical local pass | Superseded but preserved |
+| EVID-TEST-002 | `specs/p0-extra-closure-followup/implementation-report.md` supported-runtime local `npm run test` pass | TASK-P0X-009, TASK-P0X-012 | Passed under Node 20 | Superseded but preserved |
+| EVID-TEST-003 | `specs/p0-extra-inclusion/implementation-report.md` fresh supported-runtime local `npm run test` pass | TASK-P0X-009, TASK-P0X-012 | Passed under Node 20 | Resolved |
+| EVID-VERIFY-001 | `specs/p0-extra-inclusion/implementation-report.md` historical supported-runtime local `npm run verify` pass | TASK-P0X-009, TASK-P0X-012 | Historical local pass | Superseded but preserved |
+| EVID-VERIFY-002 | `specs/p0-extra-closure-followup/implementation-report.md` supported-runtime local `npm run verify` pass | TASK-P0X-009, TASK-P0X-012 | Passed under Node 20 | Superseded but preserved |
+| EVID-VERIFY-004 | `specs/p0-extra-inclusion/implementation-report.md` fresh supported-runtime local `npm run verify` fail | TASK-P0X-009, TASK-P0X-012 | Failed when child `test` failed; proves fail-fast propagation | Superseded but preserved |
+| EVID-VERIFY-005 | `specs/p0-extra-inclusion/implementation-report.md` fresh supported-runtime local `npm run verify` pass | TASK-P0X-009, TASK-P0X-012 | Passed under Node 20 after rerun | Resolved |
+| EVID-RUNTIME-001 | `inventory-api/package.json`, `inventory-api/README.md`, `inventory-api/Dockerfile`, `.github/workflows/p0-quality-gates.yml` | TASK-P0X-003, TASK-P0X-007, TASK-P0X-012 | Node 20 contract aligned | Resolved for TASK-P0X-003 and TASK-P0X-007; remains relevant to final closure assessment |
+
+## 5. Parent-P0 linkage
+The parent specification `specs/p0-project-stabilization/` must continue to reference this extension as:
+- the reason the parent package was not yet fully closed;
+- the location of quality-gate, CI, runtime and replay evidence;
+- the source of unresolved failed or inconclusive closure conditions.
+
+## 6. Resolution rules
+No audited finding may disappear without one of these outcomes:
+- Resolved
+- Accepted exception
+- Failed
+- Inconclusive
+- Blocked
+- Deferred with explicit approval
+- False positive with evidence

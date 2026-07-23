@@ -125,7 +125,7 @@ docker compose --env-file .env.example -f docker-compose.dev.yml exec -T db sh -
 docker compose --env-file .env.example -f docker-compose.dev.yml run --rm \
   -e DATABASE_URL=postgresql://tracksys:replace_me_local_password@db:5432/tracksys_p2_replay_target?schema=public \
   app \
-  node -e "const {PrismaClient}=require('@prisma/client'); const prisma=new PrismaClient(); prisma.$queryRawUnsafe('select current_database() as db, current_schema() as schema, current_user as db_user, inet_server_addr()::text as host, inet_server_port() as port').then(r=>{console.log(JSON.stringify(r));}).finally(()=>prisma.$disconnect());"
+  node -e "const {PrismaClient}=require('@prisma/client'); const prisma=new PrismaClient(); prisma.$queryRaw`select current_database() as db, current_schema() as schema, current_user as db_user, inet_server_addr()::text as host, inet_server_port() as port`.then(r=>{console.log(JSON.stringify(r));}).finally(()=>prisma.$disconnect());"
 ```
 
 Resultado esperado:

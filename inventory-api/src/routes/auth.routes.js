@@ -11,10 +11,10 @@ const router = express.Router();
 router.post('/login', enforceLoginThrottle, validate(loginSchema), async (req, res, next) => {
   try {
     const result = await authService.login(req.body, req);
-    registerLoginThrottleResult(req, { successful: true });
+    await registerLoginThrottleResult(req, { successful: true });
     return res.json(result);
   } catch (error) {
-    registerLoginThrottleResult(req, { successful: false, errorCode: error?.code || null });
+    await registerLoginThrottleResult(req, { successful: false, errorCode: error?.code || null });
     return next(error);
   }
 });

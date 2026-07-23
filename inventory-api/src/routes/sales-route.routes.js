@@ -1,7 +1,7 @@
 ﻿const express = require('express');
 
 const authenticate = require('../middlewares/authenticate');
-const authorize = require('../middlewares/authorize');
+const { authorizeAccessPolicy } = require('../security/access-policies');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
 const {
@@ -14,9 +14,8 @@ const salesRouteService = require('../services/sales-route.service');
 
 const router = express.Router();
 router.use(authenticate);
-router.use(authorize('admin', 'sales_supervisor'));
 
-router.get('/company', async (req, res, next) => {
+router.get('/company', authorizeAccessPolicy('sales-route.company.list'), async (req, res, next) => {
   try {
     const data = await salesRouteService.listCompanyRoutes(req.auth);
     return res.json(data);
@@ -25,7 +24,7 @@ router.get('/company', async (req, res, next) => {
   }
 });
 
-router.post('/company', validate(saveSalesRouteSchema), async (req, res, next) => {
+router.post('/company', authorizeAccessPolicy('sales-route.company.create'), validate(saveSalesRouteSchema), async (req, res, next) => {
   try {
     const data = await salesRouteService.createCompanyRoute(req.body, req.auth);
     return res.status(201).json(data);
@@ -34,7 +33,7 @@ router.post('/company', validate(saveSalesRouteSchema), async (req, res, next) =
   }
 });
 
-router.get('/company/:routeId', async (req, res, next) => {
+router.get('/company/:routeId', authorizeAccessPolicy('sales-route.company.detail'), async (req, res, next) => {
   try {
     const data = await salesRouteService.getCompanyRouteDetail(parseBigIntId(req.params.routeId, 'routeId'), req.auth);
     return res.json(data);
@@ -43,7 +42,7 @@ router.get('/company/:routeId', async (req, res, next) => {
   }
 });
 
-router.put('/company/:routeId', validate(saveSalesRouteSchema), async (req, res, next) => {
+router.put('/company/:routeId', authorizeAccessPolicy('sales-route.company.update'), validate(saveSalesRouteSchema), async (req, res, next) => {
   try {
     const data = await salesRouteService.updateCompanyRoute(parseBigIntId(req.params.routeId, 'routeId'), req.body, req.auth);
     return res.json(data);
@@ -52,7 +51,7 @@ router.put('/company/:routeId', validate(saveSalesRouteSchema), async (req, res,
   }
 });
 
-router.put('/company/:routeId/subzones', validate(saveSalesRouteSubzonesSchema), async (req, res, next) => {
+router.put('/company/:routeId/subzones', authorizeAccessPolicy('sales-route.company.subzones.update'), validate(saveSalesRouteSubzonesSchema), async (req, res, next) => {
   try {
     const data = await salesRouteService.saveCompanyRouteSubzones(parseBigIntId(req.params.routeId, 'routeId'), req.body, req.auth);
     return res.json(data);
@@ -61,7 +60,7 @@ router.put('/company/:routeId/subzones', validate(saveSalesRouteSubzonesSchema),
   }
 });
 
-router.delete('/company/:routeId/subzones/:subzoneId', async (req, res, next) => {
+router.delete('/company/:routeId/subzones/:subzoneId', authorizeAccessPolicy('sales-route.company.subzones.delete'), async (req, res, next) => {
   try {
     const data = await salesRouteService.removeCompanyRouteSubzone(
       parseBigIntId(req.params.routeId, 'routeId'),
@@ -74,7 +73,7 @@ router.delete('/company/:routeId/subzones/:subzoneId', async (req, res, next) =>
   }
 });
 
-router.put('/company/:routeId/assignments', validate(saveSalesRouteAssignmentsSchema), async (req, res, next) => {
+router.put('/company/:routeId/assignments', authorizeAccessPolicy('sales-route.company.assignments.update'), validate(saveSalesRouteAssignmentsSchema), async (req, res, next) => {
   try {
     const data = await salesRouteService.saveCompanyRouteAssignments(parseBigIntId(req.params.routeId, 'routeId'), req.body, req.auth);
     return res.json(data);
@@ -83,7 +82,7 @@ router.put('/company/:routeId/assignments', validate(saveSalesRouteAssignmentsSc
   }
 });
 
-router.put('/company/agents/:userId/goals', validate(saveSalesRouteGoalsSchema), async (req, res, next) => {
+router.put('/company/agents/:userId/goals', authorizeAccessPolicy('sales-route.company.goals.update'), validate(saveSalesRouteGoalsSchema), async (req, res, next) => {
   try {
     const data = await salesRouteService.saveCompanyRouteAgentGoals(parseBigIntId(req.params.userId, 'userId'), req.body, req.auth);
     return res.json(data);

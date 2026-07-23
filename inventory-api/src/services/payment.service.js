@@ -190,20 +190,38 @@ async function createPayment(payload, auth, req = null) {
       }
     : null;
 
-  const payment = await paymentRepository.createPayment({
-    invoiceId: payload.invoiceId,
-    amount: payload.amount,
-    paymentMethod: payload.paymentMethod,
-    reference: payload.reference,
-    status: 'PENDING_APPROVAL',
-    submittedByUserId: getActorUserId(auth),
-    submittedAt: new Date(),
-  });
+  const paymentId = normalizedReceiptFile ? await paymentRepository.reservePaymentId() : null;
+  let payment;
 
   try {
-    await createPaymentReceiptEvidence(payment, normalizedReceiptFile, auth);
-  } catch (_error) {
-    await paymentRepository.deleteCompanyPayment(payment.id, companyId);
+    payment = normalizedReceiptFile
+      ? await paymentRepository.transaction(async (tx) => {
+          const createdPayment = await paymentRepository.createPayment({
+            id: paymentId,
+            invoiceId: payload.invoiceId,
+            amount: payload.amount,
+            paymentMethod: payload.paymentMethod,
+            reference: payload.reference,
+            status: 'PENDING_APPROVAL',
+            submittedByUserId: getActorUserId(auth),
+            submittedAt: new Date(),
+          }, tx);
+          await createPaymentReceiptEvidence(createdPayment, normalizedReceiptFile, auth, tx);
+          return createdPayment;
+        })
+      : await paymentRepository.createPayment({
+          invoiceId: payload.invoiceId,
+          amount: payload.amount,
+          paymentMethod: payload.paymentMethod,
+          reference: payload.reference,
+          status: 'PENDING_APPROVAL',
+          submittedByUserId: getActorUserId(auth),
+          submittedAt: new Date(),
+        });
+  } catch (error) {
+    if (error?.statusCode) {
+      throw error;
+    }
     throw createHttpError(500, 'No se pudo guardar la evidencia del pago', 'internal_server_error');
   }
 

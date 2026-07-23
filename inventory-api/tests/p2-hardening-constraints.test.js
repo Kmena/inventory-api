@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, Prisma } = require('@prisma/client');
 
 const databaseUrl = process.env.P2_CONSTRAINTS_DATABASE_URL;
 
@@ -27,7 +27,7 @@ const fixtureState = {
 };
 
 async function requireSingleRow(query) {
-  const rows = await prisma.$queryRawUnsafe(query);
+  const rows = await prisma.$queryRaw(query);
 
   assert.equal(Array.isArray(rows), true, `Expected array result for query: ${query}`);
   assert.equal(rows.length > 0, true, `Missing seeded row for query: ${query}`);
@@ -48,13 +48,13 @@ async function ensureConstraintFixtures() {
     return fixtureState;
   }
 
-  const { id: companyId } = await requireSingleRow('SELECT id FROM companies ORDER BY id LIMIT 1');
-  const { id: userId } = await requireSingleRow('SELECT id FROM users WHERE company_id IS NOT NULL ORDER BY id LIMIT 1');
-  const { id: clientId } = await requireSingleRow('SELECT id FROM clients ORDER BY id LIMIT 1');
-  const { id: inventoryId } = await requireSingleRow('SELECT id FROM inventories ORDER BY id LIMIT 1');
-  const { id: categoryId } = await requireSingleRow('SELECT id FROM categories ORDER BY id LIMIT 1');
+  const { id: companyId } = await requireSingleRow(Prisma.sql`SELECT id FROM companies ORDER BY id LIMIT 1`);
+  const { id: userId } = await requireSingleRow(Prisma.sql`SELECT id FROM users WHERE company_id IS NOT NULL ORDER BY id LIMIT 1`);
+  const { id: clientId } = await requireSingleRow(Prisma.sql`SELECT id FROM clients ORDER BY id LIMIT 1`);
+  const { id: inventoryId } = await requireSingleRow(Prisma.sql`SELECT id FROM inventories ORDER BY id LIMIT 1`);
+  const { id: categoryId } = await requireSingleRow(Prisma.sql`SELECT id FROM categories ORDER BY id LIMIT 1`);
 
-  const { id: productId } = await requireSingleRow(`
+  const { id: productId } = await requireSingleRow(Prisma.sql`
     INSERT INTO products (
       company_id,
       category_id,
@@ -76,7 +76,7 @@ async function ensureConstraintFixtures() {
     RETURNING id
   `);
 
-  const { id: invoiceId } = await requireSingleRow(`
+  const { id: invoiceId } = await requireSingleRow(Prisma.sql`
     INSERT INTO invoices (client_id, number, amount, created_at, updated_at)
     VALUES (${clientId}, 'P2-CONSTRAINT-FIXTURE-INVOICE', 0, NOW(), NOW())
     ON CONFLICT (number)
@@ -105,48 +105,45 @@ test.after(async () => {
   await prisma.$disconnect();
 });
 
-test('allows a valid ACTIVE payment without reversal metadata', async () => {
+test('allows a valid APPROVED payment with approval metadata (legacy ACTIVE alignment)', async () => {
   const { invoiceId } = await ensureConstraintFixtures();
-  const { id: createdId } = await requireSingleRow(`
-    INSERT INTO payments (invoice_id, amount, payment_method, status, reference, created_at, updated_at)
-    VALUES (${invoiceId}, 1.00, 'CASH', 'ACTIVE', 'constraint-valid-payment', NOW(), NOW())
+  const { id: createdId } = await requireSingleRow(Prisma.sql`
+    INSERT INTO payments (invoice_id, amount, payment_method, status, reference, approved_at, created_at, updated_at)
+    VALUES (${invoiceId}, 1.00, 'CASH', 'APPROVED', 'constraint-valid-payment', NOW(), NOW(), NOW())
     RETURNING id
   `);
 
-  await prisma.$executeRawUnsafe(`DELETE FROM payments WHERE id = ${createdId}`);
+  await prisma.$executeRaw`DELETE FROM payments WHERE id = ${createdId}`;
 });
 
-test('rejects an ACTIVE payment with reversal metadata', async () => {
-  const { invoiceId, userId } = await ensureConstraintFixtures();
+test('rejects an APPROVED payment without approval metadata (legacy ACTIVE alignment)', async () => {
+  const { invoiceId } = await ensureConstraintFixtures();
 
-  await assertConstraintViolation(() => prisma.$executeRawUnsafe(`
+  await assertConstraintViolation(() => prisma.$executeRaw`
     INSERT INTO payments (
       invoice_id,
       amount,
       payment_method,
       status,
-      reversal_reason,
-      reversed_at,
-      reversed_by_user_id,
       created_at,
       updated_at
     )
-    VALUES (${invoiceId}, 1.00, 'CASH', 'ACTIVE', 'should fail', NOW(), ${userId}, NOW(), NOW())
-  `));
+    VALUES (${invoiceId}, 1.00, 'CASH', 'APPROVED', NOW(), NOW())
+  `);
 });
 
 test('rejects a REVERSED payment without reversal metadata', async () => {
   const { invoiceId } = await ensureConstraintFixtures();
 
-  await assertConstraintViolation(() => prisma.$executeRawUnsafe(`
+  await assertConstraintViolation(() => prisma.$executeRaw`
     INSERT INTO payments (invoice_id, amount, payment_method, status, created_at, updated_at)
     VALUES (${invoiceId}, 1.00, 'CASH', 'REVERSED', NOW(), NOW())
-  `));
+  `);
 });
 
 test('allows a valid approved order with approval metadata', async () => {
   const { companyId, userId } = await ensureConstraintFixtures();
-  const { id: createdId } = await requireSingleRow(`
+  const { id: createdId } = await requireSingleRow(Prisma.sql`
     INSERT INTO orders (
       company_id,
       user_id,
@@ -164,13 +161,13 @@ test('allows a valid approved order with approval metadata', async () => {
     RETURNING id
   `);
 
-  await prisma.$executeRawUnsafe(`DELETE FROM orders WHERE id = ${createdId}`);
+  await prisma.$executeRaw`DELETE FROM orders WHERE id = ${createdId}`;
 });
 
 test('rejects an approved order without approval metadata', async () => {
   const { companyId, userId } = await ensureConstraintFixtures();
 
-  await assertConstraintViolation(() => prisma.$executeRawUnsafe(`
+  await assertConstraintViolation(() => prisma.$executeRaw`
     INSERT INTO orders (
       company_id,
       user_id,
@@ -183,13 +180,13 @@ test('rejects an approved order without approval metadata', async () => {
       updated_at
     )
     VALUES (${companyId}, ${userId}, true, 0, 0, 0, 'APPROVED', NOW(), NOW())
-  `));
+  `);
 });
 
 test('rejects an APPROVED order when approved = false', async () => {
   const { companyId, userId } = await ensureConstraintFixtures();
 
-  await assertConstraintViolation(() => prisma.$executeRawUnsafe(`
+  await assertConstraintViolation(() => prisma.$executeRaw`
     INSERT INTO orders (
       company_id,
       user_id,
@@ -202,24 +199,24 @@ test('rejects an APPROVED order when approved = false', async () => {
       updated_at
     )
     VALUES (${companyId}, ${userId}, false, 0, 0, 0, 'APPROVED', NOW(), NOW())
-  `));
+  `);
 });
 
 test('rejects negative product quantities', async () => {
   const { productId } = await ensureConstraintFixtures();
 
-  await assertConstraintViolation(() => prisma.$executeRawUnsafe(`
+  await assertConstraintViolation(() => prisma.$executeRaw`
     UPDATE products
     SET quantity = -1
     WHERE id = ${productId}
-  `));
+  `);
 });
 
 test('rejects warehouse stock reservations above available quantity', async () => {
   const { inventoryId, productId } = await ensureConstraintFixtures();
-  const { id: warehouseId } = await requireSingleRow('SELECT id FROM warehouses ORDER BY id LIMIT 1');
+  const { id: warehouseId } = await requireSingleRow(Prisma.sql`SELECT id FROM warehouses ORDER BY id LIMIT 1`);
 
-  await assertConstraintViolation(() => prisma.$executeRawUnsafe(`
+  await assertConstraintViolation(() => prisma.$executeRaw`
     INSERT INTO warehouse_stocks (
       inventory_id,
       warehouse_id,
@@ -230,5 +227,5 @@ test('rejects warehouse stock reservations above available quantity', async () =
       updated_at
     )
     VALUES (${inventoryId}, ${warehouseId}, ${productId}, 1.000, 2.000, NOW(), NOW())
-  `));
+  `);
 });

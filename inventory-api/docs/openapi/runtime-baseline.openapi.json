@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "inventory-api runtime baseline",
-    "version": "0.3.0",
-    "description": "Baseline OpenAPI parcial y factual para superficies críticas verificadas en runtime. No cubre todo el monolito."
+    "version": "0.5.0",
+    "description": "Baseline OpenAPI parcial y factual para superficies críticas verificadas en runtime. No cubre todo el monolito y se complementa con un manifiesto explícito de exclusiones contractuales."
   },
   "x-coverage-scope": {
     "coverage": "partial",
@@ -23,9 +23,20 @@
       "regions",
       "sales-routes"
     ],
+    "contractClassification": {
+      "coveredOperationsArtifact": "docs/openapi/runtime-baseline.openapi.json",
+      "excludedOperationsArtifact": "docs/runtime-contract-manifest.json",
+      "runtimeCatalogArtifact": "docs/runtime-endpoint-catalog.md",
+      "classificationRule": "Toda operación montada en routers debe estar cubierta aquí mediante x-runtime-source o listada explícitamente como exclusión intencional en el manifiesto contractual.",
+      "notes": [
+        "OpenAPI sigue siendo parcial y factual.",
+        "Las exclusiones explícitas no implican endpoints no soportados; implican superficies runtime fuera del recorte contractual actual.",
+        "La UI embebida servida por express.static se gobierna fuera de OpenAPI mediante pruebas y documentación dedicadas."
+      ]
+    },
     "exclusions": [
-      "rutas no montadas o no caracterizadas en esta fase",
-      "dominios fuera del baseline factual actual",
+      "operaciones runtime listadas explícitamente en docs/runtime-contract-manifest.json",
+      "superficies no-HTTP-documentadas de browser/runtime público gobernadas fuera de OpenAPI",
       "cobertura total del monolito"
     ]
   },
@@ -119,6 +130,11 @@
         "description": "Ruta preservada por compatibilidad. Aunque contiene `/root/`, en runtime resuelve el mismo dashboard ejecutivo de compañía que `/api/companies/company/dashboard` y no un dashboard root global.",
         "tags": ["companies"],
         "security": [{ "bearerAuth": [] }],
+        "x-compatibility": {
+          "status": "legacy-alias",
+          "preferredPath": "/api/companies/company/dashboard",
+          "removalStrategy": "preserve-until-canonical-contract-review"
+        },
         "x-runtime-source": {
           "mountPath": "/api/companies",
           "routeFile": "src/routes/company.routes.js",
@@ -145,6 +161,50 @@
         "responses": {
           "200": { "description": "Dashboard ejecutivo" },
           "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/companies": {
+      "get": {
+        "operationId": "listCompaniesLegacyGlobalShape",
+        "summary": "Ruta global legacy preservada para listado root de empresas",
+        "description": "Superficie histórica preservada. Mantiene semántica root/global y no debe reinterpretarse como listado tenant-admin.",
+        "tags": ["companies"],
+        "security": [{ "bearerAuth": [] }],
+        "x-compatibility": {
+          "status": "legacy-global-shape",
+          "preferredPath": "/api/companies/root/companies",
+          "removalStrategy": "preserve-while-root-consumers-exist"
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/companies",
+          "routeFile": "src/routes/company.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "200": { "description": "Listado global de empresas para root" },
+          "403": { "description": "Sin permisos root" }
+        }
+      },
+      "post": {
+        "operationId": "createCompanyLegacyGlobalShape",
+        "summary": "Ruta global legacy preservada para registro root de empresas",
+        "description": "Superficie histórica preservada. Mantiene semántica root/global y no debe reinterpretarse como alta tenant-admin.",
+        "tags": ["companies"],
+        "security": [{ "bearerAuth": [] }],
+        "x-compatibility": {
+          "status": "legacy-global-shape",
+          "preferredPath": "/api/companies/root/companies",
+          "removalStrategy": "preserve-while-root-consumers-exist"
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/companies",
+          "routeFile": "src/routes/company.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "201": { "description": "Empresa creada vía forma global legacy" },
+          "403": { "description": "Sin permisos root" }
         }
       }
     },
@@ -307,6 +367,99 @@
         },
         "responses": {
           "201": { "description": "Cliente creado" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/clients/classifications/company": {
+      "get": {
+        "operationId": "listCompanyClientClassifications",
+        "summary": "Listar clasificaciones de clientes de la empresa autenticada",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/classifications/company"
+        },
+        "responses": {
+          "200": { "description": "Listado de clasificaciones" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/clients/document-types": {
+      "get": {
+        "operationId": "listClientDocumentTypes",
+        "summary": "Listar tipos de documento soportados para clientes",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/document-types"
+        },
+        "responses": {
+          "200": { "description": "Listado de tipos de documento" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/clients/company/{clientId}/stores": {
+      "post": {
+        "operationId": "createCompanyClientStore",
+        "summary": "Registrar tienda para un cliente visible de la empresa autenticada",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/company/:clientId/stores"
+        },
+        "responses": {
+          "201": { "description": "Tienda creada" },
+          "403": { "description": "Sin permisos" },
+          "404": { "description": "Cliente no encontrado" }
+        }
+      }
+    },
+    "/api/clients/{clientId}/references": {
+      "post": {
+        "operationId": "createClientReference",
+        "summary": "Registrar referencia de cliente",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/:clientId/references"
+        },
+        "responses": {
+          "201": { "description": "Referencia creada" },
+          "403": { "description": "Sin permisos" },
+          "404": { "description": "Cliente no encontrado" }
+        }
+      }
+    },
+    "/api/clients": {
+      "post": {
+        "operationId": "createClientLegacyAlias",
+        "summary": "Alias legacy preservado para crear clientes de compañía",
+        "description": "Ruta histórica preservada por compatibilidad. Se prefiere `/api/clients/company` para documentación y consumidores nuevos.",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-compatibility": {
+          "status": "legacy-alias",
+          "preferredPath": "/api/clients/company",
+          "removalStrategy": "preserve-until-broader-contract-coverage"
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "201": { "description": "Cliente creado vía alias legacy" },
           "403": { "description": "Sin permisos" }
         }
       }
@@ -931,6 +1084,11 @@
         "summary": "Compatibilidad de delete que internamente reversa pagos aprobados",
         "tags": ["payments"],
         "security": [{ "bearerAuth": [] }],
+        "x-compatibility": {
+          "status": "compatibility-delete-reverse",
+          "preferredPath": "/api/payments/{id}/reverse",
+          "removalStrategy": "preserve-while-delete-consumers-exist"
+        },
         "x-runtime-source": {
           "mountPath": "/api/payments",
           "routeFile": "src/routes/payment.routes.js",
@@ -1010,6 +1168,24 @@
         }
       }
     },
+    "/api/payments/{id}/receipts/{receiptId}/download": {
+      "get": {
+        "operationId": "downloadPaymentReceipt",
+        "summary": "Descargar comprobante privado de pago",
+        "tags": ["payments"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/payments",
+          "routeFile": "src/routes/payment.routes.js",
+          "expressPath": "/:id/receipts/:receiptId/download"
+        },
+        "responses": {
+          "200": { "description": "Descarga autorizada" },
+          "403": { "description": "Sin permisos o fuera del tenant" },
+          "404": { "description": "Comprobante no encontrado" }
+        }
+      }
+    },
     "/api/inventory/alerts": {
       "get": {
         "operationId": "listInventoryAlerts",
@@ -1059,6 +1235,92 @@
           "200": { "description": "Estado actualizado" },
           "403": { "description": "Sin permisos" },
           "409": { "description": "Transición inválida" }
+        }
+      }
+    },
+    "/api/inventory/stocks": {
+      "get": {
+        "operationId": "listInventoryStocks",
+        "summary": "Listar existencias visibles por bodega y producto",
+        "tags": ["inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/stocks"
+        },
+        "responses": {
+          "200": { "description": "Listado de existencias" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/inventory/movements": {
+      "get": {
+        "operationId": "listInventoryMovements",
+        "summary": "Listar movimientos de inventario visibles para el actor autenticado",
+        "tags": ["inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/movements"
+        },
+        "responses": {
+          "200": { "description": "Listado paginado de movimientos" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/inventory/entries": {
+      "post": {
+        "operationId": "registerInventoryEntry",
+        "summary": "Registrar ingreso de inventario",
+        "tags": ["inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/entries"
+        },
+        "responses": {
+          "201": { "description": "Ingreso registrado" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/inventory/lots/{id}/qa": {
+      "patch": {
+        "operationId": "updateInventoryLotQa",
+        "summary": "Actualizar estado QA de un lote",
+        "tags": ["inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/lots/:id/qa"
+        },
+        "responses": {
+          "200": { "description": "Estado QA actualizado" },
+          "403": { "description": "Sin permisos" },
+          "404": { "description": "Lote no encontrado" }
+        }
+      }
+    },
+    "/api/inventory/adjustments": {
+      "post": {
+        "operationId": "createInventoryAdjustment",
+        "summary": "Registrar ajuste manual de inventario",
+        "tags": ["inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/adjustments"
+        },
+        "responses": {
+          "201": { "description": "Ajuste registrado" },
+          "403": { "description": "Sin permisos" }
         }
       }
     }
