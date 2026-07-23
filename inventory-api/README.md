@@ -101,10 +101,10 @@ El schema Prisma actual ya modela:
 
 Para congelar el alcance real del repositorio, use como referencia principal:
 
-- `docs/runtime-scope-baseline.md`
-- `docs/domain-evolution-baseline.md`
+- `docs/current-state.md`
+- `docs/architecture.md`
 - `docs/runtime-endpoint-catalog.md`
-- `docs/runtime-ui-api-contract-map.md`
+- `docs/runtime-contract-manifest.json`
 - `docs/ui-guidelines.md`
 
 Ese baseline separa explícitamente:
@@ -127,7 +127,7 @@ La separación real actual del repositorio es la siguiente:
 Use estos documentos como referencia contractual:
 
 - `docs/runtime-endpoint-catalog.md`
-- `docs/runtime-ui-api-contract-map.md`
+- `docs/runtime-contract-manifest.json`
 - `docs/ui-guidelines.md`
 - `docs/production-baseline.md`
 - `docs/p7-risk-closure-evidence.md`
