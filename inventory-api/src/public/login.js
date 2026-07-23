@@ -99,7 +99,7 @@ function setMessage(text, tone = 'default') {
 
 function setSubmittingState(isSubmitting) {
   loginButton.disabled = isSubmitting;
-  loginButton.textContent = isSubmitting ? 'Validando...' : 'Entrar';
+  loginButton.textContent = isSubmitting ? 'Validando...' : 'Iniciar sesión';
   form.setAttribute('aria-busy', isSubmitting ? 'true' : 'false');
 }
 

@@ -78,6 +78,10 @@ test('public login and administrative screens keep their current API contracts',
   assert.match(loginSource, /'\/warehouse\/products\.html'/);
   assert.match(loginSource, /'\/agent\/workspace\.html'/);
   assert.match(loginHtmlSource, /Acceso seguro:/);
+  assert.match(loginHtmlSource, /Controla cada movimiento de tu inventario\./);
+  assert.match(loginHtmlSource, /Bienvenido de nuevo/);
+  assert.match(loginHtmlSource, /Iniciar sesión/);
+  assert.match(loginHtmlSource, /¿Tienes problemas para ingresar\? Contacta al administrador de tu empresa\./);
   assert.doesNotMatch(loginHtmlSource, /Acceso inicial:/);
   assert.doesNotMatch(loginHtmlSource, /Acceso inicial:/);
   assert.match(rootIndexSource, /fetch\('\/api\/companies\/root\/companies'/);

@@ -108,9 +108,9 @@ function resolveBrowserLaunchOptions() {
   return { headless: true };
 }
 
-async function createBrowserPage(t) {
+async function createBrowserPage(t, options = {}) {
   const browser = await chromium.launch(resolveBrowserLaunchOptions());
-  const context = await browser.newContext();
+  const context = await browser.newContext(options);
   const page = await context.newPage();
 
   t.after(async () => {
@@ -187,7 +187,7 @@ test('browser E2E: login redirects an authenticated company admin to the executi
   await page.goto(`${baseUrl}/`);
   await page.getByLabel('Usuario').fill('admin-demo');
   await page.getByLabel('Contrasena').fill('secret-demo');
-  await page.getByRole('button', { name: 'Entrar' }).click();
+  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
   await page.waitForURL(`${baseUrl}/root/dashboard.html`);
   await page.waitForSelector('#company-name');
@@ -214,7 +214,21 @@ test('browser E2E: direct navigation to a protected executive screen redirects a
   await page.goto(`${baseUrl}/root/dashboard.html`);
   await page.waitForURL(`${baseUrl}/`);
 
-  assert.equal(await page.locator('h1').textContent(), 'Login');
+  assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');
+});
+
+test('browser E2E: login renders the form action above the fold at 1366x768', async (t) => {
+  const { server, sockets, baseUrl } = await startServer();
+  t.after(() => stopServer(server, sockets));
+
+  const page = await createBrowserPage(t, { viewport: { width: 1366, height: 768 } });
+
+  await page.goto(`${baseUrl}/`);
+  const buttonBox = await page.locator('#login-button').boundingBox();
+
+  assert.ok(buttonBox, 'login button should be rendered');
+  assert.ok(buttonBox.y + buttonBox.height <= 768, 'login button should be visible without initial vertical scroll at 1366x768');
+  assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');
 });
 
 test('browser E2E: login shows a visible authentication error and restores the form state', async (t) => {
@@ -237,16 +251,16 @@ test('browser E2E: login shows a visible authentication error and restores the f
   await page.goto(`${baseUrl}/`);
   await page.getByLabel('Usuario').fill('usuario-invalido');
   await page.getByLabel('Contrasena').fill('secreto-invalido');
-  await page.getByRole('button', { name: 'Entrar' }).click();
+  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
   await page.waitForFunction(() => {
     const message = globalThis.document.getElementById('login-message');
     const button = globalThis.document.getElementById('login-button');
-    return message?.textContent?.includes('Usuario o contrasena incorrectos.') && button?.textContent === 'Entrar' && button?.disabled === false;
+    return message?.textContent?.includes('Usuario o contrasena incorrectos.') && button?.textContent === 'Iniciar sesión' && button?.disabled === false;
   });
 
   assert.equal(await page.locator('#login-message').textContent(), 'Usuario o contrasena incorrectos.');
-  assert.equal(await page.locator('#login-button').textContent(), 'Entrar');
+  assert.equal(await page.locator('#login-button').textContent(), 'Iniciar sesión');
   assert.equal(await page.locator('#login-button').isDisabled(), false);
 });
 
@@ -301,12 +315,12 @@ test('browser E2E: corrupt stored login session does not break bootstrap and is 
   await page.goto(`${baseUrl}/`);
   await page.waitForURL(`${baseUrl}/`);
 
-  assert.equal(await page.locator('h1').textContent(), 'Login');
+  assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');
   assert.equal(await page.evaluate((storageKey) => globalThis.localStorage.getItem(storageKey), STORAGE_KEY), null);
 
   await page.getByLabel('Usuario').fill('admin-recuperado');
   await page.getByLabel('Contrasena').fill('secret-recuperado');
-  await page.getByRole('button', { name: 'Entrar' }).click();
+  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
   await page.waitForURL(`${baseUrl}/root/dashboard.html`);
   assert.deepEqual(receivedLoginPayload, {
