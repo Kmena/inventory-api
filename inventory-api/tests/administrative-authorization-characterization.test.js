@@ -32,6 +32,17 @@ test('global user listing remains root-only', async () => {
   assert.equal(allowedError, undefined);
 });
 
+test('global user creation remains root-only', async () => {
+  const guard = getRouteGuard(userRoutes, '/', 'post');
+
+  const deniedError = await runGuard(guard, { role: 'admin', companyId: '7' });
+  assert.equal(deniedError?.statusCode, 403);
+  assert.equal(deniedError?.code, 'forbidden');
+
+  const allowedError = await runGuard(guard, { role: 'root', companyId: null });
+  assert.equal(allowedError, undefined);
+});
+
 test('company user creation remains company-admin-only', async () => {
   const guard = getRouteGuard(userRoutes, '/company', 'post');
 

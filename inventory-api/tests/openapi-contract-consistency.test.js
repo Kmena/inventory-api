@@ -3,9 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { skipIfMissing } = require('./internal-docs-optional');
 const appPath = path.join(__dirname, '..', 'src', 'app.js');
-const openApiPath = path.join(__dirname, '..', 'docs', 'openapi', 'runtime-baseline.openapi.json');
-const runtimeContractManifestPath = path.join(__dirname, '..', 'docs', 'runtime-contract-manifest.json');
+const openApiPath = path.join(__dirname, '..', 'internal-docs', 'openapi', 'runtime-baseline.openapi.json');
+const runtimeContractManifestPath = path.join(__dirname, '..', 'internal-docs', 'runtime-contract-manifest.json');
 
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
@@ -19,7 +20,11 @@ function buildRouteRegex(method, expressPath) {
   return new RegExp(`router\\.${method}\\(\\s*'${escapeRegExp(expressPath)}'`);
 }
 
-test('OpenAPI baseline stays explicitly partial and machine-readable while covering more runtime domains', () => {
+test('OpenAPI baseline stays explicitly partial and machine-readable while covering more runtime domains', (t) => {
+  if (skipIfMissing(t, ['internal-docs/openapi/runtime-baseline.openapi.json', 'internal-docs/runtime-contract-manifest.json'], 'internal-docs OpenAPI artifacts are optional in public repo mode')) {
+    return;
+  }
+
   const openApi = JSON.parse(read(openApiPath));
   const runtimeContractManifest = JSON.parse(read(runtimeContractManifestPath));
   const domains = JSON.stringify(openApi['x-coverage-scope'].domains);
@@ -28,8 +33,9 @@ test('OpenAPI baseline stays explicitly partial and machine-readable while cover
   assert.equal(openApi.info.title, 'inventory-api runtime baseline');
   assert.equal(openApi.info.version, '0.5.0');
   assert.equal(openApi['x-coverage-scope'].coverage, 'partial');
-  assert.equal(openApi['x-coverage-scope'].contractClassification?.excludedOperationsArtifact, 'docs/runtime-contract-manifest.json');
-  assert.equal(openApi['x-coverage-scope'].contractClassification?.runtimeCatalogArtifact, 'docs/runtime-endpoint-catalog.md');
+  assert.equal(openApi['x-coverage-scope'].contractClassification?.excludedOperationsArtifact, 'internal-docs/runtime-contract-manifest.json');
+  assert.equal(openApi['x-coverage-scope'].contractClassification?.runtimeCatalogArtifact, 'internal-docs/runtime-endpoint-catalog.md');
+  assert.equal(openApi['x-coverage-scope'].contractClassification?.criticalContractMatrixArtifact, 'internal-docs/critical-contract-matrix.json');
   assert.equal(runtimeContractManifest.classificationMode, 'openapi-covered-plus-explicit-exclusions');
   assert.match(domains, /auth/i);
   assert.match(domains, /companies\/users\/roles/i);
@@ -45,7 +51,11 @@ test('OpenAPI baseline stays explicitly partial and machine-readable while cover
   assert.match(domains, /sales-routes/i);
 });
 
-test('OpenAPI baseline keeps legacy company dashboard alias and preferred alias', () => {
+test('OpenAPI baseline keeps legacy company dashboard alias and preferred alias', (t) => {
+  if (skipIfMissing(t, ['internal-docs/openapi/runtime-baseline.openapi.json'], 'internal-docs OpenAPI artifacts are optional in public repo mode')) {
+    return;
+  }
+
   const openApi = JSON.parse(read(openApiPath));
 
   const legacyAlias = openApi.paths['/api/companies/root/dashboard']?.get;
@@ -60,41 +70,51 @@ test('OpenAPI baseline keeps legacy company dashboard alias and preferred alias'
   assert.match(preferredAlias.summary, /preferido.*compañía|preferido.*compania/i);
 });
 
-test('OpenAPI baseline covers expanded auth, client, agent, integration and phase-4 operational surfaces', () => {
+test('OpenAPI baseline covers expanded auth, client, agent, integration and phase-4 operational surfaces', (t) => {
+  if (skipIfMissing(t, ['internal-docs/openapi/runtime-baseline.openapi.json'], 'internal-docs OpenAPI artifacts are optional in public repo mode')) {
+    return;
+  }
+
   const openApi = JSON.parse(read(openApiPath));
 
-  assert.ok(openApi.paths['/api/auth/login']?.post);
-  assert.ok(openApi.paths['/api/auth/me']?.get);
-  assert.ok(openApi.paths['/api/companies']?.get);
-  assert.ok(openApi.paths['/api/companies']?.post);
-  assert.ok(openApi.paths['/api/roles/company']?.get);
-  assert.ok(openApi.paths['/api/users/company']?.post);
-  assert.ok(openApi.paths['/api/clients/company']?.get);
-  assert.ok(openApi.paths['/api/clients/classifications/company']?.get);
-  assert.ok(openApi.paths['/api/clients/document-types']?.get);
-  assert.ok(openApi.paths['/api/clients/company/{clientId}/stores']?.post);
-  assert.ok(openApi.paths['/api/clients/{clientId}/references']?.post);
-  assert.ok(openApi.paths['/api/clients']?.post);
-  assert.ok(openApi.paths['/api/clients/{clientId}/documents/{documentId}/download']?.get);
-  assert.ok(openApi.paths['/api/agent/dashboard']?.get);
-  assert.ok(openApi.paths['/api/agent/stores/{storeId}/orders']?.post);
-  assert.ok(openApi.paths['/api/geocoding/search']?.get);
-  assert.ok(openApi.paths['/api/taxpayers/lookup']?.get);
-  assert.ok(openApi.paths['/api/products']?.get);
-  assert.ok(openApi.paths['/api/products/import']?.post);
-  assert.ok(openApi.paths['/api/orders']?.post);
-  assert.ok(openApi.paths['/api/invoices']?.get);
-  assert.ok(openApi.paths['/api/invoices/inconsistencies']?.get);
-  assert.ok(openApi.paths['/api/payments/{id}/receipts/{receiptId}/download']?.get);
-  assert.ok(openApi.paths['/api/inventory/stocks']?.get);
-  assert.ok(openApi.paths['/api/inventory/movements']?.get);
-  assert.ok(openApi.paths['/api/inventory/entries']?.post);
-  assert.ok(openApi.paths['/api/inventory/lots/{id}/qa']?.patch);
-  assert.ok(openApi.paths['/api/inventory/adjustments']?.post);
-  assert.ok(openApi.paths['/api/warehouses/company']?.get);
-  assert.ok(openApi.paths['/api/regions/company/{regionId}/subregions']?.post);
-  assert.ok(openApi.paths['/api/sales-routes/company/{routeId}']?.put);
-  assert.ok(openApi.paths['/api/sales-routes/company/agents/{userId}/goals']?.put);
+  const requiredOperations = [
+    ['/api/auth/login', 'post'],
+    ['/api/auth/me', 'get'],
+    ['/api/companies', 'get'],
+    ['/api/companies', 'post'],
+    ['/api/roles/company', 'get'],
+    ['/api/users/company', 'post'],
+    ['/api/clients/company', 'get'],
+    ['/api/clients/classifications/company', 'get'],
+    ['/api/clients/document-types', 'get'],
+    ['/api/clients/company/{clientId}/stores', 'post'],
+    ['/api/clients/{clientId}/references', 'post'],
+    ['/api/clients', 'post'],
+    ['/api/clients/{clientId}/documents/{documentId}/download', 'get'],
+    ['/api/agent/dashboard', 'get'],
+    ['/api/agent/stores/{storeId}/orders', 'post'],
+    ['/api/geocoding/search', 'get'],
+    ['/api/taxpayers/lookup', 'get'],
+    ['/api/products', 'get'],
+    ['/api/products/import', 'post'],
+    ['/api/orders', 'post'],
+    ['/api/invoices', 'get'],
+    ['/api/invoices/inconsistencies', 'get'],
+    ['/api/payments/{id}/receipts/{receiptId}/download', 'get'],
+    ['/api/inventory/stocks', 'get'],
+    ['/api/inventory/movements', 'get'],
+    ['/api/inventory/entries', 'post'],
+    ['/api/inventory/lots/{id}/qa', 'patch'],
+    ['/api/inventory/adjustments', 'post'],
+    ['/api/warehouses/company', 'get'],
+    ['/api/regions/company/{regionId}/subregions', 'post'],
+    ['/api/sales-routes/company/{routeId}', 'put'],
+    ['/api/sales-routes/company/agents/{userId}/goals', 'put'],
+  ];
+
+  for (const [apiPath, method] of requiredOperations) {
+    assert.ok(openApi.paths[apiPath]?.[method], `Missing ${method.toUpperCase()} ${apiPath} in runtime baseline OpenAPI`);
+  }
   assert.equal(openApi.paths['/api/auth/login'].post.security, undefined);
   assert.equal(openApi.paths['/api/clients'].post['x-compatibility']?.status, 'legacy-alias');
   assert.equal(openApi.paths['/api/payments/{id}'].delete['x-compatibility']?.status, 'compatibility-delete-reverse');
@@ -102,7 +122,11 @@ test('OpenAPI baseline covers expanded auth, client, agent, integration and phas
   assert.match(openApi.paths['/api/taxpayers/lookup'].get.summary, /throttle/i);
 });
 
-test('every covered OpenAPI operation matches a mounted runtime route', () => {
+test('every covered OpenAPI operation matches a mounted runtime route', (t) => {
+  if (skipIfMissing(t, ['internal-docs/openapi/runtime-baseline.openapi.json'], 'internal-docs OpenAPI artifacts are optional in public repo mode')) {
+    return;
+  }
+
   const openApi = JSON.parse(read(openApiPath));
   const appSource = read(appPath);
 

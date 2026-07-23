@@ -1,4 +1,3 @@
-// @ts-nocheck -- Prisma orderBy literals are kept explicit in JS repositories.
 const prisma = require('../lib/prisma');
 
 function findActivePermissions() {
@@ -18,6 +17,7 @@ function assignableRolesWhere(companyId) {
 
 function findAssignableRoles(companyId, pagination = null) {
   const where = assignableRolesWhere(companyId);
+  /** @type {[{ companyId: 'asc' }, { name: 'asc' }]} */
   const orderBy = [{ companyId: 'asc' }, { name: 'asc' }];
   const include = { rolePermissions: { include: { permission: true } } };
   if (!pagination) {

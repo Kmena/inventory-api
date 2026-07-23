@@ -1,21 +1,33 @@
-// @ts-nocheck -- Prisma nested orderBy literals require repository-specific typing not introduced in this P0 gate.
 const prisma = require('../lib/prisma');
 
+/** @type {[{ isPrimaryContact: 'desc' }, { fullName: 'asc' }]} */
+const clientRepresentativeOrderBy = [{ isPrimaryContact: 'desc' }, { fullName: 'asc' }];
+
+/** @type {[{ createdAt: 'desc' }, { id: 'desc' }]} */
+const clientDocumentOrderBy = [{ createdAt: 'desc' }, { id: 'desc' }];
+
+/** @type {[{ name: 'asc' }, { id: 'asc' }]} */
+const clientListOrderBy = [{ name: 'asc' }, { id: 'asc' }];
+
+/** @type {[{ name: 'asc' }, { id: 'asc' }]} */
+const clientClassificationOrderBy = [{ name: 'asc' }, { id: 'asc' }];
+
+/** @returns {import('@prisma/client').Prisma.ClientInclude} */
 function clientInclude() {
   return {
     classification: true,
     legalEntity: true,
     stores: {
-      orderBy: { name: 'asc' },
+      orderBy: /** @type {{ name: 'asc' }} */ ({ name: 'asc' }),
       include: {
         subregion: { include: { region: true } },
         legalEntity: true,
-        representatives: { where: { isActive: true }, orderBy: [{ isPrimaryContact: 'desc' }, { fullName: 'asc' }] },
+        representatives: { where: { isActive: true }, orderBy: clientRepresentativeOrderBy },
       },
     },
     contacts: true,
     references: true,
-    documents: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+    documents: { orderBy: clientDocumentOrderBy },
     _count: { select: { stores: true } },
   };
 }
@@ -28,16 +40,18 @@ function buildDefaultClientWhere(where = {}) {
 }
 
 function findAllClients() {
+  /** @type {{ id: 'asc' }} */
+  const orderBy = { id: 'asc' };
   return prisma.client.findMany({
     where: buildDefaultClientWhere(),
-    orderBy: { id: 'asc' },
+    orderBy,
     include: clientInclude(),
   });
 }
 
 function findCompanyClients(companyId, pagination = null) {
   const where = buildDefaultClientWhere({ companyId });
-  const orderBy = [{ name: 'asc' }, { id: 'asc' }];
+  const orderBy = clientListOrderBy;
 
   if (!pagination) {
     return prisma.client.findMany({
@@ -82,7 +96,7 @@ function findCompanyClassificationById(id, companyId) {
 function findCompanyClassifications(companyId) {
   return prisma.clientClassification.findMany({
     where: { companyId, isActive: true },
-    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    orderBy: clientClassificationOrderBy,
   });
 }
 
@@ -109,13 +123,13 @@ async function updateCompanyClient(id, companyId, data) {
 
   return prisma.client.findFirst({
     where: buildDefaultClientWhere({ id, companyId }),
-    include: {
+    include: /** @type {import('@prisma/client').Prisma.ClientInclude} */ ({
       classification: true,
       legalEntity: true,
       contacts: true,
       references: true,
-      documents: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
-    },
+      documents: { orderBy: clientDocumentOrderBy },
+    }),
   });
 }
 
@@ -145,11 +159,11 @@ function createClientStore(data) {
           }
         : undefined,
     },
-    include: {
+    include: /** @type {import('@prisma/client').Prisma.ClientStoreInclude} */ ({
       subregion: { include: { region: true } },
       legalEntity: true,
-      representatives: { where: { isActive: true }, orderBy: [{ isPrimaryContact: 'desc' }, { fullName: 'asc' }] },
-    },
+      representatives: { where: { isActive: true }, orderBy: clientRepresentativeOrderBy },
+    }),
   });
 }
 

@@ -75,6 +75,8 @@ test('warehouse routes stay permission-governed through centralized access polic
 
 test('sales-route administration routes stay limited to admin and sales_supervisor through centralized access policies', async () => {
   const listGuard = getRouteGuard(salesRouteRoutes, '/company', 'get');
+  const subzonesUpdateGuard = getRouteGuard(salesRouteRoutes, '/company/:routeId/subzones', 'put');
+  const subzoneDeleteGuard = getRouteGuard(salesRouteRoutes, '/company/:routeId/subzones/:subzoneId', 'delete');
   const goalsGuard = getRouteGuard(salesRouteRoutes, '/company/agents/:userId/goals', 'put');
 
   const deniedList = await runGuard(listGuard, { role: 'sales', companyId: '7' });
@@ -82,6 +84,18 @@ test('sales-route administration routes stay limited to admin and sales_supervis
 
   const allowedSupervisorList = await runGuard(listGuard, { role: 'sales_supervisor', companyId: '7' });
   assert.equal(allowedSupervisorList, undefined);
+
+  const deniedSubzonesUpdate = await runGuard(subzonesUpdateGuard, { role: 'warehouse', companyId: '7' });
+  assert.equal(deniedSubzonesUpdate?.statusCode, 403);
+
+  const allowedAdminSubzonesUpdate = await runGuard(subzonesUpdateGuard, { role: 'admin', companyId: '7' });
+  assert.equal(allowedAdminSubzonesUpdate, undefined);
+
+  const deniedSubzoneDelete = await runGuard(subzoneDeleteGuard, { role: 'sales', companyId: '7' });
+  assert.equal(deniedSubzoneDelete?.statusCode, 403);
+
+  const allowedSupervisorSubzoneDelete = await runGuard(subzoneDeleteGuard, { role: 'sales_supervisor', companyId: '7' });
+  assert.equal(allowedSupervisorSubzoneDelete, undefined);
 
   const deniedGoals = await runGuard(goalsGuard, { role: 'warehouse', companyId: '7' });
   assert.equal(deniedGoals?.statusCode, 403);

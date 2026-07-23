@@ -19,7 +19,23 @@ Thumbs.db
 *.temp
 prisma/dev.db
 *.pdf
-*/docs/*
-!docs/production-baseline.md
 *.png
 .codex/*
+
+# Public repo docs policy:
+# keep only low-risk docs versioned by default.
+docs/**
+!docs/
+!docs/architecture.md
+!docs/coding-standards.md
+!docs/ui-guidelines.md
+
+# Keep the audit directory ignored in public mode.
+docs/audit/**
+
+# Internal/private technical artifacts kept out of the public repo.
+internal-docs/**
+
+# Local planning / cleanup scratch files.
+commit-plan-*.md
+docs-cleanup-report.md

@@ -1,4 +1,4 @@
-name: quality-gates
+name: static-checks
 
 on:
   push:
@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: verify
+  static-checks:
+    name: static-checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -31,11 +31,11 @@ jobs:
       - name: Generate Prisma client
         run: npm run build
 
-      - name: Run repository quality gates
-        run: npm run verify
+      - name: Run ESLint
+        run: npm run lint
 
-      - name: Install Chromium for browser E2E
-        run: npx playwright install --with-deps chromium
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
 
-      - name: Run browser E2E critical flows
-        run: npm run test:e2e:browser
+      - name: Lint embedded public runtime
+        run: npm run lint:public-runtime

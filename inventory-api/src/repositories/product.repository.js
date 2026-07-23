@@ -1,6 +1,18 @@
-// @ts-nocheck -- Prisma nested orderBy literals require repository-specific typing not introduced in this P0 gate.
 const prisma = require('../lib/prisma');
 
+/** @type {[{ priceType: 'asc' }, { validFrom: 'desc' }]} */
+const activeProductPriceOrderBy = [{ priceType: 'asc' }, { validFrom: 'desc' }];
+
+/** @type {{ warehouseId: 'asc' }} */
+const warehouseStockOrderBy = { warehouseId: 'asc' };
+
+/** @type {[{ warehouseId: 'asc' }, { lotId: 'asc' }]} */
+const warehouseLotStockOrderBy = [{ warehouseId: 'asc' }, { lotId: 'asc' }];
+
+/** @type {[{ id: 'asc' }]} */
+const productListOrderBy = [{ id: 'asc' }];
+
+/** @type {import('@prisma/client').Prisma.ProductInclude} */
 const productInclude = {
   category: true,
   subcategory: true,
@@ -19,18 +31,18 @@ const productInclude = {
   },
   prices: {
     where: { isActive: true },
-    orderBy: [{ priceType: 'asc' }, { validFrom: 'desc' }],
+    orderBy: activeProductPriceOrderBy,
   },
   supplierLinks: {
     include: { supplier: true },
   },
   warehouseStocks: {
     include: { warehouse: true },
-    orderBy: { warehouseId: 'asc' },
+    orderBy: warehouseStockOrderBy,
   },
   warehouseLotStocks: {
     include: { warehouse: true, lot: true },
-    orderBy: [{ warehouseId: 'asc' }, { lotId: 'asc' }],
+    orderBy: warehouseLotStockOrderBy,
   },
 };
 
@@ -47,7 +59,7 @@ function buildDefaultActiveProductWhere(where = {}) {
 
 function findAllProducts(companyId, pagination = null) {
   const where = buildDefaultActiveProductWhere({ companyId });
-  const orderBy = [{ id: 'asc' }];
+  const orderBy = productListOrderBy;
 
   if (!pagination) {
     return prisma.product.findMany({
