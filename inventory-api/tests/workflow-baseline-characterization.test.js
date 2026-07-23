@@ -39,14 +39,19 @@ test('production baseline documentation includes the operational smoke workflow 
   assert.match(docSource, /docker build -t inventory-api:operational-smoke \./);
 });
 
-test('windows Prisma workflow stays dedicated to npm ci plus build on windows-latest', () => {
+test('windows Prisma workflow stays dedicated to npm ci plus build on windows-latest while publishing auditable evidence', () => {
   const workflowSource = readWorkflow('windows-prisma-build.yml');
 
   assert.match(workflowSource, /^\s{2}windows-prisma-build:\s*$/m);
   assert.match(workflowSource, /runs-on:\s+windows-latest/);
   assert.match(workflowSource, /node-version:\s+'20'/);
   assert.match(workflowSource, /run:\s+npm ci/);
-  assert.match(workflowSource, /run:\s+npm run build/);
+  assert.match(workflowSource, /npm run build/);
+  assert.match(workflowSource, /id:\s+prisma_build/);
+  assert.match(workflowSource, /continue-on-error:\s+true/);
+  assert.match(workflowSource, /GITHUB_STEP_SUMMARY/);
+  assert.match(workflowSource, /actions\/upload-artifact@v4/);
+  assert.match(workflowSource, /Fail workflow when guarded Prisma build fails/);
   assert.doesNotMatch(workflowSource, /npm run verify/);
 });
 

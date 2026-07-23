@@ -28,5 +28,82 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate Prisma client on Windows
-        run: npm run build
+      - name: Run guarded Prisma build on Windows
+        id: prisma_build
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $logDirectory = Join-Path $env:RUNNER_TEMP 'prisma-windows-build'
+          New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
+          $logPath = Join-Path $logDirectory 'npm-run-build.log'
+
+          & npm run build *>&1 | Tee-Object -FilePath $logPath
+          $buildExitCode = $LASTEXITCODE
+
+          "build_exit_code=$buildExitCode" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "build_log_path=$logPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Classify Prisma Windows build result
+        if: always()
+        id: prisma_build_classification
+        shell: pwsh
+        run: |
+          $buildExitCode = '${{ steps.prisma_build.outputs.build_exit_code }}'
+          $logPath = '${{ steps.prisma_build.outputs.build_log_path }}'
+          $classification = 'success'
+
+          if ($buildExitCode -ne '0') {
+            if (Test-Path $logPath) {
+              $logContent = Get-Content -Path $logPath -Raw
+              if ($logContent -match 'classification=windows_rename_lock') {
+                $classification = 'windows_rename_lock'
+              } elseif ($logContent -match 'classification=non_retryable_failure') {
+                $classification = 'non_retryable_failure'
+              } else {
+                $classification = 'runner/environment issue'
+              }
+            } else {
+              $classification = 'runner/environment issue'
+            }
+          }
+
+          "failure_classification=$classification" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Publish Prisma Windows workflow summary
+        if: always()
+        shell: pwsh
+        run: |
+          @"
+          # Prisma Windows build summary
+
+          | Field | Value |
+          | --- | --- |
+          | Workflow | ${{ github.workflow }} |
+          | Workflow path | `.github/workflows/windows-prisma-build.yml` |
+          | Event | ${{ github.event_name }} |
+          | Run ID | ${{ github.run_id }} |
+          | Run attempt | ${{ github.run_attempt }} |
+          | Branch | ${{ github.ref_name }} |
+          | Commit SHA | ${{ github.sha }} |
+          | Runner OS | ${{ runner.os }} |
+          | Node version | 20 |
+          | Build exit code | ${{ steps.prisma_build.outputs.build_exit_code }} |
+          | Failure classification | ${{ steps.prisma_build_classification.outputs.failure_classification }} |
+          | Build log artifact | `windows-prisma-build-log-${{ github.run_id }}` |
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Upload Prisma Windows build log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-prisma-build-log-${{ github.run_id }}
+          path: ${{ steps.prisma_build.outputs.build_log_path }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Fail workflow when guarded Prisma build fails
+        if: always() && steps.prisma_build.outputs.build_exit_code != '0'
+        shell: pwsh
+        run: |
+          Write-Error "Prisma Windows build failed with classification ${{ steps.prisma_build_classification.outputs.failure_classification }}"
+          exit 1

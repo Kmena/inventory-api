@@ -160,6 +160,10 @@ El repositorio versiona los siguientes workflows de baseline y gobernanza en Git
 
 En conjunto cubren instalación, generación de Prisma, validaciones de contratos, test suite, browser E2E, smoke operativo y el gate dedicado de Prisma/Windows en `push`, `pull_request` y `workflow_dispatch` según corresponda.
 
+Para el estado auditable del riesgo Prisma/Windows y la evidencia CI consolidada, use como fuente primaria:
+
+- `docs/prisma-windows-stability-evidence.md`
+
 ## CD parcial versionado sin deploy
 
 El repositorio incluye además un workflow controlado de build/publicación en:

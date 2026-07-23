@@ -39,7 +39,11 @@ const workflowRules = [
       { description: 'runs on windows-latest', pattern: /runs-on:\s+windows-latest/ },
       { description: 'pins Node.js 20', pattern: /node-version:\s+'20'/ },
       { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
-      { description: 'runs the guarded Prisma build on Windows', pattern: /run:\s+npm run build/ },
+      { description: 'runs the guarded Prisma build on Windows', pattern: /npm run build/ },
+      { description: 'captures the guarded build step with explicit id', pattern: /id:\s+prisma_build/ },
+      { description: 'publishes a workflow summary for audit evidence', pattern: /GITHUB_STEP_SUMMARY/ },
+      { description: 'uploads the Prisma Windows build log artifact', pattern: /uses:\s+actions\/upload-artifact@v4/ },
+      { description: 'preserves the real build exit code through explicit failure gate', pattern: /Fail workflow when guarded Prisma build fails/ },
     ],
   },
   {
