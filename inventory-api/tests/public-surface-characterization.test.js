@@ -29,6 +29,10 @@ test('embedded UI has explicit browser-first public-runtime quality gates', () =
   assert.match(validateScriptSource, /listHtmlFiles/);
   assert.match(validateScriptSource, /collectLocalAssetReferences/);
   assert.match(validateScriptSource, /validateCriticalJavaScriptContracts/);
+  assert.match(validateScriptSource, /validateLoginRuntimeContracts/);
+  assert.match(validateScriptSource, /validateRootDashboardRuntimeContracts/);
+  assert.match(validateScriptSource, /validateWarehouseProductsRuntimeContracts/);
+  assert.match(validateScriptSource, /validateAgentWorkspaceRuntimeContracts/);
   assert.match(validateScriptSource, /CRITICAL_JAVASCRIPT_RULES/);
 });
 
@@ -59,11 +63,27 @@ test('critical embedded UI assets exist for login, root admin, warehouse and age
 
 test('public login and administrative screens keep their current API contracts', () => {
   const loginSource = readPublicFile('login.js');
+  const loginHtmlSource = readPublicFile('index.html');
   const rootIndexSource = readPublicFile('root/index.js');
   const rootDashboardSource = readPublicFile('root/dashboard.js');
   const rootClientsSource = readPublicFile('root/clients.js');
 
-  assert.match(loginSource, /fetch\('\/api\/auth\/login'/);
+  assert.match(loginSource, /STORAGE_KEY = 'inventory-api-auth'/);
+  assert.match(loginSource, /fetch\(LOGIN_ENDPOINT/);
+  assert.match(loginSource, /LOGIN_ENDPOINT = '\/api\/auth\/login'/);
+  assert.match(loginSource, /clearStoredSession\(\)/);
+  assert.match(loginSource, /localStorage\.removeItem\(STORAGE_KEY\)/);
+  assert.match(loginSource, /'\/root\/dashboard\.html'/);
+  assert.match(loginSource, /'\/root\/routes\.html'/);
+  assert.match(loginSource, /'\/warehouse\/products\.html'/);
+  assert.match(loginSource, /'\/agent\/workspace\.html'/);
+  assert.match(loginHtmlSource, /Acceso seguro:/);
+  assert.match(loginHtmlSource, /Controla cada movimiento de tu inventario\./);
+  assert.match(loginHtmlSource, /Bienvenido de nuevo/);
+  assert.match(loginHtmlSource, /Iniciar sesión/);
+  assert.match(loginHtmlSource, /¿Tienes problemas para ingresar\? Contacta al administrador de tu empresa\./);
+  assert.doesNotMatch(loginHtmlSource, /Acceso inicial:/);
+  assert.doesNotMatch(loginHtmlSource, /Acceso inicial:/);
   assert.match(rootIndexSource, /fetch\('\/api\/companies\/root\/companies'/);
   assert.match(rootIndexSource, /fetch\(`\/api\/companies\/root\/companies\/\$\{companyId\}\/status`/);
   assert.match(rootDashboardSource, /fetch\('\/api\/companies\/company\/dashboard'/);

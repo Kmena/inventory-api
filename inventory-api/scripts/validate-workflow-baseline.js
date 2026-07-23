@@ -33,6 +33,20 @@ const workflowRules = [
     ],
   },
   {
+    relativePath: 'windows-prisma-build.yml',
+    checks: [
+      { description: 'defines a dedicated Windows Prisma build job', pattern: /^\s{2}windows-prisma-build:\s*$/m },
+      { description: 'runs on windows-latest', pattern: /runs-on:\s+windows-latest/ },
+      { description: 'pins Node.js 20', pattern: /node-version:\s+'20'/ },
+      { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
+      { description: 'runs the guarded Prisma build on Windows', pattern: /npm run build/ },
+      { description: 'captures the guarded build step with explicit id', pattern: /id:\s+prisma_build/ },
+      { description: 'publishes a workflow summary for audit evidence', pattern: /GITHUB_STEP_SUMMARY/ },
+      { description: 'uploads the Prisma Windows build log artifact', pattern: /uses:\s+actions\/upload-artifact@v4/ },
+      { description: 'preserves the real build exit code through explicit failure gate', pattern: /Fail workflow when guarded Prisma build fails/ },
+    ],
+  },
+  {
     relativePath: 'browser-e2e.yml',
     checks: [
       { description: 'defines a browser-e2e job', pattern: /^\s{2}browser-e2e:\s*$/m },

@@ -1,68 +1,235 @@
-# Runtime Architecture Reference
+# Architecture
 
-## Purpose
-This document is the formal repository-level pointer for the currently approved hardening baseline reflected by the inspected repository.
+## 1. Architectural goals
+### Proposed
+- keep the repository as a single deployable modular monolith
+- avoid redesigning production runtime architecture for a CI/governance-only closeout cycle
+- make repository-level Windows Prisma governance explicit, auditable, and test-protected
+- preserve the real failure semantics of `npm run build` while improving evidence capture
+- centralize closeout evidence in versioned repository documentation
 
-## Canonical architecture source for the current change
-The canonical architecture and audit-governance source for the current approved closeout work is:
+## 2. Current architecture summary
+The production runtime remains an Express + Prisma layered modular monolith.
 
-- `../specs/p6-audit-excellence-program/architecture.md`
+The architecture added or clarified in this cycle is repository-governance architecture around Windows Prisma stabilization:
+- `npm run build` is the guarded Prisma-generation contract
+- `.github/workflows/windows-prisma-build.yml` is the executable Windows CI adapter
+- `inventory-api/.github/workflows/windows-prisma-build.yml` is a mirrored contractual baseline/reference
+- `scripts/validate-workflow-baseline.js` is the local governance validator for workflow contracts
+- `tests/workflow-baseline-characterization.test.js` and `tests/prisma-windows-build-stabilization.test.js` preserve the contract through regression coverage
+- `docs/prisma-windows-stability-evidence.md` is the primary repository evidence source
 
-The historical runtime-hardening baseline that remains preserved for traceability is:
+## 3. Architectural problems
+- historical Prisma/Windows closure evidence was fragmented across specs, workflow files, and prior reports
+- a successful Windows run could be documented without a sufficiently explicit repository criterion for declaring stabilization
+- workflow evidence needed summary/artifact output without converting real build failures into false success
+- the approved stabilization criterion required at least one documented `workflow_dispatch` or rerun; that rerun evidence is now present, but the workflow duplication model still leaves maintainability risk
+- governance now exists in both the root workflow and the mirrored app-local workflow baseline, so drift remains a maintainability concern
 
-- `../specs/p4-closeout-hardening/architecture.md`
+## 4. Target architecture proposal
+### Proposed
+For this scope, the target is **not** a new production architecture. The target is a clearer repository-governance architecture for Windows Prisma evidence.
 
-## Supporting specification documents
-For the current closeout/audit-governance context, read together with:
-- `../specs/p6-audit-excellence-program/requirements.md`
-- `../specs/p6-audit-excellence-program/current-state.md`
-- `../specs/p6-audit-excellence-program/domain-analysis.md`
-- `../specs/p6-audit-excellence-program/implementation-plan.md`
-- `../specs/p6-audit-excellence-program/tasks.md`
-- `../specs/p6-audit-excellence-program/traceability.md`
-- `../specs/p6-audit-excellence-program/risks.md`
-- `../specs/p6-audit-excellence-program/decisions.md`
+Target governance shape:
+- **Build contract layer**
+  - `npm run build`
+  - guarded Prisma wrapper preserving retryable/non-retryable classification and real exit status
+- **CI adapter layer**
+  - root Windows workflow runs the guarded build on `windows-latest`
+  - captures log output, publishes summary, uploads artifact, and fails explicitly on real errors
+- **Governance verification layer**
+  - local workflow-baseline validator
+  - characterization tests for workflow contract and wrapper behavior
+- **Evidence layer**
+  - single versioned Markdown source of truth for closeout criterion, historical runs, verdict, and remaining gap
 
-For the historical internal runtime-hardening baseline preserved under the application tree, read together with:
-- `../specs/p4-closeout-hardening/requirements.md`
-- `../specs/p4-closeout-hardening/current-state.md`
-- `../specs/p4-closeout-hardening/domain-analysis.md`
-- `../specs/p4-closeout-hardening/implementation-plan.md`
-- `../specs/p4-closeout-hardening/tasks.md`
-- `../specs/p4-closeout-hardening/traceability.md`
-- `../specs/p4-closeout-hardening/risks.md`
-- `../specs/p4-closeout-hardening/decisions.md`
+## 5. Domain map
+### Proposed
+| Domain | Classification | Responsibility |
+|---|---|---|
+| Platform Runtime Governance | Supporting | repository build contracts, CI workflow baselines, evidence closure and validation |
+| Build & Prisma Bootstrap | Supporting | guarded Prisma generation, retry/failure classification, build exit semantics |
+| Evidence and Documentation Governance | Supporting | versioned closeout criterion, evidence consolidation, residual-risk verdict |
+| Core Application Runtime | Core | business APIs, persistence and embedded browser runtime; unchanged by this cycle |
 
-## Current runtime architecture summary
-The runtime application currently follows this structure:
-- Express application bootstrap in `src/app.js`
-- JWT authentication in `src/middlewares/authenticate.js`
-- Distributed runtime hardening via `src/middlewares/login-throttle.js`, `src/middlewares/request-throttle.js` and `src/middlewares/request-payload.js`
-- Role and permission enforcement in `src/middlewares/authorize.js` and `src/middlewares/authorizePermission.js`
-- Route -> service -> repository -> Prisma flow across business modules
-- Persistence via Prisma schema in `prisma/schema.prisma`
-- Embedded UI served from `src/public/` as part of the supported runtime
-- Browser-first public-runtime gates via `eslint.config.js`, `scripts/validate-public-runtime.js` and `package.json`
-- Automated tests with `node --test` configured in `package.json`
+## 6. Bounded contexts
+### Proposed
+Relevant bounded contexts for this refresh:
+- `PlatformRuntimeGovernance`
+- `BuildPrismaBootstrap`
+- `EvidenceDocumentationGovernance`
 
-## Scope clarifications relevant to the current baseline
-- `GET /api/companies/company/dashboard` is the semantic company-admin dashboard path.
-- `GET /api/companies/root/dashboard` is a legacy misleading compatibility alias for the same company-admin dashboard behavior; it is not a root-global dashboard.
-- `internal-docs/openapi/runtime-baseline.openapi.json` remains a partial factual contract, now expanded to additional verified runtime domains, not a complete monolith-wide OpenAPI description.
-- `internal-docs/production-baseline.md` documents a minimal verifiable production baseline, not a fully hardened final production architecture.
-- `src/public/` remains a real runtime surface and is governed incrementally without introducing a separate frontend build pipeline.
-- The embedded browser/runtime boundary is governed explicitly through characterization tests, HTTP smoke coverage, browser E2E, `scripts/validate-public-runtime.js` and `npm run lint:public-runtime`.
-- `src/public/root/**` is the primary extract-later candidate, but extraction is deferred to a separate approved specification.
+Boundary notes:
+- `BuildPrismaBootstrap` owns wrapper behavior and classification semantics for local/CI build execution
+- `PlatformRuntimeGovernance` owns executable workflow shape, baseline validation, and test-governed workflow contracts
+- `EvidenceDocumentationGovernance` owns the closeout criterion and the final repository verdict
+- the production application contexts remain outside the implementation scope of this cycle
 
-## Formal substitution note
-If another process expects `inventory-api/docs/architecture.md`, this file is the repository-level substitute and points to the approved closeout/audit-governance feature architecture in:
+## 7. Ubiquitous language
+### Proposed
+- **Guarded Prisma Build**: `npm run build` executed through the safe Prisma wrapper
+- **Executable Windows Workflow**: the root GitHub Actions workflow used for real CI evidence
+- **Mirrored Workflow Baseline**: the app-local workflow copy kept for contractual alignment and repository-local governance
+- **Failure Classification**: `windows_rename_lock`, `non_retryable_failure`, `runner/environment issue`, or `success`
+- **Explicit Failure Gate**: the final workflow step that re-fails the job when the guarded build exited non-zero
+- **Residual Gobernado**: the approved fallback status when evidence and governance exist but the full stabilization criterion is not yet satisfied
+- **Estabilizado con evidencia CI**: the current approved status when the repository evidence meets the documented threshold, including a documented `workflow_dispatch` run or rerun
 
-- `../specs/p6-audit-excellence-program/architecture.md`
+## 8. Domain models
+### Proposed
+This cycle does not introduce new persisted business entities. The most relevant model candidates are governance-policy concepts:
 
-The nested `inventory-api/specs/p4-closeout-hardening/` package remains preserved as the historical internal runtime-hardening baseline, not as the primary canonical closeout source.
+- **WindowsPrismaBuildResult** policy model candidate
+  - attributes: run metadata, exit code, classification, artifact presence, summary presence, final result
+  - responsibility: describe the auditable outcome of one Windows build execution
 
-## Status
-- Repository architecture pointer: Present
-- Primary canonical closeout/audit-governance baseline: `specs/p6-audit-excellence-program`
-- Historical internal runtime-hardening baseline: `inventory-api/specs/p4-closeout-hardening`
-- Production code impact: Reflected in runtime hardening, quality gates, browser E2E, contract documentation and audit evidence
+- **WindowsPrismaCloseoutCriterion** policy model candidate
+  - attributes: minimum successful run count, distinct-run requirement, documented `workflow_dispatch`/rerun requirement, rename-lock blocker rule
+  - responsibility: determine whether the verdict is `estabilizado con evidencia CI` or `residual gobernado`
+
+- **WorkflowBaselineContract** policy model candidate
+  - attributes: required job name, runner, Node version, build command, summary publication, artifact upload, explicit failure gate
+  - responsibility: keep the versioned workflow shape stable and auditable
+
+## 9. Aggregates and consistency boundaries
+### Proposed
+No database aggregate changes are proposed.
+
+The relevant consistency boundaries are repository-governance boundaries:
+- wrapper classification + build exit semantics must remain internally consistent
+- workflow summary, artifact upload, and failure gate must remain consistent with the guarded build result
+- the evidence document verdict must remain consistent with the documented closeout criterion and known runs
+
+## 10. Application use cases
+### Proposed
+Relevant implemented or verified use cases:
+- ExecuteGuardedPrismaBuild
+- ClassifyPrismaGenerateFailure
+- RunWindowsPrismaBuildWorkflow
+- PublishWindowsBuildSummary
+- UploadWindowsBuildLogArtifact
+- FailWorkflowOnRealBuildFailure
+- ValidateWorkflowBaselineContracts
+- ConsolidatePrismaWindowsEvidence
+- ReassessCloseoutVerdict
+
+## 11. Input ports
+### Proposed
+- `ExecuteBuildPort`
+- `RunWindowsWorkflowPort`
+- `ValidateWorkflowBaselinePort`
+- `CaptureWindowsBuildEvidencePort`
+- `ReassessCloseoutVerdictPort`
+
+## 12. Output ports
+### Proposed
+- `PrismaGeneratePort`
+- `WorkflowExecutionPort` via GitHub Actions
+- `WorkflowArtifactPublicationPort`
+- `WorkflowSummaryPublicationPort`
+- `EvidenceDocumentPort`
+
+## 13. Input adapters
+### Proposed
+- `package.json` script entry for `npm run build`
+- root GitHub Actions workflow `.github/workflows/windows-prisma-build.yml`
+- local validation command `npm run validate:workflow-baseline`
+- Node characterization tests under `tests/`
+- versioned evidence document and README linkage
+
+## 14. Output adapters
+### Proposed
+- `scripts/prisma-generate-safe.js` and `scripts/prisma-generate-safe-lib.js`
+- GitHub Actions workflow summary via `GITHUB_STEP_SUMMARY`
+- GitHub Actions artifact upload via `actions/upload-artifact@v4`
+- Markdown evidence publication in `docs/prisma-windows-stability-evidence.md`
+
+## 15. Dependency rules
+### Proposed
+- workflow governance tests may assert workflow-shape contracts, but they must not redefine the closeout criterion independently of the evidence document
+- the mirrored workflow baseline must stay contract-aligned with the root executable workflow for the governed behavior it represents
+- summary publication and artifact upload must never be implemented in a way that suppresses or hides a real non-zero build outcome
+- documentation may report a stronger stabilization status only when supported by recorded evidence
+- repository-governance changes must stay scoped; they must not silently redesign production business modules
+
+## 16. Database ownership
+### Proposed
+No database ownership change is proposed in this cycle.
+
+## 17. Transaction boundaries
+### Proposed
+No application transaction-boundary change is proposed in this cycle.
+
+## 18. Event strategy
+### Proposed
+No in-application event strategy change is proposed.
+
+Repository-governance note:
+- GitHub Actions workflow runs are operational evidence events, not domain events inside the application runtime
+
+## 19. API and integration contracts
+### Proposed
+No application API path changed.
+
+Repository-governance contracts now explicitly protected:
+- root Windows workflow must run on `windows-latest`
+- Node version remains `20`
+- the workflow must run `npm ci` and `npm run build`
+- the workflow must publish a summary and upload a build-log artifact
+- the workflow must preserve the real build failure through the explicit failure gate
+
+## 20. Security boundaries
+### Proposed
+- the hardened workflow must not produce false-success evidence when `npm run build` actually fails
+- failure classification should aid diagnosis without weakening build integrity
+- documentation must distinguish confirmed remote evidence from local-only assumptions
+- lack of `gh`/`GITHUB_TOKEN` in the current environment is an evidence-collection limitation, not a reason to overstate closure
+
+## 21. Container and deployment architecture
+### Proposed
+No container or deployment redesign is proposed by this refresh. The scope is CI-governance hardening and documentation synchronization only.
+
+## 22. Testing strategy
+### Proposed
+Preserve and rely on the current repository-governance safety net:
+- `validate:workflow-baseline` for local workflow contract validation
+- `tests/workflow-baseline-characterization.test.js` for workflow governance characterization
+- `tests/prisma-windows-build-stabilization.test.js` for wrapper classification and Windows workflow contract assertions
+- broader `npm run verify` aggregation to keep workflow-baseline validation in the main repository gate
+
+## 23. Context map
+### Proposed
+- `BuildPrismaBootstrap -> PlatformRuntimeGovernance` through `npm run build`
+- `PlatformRuntimeGovernance -> GitHub Actions` through `.github/workflows/windows-prisma-build.yml`
+- `PlatformRuntimeGovernance -> EvidenceDocumentationGovernance` through run metadata, summary expectations, artifact expectations, and final verdict capture
+- `README -> EvidenceDocumentationGovernance` through repository-source-of-truth linkage
+
+## 24. Migration strategy
+### Proposed
+1. keep the guarded Prisma wrapper as the build contract
+2. preserve the hardened root workflow and mirrored baseline contract
+3. preserve local validation and characterization coverage
+4. preserve the documented rerun/workflow evidence already captured for the hardened workflow version
+5. update the evidence document and architecture-facing docs again only if future Windows/Prisma behavior materially changes
+6. preserve the current verdict `estabilizado con evidencia CI` unless new evidence justifies downgrading it
+
+## 25. Forbidden dependencies
+### Proposed
+- treating historical successful runs alone as sufficient when no documented `workflow_dispatch` run or rerun exists
+- removing the explicit failure gate in a way that allows false-success workflow results
+- reporting the repository as stabilized without documented evidence in `docs/prisma-windows-stability-evidence.md`
+- expanding this closeout cycle into unrelated production refactors
+
+## 26. Architectural decisions
+### Proposed
+- **ADR-P01**: the root workflow `.github/workflows/windows-prisma-build.yml` is the executable source for real Windows Prisma CI evidence
+- **ADR-P02**: the mirrored workflow in `inventory-api/.github/workflows/windows-prisma-build.yml` remains a contract/reference baseline and should mirror the governed workflow shape
+- **ADR-P03**: workflow summary publication, build-log artifact upload, and an explicit failure gate are mandatory parts of the Windows evidence contract
+- **ADR-P04**: the repository source of truth for this risk is `docs/prisma-windows-stability-evidence.md`
+- **ADR-P05**: current closeout status is `estabilizado con evidencia CI` because the approved evidence threshold is now documented as satisfied
+
+## 27. Open decisions
+### Proposed
+- Should the mirrored app-local workflow remain duplicated long term, or should a future governance step reduce duplication while preserving the baseline contract?
+- Does the repository want an additional automation step to ingest run metadata into the evidence document, or is manual versioned documentation sufficient?
+- Should future audit closeout cycles require explicit artifact-presence assertions in local tests, or is the current workflow-shape governance enough?

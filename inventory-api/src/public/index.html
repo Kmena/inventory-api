@@ -3,36 +3,80 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Inventory API | Login</title>
+    <title>Inventori | Iniciar sesión</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
-    <main class="auth-layout">
-      <section class="card auth-card">
-        <div>
-          <p class="eyebrow">Inventory API</p>
-          <h1>Login</h1>
-          <p class="muted">Ingrese con su usuario para acceder al panel correspondiente.</p>
-        </div>
+  <body class="login-page">
+    <main class="login-shell">
+      <section class="card login-surface">
+        <section class="login-hero" aria-labelledby="login-hero-title">
+          <div class="login-hero__brand" aria-label="Inventori">
+            <span class="brand-mark" aria-hidden="true">I</span>
+            <span class="brand-name">Inventori</span>
+          </div>
 
-        <form id="login-form" class="stack-lg">
-          <label class="field">
-            <span>Usuario</span>
-            <input type="text" name="username" placeholder="root" required />
-          </label>
+          <div class="login-hero__content">
+            <p class="login-hero__eyebrow">Operacion y trazabilidad en un solo lugar</p>
+            <h1 id="login-hero-title">Controla cada movimiento de tu inventario.</h1>
+            <p class="login-hero__subtitle">Administra productos, lotes, produccion, ventas y existencias desde una plataforma diseñada para crecer con tu negocio.</p>
+            <ul class="login-benefits" aria-label="Beneficios principales de Inventori">
+              <li>Inventario en tiempo real</li>
+              <li>Produccion, ventas y compras integradas</li>
+              <li>Trazabilidad completa por lote y movimientos</li>
+            </ul>
+            <p class="login-security-note"><strong>Acceso seguro:</strong> Tus datos permanecen protegidos mediante autenticacion segura y registro de auditoria.</p>
+          </div>
 
-          <label class="field">
-            <span>Contrasena</span>
-            <input type="password" name="password" placeholder="********" required />
-          </label>
+          <div class="login-hero__art" aria-hidden="true">
+            <div class="tori-placeholder">
+              <span class="tori-placeholder__label">Espacio preparado para futura ilustracion de Tori</span>
+            </div>
+          </div>
+        </section>
 
-          <button id="login-button" type="submit">Entrar</button>
-          <p id="login-message" class="message" aria-live="polite"></p>
-        </form>
+        <section class="login-panel" aria-labelledby="login-form-title">
+          <div class="login-panel__brand" aria-label="Inventori">
+            <span class="brand-mark" aria-hidden="true">I</span>
+            <span class="brand-name">Inventori</span>
+          </div>
 
-        <div class="hint-box">
-          <p><strong>Inicial:</strong> usuario <code>root</code> / contrasena <code>root1234</code></p>
-        </div>
+          <header class="login-panel__header">
+            <h2 id="login-form-title">Bienvenido de nuevo</h2>
+            <p class="login-panel__intro">Ingresa tus credenciales para acceder a tu espacio de trabajo.</p>
+          </header>
+
+          <form id="login-form" class="login-form stack-lg">
+            <p id="login-message" class="message" aria-live="polite" role="status"></p>
+
+            <label class="field">
+              <span>Usuario</span>
+              <input
+                type="text"
+                name="username"
+                placeholder="Ingresa tu usuario"
+                autocomplete="username"
+                inputmode="text"
+                aria-describedby="login-help login-message"
+                required
+              />
+            </label>
+
+            <label class="field">
+              <span>Contrasena</span>
+              <input
+                type="password"
+                name="password"
+                placeholder="********"
+                autocomplete="current-password"
+                aria-describedby="login-help login-message"
+                required
+              />
+            </label>
+
+            <button id="login-button" type="submit">Iniciar sesión</button>
+            <p id="login-help" class="auth-help">¿Tienes problemas para ingresar? Contacta al administrador de tu empresa.</p>
+          </form>
+        </section>
       </section>
     </main>
 

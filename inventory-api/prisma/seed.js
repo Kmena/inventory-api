@@ -81,6 +81,39 @@ function getBcryptRounds() {
   return Number.isFinite(rounds) && rounds > 0 ? rounds : 12;
 }
 
+const seedPasswordEnvByUser = {
+  root: 'SEED_ROOT_PASSWORD',
+  admin: 'SEED_ADMIN_PASSWORD',
+  sales: 'SEED_SALES_PASSWORD',
+  salesAgent: 'SEED_SALES_AGENT_PASSWORD',
+  salesSupervisor: 'SEED_SALES_SUPERVISOR_PASSWORD',
+  warehouse: 'SEED_WAREHOUSE_PASSWORD',
+};
+
+function readSeedPasswords() {
+  const missingVariables = [];
+  const passwords = {};
+
+  for (const [userKey, envName] of Object.entries(seedPasswordEnvByUser)) {
+    const password = process.env[envName]?.trim();
+    if (!password) {
+      missingVariables.push(envName);
+      continue;
+    }
+
+    passwords[userKey] = password;
+  }
+
+  if (missingVariables.length > 0) {
+    throw new Error(
+      `Seed bootstrap passwords are not configured. Define the following private environment variables before running prisma:seed: ${missingVariables.join(', ')}. `
+      + 'Keep their values outside Git (for example in a private .env file or your secret manager).',
+    );
+  }
+
+  return passwords;
+}
+
 async function upsertRole(code, name) {
   return prisma.role.upsert({
     where: { code },
@@ -554,6 +587,7 @@ async function ensureSalesRoutes(companyId, usersByCode, subregionsByCode) {
 
 async function main() {
   const rounds = getBcryptRounds();
+  const seedPasswords = readSeedPasswords();
 
   const rolesByCode = {
     root: await upsertRole('root', 'Root'),
@@ -651,12 +685,12 @@ async function main() {
   await ensureWarehouses(company.id);
   const subregions = await ensureRegions(company.id);
 
-  const rootPasswordHash = await bcrypt.hash('root1234', rounds);
-  const adminPasswordHash = await bcrypt.hash('admin123', rounds);
-  const salesPasswordHash = await bcrypt.hash('ventas123', rounds);
-  const agentPasswordHash = await bcrypt.hash('agente123', rounds);
-  const supervisorPasswordHash = await bcrypt.hash('supervisor123', rounds);
-  const warehousePasswordHash = await bcrypt.hash('bodega123', rounds);
+  const rootPasswordHash = await bcrypt.hash(seedPasswords.root, rounds);
+  const adminPasswordHash = await bcrypt.hash(seedPasswords.admin, rounds);
+  const salesPasswordHash = await bcrypt.hash(seedPasswords.sales, rounds);
+  const agentPasswordHash = await bcrypt.hash(seedPasswords.salesAgent, rounds);
+  const supervisorPasswordHash = await bcrypt.hash(seedPasswords.salesSupervisor, rounds);
+  const warehousePasswordHash = await bcrypt.hash(seedPasswords.warehouse, rounds);
 
   const usersByCode = {
     root: await upsertUser({

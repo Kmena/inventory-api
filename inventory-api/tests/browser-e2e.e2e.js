@@ -108,9 +108,9 @@ function resolveBrowserLaunchOptions() {
   return { headless: true };
 }
 
-async function createBrowserPage(t) {
+async function createBrowserPage(t, options = {}) {
   const browser = await chromium.launch(resolveBrowserLaunchOptions());
-  const context = await browser.newContext();
+  const context = await browser.newContext(options);
   const page = await context.newPage();
 
   t.after(async () => {
@@ -187,7 +187,7 @@ test('browser E2E: login redirects an authenticated company admin to the executi
   await page.goto(`${baseUrl}/`);
   await page.getByLabel('Usuario').fill('admin-demo');
   await page.getByLabel('Contrasena').fill('secret-demo');
-  await page.getByRole('button', { name: 'Entrar' }).click();
+  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
   await page.waitForURL(`${baseUrl}/root/dashboard.html`);
   await page.waitForSelector('#company-name');
@@ -214,7 +214,164 @@ test('browser E2E: direct navigation to a protected executive screen redirects a
   await page.goto(`${baseUrl}/root/dashboard.html`);
   await page.waitForURL(`${baseUrl}/`);
 
-  assert.equal(await page.locator('h1').textContent(), 'Login');
+  assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');
+});
+
+test('browser E2E: login renders the form action above the fold at 1366x768', async (t) => {
+  const { server, sockets, baseUrl } = await startServer();
+  t.after(() => stopServer(server, sockets));
+
+  const page = await createBrowserPage(t, { viewport: { width: 1366, height: 768 } });
+
+  await page.goto(`${baseUrl}/`);
+  const buttonBox = await page.locator('#login-button').boundingBox();
+
+  assert.ok(buttonBox, 'login button should be rendered');
+  assert.ok(buttonBox.y + buttonBox.height <= 768, 'login button should be visible without initial vertical scroll at 1366x768');
+  assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');
+});
+
+test('browser E2E: login shows a visible authentication error and restores the form state', async (t) => {
+  const { server, sockets, baseUrl } = await startServer();
+  t.after(() => stopServer(server, sockets));
+
+  const page = await createBrowserPage(t);
+
+  await page.route(`${baseUrl}/api/auth/login`, async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: 'invalid_credentials',
+        message: 'Credenciales invalidas.',
+      }),
+    });
+  });
+
+  await page.goto(`${baseUrl}/`);
+  await page.getByLabel('Usuario').fill('usuario-invalido');
+  await page.getByLabel('Contrasena').fill('secreto-invalido');
+  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+
+  await page.waitForFunction(() => {
+    const message = globalThis.document.getElementById('login-message');
+    const button = globalThis.document.getElementById('login-button');
+    return message?.textContent?.includes('Usuario o contrasena incorrectos.') && button?.textContent === 'Iniciar sesión' && button?.disabled === false;
+  });
+
+  assert.equal(await page.locator('#login-message').textContent(), 'Usuario o contrasena incorrectos.');
+  assert.equal(await page.locator('#login-button').textContent(), 'Iniciar sesión');
+  assert.equal(await page.locator('#login-button').isDisabled(), false);
+});
+
+test('browser E2E: corrupt stored login session does not break bootstrap and is cleared before normal login continues', async (t) => {
+  const { server, sockets, baseUrl } = await startServer();
+  t.after(() => stopServer(server, sockets));
+
+  const page = await createBrowserPage(t);
+  let receivedLoginPayload = null;
+
+  await page.route(`${baseUrl}/api/auth/login`, async (route) => {
+    receivedLoginPayload = JSON.parse(route.request().postData() || '{}');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(createSession({
+        roleCode: 'admin',
+        companyId: 'cmp-corrupt',
+        fullName: 'Admin Recuperado',
+        username: 'admin-recuperado',
+      })),
+    });
+  });
+
+  await page.route(`${baseUrl}/api/companies/company/dashboard`, async (route) => {
+    assert.equal(await route.request().headerValue('authorization'), 'Bearer browser-e2e-token');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        company: {
+          name: 'Empresa Recuperada',
+          isActive: true,
+          legalId: '3-101-123456',
+          description: 'Validacion de storage corrupto.',
+          fiscalConfig: {
+            identificationNumber: '3-101-123456',
+          },
+        },
+        metrics: {
+          employeesCount: 4,
+        },
+      }),
+    });
+  });
+
+  await page.goto(`${baseUrl}/`);
+  await page.evaluate(({ storageKey }) => {
+    globalThis.localStorage.setItem(storageKey, '{sesion-corrupta');
+  }, { storageKey: STORAGE_KEY });
+
+  await page.goto(`${baseUrl}/`);
+  await page.waitForURL(`${baseUrl}/`);
+
+  assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');
+  assert.equal(await page.evaluate((storageKey) => globalThis.localStorage.getItem(storageKey), STORAGE_KEY), null);
+
+  await page.getByLabel('Usuario').fill('admin-recuperado');
+  await page.getByLabel('Contrasena').fill('secret-recuperado');
+  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+
+  await page.waitForURL(`${baseUrl}/root/dashboard.html`);
+  assert.deepEqual(receivedLoginPayload, {
+    username: 'admin-recuperado',
+    password: 'secret-recuperado',
+  });
+  assert.equal(await page.locator('#company-name').textContent(), 'Empresa Recuperada');
+});
+
+test('browser E2E: an existing warehouse session redirects immediately to the approved landing', async (t) => {
+  const { server, sockets, baseUrl } = await startServer();
+  t.after(() => stopServer(server, sockets));
+
+  const page = await createBrowserPage(t);
+  await stubWarehouseRuntimeDependencies(page);
+
+  await page.route(`${baseUrl}/api/warehouses/company`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [] }),
+    });
+  });
+
+  await page.route(`${baseUrl}/api/products`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+
+  await page.route(`${baseUrl}/api/inventory/alerts?page=1&pageSize=20`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [] }),
+    });
+  });
+
+  await seedSession(page, baseUrl, createSession({
+    roleCode: 'warehouse',
+    companyId: 'cmp-existing-warehouse',
+    username: 'warehouse-existing',
+    fullName: 'Warehouse Existing',
+    permissions: ['warehouse.access'],
+  }));
+
+  await page.goto(`${baseUrl}/`);
+  await page.waitForURL(`${baseUrl}/warehouse/products.html`);
+  assert.match(await page.locator('#welcome-message').textContent(), /Warehouse Existing/);
 });
 
 test('browser E2E: warehouse users can inspect inventory alerts and are logged out on unauthorized API responses', async (t) => {

@@ -8,14 +8,6 @@ const HTML_WITHOUT_LOCAL_SCRIPT_ALLOWED = new Set(['no-access.html']);
 
 const CRITICAL_JAVASCRIPT_RULES = [
   {
-    relativePath: 'login.js',
-    checks: [
-      { description: 'submits credentials to the login API', pattern: /fetch\('\/api\/auth\/login', \{/ },
-      { description: 'stores authenticated session in localStorage', pattern: /localStorage\.setItem\(STORAGE_KEY, JSON\.stringify\(data\)\);/ },
-      { description: 'redirects authenticated users to a role home', pattern: /window\.location\.href = getHomeForSession\(/ },
-    ],
-  },
-  {
     relativePath: 'root/index.js',
     checks: [
       { description: 'guards the root-only administrative screen', pattern: /if \(!session\?\.token \|\| session\?\.user\?\.role\?\.code !== 'root'\)/ },
@@ -25,38 +17,11 @@ const CRITICAL_JAVASCRIPT_RULES = [
     ],
   },
   {
-    relativePath: 'root/dashboard.js',
-    checks: [
-      { description: 'guards the company-admin dashboard screen', pattern: /if \(!session\?\.token \|\| session\?\.user\?\.role\?\.code !== 'admin'\)/ },
-      { description: 'uses the preferred company dashboard API', pattern: /fetch\('\/api\/companies\/company\/dashboard', \{/ },
-      { description: 'sends authenticated dashboard requests', pattern: /Authorization: `Bearer \$\{session\.token\}`/ },
-      { description: 'clears local session on logout', pattern: /localStorage\.removeItem\(STORAGE_KEY\);/ },
-    ],
-  },
-  {
     relativePath: 'root/clients.js',
     checks: [
       { description: 'reuses the shared root clients runtime helper', pattern: /const clientsShared = window\.RootClientsShared;/ },
       { description: 'builds authenticated headers through the shared helper', pattern: /const authHeaders = \(\) => clientsShared\.authHeaders\(session\);/ },
       { description: 'keeps protected document downloads behind the shared helper', pattern: /clientsShared\.downloadProtectedFile\(/ },
-      { description: 'clears local session on logout', pattern: /localStorage\.removeItem\(STORAGE_KEY\);/ },
-    ],
-  },
-  {
-    relativePath: 'warehouse/products.js',
-    checks: [
-      { description: 'guards the warehouse screen behind an authenticated warehouse-capable session', pattern: /if \(!session\?\.token \|\| !canAccessWarehouse\)/ },
-      { description: 'centralizes authenticated API access', pattern: /async function apiFetch\(url, options = \{\}\) \{/ },
-      { description: 'sends bearer authorization in warehouse API requests', pattern: /Authorization: `Bearer \$\{session\.token\}`/ },
-      { description: 'returns to login on unauthorized warehouse API responses', pattern: /if \(response\.status === 401\) \{[\s\S]*localStorage\.removeItem\(STORAGE_KEY\);[\s\S]*window\.location\.href = '\/'/ },
-    ],
-  },
-  {
-    relativePath: 'agent/workspace.js',
-    checks: [
-      { description: 'guards the agent workspace behind an authenticated company session', pattern: /if \(!session\?\.token \|\| !session\?\.user\?\.companyId\)/ },
-      { description: 'builds authenticated headers for agent requests', pattern: /function authHeaders\(\) \{/ },
-      { description: 'loads the agent dashboard through authenticated fetch', pattern: /fetch\('\/api\/agent\/dashboard', \{ headers: authHeaders\(\) \}\)/ },
       { description: 'clears local session on logout', pattern: /localStorage\.removeItem\(STORAGE_KEY\);/ },
     ],
   },
@@ -166,8 +131,79 @@ function validateHtmlAssets(filePath) {
   }
 }
 
+function validateLoginRuntimeContracts(failures) {
+  const loginSource = readSource(path.join(publicRoot, 'login.js'));
+  const loginHtmlSource = readSource(path.join(publicRoot, 'index.html'));
+
+  const loginSourceContracts = [
+    { description: 'declares the supported login storage key', snippet: 'inventory-api-auth' },
+    { description: 'declares the supported login endpoint', snippet: '/api/auth/login' },
+    { description: 'persists authenticated session in localStorage', snippet: 'localStorage.setItem(STORAGE_KEY, JSON.stringify(session));' },
+    { description: 'clears malformed stored session data defensively', snippet: 'localStorage.removeItem(STORAGE_KEY);' },
+    { description: 'keeps the approved landing resolver', snippet: 'getHomeForSession' },
+    { description: 'keeps the approved warehouse landing target', snippet: '/warehouse/products.html' },
+    { description: 'keeps the approved agent landing target', snippet: '/agent/workspace.html' },
+    { description: 'keeps the approved company-admin landing target', snippet: '/root/dashboard.html' },
+  ];
+
+  for (const contract of loginSourceContracts) {
+    if (!loginSource.includes(contract.snippet)) {
+      failures.push(`login.js: missing contract -> ${contract.description}`);
+    }
+  }
+
+  if (loginHtmlSource.includes('Acceso inicial:')) {
+    failures.push('index.html: public login still exposes default bootstrap credentials');
+  }
+}
+
+function validateRuntimeSourceContracts(relativePath, contracts, failures) {
+  const source = readSource(path.join(publicRoot, relativePath));
+
+  for (const contract of contracts) {
+    if (!source.includes(contract.snippet)) {
+      failures.push(`${relativePath}: missing contract -> ${contract.description}`);
+    }
+  }
+}
+
+function validateRootDashboardRuntimeContracts(failures) {
+  validateRuntimeSourceContracts('root/dashboard.js', [
+    { description: 'guards the company-admin dashboard screen', snippet: "session?.user?.role?.code !== 'admin'" },
+    { description: 'uses the preferred company dashboard API', snippet: "/api/companies/company/dashboard" },
+    { description: 'sends authenticated dashboard requests', snippet: 'Authorization: `Bearer ${session.token}`' },
+    { description: 'clears local session on logout', snippet: 'localStorage.removeItem(STORAGE_KEY);' },
+  ], failures);
+}
+
+function validateWarehouseProductsRuntimeContracts(failures) {
+  validateRuntimeSourceContracts('warehouse/products.js', [
+    { description: 'guards the warehouse screen behind an authenticated warehouse-capable session', snippet: 'if (!session?.token || !canAccessWarehouse)' },
+    { description: 'centralizes authenticated API access', snippet: 'async function apiFetch(url, options = {}) {' },
+    { description: 'sends bearer authorization in warehouse API requests', snippet: 'Authorization: `Bearer ${session.token}`' },
+    { description: 'returns to login on unauthorized warehouse API responses', snippet: "if (response.status === 401) {" },
+    { description: 'clears local session when warehouse API returns unauthorized', snippet: 'localStorage.removeItem(STORAGE_KEY);' },
+    { description: 'returns to the public login after unauthorized warehouse API response', snippet: "window.location.href = '/';" },
+  ], failures);
+}
+
+function validateAgentWorkspaceRuntimeContracts(failures) {
+  validateRuntimeSourceContracts('agent/workspace.js', [
+    { description: 'guards the agent workspace behind an authenticated company session', snippet: 'if (!session?.token || !session?.user?.companyId)' },
+    { description: 'builds authenticated headers for agent requests', snippet: 'function authHeaders() {' },
+    { description: 'loads the agent dashboard through authenticated fetch', snippet: "fetch('/api/agent/dashboard', { headers: authHeaders() })" },
+    { description: 'clears local session on logout', snippet: 'localStorage.removeItem(STORAGE_KEY);' },
+    { description: 'returns to the public login on logout', snippet: "window.location.href = '/';" },
+  ], failures);
+}
+
 function validateCriticalJavaScriptContracts() {
   const failures = [];
+
+  validateLoginRuntimeContracts(failures);
+  validateRootDashboardRuntimeContracts(failures);
+  validateWarehouseProductsRuntimeContracts(failures);
+  validateAgentWorkspaceRuntimeContracts(failures);
 
   for (const rule of CRITICAL_JAVASCRIPT_RULES) {
     const filePath = path.join(publicRoot, rule.relativePath);
@@ -219,4 +255,9 @@ module.exports = {
   listHtmlFiles,
   listJavaScriptFiles,
   validateCriticalJavaScriptContracts,
+  validateLoginRuntimeContracts,
+  validateRootDashboardRuntimeContracts,
+  validateWarehouseProductsRuntimeContracts,
+  validateAgentWorkspaceRuntimeContracts,
+  validateRuntimeSourceContracts,
 };
