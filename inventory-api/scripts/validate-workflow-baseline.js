@@ -33,6 +33,16 @@ const workflowRules = [
     ],
   },
   {
+    relativePath: 'windows-prisma-build.yml',
+    checks: [
+      { description: 'defines a dedicated Windows Prisma build job', pattern: /^\s{2}windows-prisma-build:\s*$/m },
+      { description: 'runs on windows-latest', pattern: /runs-on:\s+windows-latest/ },
+      { description: 'pins Node.js 20', pattern: /node-version:\s+'20'/ },
+      { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
+      { description: 'runs the guarded Prisma build on Windows', pattern: /run:\s+npm run build/ },
+    ],
+  },
+  {
     relativePath: 'browser-e2e.yml',
     checks: [
       { description: 'defines a browser-e2e job', pattern: /^\s{2}browser-e2e:\s*$/m },

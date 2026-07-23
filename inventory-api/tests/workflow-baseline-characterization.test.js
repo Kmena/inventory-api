@@ -39,6 +39,17 @@ test('production baseline documentation includes the operational smoke workflow 
   assert.match(docSource, /docker build -t inventory-api:operational-smoke \./);
 });
 
+test('windows Prisma workflow stays dedicated to npm ci plus build on windows-latest', () => {
+  const workflowSource = readWorkflow('windows-prisma-build.yml');
+
+  assert.match(workflowSource, /^\s{2}windows-prisma-build:\s*$/m);
+  assert.match(workflowSource, /runs-on:\s+windows-latest/);
+  assert.match(workflowSource, /node-version:\s+'20'/);
+  assert.match(workflowSource, /run:\s+npm ci/);
+  assert.match(workflowSource, /run:\s+npm run build/);
+  assert.doesNotMatch(workflowSource, /npm run verify/);
+});
+
 test('validate-workflow-baseline passes when the versioned workflows preserve their contracts', () => {
   const result = spawnSync('node', ['scripts/validate-workflow-baseline.js'], {
     cwd: repositoryRoot,
@@ -46,5 +57,5 @@ test('validate-workflow-baseline passes when the versioned workflows preserve th
   });
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /Validated 6 workflow baseline files/);
+  assert.match(result.stdout, /Validated 7 workflow baseline files/);
 });

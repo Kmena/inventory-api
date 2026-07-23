@@ -148,17 +148,17 @@ Ese artefacto resume:
 
 ## Quality gates versionados
 
-El repositorio incluye un workflow mínimo de GitHub Actions en:
+El repositorio versiona los siguientes workflows de baseline y gobernanza en GitHub Actions:
 
-- `.github/workflows/quality-gates.yml`
+- `.github/workflows/static-checks.yml`
+- `.github/workflows/contract-validations.yml`
+- `.github/workflows/repository-tests.yml`
+- `.github/workflows/windows-prisma-build.yml`
+- `.github/workflows/browser-e2e.yml`
+- `.github/workflows/operational-smoke.yml`
+- `.github/workflows/build-and-publish.yml`
 
-Ese workflow ejecuta el baseline reproducible de calidad sin requerir secretos de despliegue:
-
-1. `npm ci`
-2. `npm run build`
-3. `npm run verify`
-
-Su objetivo es validar instalación, generación de Prisma y los gates versionados del repositorio en `push`, `pull_request` y `workflow_dispatch`.
+En conjunto cubren instalación, generación de Prisma, validaciones de contratos, test suite, browser E2E, smoke operativo y el gate dedicado de Prisma/Windows en `push`, `pull_request` y `workflow_dispatch` según corresponda.
 
 ## CD parcial versionado sin deploy
 
@@ -170,6 +170,7 @@ Características del flujo:
 
 - se activa solo por tag `v*` o por `workflow_dispatch`
 - ejecuta `npm ci`, `npm run build` y `npm run verify` antes de empaquetar
+- el riesgo Prisma/Windows queda gobernado además por `windows-prisma-build.yml`, que ejecuta `npm ci` + `npm run build` en `windows-latest`
 - construye una imagen Docker versionada
 - publica artefactos reproducibles en GitHub Actions mediante `upload-artifact`
 - no realiza despliegue automático a ningún ambiente
@@ -189,6 +190,21 @@ Aunque el backend ya es funcional, todavia no cubre completo el alcance del PRD.
 - producción real operable con estados propios, doble aprobación, consumo, salida y merma expuesta como módulo usable
 - reportes y exportaciones como superficie runtime completa
 - cualquier otra capacidad descrita solo por PRD/ERD sin ruta, servicio y flujo runtime verificable
+
+## Bootstrap privado de seeds
+
+Las credenciales bootstrap/demo ya no viven en el repositorio.
+
+Antes de ejecutar `npm run prisma:seed`, configure de forma privada y fuera de Git estas variables de entorno:
+
+- `SEED_ROOT_PASSWORD`
+- `SEED_ADMIN_PASSWORD`
+- `SEED_SALES_PASSWORD`
+- `SEED_SALES_AGENT_PASSWORD`
+- `SEED_SALES_SUPERVISOR_PASSWORD`
+- `SEED_WAREHOUSE_PASSWORD`
+
+Use valores reales solo en archivos privados locales o en su gestor de secretos. No agregue estas credenciales a `README`, `docs/`, `prisma/seed.js` ni ningún archivo versionado.
 
 ## Estructura
 
@@ -281,7 +297,7 @@ Límites explícitos de este hardening:
 
 1. Copiar `.env.example` a `.env`
 2. Ejecutar `npm install`
-3. Ejecutar `npx prisma generate`
+3. Ejecutar `npm run prisma:generate`
 4. Ejecutar `npx prisma migrate dev --name init`
 5. Ejecutar `npm run prisma:seed`
 6. Ejecutar `npm run dev`
@@ -292,13 +308,11 @@ Si PowerShell bloquea `npm` o `npx` por politicas de ejecucion, use:
 
 ```powershell
 npm.cmd install
-npx.cmd prisma generate
+npm.cmd run prisma:generate
 npx.cmd prisma migrate dev --name init
 ```
 
-Si Prisma falla de forma intermitente en Windows con errores tipo `EPERM`, locks sobre `query_engine-windows.dll.node` o problemas al regenerar el client, siga la guía operativa dedicada:
-
-- `docs/windows-prisma-troubleshooting.md`
+Si Prisma falla de forma intermitente en Windows con errores tipo `EPERM`, locks sobre `query_engine-windows.dll.node` o problemas al regenerar el client, use el wrapper soportado del repositorio y esta mitigación local:
 
 Resumen corto de mitigación local:
 
@@ -307,16 +321,17 @@ Resumen corto de mitigación local:
 3. regenere Prisma Client con:
 
 ```powershell
-npx.cmd prisma generate
+npm.cmd run prisma:generate
 ```
 
-4. si persiste el lock, elimine el contenido temporal de `node_modules/.prisma/client` y vuelva a ejecutar `npx.cmd prisma generate`
+4. si persiste el lock, elimine el contenido temporal de `node_modules/.prisma/client` y vuelva a ejecutar `npm.cmd run prisma:generate`
 5. revise antivirus/Windows Defender/exclusiones si el DLL vuelve a quedar bloqueado
 6. solo despues reintente `npm run build`, migraciones o tests dependientes de Prisma
 
 Importante:
 
 - esta guia reduce friccion local, pero no garantiza eliminar todas las causas ambientales del file-lock
+- el repositorio ahora versiona un gate dedicado en GitHub Actions: `.github/workflows/windows-prisma-build.yml`, enfocado en `npm ci` + `npm run build` sobre `windows-latest`
 - si el problema reaparece durante validaciones, documentelo como falla ambiental y no lo atribuya automaticamente al cambio funcional en curso
 
 ## Quality gates
@@ -333,12 +348,12 @@ Los scripts soportados del repositorio para validación del backend son:
 | `npm run validate:public-runtime` | gate individual | validación de sintaxis JS + referencias locales HTML en `src/public/` | Sí |
 | `npm run build` | gate individual | generación de Prisma Client requerida por runtime | Sí |
 | `npm run test` | gate individual | suites automatizadas obligatorias del backend | Sí |
-| `npm run verify` | gate agregado | ejecución fail-fast de `lint + typecheck + lint:public-runtime + validate:public-runtime + build + test` | Sí |
+| `npm run verify` | gate agregado | ejecución fail-fast de `lint + typecheck + lint:public-runtime + validate:public-runtime + validate:workflow-baseline + validate:operational-readiness + build + test` | Sí |
 | `npm run validate:agent-workspace` | diagnóstico | validación adicional de workspace/agente fuera del gate obligatorio | No |
 
 Reglas de uso del contrato actual:
 
-- `verify` reutiliza exactamente los mismos scripts obligatorios definidos de forma individual.
+- `verify` reutiliza exactamente los mismos scripts obligatorios definidos de forma individual, incluyendo `validate:workflow-baseline` y `validate:operational-readiness`.
 - `src/public` ya no depende solo del gate sintáctico: queda cubierto además por `lint:public-runtime` y por validación de referencias HTML locales.
 - `validate:agent-workspace` permanece como diagnóstico opcional mientras no forme parte del gate obligatorio aprobado.
 - La evidencia canónica del repositorio debe seguir ejecutándose con Node 20, aunque localmente puedan observarse otros runtimes.
@@ -463,7 +478,7 @@ npm run build
 
 Definición actual de build para este backend:
 
-- ejecuta `prisma generate`
+- ejecuta el wrapper versionado `node scripts/prisma-generate-safe.js` para generar Prisma Client
 - valida que el Prisma Client requerido por el runtime quede generado sin crear artefactos de compilación adicionales
 - corresponde al paso de preparación de runtime usado también por el `Dockerfile`
 
@@ -726,11 +741,9 @@ Notas:
 
 ## Credenciales demo
 
-- admin -> `admin` / `admin123`
-- ventas -> `ventas` / `ventas123`
-- bodega -> `bodega` / `bodega123`
+Las credenciales de bootstrap/demo ya no se versionan en el repositorio.
 
-Estas credenciales son solo para pruebas locales y seed demo.
+Para entornos controlados, configure valores privados fuera de Git mediante las variables `SEED_*_PASSWORD` antes de ejecutar `npm run prisma:seed`.
 
 ## Documentacion util
 
