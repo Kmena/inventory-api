@@ -162,8 +162,14 @@ async function verifyClientSchemaCompatibility() {
   });
 }
 
+function readAgentWorkspaceValidationPassword() {
+  const privatePassword = process.env.AGENT_WORKSPACE_VALIDATION_PASSWORD?.trim() || process.env.SEED_SALES_AGENT_PASSWORD?.trim();
+  assert(privatePassword, 'Configure AGENT_WORKSPACE_VALIDATION_PASSWORD o SEED_SALES_AGENT_PASSWORD fuera de Git antes de ejecutar validate-agent-workspace.');
+  return privatePassword;
+}
+
 async function loadAgentContext() {
-  const agentAuth = await buildAuth('agente', 'agente123');
+  const agentAuth = await buildAuth('agente', readAgentWorkspaceValidationPassword());
   const agentUser = await prisma.user.findUnique({
     where: { username: 'agente' },
     include: {
