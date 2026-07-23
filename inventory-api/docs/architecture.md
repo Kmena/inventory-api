@@ -23,7 +23,7 @@ The architecture added or clarified in this cycle is repository-governance archi
 - historical Prisma/Windows closure evidence was fragmented across specs, workflow files, and prior reports
 - a successful Windows run could be documented without a sufficiently explicit repository criterion for declaring stabilization
 - workflow evidence needed summary/artifact output without converting real build failures into false success
-- the final approved stabilization criterion still depends on at least one documented `workflow_dispatch` or rerun, which is not yet present in the repository evidence set
+- the approved stabilization criterion required at least one documented `workflow_dispatch` or rerun; that rerun evidence is now present, but the workflow duplication model still leaves maintainability risk
 - governance now exists in both the root workflow and the mirrored app-local workflow baseline, so drift remains a maintainability concern
 
 ## 4. Target architecture proposal
@@ -72,8 +72,8 @@ Boundary notes:
 - **Mirrored Workflow Baseline**: the app-local workflow copy kept for contractual alignment and repository-local governance
 - **Failure Classification**: `windows_rename_lock`, `non_retryable_failure`, `runner/environment issue`, or `success`
 - **Explicit Failure Gate**: the final workflow step that re-fails the job when the guarded build exited non-zero
-- **Residual Gobernado**: the approved status when evidence and governance exist but the full stabilization criterion is not yet satisfied
-- **Estabilizado con evidencia CI**: the approved status only when the repository evidence meets the documented threshold, including a documented `workflow_dispatch` run or rerun
+- **Residual Gobernado**: the approved fallback status when evidence and governance exist but the full stabilization criterion is not yet satisfied
+- **Estabilizado con evidencia CI**: the current approved status when the repository evidence meets the documented threshold, including a documented `workflow_dispatch` run or rerun
 
 ## 8. Domain models
 ### Proposed
@@ -209,13 +209,13 @@ Preserve and rely on the current repository-governance safety net:
 1. keep the guarded Prisma wrapper as the build contract
 2. preserve the hardened root workflow and mirrored baseline contract
 3. preserve local validation and characterization coverage
-4. capture at least one documented `workflow_dispatch` run or rerun remotely
-5. update the evidence document and architecture-facing docs again after that remote run
-6. only then reconsider the verdict for `estabilizado con evidencia CI`
+4. preserve the documented rerun/workflow evidence already captured for the hardened workflow version
+5. update the evidence document and architecture-facing docs again only if future Windows/Prisma behavior materially changes
+6. preserve the current verdict `estabilizado con evidencia CI` unless new evidence justifies downgrading it
 
 ## 25. Forbidden dependencies
 ### Proposed
-- treating historical successful runs alone as sufficient when the approved criterion still requires a documented `workflow_dispatch` run or rerun
+- treating historical successful runs alone as sufficient when no documented `workflow_dispatch` run or rerun exists
 - removing the explicit failure gate in a way that allows false-success workflow results
 - reporting the repository as stabilized without documented evidence in `docs/prisma-windows-stability-evidence.md`
 - expanding this closeout cycle into unrelated production refactors
@@ -226,10 +226,10 @@ Preserve and rely on the current repository-governance safety net:
 - **ADR-P02**: the mirrored workflow in `inventory-api/.github/workflows/windows-prisma-build.yml` remains a contract/reference baseline and should mirror the governed workflow shape
 - **ADR-P03**: workflow summary publication, build-log artifact upload, and an explicit failure gate are mandatory parts of the Windows evidence contract
 - **ADR-P04**: the repository source of truth for this risk is `docs/prisma-windows-stability-evidence.md`
-- **ADR-P05**: current closeout status remains `residual gobernado` until the approved evidence threshold is fully met
+- **ADR-P05**: current closeout status is `estabilizado con evidencia CI` because the approved evidence threshold is now documented as satisfied
 
 ## 27. Open decisions
 ### Proposed
-- When remote execution becomes available, should the next evidence-collection run be a `workflow_dispatch` or a rerun of the latest successful workflow?
 - Should the mirrored app-local workflow remain duplicated long term, or should a future governance step reduce duplication while preserving the baseline contract?
-- After a documented remote run is captured, does the repository want an additional automation step to ingest run metadata into the evidence document, or is manual versioned documentation sufficient?
+- Does the repository want an additional automation step to ingest run metadata into the evidence document, or is manual versioned documentation sufficient?
+- Should future audit closeout cycles require explicit artifact-presence assertions in local tests, or is the current workflow-shape governance enough?

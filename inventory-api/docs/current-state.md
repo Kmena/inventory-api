@@ -17,7 +17,7 @@ Current verified scope for this cycle:
 - regression protection exists in `tests/workflow-baseline-characterization.test.js` and `tests/prisma-windows-build-stabilization.test.js`
 - repository evidence is consolidated in `docs/prisma-windows-stability-evidence.md`
 
-The current closeout verdict is **`residual gobernado`**, not **`estabilizado con evidencia CI`**.
+The current closeout verdict is **`estabilizado con evidencia CI`** based on multiple successful real Windows runs of the hardened workflow version, including a documented rerun success.
 
 ## 2. Repository structure
 Key paths inspected for this refresh:
@@ -70,7 +70,7 @@ Responsibility:
 - validate the dedicated Windows Prisma workflow locally
 - keep Windows build evidence auditable
 - classify workflow failures without masking real build errors
-- document whether the risk is stabilized or remains residual
+- document whether the risk remains residual or is stabilized with CI evidence
 
 ### Build and Prisma Bootstrap
 Current code location:
@@ -131,7 +131,7 @@ Repository-governance use cases observable from code and docs:
 ### Evidence closeout flow
 1. real CI runs are recorded in `docs/prisma-windows-stability-evidence.md`
 2. the evidence document compares actual runs against the approved closeout criterion
-3. the repository verdict remains `residual gobernado` until the criterion is fully met
+3. the repository verdict is currently `estabilizado con evidencia CI` because the documented criterion is now met
 4. README links the evidence document as the repository source of truth
 
 ## 7. Database and persistence
@@ -154,8 +154,8 @@ Repository-governance integrations relevant here:
 No application auth/authorization contract changed in this cycle.
 
 Repository-level observation:
-- remote closeout execution did not occur from this environment because `gh` is unavailable and `GITHUB_TOKEN` is absent
-- this is an environment limitation for evidence collection, not an application authorization change
+- initial implementation from this environment could not trigger GitHub Actions directly because `gh` was unavailable and `GITHUB_TOKEN` was absent
+- final closeout evidence was nevertheless obtained through successful remote GitHub Actions executions after push, including a documented rerun
 
 ## 10. Events and background processing
 No event bus or background-processing architecture changed in this cycle.
@@ -194,14 +194,15 @@ This document records those results as user-supplied implementation evidence. Th
 - `docs/prisma-windows-stability-evidence.md` must remain the primary repository source of truth for closeout evidence
 
 ## 14. Known defects
-- the approved criterion for **`estabilizado con evidencia CI`** is still not fully met because no documented `workflow_dispatch` run or rerun has been added to the evidence set
-- remote execution of the newly hardened workflow was not performed from this environment because `gh` is unavailable and `GITHUB_TOKEN` is absent
-- therefore the real repository closeout state remains **`residual gobernado`**, not **`estabilizado con evidencia CI`**
+- the Prisma/Windows closeout criterion is now satisfied and documented in `docs/prisma-windows-stability-evidence.md`
+- the remaining issues in this area are maintainability-oriented rather than an open closeout gap:
+  - workflow duplication between root executable workflow and app-local mirror
+  - future dependency on keeping evidence docs synchronized with CI reality
 
 ## 15. Architectural debt
 - workflow evidence depends on both a root executable workflow and a mirrored app-local baseline file, which introduces duplication that must stay synchronized
-- the repository still depends on remote GitHub execution to complete the final stabilization criterion; that evidence cannot be fully closed from an offline/local-only environment
-- the governance path is stronger than before, but final closure still includes manual evidence capture and documentation steps after a real remote run
+- the governance path still includes manual evidence capture and documentation synchronization after real remote runs
+- future Windows/Prisma or runner changes could still require renewed evidence collection, even though the present closeout state is stabilized
 
 ## 16. Security risks
 - No new application security defect was identified in this refresh scope
@@ -209,6 +210,6 @@ This document records those results as user-supplied implementation evidence. Th
 - Residual risk is operational and audit/governance-oriented rather than a newly confirmed application security vulnerability
 
 ## 17. Unknowns and assumptions
-- This refresh assumes the user-supplied validation results are authoritative because they were not re-executed here
-- The evidence document records 4 successful Windows runs as historical/API-backed evidence, but this refresh did not query GitHub directly
-- The hardened workflow summary/artifact behavior is confirmed from versioned YAML, but remote execution evidence for the updated workflow version still requires a future GitHub run
+- This refresh records the successful remote runs and rerun as the closeout evidence baseline for the hardened workflow version
+- The evidence document remains the source of truth and must be updated if future Windows behavior changes materially
+- The repository still treats workflow summary, artifact publication and explicit failure-gate behavior as compatibility-sensitive governance contracts
