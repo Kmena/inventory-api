@@ -9,30 +9,47 @@
   <body>
     <main class="auth-layout">
       <section class="card auth-card">
-        <div>
+        <header class="auth-card__header">
           <p class="eyebrow">Inventory API</p>
           <h1>Login</h1>
-          <p class="muted">Ingrese con su usuario para acceder al panel correspondiente.</p>
-        </div>
+          <p class="muted">Accede con tu usuario para ir a tu panel de trabajo.</p>
+        </header>
 
         <form id="login-form" class="stack-lg">
+          <p id="login-message" class="message" aria-live="polite" role="status"></p>
+
           <label class="field">
             <span>Usuario</span>
-            <input type="text" name="username" placeholder="root" required />
+            <input
+              type="text"
+              name="username"
+              placeholder="Ingresa tu usuario"
+              autocomplete="username"
+              inputmode="text"
+              aria-describedby="login-help login-message"
+              required
+            />
           </label>
 
           <label class="field">
             <span>Contrasena</span>
-            <input type="password" name="password" placeholder="********" required />
+            <input
+              type="password"
+              name="password"
+              placeholder="********"
+              autocomplete="current-password"
+              aria-describedby="login-help login-message"
+              required
+            />
           </label>
 
           <button id="login-button" type="submit">Entrar</button>
-          <p id="login-message" class="message" aria-live="polite"></p>
+          <p id="login-help" class="auth-help">Usa tu usuario y contrasena asignados. Si tienes problemas para ingresar, verifica tus datos.</p>
         </form>
 
-        <div class="hint-box">
-          <p><strong>Inicial:</strong> usuario <code>root</code> / contrasena <code>root1234</code></p>
-        </div>
+        <aside class="hint-box auth-hint">
+          <p><strong>Acceso seguro:</strong> Ingresa tu usuario y contrasena asignados para continuar.</p>
+        </aside>
       </section>
     </main>
 

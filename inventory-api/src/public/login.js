@@ -1,42 +1,75 @@
 const form = document.getElementById('login-form');
 const message = document.getElementById('login-message');
 const loginButton = document.getElementById('login-button');
-const STORAGE_KEY = 'inventory-api-auth';
 
-const ROLE_HOME = {
+const STORAGE_KEY = 'inventory-api-auth';
+const LOGIN_ENDPOINT = '/api/auth/login';
+const DEFAULT_LOGIN_ERROR_MESSAGE = 'No se pudo iniciar sesion. Intente de nuevo.';
+const UNEXPECTED_LOGIN_ERROR_MESSAGE = 'Ocurrio un error inesperado.';
+const LANDING_BY_ROLE = {
   root: '/root/index.html',
   warehouse: '/warehouse/products.html',
 };
 
+function clearStoredSession() {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+function readStoredSession() {
+  const serializedSession = localStorage.getItem(STORAGE_KEY);
+
+  if (!serializedSession) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(serializedSession);
+  } catch (_error) {
+    clearStoredSession();
+    return null;
+  }
+}
+
+function hasOperationalAgentPermissions(permissions) {
+  return permissions.includes('sales.routes.view.own')
+    && permissions.includes('sales.orders.create')
+    && permissions.includes('customer.activities.manage')
+    && !permissions.includes('sales.routes.assign')
+    && !permissions.includes('sales.routes.view.all');
+}
+
+function isOperationalAgentSession(session) {
+  const roleCode = session?.user?.role?.code;
+  const permissions = session?.user?.permissions || [];
+
+  return roleCode === 'sales_agent' || hasOperationalAgentPermissions(permissions);
+}
+
 function getHomeForSession(session) {
   const roleCode = session?.user?.role?.code;
   const permissions = session?.user?.permissions || [];
-  const isOperationalAgent = roleCode === 'sales_agent'
-    || (
-      permissions.includes('sales.routes.view.own')
-      && permissions.includes('sales.orders.create')
-      && permissions.includes('customer.activities.manage')
-      && !permissions.includes('sales.routes.assign')
-      && !permissions.includes('sales.routes.view.all')
-    );
 
   if (roleCode === 'root') {
     return '/root/index.html';
   }
+
   if (roleCode === 'admin' && session?.user?.companyId) {
     return '/root/dashboard.html';
   }
+
   if (roleCode === 'sales_supervisor') {
     return '/root/routes.html';
   }
+
   if (permissions.includes('warehouse.access')) {
     return '/warehouse/products.html';
   }
-  if (isOperationalAgent) {
+
+  if (isOperationalAgentSession(session)) {
     return '/agent/workspace.html';
   }
 
-  return ROLE_HOME[roleCode] || '/no-access.html';
+  return LANDING_BY_ROLE[roleCode] || '/no-access.html';
 }
 
 function getFriendlyLoginMessage(statusCode, fallbackMessage) {
@@ -52,52 +85,86 @@ function getFriendlyLoginMessage(statusCode, fallbackMessage) {
     return 'El servicio no esta disponible en este momento. Intente de nuevo en unos minutos.';
   }
 
-  return fallbackMessage || 'No se pudo iniciar sesion. Intente de nuevo.';
+  return fallbackMessage || DEFAULT_LOGIN_ERROR_MESSAGE;
 }
 
-const existingSession = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-if (existingSession?.token) {
-  window.location.href = getHomeForSession(existingSession);
-}
-
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  message.textContent = '';
+function setMessage(text, tone = 'default') {
+  message.textContent = text;
   message.className = 'message';
-  loginButton.disabled = true;
-  loginButton.textContent = 'Entrando...';
 
+  if (tone !== 'default') {
+    message.classList.add(tone);
+  }
+}
+
+function setSubmittingState(isSubmitting) {
+  loginButton.disabled = isSubmitting;
+  loginButton.textContent = isSubmitting ? 'Validando...' : 'Entrar';
+  form.setAttribute('aria-busy', isSubmitting ? 'true' : 'false');
+}
+
+function buildLoginPayload() {
   const formData = new FormData(form);
-  const payload = {
+
+  return {
     username: formData.get('username')?.toString().trim(),
     password: formData.get('password')?.toString(),
   };
+}
+
+async function parseJsonSafely(response) {
+  try {
+    return await response.json();
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function requestLogin(payload) {
+  const response = await fetch(LOGIN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await parseJsonSafely(response);
+
+  if (!response.ok) {
+    throw new Error(getFriendlyLoginMessage(response.status, data?.message));
+  }
+
+  return data;
+}
+
+function persistSession(session) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+}
+
+function redirectToSessionHome(session) {
+  window.location.href = getHomeForSession(session);
+}
+
+function restoreExistingSession() {
+  const existingSession = readStoredSession();
+  if (existingSession?.token) {
+    redirectToSessionHome(existingSession);
+  }
+}
+
+restoreExistingSession();
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  setMessage('Validando acceso...');
+  setSubmittingState(true);
 
   try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    let data = null;
-    try {
-      data = await response.json();
-    } catch (_error) {
-      data = null;
-    }
-
-    if (!response.ok) {
-      throw new Error(getFriendlyLoginMessage(response.status, data?.message));
-    }
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    window.location.href = getHomeForSession(data);
+    const session = await requestLogin(buildLoginPayload());
+    persistSession(session);
+    redirectToSessionHome(session);
   } catch (error) {
-    message.textContent = error.message || 'Ocurrio un error inesperado.';
-    message.classList.add('error');
+    setMessage(error.message || UNEXPECTED_LOGIN_ERROR_MESSAGE, 'error');
   } finally {
-    loginButton.disabled = false;
-    loginButton.textContent = 'Entrar';
+    setSubmittingState(false);
   }
 });
