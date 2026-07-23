@@ -1,4 +1,3 @@
-// @ts-nocheck -- Prisma orderBy literals are kept explicit in JS repositories.
 const prisma = require('../lib/prisma');
 
 function userRelationsInclude() {
@@ -15,6 +14,7 @@ function userRelationsInclude() {
 }
 
 function findAllUsers(pagination = null) {
+  /** @type {{ id: 'asc' }} */
   const orderBy = { id: 'asc' };
   const include = userRelationsInclude();
   if (!pagination) {
@@ -37,6 +37,7 @@ function findAllUsers(pagination = null) {
 
 function findUsersByCompanyId(companyId, pagination = null) {
   const where = { companyId };
+  /** @type {{ id: 'asc' }} */
   const orderBy = { id: 'asc' };
   const include = userRelationsInclude();
   if (!pagination) {

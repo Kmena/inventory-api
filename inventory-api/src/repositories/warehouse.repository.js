@@ -1,4 +1,3 @@
-// @ts-nocheck -- Prisma orderBy literals are kept explicit in JS repositories.
 const prisma = require('../lib/prisma');
 
 function buildWarehouseWhere(companyId) {
@@ -6,11 +5,13 @@ function buildWarehouseWhere(companyId) {
 }
 
 function warehouseOrderBy() {
-  return [
+  /** @type {[{ isActive: 'desc' }, { warehouseType: 'asc' }, { name: 'asc' }]} */
+  const orderBy = [
     { isActive: 'desc' },
     { warehouseType: 'asc' },
     { name: 'asc' },
   ];
+  return orderBy;
 }
 
 async function buildWarehouseSummary(where) {
