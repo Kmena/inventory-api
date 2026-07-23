@@ -45,12 +45,6 @@ prisma/dev.db
 __pycache__/
 *.pyc
 
-# Docs markdown: ignore all docs/*.md except README.md
-**/docs/**/*.md
-**/docs/**/*.html
-!**/docs/**/README.md
-!inventory-api/docs/production-baseline.md
-!inventory-api/docs/production-operations-runbook.md
 plan/*
 
 */docs/*.txt

@@ -22,14 +22,6 @@ prisma/dev.db
 *.png
 .codex/*
 
-# Public repo docs policy:
-# keep only low-risk docs versioned by default.
-docs/**
-!docs/
-!docs/architecture.md
-!docs/coding-standards.md
-!docs/ui-guidelines.md
-
 # Keep the audit directory ignored in public mode.
 docs/audit/**
 
