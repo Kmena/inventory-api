@@ -1,0 +1,83 @@
+name: operational-smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  operational-smoke:
+    name: operational-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: inventory-api
+
+    env:
+      NODE_ENV: production
+      PORT: '2500'
+      DATABASE_URL: postgresql://tracksys:secure_password@db:5432/tracksys?schema=public
+      POSTGRES_DB: tracksys
+      POSTGRES_USER: tracksys
+      POSTGRES_PASSWORD: secure_password
+      CORS_ORIGIN: https://inventory.example.com
+      APP_BASE_URL: https://inventory.example.com
+      JWT_SECRET: 0123456789abcdef0123456789abcdef
+      ENV_FILE: missing.env.production
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: inventory-api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run build
+
+      - name: Validate workflow baseline
+        run: node scripts/validate-workflow-baseline.js
+
+      - name: Validate production baseline inputs
+        run: npm run validate:production-baseline
+
+      - name: Validate restore readiness evidence
+        run: npm run validate:restore-readiness
+
+      - name: Validate operational readiness evidence
+        run: npm run validate:operational-readiness
+
+      - name: Materialize temporary production env file for Compose smoke
+        shell: bash
+        run: |
+          cat > .env.production <<EOF
+          NODE_ENV=${NODE_ENV}
+          PORT=${PORT}
+          DATABASE_URL=${DATABASE_URL}
+          POSTGRES_DB=${POSTGRES_DB}
+          POSTGRES_USER=${POSTGRES_USER}
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          CORS_ORIGIN=${CORS_ORIGIN}
+          APP_BASE_URL=${APP_BASE_URL}
+          JWT_SECRET=${JWT_SECRET}
+          EOF
+
+      - name: Validate production compose syntax
+        run: docker compose -f docker-compose.prod.yml config
+
+      - name: Build production image smoke artifact
+        run: docker build -t inventory-api:operational-smoke .
+
+      - name: Clean up temporary production env file
+        if: always()
+        run: rm -f .env.production

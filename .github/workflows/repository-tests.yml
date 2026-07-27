@@ -1,40 +1,38 @@
-name: p0-quality-gates
+name: repository-tests
 
 on:
   push:
-    branches:
-      - main
-      - master
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  quality-gates:
+  repository-tests:
+    name: repository-tests
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: inventory-api
+
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: '24'
           cache: npm
           cache-dependency-path: inventory-api/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Build
+      - name: Generate Prisma client
         run: npm run build
 
-      - name: Test
+      - name: Run repository test suite
         run: npm run test

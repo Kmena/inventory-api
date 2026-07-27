@@ -1,0 +1,67 @@
+name: db-constraints-tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  db-constraints-tests:
+    name: db-constraints-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: inventory-api
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/inventory_api_constraints?schema=public
+      P2_CONSTRAINTS_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/inventory_api_constraints?schema=public
+      SEED_ROOT_PASSWORD: ci-root-password
+      SEED_ADMIN_PASSWORD: ci-admin-password
+      SEED_SALES_PASSWORD: ci-sales-password
+      SEED_SALES_AGENT_PASSWORD: ci-sales-agent-password
+      SEED_SALES_SUPERVISOR_PASSWORD: ci-sales-supervisor-password
+      SEED_WAREHOUSE_PASSWORD: ci-warehouse-password
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: inventory_api_constraints
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d inventory_api_constraints"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: inventory-api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run build
+
+      - name: Apply committed Prisma migrations
+        run: npm run prisma:apply-committed-migrations
+
+      - name: Seed CI constraints database
+        run: npm run prisma:seed
+
+      - name: Run focused DB constraints evidence
+        run: node --test tests/p2-hardening-constraints.test.js
