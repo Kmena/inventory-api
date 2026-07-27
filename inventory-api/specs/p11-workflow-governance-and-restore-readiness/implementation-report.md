@@ -31,9 +31,9 @@
   - hidden residual references to the duplicated workflow tree
   - unrelated dirty working tree files left untouched
 
-### Implemented follow-up tasks in this cycle
-- `TASK-002: Reparar el gate validate:restore-readiness y armonizar su contrato` (local validation complete; hosted `operational-smoke` rerun still pending for final closure)
-- `TASK-003: Consolidar documentación, trazabilidad y evidencia de cierre` (documentation updated; final closure still depends on the same pending hosted review)
+### Completed follow-up tasks in this cycle
+- `TASK-002: Reparar el gate validate:restore-readiness y armonizar su contrato`
+- `TASK-003: Consolidar documentación, trazabilidad y evidencia de cierre`
 
 ## 5. Files changed
 ### Task 001
@@ -104,6 +104,7 @@
 - `npm run typecheck`
 - `npm run build`
 - `git diff --check`
+- hosted `operational-smoke` run `30288569602`
 
 ## 10. Validation results
 ### Passed
@@ -135,16 +136,15 @@
 - During TASK-002, validation revealed an additional root-path defect in `scripts/validate-operational-readiness.js`; this was corrected as part of the same operational workflow execution path because the deleted local workflow YAML exposed the stale path.
 
 ## 14. Remaining risks
-- Hosted `operational-smoke` still needs a fresh run to prove no second independent failure remains after the missing-script repair.
 - `validate:operational-readiness` still depends on optional `internal-docs/` overlays for some checks, unlike the now-public restore-readiness contract.
-- A fresh hosted rerun of `operational-smoke` is still the remaining hosted proof point for this repaired path.
 
 ## 15. Manual validation
 - Local command-level validation confirmed `validate:restore-readiness` and `validate:operational-readiness` both execute successfully from `inventory-api/`.
+- Hosted `operational-smoke` run `30288569602` completed successfully for commit `b278606c89c17435e8be25d605121a37f8bb960a`.
 
 ## 16. Next executable task
-- Complete hosted rerun/review of `operational-smoke` to close TASK-002 and TASK-003 from `Implemented` to `Completed`.
-- Recommended later follow-up only if separately approved: optional convergence of `validate:operational-readiness` onto public `docs/` artifacts.
+- No remaining pending task inside this approved spec.
+- Recommended later follow-up only if separately approved: converge `validate:operational-readiness` onto public `docs/` artifacts.
 
 ## 17. Post-implementation audit
 - Delegated agent: `baseline-audit-agent`
@@ -160,7 +160,7 @@
   - `validate:operational-readiness` still depends partly on optional `internal-docs/` overlays;
   - large unrelated service modules remain general maintainability hotspots outside this feature.
 - Warning required by process:
-  - the audit score remains below the required `9.5/10` threshold, so the implementation is not claimable as fully closed at the audit target and still carries documented governance debt.
+  - the audit score remains below the required `9.5/10` threshold, so the implementation is completed and validated but still carries documented governance debt below the audit target.
 
 ## 18. Architecture documentation refresh
 - Delegated agent: `hdd-architecture-agent`

@@ -41,7 +41,7 @@
 **Risk:** Medium
 
 ## TASK-002: Reparar el gate validate:restore-readiness y armonizar su contrato
-**Status:** Implemented
+**Status:** Completed
 **Completed at:** 2026-07-27
 **Priority:** High
 **Domain:** Operational governance
@@ -80,12 +80,12 @@
 - `npm run lint`
 - `npm run typecheck`
 - `npm run build`
-**Pending validation to reach Completed:**
-- hosted rerun/review of `operational-smoke`
+**Hosted validation evidence:**
+- `operational-smoke` run `30288569602` ✅
 **Risk:** Medium
 
 ## TASK-003: Consolidar documentación, trazabilidad y evidencia de cierre
-**Status:** Implemented
+**Status:** Completed
 **Completed at:** 2026-07-27
 **Priority:** Medium
 **Domain:** Architecture/documentation governance
@@ -114,6 +114,6 @@
 **Validation evidence:**
 - documentation review
 - `git diff --check`
-**Pending validation to reach Completed:**
-- hosted rerun/review of `operational-smoke` so final closure evidence matches the repaired contract
+**Hosted validation evidence:**
+- `operational-smoke` run `30288569602` ✅
 **Risk:** Low
