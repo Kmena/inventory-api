@@ -17,8 +17,9 @@ La prioridad principal de este substream es que la migración a Node.js 24 LTS n
 1. **Node 24 baseline alignment accepted:** `package.json`, `Dockerfile`, workflows y validadores quedaron alineados a Node 24.
 2. **No dependency upgrade required:** no fue necesario actualizar `prisma` ni `@prisma/client`; el alcance se mantuvo en la opción menos invasiva aprobada.
 3. **Prisma constructor issue isolated as non-reproducible on clean baseline:** tras `npm ci` + `npm run build` + reruns en Node `v24.16.0`, no se reprodujo `TypeError: PrismaClient is not a constructor`.
-4. **Windows rename-lock remains baseline behavior:** el wrapper siguió manejando el `EPERM` conocido con cleanup + retry exitoso; no apareció una regresión Node 24 distinta.
-5. **Full closure still pending:** browser E2E y Docker build ya quedaron validados localmente; la única evidencia pendiente para cerrar `TASK-004` y `TASK-005` es un run hospedado del workflow Windows sobre la revisión actualizada a Node 24.
+4. **Windows rename-lock remains baseline behavior:** el wrapper siguió manejando el `EPERM` conocido con cleanup + retry; no apareció una regresión Node 24 distinta.
+5. **Hosted closure evidence completed:** el workflow oficial `windows-prisma-build` del root corrió exitosamente en Node 24 (`30281935398`, job `90030223669`) y quedó acompañado por runs exitosos de `static-checks`, `db-constraints-tests`, `contract-validations`, `repository-tests` y `browser-e2e`.
+6. **Official workflow location clarified:** GitHub Actions hospedado toma como fuente oficial `/.github/workflows/`; las copias en `inventory-api/.github/workflows/` permanecen como fixtures de validación local hasta nueva decisión aprobada.
 
 ## Resolved open questions
 ### OQ-001
@@ -39,4 +40,4 @@ La prioridad principal de este substream es que la migración a Node.js 24 LTS n
 ## Rejected alternatives
 - Actualizar solo `engines.node` sin tocar Docker y workflows.
 - Forzar upgrades de Prisma sin necesidad reproducible.
-- Declarar cerrado el substream sin evidencia adicional de browser/Docker/Windows hospedado.
+- Declarar el substream como si el source-of-truth de workflows siguiera dentro de `inventory-api/.github/workflows/` cuando el path oficial hospedado ya es `/.github/workflows/`.

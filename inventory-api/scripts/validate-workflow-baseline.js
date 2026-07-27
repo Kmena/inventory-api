@@ -1,8 +1,21 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const repositoryRoot = path.join(__dirname, '..');
-const workflowsDirectory = path.join(repositoryRoot, '.github', 'workflows');
+const applicationRoot = path.join(__dirname, '..');
+const hostedRepositoryRoot = path.resolve(applicationRoot, '..');
+
+function resolveOfficialWorkflowDirectory() {
+  const rootWorkflowDirectory = path.join(hostedRepositoryRoot, '.github', 'workflows');
+  const rootApplicationDirectory = path.join(hostedRepositoryRoot, 'inventory-api');
+
+  if (fs.existsSync(rootWorkflowDirectory) && fs.existsSync(path.join(rootApplicationDirectory, 'package.json'))) {
+    return rootWorkflowDirectory;
+  }
+
+  return path.join(applicationRoot, '.github', 'workflows');
+}
+
+const workflowsDirectory = resolveOfficialWorkflowDirectory();
 
 const workflowRules = [
   {
@@ -89,6 +102,18 @@ const workflowRules = [
       { description: 'builds the production image without deploy', pattern: /docker build -t inventory-api:operational-smoke \./ },
     ],
   },
+  {
+    relativePath: 'p0-quality-gates.yml',
+    checks: [
+      { description: 'defines a quality-gates job', pattern: /^\s{2}quality-gates:\s*$/m },
+      { description: 'pins Node.js 24 for the legacy P0 gate', pattern: /node-version:\s+24/ },
+      { description: 'executes from inventory-api as the working directory', pattern: /working-directory:\s+inventory-api/ },
+      { description: 'runs lint in the legacy P0 gate', pattern: /run:\s+npm run lint/ },
+      { description: 'runs typecheck in the legacy P0 gate', pattern: /run:\s+npm run typecheck/ },
+      { description: 'runs build in the legacy P0 gate', pattern: /run:\s+npm run build/ },
+      { description: 'runs repository tests in the legacy P0 gate', pattern: /run:\s+npm run test/ },
+    ],
+  },
 ];
 
 function read(relativePath) {
@@ -126,4 +151,5 @@ if (require.main === module) {
 
 module.exports = {
   workflowRules,
+  workflowsDirectory,
 };

@@ -19,9 +19,11 @@ A new failure classified as `windows_rename_lock` during the same closeout cycle
 
 ## 3. Workflow under governance
 - Executable workflow: `.github/workflows/windows-prisma-build.yml`
+- Hosted workflow source of truth: repository-root `/.github/workflows/`
 - Reference/baseline mirror: `inventory-api/.github/workflows/windows-prisma-build.yml`
+- Local validator/test resolution: root official workflow tree first, with fallback to the application-local mirror only when the root hosted layout is unavailable
 - Guarded build command: `npm run build`
-- Node version: `20`
+- Node version: `24`
 - Runner: `windows-latest`
 
 ## 4. Failure classification taxonomy
@@ -44,6 +46,7 @@ The wrapper remains responsible for explicit retryable vs non-retryable Prisma c
 | `30043423266` | `89328614862` | `push` | `1` | `login-guidelines-alignment` | `f1ab9a26842a36e98aa4f042128d88c484e37a28` | `2026-07-23T20:45:22Z` | `success` | Hardened workflow version validated remotely after push |
 | `30043427099` | `89328625061` | `pull_request` | `1` | `login-guidelines-alignment` | `f1ab9a26842a36e98aa4f042128d88c484e37a28` | `2026-07-23T20:45:24Z` | `success` | Hardened workflow version validated remotely on PR execution |
 | `30043427099` | `89330039291` | `pull_request` | `2` | `login-guidelines-alignment` | `f1ab9a26842a36e98aa4f042128d88c484e37a28` | `2026-07-23T20:45:24Z` | `success` | Documented rerun of the hardened workflow with 1 artifact published |
+| `30281935398` | `90030223669` | `push` | `1` | `34-p11-extrenal-audit-fix` | `24106ee8fae3e5a21197e3a6494261e08e0ee8d7` | `2026-07-27T15:50:57Z` | `success` | Root-official workflow aligned to Node 24; Jobs API confirms `Set up Node.js 24` and artifact `windows-prisma-build-log-30281935398` |
 
 ## 6. Current conclusion
 ### Verdict
@@ -55,7 +58,8 @@ The repository now has:
 1. more than **3 real successful Windows workflow executions**;
 2. remote validation of the **hardened workflow version** on commit `f1ab9a26842a36e98aa4f042128d88c484e37a28`;
 3. a **documented rerun** (`run_attempt=2`) for run `30043427099` that completed successfully;
-4. no documented new failure classified as `windows_rename_lock` during this closeout cycle.
+4. a newer root-official success run (`30281935398`) that confirms the executable hosted workflow is now on Node 24;
+5. no documented new failure classified as `windows_rename_lock` during this closeout cycle.
 
 Based on the approved criterion, the current evidence is sufficient to classify the risk as **`estabilizado con evidencia CI`**.
 
@@ -67,8 +71,8 @@ The hardened workflow has now been remotely validated as publishing or supportin
 
 ## 8. How to preserve the closeout safely
 1. Keep `.github/workflows/windows-prisma-build.yml` as the executable source of truth.
-2. Keep `inventory-api/.github/workflows/windows-prisma-build.yml` aligned as the baseline mirror.
-3. Preserve `npm run validate:workflow-baseline` and the workflow characterization tests.
+2. Keep `inventory-api/.github/workflows/windows-prisma-build.yml` aligned as the baseline mirror while the duplicated workflow-tree model remains in place.
+3. Preserve `npm run validate:workflow-baseline` and the workflow characterization tests, which now resolve the root official workflow tree first and validate 9 workflows including `p0-quality-gates.yml` when the root hosted layout is present.
 4. If a future run produces `windows_rename_lock`, reassess whether the verdict should fall back to `residual gobernado` for that cycle.
 
 ## 9. Related repository files

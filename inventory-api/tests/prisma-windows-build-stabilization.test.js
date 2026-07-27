@@ -3,7 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const workflowPath = path.join(__dirname, '..', '.github', 'workflows', 'windows-prisma-build.yml');
+const applicationRoot = path.join(__dirname, '..');
+const hostedRepositoryRoot = path.resolve(applicationRoot, '..');
+const workflowDirectory = fs.existsSync(path.join(hostedRepositoryRoot, '.github', 'workflows'))
+  && fs.existsSync(path.join(hostedRepositoryRoot, 'inventory-api', 'package.json'))
+  ? path.join(hostedRepositoryRoot, '.github', 'workflows')
+  : path.join(applicationRoot, '.github', 'workflows');
+const workflowPath = path.join(workflowDirectory, 'windows-prisma-build.yml');
 const wrapperLibrary = require('../scripts/prisma-generate-safe-lib.js');
 
 function read(filePath) {

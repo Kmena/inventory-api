@@ -1,40 +1,36 @@
 # Risks
 
 ## 1. Residual migration risks
-- **Risk:** A fresh hosted Windows run of the updated Node 24 workflow may still surface a regression not visible in local validation.
-  - **Impact:** `TASK-004` cannot be closed confidently.
-  - **Mitigation:** push the workflow changes, trigger or wait for a hosted `windows-prisma-build` execution, and review the generated artifact/log.
+- **Risk:** A future change updates only one workflow tree (`/.github/workflows/` or `inventory-api/.github/workflows/`).
+  - **Impact:** local validation and hosted execution could diverge silently.
+  - **Mitigation:** add a parity guard or converge to a single workflow source-of-truth model in follow-up governance work.
 
 ## 2. Platform risks
-- **Risk:** Hosted Windows workflow may classify failures differently from local guarded build reruns.
-  - **Impact:** the repository may still lack final evidence separating baseline rename-lock from any hosted Node 24 regression.
-  - **Mitigation:** execute and review `windows-prisma-build` workflow artifact/log under Node 24.
+- **Risk:** The pre-existing Windows Prisma `EPERM rename-lock` issue can still appear in some environments.
+  - **Impact:** a future Windows failure may need classification before it is treated as a Node 24 regression.
+  - **Mitigation:** preserve the dedicated Windows Prisma workflow, summary, and artifact evidence path.
 
-- **Risk:** Publicly reviewable hosted runs can lag behind the local repository state.
-  - **Impact:** artifact review may only confirm the historical Node 20 workflow instead of the updated Node 24 one.
-  - **Mitigation:** treat public artifact review as insufficient when the workflow revision has not been pushed/executed yet.
-
-- **Risk:** The historical `PrismaClient is not a constructor` failure could still depend on stale generated artifacts or environment drift not recreated in the clean local rerun.
+- **Risk:** The historical `PrismaClient is not a constructor` failure could still depend on stale generated artifacts or environment drift not recreated in the clean rerun.
   - **Impact:** a future environment could still reproduce the prior issue.
-  - **Mitigation:** preserve the evidence in traceability, keep the install/build-first validation path explicit, and treat any future reproduction as an environment-specific regression requiring fresh evidence.
+  - **Mitigation:** preserve the clean install/build-first validation path and treat any future reproduction as fresh evidence requiring its own investigation.
 
 ## 3. Governance risks
-- **Risk:** Claiming the substream fully closed after only local validation.
-  - **Impact:** false closure of P0-003.
-  - **Mitigation:** keep `TASK-004` in `Implemented` and `TASK-005` pending until the remaining validations are executed.
+- **Risk:** Teams may treat the application-local workflow copies as the hosted source of truth.
+  - **Impact:** documentation and validator assumptions may drift from real hosted GitHub Actions behavior.
+  - **Mitigation:** keep the root official workflow location explicit in docs and future governance tasks.
 
 ## 4. Controlled risks already addressed
 - **Controlled risk:** Mixed Node baseline across package/Docker/workflows.
-  - **Outcome:** resolved in this cycle.
+  - **Outcome:** resolved.
 
 - **Controlled risk:** Broad dependency upgrades without need.
   - **Outcome:** avoided; no dependency changes were required.
 
 - **Controlled risk:** Browser E2E compatibility under Node 24.
-  - **Outcome:** validated successfully in this cycle.
+  - **Outcome:** validated successfully.
 
 - **Controlled risk:** Docker build compatibility on `node:24-bullseye-slim`.
-  - **Outcome:** validated successfully in this cycle.
+  - **Outcome:** validated successfully.
 
-- **Controlled risk:** New Node 24 regression being confused with Windows rename-lock baseline.
-  - **Outcome:** current evidence still supports the rename-lock as a separate known baseline issue, but hosted Node 24 proof is still pending.
+- **Controlled risk:** Missing hosted Windows evidence for the updated Node 24 workflow.
+  - **Outcome:** resolved through hosted run `30281935398` and related root-workflow evidence.
