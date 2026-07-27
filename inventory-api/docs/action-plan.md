@@ -1,13 +1,15 @@
 # Architectural Action Plan
 
 ## 1. Objective
-Preserve the implemented Node 24 baseline, keep architecture-facing documentation synchronized with the real repository state, and reduce the remaining workflow-governance drift risk created by duplicated workflow trees.
+Preserve the implemented Node 24 baseline, keep architecture-facing documentation synchronized with the real repository state, preserve root-only workflow governance, and preserve the repaired public restore-readiness contract.
 
 ## 2. Scope
 In scope after the completed Node 24 alignment:
 - preserve Node 24 runtime, Docker, and hosted workflow baseline
 - preserve hosted root workflow execution from `/.github/workflows/`
-- address the remaining governance risk created by duplicated root official workflows and application-local workflow mirror files
+- preserve root-only workflow governance from `/.github/workflows/`
+- preserve the repaired restore-readiness smoke contract used by the official operational workflow
+- preserve the current split where restore readiness is public but broader operational readiness can still use optional internal overlays
 - continue broader P11 hardening follow-up already documented in the repository
 
 ## 3. Out of scope
@@ -19,14 +21,14 @@ In scope after the completed Node 24 alignment:
 ## 4. Requirements addressed
 This plan now focuses on post-implementation governance and remaining hardening objectives:
 - `p11-node24-runtime-migration` FR-008, FR-009, FR-012, FR-016 are already satisfied and must be preserved
+- `p11-workflow-governance-and-restore-readiness` FR-001 through FR-012 are implemented and must be preserved
 - Architectural objective AO-001: maintain a trustworthy workflow source of truth after the official root workflow alignment
 - Architectural objective AO-002: keep architecture-facing docs synchronized with actual hosted workflow behavior
 
 ## 5. Current problems addressed
-- duplicated workflow governance between `/.github/workflows/` and `inventory-api/.github/workflows/`
-- duplicated workflow trees remain a maintainability risk even though local validators/tests now resolve the hosted root official workflows first
+- operational-readiness governance still mixes public docs and optional internal overlays
 - pre-existing Windows Prisma rename-lock debt
-- broader P11 hardening debt outside this runtime baseline slice
+- broader P11 hardening debt outside this runtime and workflow-governance slice
 
 ## 6. Domains affected
 - Repository/platform governance
@@ -37,26 +39,27 @@ This plan now focuses on post-implementation governance and remaining hardening 
 ## 7. Behavior to preserve
 - Node 24 baseline in `package.json`, Docker, and workflows
 - root hosted workflows executing with `working-directory: inventory-api`
-- current root-first validator/test resolution with fallback to the application-local mirror until an approved replacement exists
+- local workflow validators/tests reading the same root workflow definitions directly
 - dedicated Windows Prisma build classification and artifact publication
 - current API and browser-runtime contracts
 
 ## 8. Defects to correct
 ### High
-- no automated parity guard currently proves that root official workflows and the duplicated application-local mirror remain aligned
+- none currently identified in this completed governance slice
 
 ### Medium
-- duplicated workflow trees still create synchronization and maintainability overhead even after root-first validator/test hardening
+- operational-readiness validation still uses optional internal overlays rather than a fully public canonical artifact set
 - pre-existing Windows Prisma `EPERM` rename-lock issue remains operational debt
 
 ### Low
-- workflow-governance knowledge is distributed across scripts, tests, root workflows, application-local copies, docs, and specs
+- workflow-governance knowledge is distributed across scripts, tests, root workflows, docs, and specs
 
 ## 9. Future architectural changes
 Planned incremental changes:
-1. introduce an explicit governance rule or automation to keep root official workflows and the duplicated application-local mirror aligned;
-2. decide whether duplicated workflows remain versioned mirrors or should be replaced by a single authoritative source pattern;
-3. continue broader P11 hardening slices without reopening the completed Node 24 migration.
+1. preserve the single authoritative root workflow source already implemented;
+2. preserve the exposed and validated restore-readiness npm gate used by the official operational smoke workflow;
+3. decide in a later approved slice whether `validate:operational-readiness` should remain an optional-overlay validator or converge onto fully public docs;
+4. continue broader P11 hardening slices without reopening the completed Node 24 migration.
 
 ## 10. Database changes
 No database change is currently planned.
@@ -83,15 +86,21 @@ Future security-related governance work should:
 
 ## 14. Test strategy
 Future work should validate in this order:
-1. add characterization or parity checks before changing workflow-governance behavior further;
-2. verify the duplicated application-local mirror stays functionally aligned with the root hosted workflows;
-3. keep `validate:workflow-baseline` and related tests green while they continue resolving the root official workflow tree first;
+1. keep `validate:workflow-baseline` and related tests green against the root official workflow tree;
+2. keep `validate:restore-readiness` green as part of the operational smoke contract;
+3. preserve the documented optional-overlay behavior of `validate:operational-readiness` unless and until a later approved convergence changes it;
 4. preserve Node 24 runtime evidence on local, Docker, and hosted workflows.
 
-Evidence already recorded for the completed Node 24 baseline includes:
-- local `validate:workflow-baseline`
-- local workflow characterization tests
-- previously recorded Node 24 mainline validation across build, lint, typecheck, tests, browser E2E, validators, and Docker build
+Evidence already recorded for the completed Node 24 and workflow-governance baselines includes:
+- local `npm run build`
+- local `npm run lint`
+- local `npm run typecheck`
+- local `npm run validate:workflow-baseline`
+- local `npm run validate:restore-readiness`
+- local `npm run validate:operational-readiness`
+- local `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`
+- local `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`
+- previously recorded Node 24 mainline validation across tests, browser E2E, validators, and Docker build
 - hosted success runs `30281932831`, `30281933453`, `30281933525`, `30281935485`, `30281937000`, and `30281935398`
 
 ## 15. Migration stages
@@ -115,31 +124,38 @@ Evidence already recorded for the completed Node 24 baseline includes:
 - Align the **official root workflows** to Node 24 with `working-directory: inventory-api`
 - Record hosted GitHub Actions success evidence for the updated root workflow path
 
-### Stage 7 — Proposed
-- Add a workflow-governance parity guard or converge to a single workflow source-of-truth model
+### Stage 7 — Completed
+- Converge governance fully to the root official workflow tree and remove the duplicated application-local workflow YAML
 
-### Stage 8 — Proposed
-- Continue remaining broader P11 hardening slices unrelated to the now-complete Node 24 baseline migration
+### Stage 8 — Completed
+- Repair and document the restore-readiness smoke contract used by the official operational workflow
+- Add `docs/restore-readiness-baseline.md` as the public canonical restore-readiness baseline
+- Keep `validate:operational-readiness` on the root workflow path after the local workflow YAML removal
+
+### Stage 9 — Proposed
+- Continue remaining broader P11 hardening slices unrelated to the now-complete Node 24 and workflow-governance baselines
 
 ## 16. Risks and mitigations
 | Risk | Level | Mitigation |
 |---|---|---|
-| Root and application-local workflows drift again | High | add parity validation or converge to one source of truth |
-| A later workflow edit updates only one duplicated workflow tree | High | require documentation and tests to name the official and mirrored locations explicitly, and add parity automation |
+| Operational-readiness overlays remain partly private while restore readiness is now public | Medium | keep the residual split explicitly documented and decide later whether to migrate the remaining validator to public docs |
 | Windows Prisma build instability obscures later regressions | Medium | preserve dedicated Windows workflow classification and artifact evidence |
 | Broader P11 work accidentally reopens the Node 24 baseline question | Medium | treat Node 24 baseline as implemented and only reopen on new reproduced evidence |
 
 ## 17. Rollback or recovery strategy
 - Do not roll back Node 24 baseline without a newly reproduced critical incompatibility.
-- If workflow-governance changes create drift or break validators, revert only the governance slice and preserve the current root official workflows.
-- Keep root hosted workflows as the operational truth during any parity-refactor work.
+- If governance changes break validators, revert only the affected governance slice and preserve the current root official workflows.
+- Keep root hosted workflows as the operational truth for future governance/operational documentation changes.
 
 ## 18. Manual validation
 For future approved governance work, manually confirm:
 - root hosted workflows still execute in `inventory-api/`
 - Node setup still uses version 24
 - cache path still points to `inventory-api/package-lock.json`
-- local validators/tests still resolve the root official workflow tree first, and any fallback or mirror behavior is explicitly documented or parity-checked
+- local validators/tests still read the root official workflow tree directly
+- the restore-readiness npm command exists and matches the documented operational baseline
+- any remaining operational-readiness validator overlay behavior is explicitly documented
+- root-only workflow governance is preserved with no reintroduced application-local workflow YAML mirror
 
 ## 19. Approval status
-**Status:** Node 24 runtime migration completed and evidenced; follow-up governance work remains Proposed
+**Status:** Node 24 runtime migration completed and evidenced; root-only workflow governance and public restore-readiness follow-up implemented; remaining broader operational overlay convergence is still optional future work

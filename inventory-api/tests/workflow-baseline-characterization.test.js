@@ -4,13 +4,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const { repositoryRoot, skipIfMissing } = require('./internal-docs-optional');
+const { repositoryRoot } = require('./internal-docs-optional');
 const hostedRepositoryRoot = path.resolve(repositoryRoot, '..');
-const workflowsRoot = fs.existsSync(path.join(hostedRepositoryRoot, '.github', 'workflows'))
-  && fs.existsSync(path.join(hostedRepositoryRoot, 'inventory-api', 'package.json'))
-  ? path.join(hostedRepositoryRoot, '.github', 'workflows')
-  : path.join(repositoryRoot, '.github', 'workflows');
-const productionDocPath = path.join(repositoryRoot, 'internal-docs', 'production-baseline.md');
+const workflowsRoot = path.join(hostedRepositoryRoot, '.github', 'workflows');
+const productionDocPath = path.join(repositoryRoot, 'docs', 'production-baseline.md');
 
 function readWorkflow(name) {
   return fs.readFileSync(path.join(workflowsRoot, name), 'utf8');
@@ -30,11 +27,7 @@ test('operational smoke workflow validates production baseline inputs, compose s
   assert.doesNotMatch(workflowSource, /deploy/i);
 });
 
-test('production baseline documentation includes the operational smoke workflow and local smoke checklist', (t) => {
-  if (skipIfMissing(t, ['internal-docs/production-baseline.md'], 'internal-docs production baseline is optional in public repo mode')) {
-    return;
-  }
-
+test('production baseline documentation includes the operational smoke workflow and local smoke checklist', () => {
   const docSource = fs.readFileSync(productionDocPath, 'utf8');
 
   assert.match(docSource, /operational-smoke\.yml/);

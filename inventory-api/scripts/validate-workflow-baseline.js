@@ -3,19 +3,7 @@ const path = require('node:path');
 
 const applicationRoot = path.join(__dirname, '..');
 const hostedRepositoryRoot = path.resolve(applicationRoot, '..');
-
-function resolveOfficialWorkflowDirectory() {
-  const rootWorkflowDirectory = path.join(hostedRepositoryRoot, '.github', 'workflows');
-  const rootApplicationDirectory = path.join(hostedRepositoryRoot, 'inventory-api');
-
-  if (fs.existsSync(rootWorkflowDirectory) && fs.existsSync(path.join(rootApplicationDirectory, 'package.json'))) {
-    return rootWorkflowDirectory;
-  }
-
-  return path.join(applicationRoot, '.github', 'workflows');
-}
-
-const workflowsDirectory = resolveOfficialWorkflowDirectory();
+const workflowsDirectory = path.join(hostedRepositoryRoot, '.github', 'workflows');
 
 const workflowRules = [
   {

@@ -20,8 +20,7 @@ A new failure classified as `windows_rename_lock` during the same closeout cycle
 ## 3. Workflow under governance
 - Executable workflow: `.github/workflows/windows-prisma-build.yml`
 - Hosted workflow source of truth: repository-root `/.github/workflows/`
-- Reference/baseline mirror: `inventory-api/.github/workflows/windows-prisma-build.yml`
-- Local validator/test resolution: root official workflow tree first, with fallback to the application-local mirror only when the root hosted layout is unavailable
+- Local validator/test resolution: root official workflow tree only
 - Guarded build command: `npm run build`
 - Node version: `24`
 - Runner: `windows-latest`
@@ -71,13 +70,11 @@ The hardened workflow has now been remotely validated as publishing or supportin
 
 ## 8. How to preserve the closeout safely
 1. Keep `.github/workflows/windows-prisma-build.yml` as the executable source of truth.
-2. Keep `inventory-api/.github/workflows/windows-prisma-build.yml` aligned as the baseline mirror while the duplicated workflow-tree model remains in place.
-3. Preserve `npm run validate:workflow-baseline` and the workflow characterization tests, which now resolve the root official workflow tree first and validate 9 workflows including `p0-quality-gates.yml` when the root hosted layout is present.
-4. If a future run produces `windows_rename_lock`, reassess whether the verdict should fall back to `residual gobernado` for that cycle.
+2. Preserve `npm run validate:workflow-baseline` and the workflow characterization tests, which validate 9 root official workflows including `p0-quality-gates.yml`.
+3. If a future run produces `windows_rename_lock`, reassess whether the verdict should fall back to `residual gobernado` for that cycle.
 
 ## 9. Related repository files
 - `.github/workflows/windows-prisma-build.yml`
-- `inventory-api/.github/workflows/windows-prisma-build.yml`
 - `inventory-api/scripts/prisma-generate-safe.js`
 - `inventory-api/scripts/prisma-generate-safe-lib.js`
 - `inventory-api/scripts/validate-workflow-baseline.js`

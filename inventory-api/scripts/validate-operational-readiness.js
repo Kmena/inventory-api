@@ -5,7 +5,7 @@ const repositoryRoot = path.join(__dirname, '..');
 const { internalDocsExist, writeSkip } = require('./internal-docs-optional');
 const runbookPath = path.join(repositoryRoot, 'internal-docs', 'production-operations-runbook.md');
 const productionBaselinePath = path.join(repositoryRoot, 'internal-docs', 'production-baseline.md');
-const workflowPath = path.join(repositoryRoot, '.github', 'workflows', 'operational-smoke.yml');
+const workflowPath = path.join(repositoryRoot, '..', '.github', 'workflows', 'operational-smoke.yml');
 const loggingPath = path.join(repositoryRoot, 'src', 'lib', 'logging.js');
 const requestContextPath = path.join(repositoryRoot, 'src', 'lib', 'request-context.js');
 

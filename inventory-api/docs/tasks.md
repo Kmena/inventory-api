@@ -100,22 +100,38 @@
 **Rollback or mitigation:** If a future surface fails, reopen the compatibility task instead of rolling back documented evidence.
 **Risk:** Medium
 
-## TASK-006: Reduce workflow-governance drift between root official workflows and application-local copies
-**Status:** Proposed
+## TASK-006: Retire duplicated application-local workflow YAML and preserve root-only governance
+**Status:** Completed
+**Completed at:** 2026-07-27
 **Priority:** High
 **Domain:** CI/workflow governance
 **Requirement:** Architectural objective AO-001 workflow source-of-truth governance after root alignment
-**Reason:** The repository now has a correct official root workflow location, but governance is duplicated across root workflows and application-local copies.
-**Current problem:** Local validators/tests now resolve the official root workflow tree first, but the repository still keeps a duplicated `inventory-api/.github/workflows/` mirror. A future edit could change only one tree and leave the other stale.
-**Proposed change:** Introduce a parity guard or converge to one authoritative workflow source so local workflow validation and hosted automation cannot drift silently.
-**Affected files:** `scripts/validate-workflow-baseline.js`, `tests/workflow-baseline-characterization.test.js`, `inventory-api/.github/workflows/*`, `/.github/workflows/*`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
+**Reason:** The repository already established `/.github/workflows/` as the official source of truth; the remaining application-local workflow YAML only adds maintainability drift.
+**Current problem:** Although validators/tests already anchor to the official root workflow tree, the repository still versions duplicated YAML under `inventory-api/.github/workflows/`.
+**Proposed change:** Remove the duplicated application-local workflow YAML, update validators/tests to read the root official workflows directly, and refresh architecture-facing docs accordingly.
+**Affected files:** `scripts/validate-workflow-baseline.js`, `tests/workflow-baseline-characterization.test.js`, `tests/prisma-windows-build-stabilization.test.js`, `inventory-api/.github/workflows/*`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
 **Dependencies:** TASK-005
 **Database impact:** None
 **API impact:** None
 **Container impact:** None
 **Security impact:** Medium positive impact through stronger governance integrity
-**Acceptance criteria:** A documented and tested mechanism exists that either validates parity between root and application-local workflows or replaces the duplicate-tree model with a single approved source-of-truth pattern.
-**Required tests:** Updated workflow baseline validation plus characterization or parity coverage proving duplicated workflow trees cannot drift silently while root-first workflow resolution remains intact
-**Migration considerations:** Preserve current root hosted workflow behavior while changing governance internals.
-**Rollback or mitigation:** Revert only the governance slice if parity enforcement creates false positives or blocks normal workflow changes.
-**Risk:** High
+**Acceptance criteria:** Root workflows are the only versioned workflow definitions; validators/tests use the root tree directly; documentation no longer describes an active duplicated mirror.
+**Implemented files:** `inventory-api/scripts/validate-workflow-baseline.js`, `inventory-api/tests/workflow-baseline-characterization.test.js`, `inventory-api/tests/prisma-windows-build-stabilization.test.js`, `inventory-api/docs/current-state.md`, `inventory-api/docs/architecture.md`, `inventory-api/docs/action-plan.md`, `inventory-api/docs/tasks.md`, `inventory-api/docs/prisma-windows-stability-evidence.md`, removed `inventory-api/.github/workflows/*.yml`
+**Validation evidence:** `npm run validate:workflow-baseline`; `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`; `git diff --check`
+**Migration considerations:** Preserve current root hosted workflow behavior while removing local duplication.
+**Rollback or mitigation:** Revert only the governance slice if a hidden local reference to the deleted YAML is discovered.
+**Risk:** Medium
+
+## TASK-007: Repair restore-readiness smoke contract and publish its public baseline
+**Status:** Completed
+**Completed at:** 2026-07-27
+**Priority:** High
+**Domain:** Operational governance
+**Requirement:** Operational smoke baseline consistency after root workflow convergence
+**Reason:** `operational-smoke` invoked `npm run validate:restore-readiness` even though `package.json` did not expose that command, and the validator/tests were still split between public `docs/` and optional `internal-docs/` assumptions.
+**Current problem resolved:** The repository now exposes the npm command, validates restore readiness against public `docs/` artifacts, documents the same contract in the production baseline and runbook, and keeps `validate:operational-readiness` aligned to the root workflow path even though that validator still supports optional `internal-docs/` overlays.
+**Implemented files:** `inventory-api/package.json`, `inventory-api/scripts/validate-restore-readiness.js`, `inventory-api/scripts/validate-operational-readiness.js`, `inventory-api/tests/workflow-baseline-characterization.test.js`, `inventory-api/tests/production-baseline-characterization.test.js`, `inventory-api/tests/restore-readiness-characterization.test.js`, `inventory-api/docs/production-baseline.md`, `inventory-api/docs/restore-readiness-baseline.md`
+**Validation evidence:** `npm run build`; `npm run lint`; `npm run typecheck`; `npm run validate:workflow-baseline`; `npm run validate:restore-readiness`; `npm run validate:operational-readiness`; `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`; `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`; `git diff --check`
+**Migration considerations:** Preserve the existing `operational-smoke` workflow step while making the package/validator/docs contract real.
+**Rollback or mitigation:** Revert only the restore-readiness contract slice if a later hosted run reveals a second independent operational-smoke defect.
+**Risk:** Medium

@@ -8,6 +8,7 @@ Este documento define el baseline productivo **mínimo y verificable** soportado
 - `docker-compose.prod.yml`
 - `.env.production.example`
 - `scripts/validate-production-baseline.js`
+- `scripts/validate-restore-readiness.js`
 - `scripts/validate-operational-readiness.js`
 - `scripts/validate-workflow-baseline.js`
 - `docs/production-operations-runbook.md`
@@ -41,6 +42,7 @@ Desde `inventory-api/`:
 cp .env.production.example .env.production
 # editar .env.production
 npm run validate:production-baseline
+npm run validate:restore-readiness
 npm run validate:operational-readiness
 ```
 
@@ -85,6 +87,7 @@ Alcance del workflow:
 - `npm run build`
 - `node scripts/validate-workflow-baseline.js`
 - `npm run validate:production-baseline`
+- `npm run validate:restore-readiness`
 - `npm run validate:operational-readiness`
 - materialización temporal de `.env.production` en el runner para satisfacer `env_file` del compose smoke
 - `docker compose -f docker-compose.prod.yml config`
@@ -104,6 +107,7 @@ Desde `inventory-api/` con Docker disponible:
 cp .env.production.example .env.production
 # editar .env.production
 npm run validate:production-baseline
+npm run validate:restore-readiness
 npm run validate:operational-readiness
 docker compose -f docker-compose.prod.yml config
 docker build -t inventory-api:operational-smoke .
@@ -128,7 +132,9 @@ docker build -t inventory-api:operational-smoke .
 
 ### Restore / runbook / observabilidad mínima
 - `docs/production-operations-runbook.md` documenta backup lógico, restore validation y checklist posterior al restore.
-- `scripts/validate-operational-readiness.js` valida que el runbook, las señales de observabilidad mínima y el workflow operativo sigan presentes.
+- `docs/restore-readiness-baseline.md` define el contrato versionado mínimo y público de restore readiness.
+- `scripts/validate-restore-readiness.js` valida que el contrato público de restore readiness, el runbook y el workflow operativo sigan alineados.
+- `scripts/validate-operational-readiness.js` valida el workflow operativo root y, cuando existen, overlays opcionales bajo `internal-docs/` para señales operativas más amplias no totalmente públicas.
 - El runtime ya emite `X-Request-Id`, logging estructurado fuera de development y contexto útil de error/request.
 
 ### Persistencia
@@ -159,5 +165,6 @@ Límites explícitos del workflow:
 - No incluye TLS, reverse proxy ni certificados.
 - No incluye backups automatizados programados ni restore drill automático con datos reales persistidos.
 - No incluye observabilidad externa ni agregación de logs SaaS; sí preserva señales mínimas versionadas de health, requestId y logging estructurado.
+- El contrato público de restore readiness ya es totalmente verificable desde `docs/`, pero la validación de operational readiness más amplia todavía puede depender de overlays opcionales `internal-docs/`.
 - No reemplaza una estrategia cloud específica.
 - `docker-compose.prod.yml` es un baseline mínimo verificable, no una certificación de production-ready total.

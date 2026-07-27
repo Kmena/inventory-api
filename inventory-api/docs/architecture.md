@@ -22,8 +22,7 @@ Current implemented style is layered, not hexagonal:
 
 A current governance boundary also exists between:
 - root official workflows used by hosted GitHub Actions as the operational source of truth;
-- application-local workflow copies retained as a duplicated mirror tree;
-- local validators and characterization tests that now resolve the root official workflow tree first and only fall back to the mirror when the root hosted layout is unavailable.
+- local validators and characterization tests that read the same root workflow tree directly.
 
 ## 4. Current domain map
 Observable current runtime/governance areas:
@@ -46,17 +45,19 @@ Observable current runtime/governance areas:
 - **Prisma**: schema and migration history
 - **Embedded browser runtime**: login, root admin, warehouse, and agent flows
 - **Root workflows**: official hosted CI/CD jobs, all configured for Node 24 with `working-directory: inventory-api`, and the authoritative hosted workflow source
-- **Application-local workflow copies**: duplicated mirror files retained under `inventory-api/.github/workflows/` for local fallback/governance compatibility
+- **Restore-readiness contract**: public operational baseline artifacts under `inventory-api/docs/`, validated through `package.json` and `scripts/validate-restore-readiness.js`
+- **Operational-readiness overlay validator**: broader operational validator in `scripts/validate-operational-readiness.js` that targets the root `operational-smoke` workflow path but still treats `internal-docs/` artifacts as optional private overlays
 
 ## 6. Current dependency rules
 Observed dependency direction remains mostly:
 - routes -> services -> repositories -> Prisma
 - browser runtime -> HTTP API
-- local scripts/tests -> root workflow definitions first -> fallback mirror files, contracts, and docs
+- local scripts/tests -> root workflow definitions, contracts, and docs
 - hosted GitHub Actions -> repository-root workflow definitions -> `inventory-api/` working directory
 
 Current architectural limitation:
-- workflow governance still depends on duplicated workflow trees, so maintainability drift remains possible even though local validators now anchor to the same root workflow tree that hosted GitHub Actions executes when that tree is present.
+- workflow governance still depends on scripts, tests, docs, and workflow artifacts remaining synchronized around the root official workflow tree.
+- operational readiness and restore-readiness do not yet share a single fully public validation model because `validate:operational-readiness` still tolerates optional `internal-docs/` overlays while restore readiness now validates public `docs/` artifacts directly.
 
 ## 7. Current database ownership and transaction boundaries
 Current persistence architecture remains:
@@ -72,7 +73,9 @@ Current active contracts relevant to architecture:
 - REST-style API under `/api/*`
 - health endpoints under `/health/*`
 - browser runtime served from the same process
+- root-only GitHub Actions workflow definitions under `/.github/workflows/`
 - package scripts, GitHub Actions workflows, and validator scripts as operational repository contracts
+- `validate:restore-readiness` as a public docs-backed contract exposed via `package.json`
 
 The Node 24 baseline change preserved public runtime and API contracts.
 
@@ -100,18 +103,19 @@ Current platform baseline is Node 24 in:
 - `package.json` engines
 - `Dockerfile` base image
 - repository-root workflow Node setup steps
-- workflow-governance validators/tests that read the root official workflow tree first and fall back to the application-local mirror when needed
+- workflow-governance validators/tests that read the root official workflow tree directly
 
 ## 11. Current testing strategy
 Current implemented testing posture:
 - repository-level scripts for lint, typecheck, build, test, and verify
 - broad `tests/` suite mixing characterization, governance, service, integration, browser E2E, and optional/environment-gated checks
-- workflow-governance characterization based on the root official workflow tree first, with fallback to `inventory-api/.github/workflows/` when the root hosted layout is absent
+- workflow-governance characterization based on the root official workflow tree
+- restore-readiness characterization now anchored to public docs artifacts under `inventory-api/docs/`
 - hosted GitHub Actions evidence now confirms the root official workflow path on Node 24
 
-Current Node 24 evidence in effect:
-- local validation executed for workflow baseline and Windows workflow characterization
-- previously recorded local/mainline Node 24 suite includes build, lint, typecheck, focused Prisma regression, aggregate tests, browser E2E, runtime validators, and Docker build
+Current Node 24 and workflow-governance evidence in effect:
+- reported local validation executed for `build`, `lint`, `typecheck`, `validate:workflow-baseline`, `validate:restore-readiness`, `validate:operational-readiness`, and the focused workflow/restore characterization suites
+- previously recorded local/mainline Node 24 suite includes focused Prisma regression, aggregate tests, browser E2E, runtime validators, and Docker build
 - hosted runs succeeded for `static-checks`, `db-constraints-tests`, `contract-validations`, `repository-tests`, `browser-e2e`, and `windows-prisma-build`
 
 ## 12. Active architectural decisions
@@ -122,19 +126,19 @@ Currently implemented or actively governing decisions:
 - keep a dedicated Windows Prisma workflow and artifact trail
 - keep Node 24 as the active runtime baseline across package, Docker, and hosted workflows
 - treat repository-root `/.github/workflows/` as the official hosted workflow source
-- keep `inventory-api/.github/workflows/` as a duplicated fallback/mirror tree for now
+- keep the duplicated application-local workflow YAML removed rather than mirrored under `inventory-api/.github/workflows/`
+- expose `validate:restore-readiness` in `package.json` and treat it as a public docs-backed repository contract
 - preserve `working-directory: inventory-api` and `cache-dependency-path: inventory-api/package-lock.json` in root hosted workflows while the application remains nested
 
 ## 13. Known architectural limitations
 - layered architecture without strict hexagonal separation
 - broad service responsibilities
-- duplicated workflow trees increase governance drift risk
-- local workflow validators reduce path drift by reading the root official tree first, but they do not yet prove parity or synchronization for every duplicated workflow file that remains under `inventory-api/.github/workflows/`
+- the broader operational-readiness contract still mixes public docs and optional private overlays, even though restore readiness is now fully public
 - incomplete typecheck coverage over the whole repository
 - Windows Prisma rename-lock remains mitigated operational debt rather than eliminated platform debt
 
 ## 14. Open decisions requiring clarification
 Open future decisions now visible:
-- whether root and application-local workflow definitions should converge to one authoritative source with generated copies, direct reuse, or a parity validator
+- whether future work should also migrate `validate:operational-readiness` fully onto public `docs/` artifacts for consistency with restore readiness
+- whether public docs should eventually absorb the current optional internal operational overlays or keep the split model intentionally
 - how far typecheck coverage should be expanded beyond the approved slices
-- whether the application-local mirror tree should remain versioned at all once a stronger parity or single-source workflow pattern is approved

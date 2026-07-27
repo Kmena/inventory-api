@@ -15,7 +15,6 @@ The `p11-node24-runtime-migration` baseline is now implemented and evidenced on 
 High-signal paths verified in this refresh:
 - repository root: `.github/workflows/`, `README.md`, `docker/`, `sql/`
 - application root: `inventory-api/package.json`, `inventory-api/Dockerfile`, `inventory-api/src/`, `inventory-api/prisma/`, `inventory-api/scripts/`, `inventory-api/tests/`, `inventory-api/docs/`, `inventory-api/specs/`
-- duplicated application-local workflow mirror: `inventory-api/.github/workflows/`
 
 Verified root official workflows:
 - `.github/workflows/static-checks.yml`
@@ -28,19 +27,16 @@ Verified root official workflows:
 - `.github/workflows/build-and-publish.yml`
 - `.github/workflows/p0-quality-gates.yml`
 
-Verified application-local workflow mirror files:
-- `inventory-api/.github/workflows/static-checks.yml`
-- `inventory-api/.github/workflows/repository-tests.yml`
-- `inventory-api/.github/workflows/db-constraints-tests.yml`
-- `inventory-api/.github/workflows/contract-validations.yml`
-- `inventory-api/.github/workflows/browser-e2e.yml`
-- `inventory-api/.github/workflows/operational-smoke.yml`
-- `inventory-api/.github/workflows/windows-prisma-build.yml`
-- `inventory-api/.github/workflows/build-and-publish.yml`
-
-Observed difference:
-- the root official workflow tree currently contains 9 workflows, including `p0-quality-gates.yml`;
-- the application-local mirrored tree currently contains 8 workflows and does not include a local `p0-quality-gates.yml` mirror.
+Verified root official workflow tree contents:
+- `static-checks.yml`
+- `repository-tests.yml`
+- `db-constraints-tests.yml`
+- `contract-validations.yml`
+- `browser-e2e.yml`
+- `operational-smoke.yml`
+- `windows-prisma-build.yml`
+- `build-and-publish.yml`
+- `p0-quality-gates.yml`
 
 ## 3. Current architecture
 Current implemented architecture remains layered:
@@ -52,8 +48,10 @@ Current implemented architecture remains layered:
 
 A second operational layer exists for repository governance:
 - root GitHub Actions workflows are the official hosted automation entry point and operational source of truth;
-- application-local workflow copies remain a duplicated mirror tree inside `inventory-api/`;
-- local validators and characterization tests now resolve the root official workflow tree first when it is available and fall back to the application-local mirror only when the hosted-root layout is not present.
+- the previously duplicated `inventory-api/.github/workflows/` YAML tree has been removed;
+- local validators and characterization tests read the same root official workflow tree directly;
+- restore-readiness is now exposed as a package script and validated against public versioned docs under `inventory-api/docs/`;
+- operational-readiness remains a separate validator that still accepts optional `internal-docs/` overlays when those private artifacts are present.
 
 Strict hexagonal boundaries are still not implemented.
 
@@ -76,7 +74,7 @@ Examples still implemented:
 - retrieve authenticated context via `/api/auth/me`
 - manage companies, roles, users, clients, products, warehouses, routes, orders, invoices, and payments
 - use embedded root, warehouse, and agent browser screens
-- run repository validation through `npm run lint`, `npm run typecheck`, `npm run build`, `npm test`, `npm run validate:workflow-baseline`, `npm run validate:public-runtime`, `npm run validate:operational-readiness`, `npm run validate:production-baseline`, and `npm run verify`
+- run repository validation through `npm run lint`, `npm run typecheck`, `npm run build`, `npm test`, `npm run validate:workflow-baseline`, `npm run validate:restore-readiness`, `npm run validate:public-runtime`, `npm run validate:operational-readiness`, `npm run validate:production-baseline`, and `npm run verify`
 - execute hosted quality gates from repository-root workflows with `working-directory: inventory-api`
 
 ## 6. Current data flows
@@ -89,10 +87,11 @@ Examples still implemented:
 
 ### Repository-governance flow
 1. Local scripts and tests run from `inventory-api/`.
-2. `scripts/validate-workflow-baseline.js`, `tests/workflow-baseline-characterization.test.js`, and `tests/prisma-windows-build-stabilization.test.js` resolve `/.github/workflows/` first when the repository-root hosted layout is present.
-3. Those validators/tests fall back to `inventory-api/.github/workflows/` only when the repository is running without the root hosted workflow tree.
-4. Hosted GitHub Actions run from repository root `/.github/workflows/` and use `working-directory: inventory-api` plus `cache-dependency-path: inventory-api/package-lock.json`.
-5. Evidence is recorded in workflow logs, artifacts, docs, and spec packages.
+2. `scripts/validate-workflow-baseline.js`, `tests/workflow-baseline-characterization.test.js`, and `tests/prisma-windows-build-stabilization.test.js` read `/.github/workflows/` directly.
+3. `scripts/validate-restore-readiness.js` validates `docs/production-operations-runbook.md`, `docs/production-baseline.md`, and `docs/restore-readiness-baseline.md` as the public restore-readiness contract.
+4. `scripts/validate-operational-readiness.js` reads the root `operational-smoke.yml` path but still skips cleanly unless optional `internal-docs/production-operations-runbook.md` and `internal-docs/production-baseline.md` are present.
+5. Hosted GitHub Actions run from repository root `/.github/workflows/` and use `working-directory: inventory-api` plus `cache-dependency-path: inventory-api/package-lock.json`.
+6. Evidence is recorded in workflow logs, artifacts, docs, and spec packages.
 
 ## 7. Database and persistence
 - Prisma schema remains in `inventory-api/prisma/schema.prisma`.
@@ -139,11 +138,17 @@ Current platform baseline:
 - root official workflows cache `inventory-api/package-lock.json`
 
 ## 12. Current testing strategy
-Current observable validation baseline recorded for the implemented Node 24 cycle:
-- reported local validation executed from `inventory-api/`:
+Current observable validation baseline recorded for the implemented Node 24 and workflow-governance cycles:
+- reported local validation executed from `inventory-api/` for this governance refresh:
+  - `npm run build`
+  - `npm run lint`
+  - `npm run typecheck`
   - `npm run validate:workflow-baseline`
+  - `npm run validate:restore-readiness`
+  - `npm run validate:operational-readiness`
   - `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`
-- previously recorded mainline Node 24 evidence in the feature implementation report includes successful `npm ci`, `npm run build`, `npm run lint`, `npm run typecheck`, `node --test tests/taxpayer-characterization.test.js`, `npm test -- --silent`, `npm run test:e2e:browser`, `npm run validate:public-runtime`, `npm run validate:operational-readiness`, `npm run validate:production-baseline` with required env, and `docker build -t inventory-api:node24-smoke .`
+  - `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`
+- previously recorded mainline Node 24 evidence in the feature implementation report includes successful `npm ci`, `node --test tests/taxpayer-characterization.test.js`, `npm test -- --silent`, `npm run test:e2e:browser`, `npm run validate:public-runtime`, `npm run validate:operational-readiness`, `npm run validate:production-baseline` with required env, and `docker build -t inventory-api:node24-smoke .`
 - hosted GitHub Actions evidence now exists for the official root workflows:
   - `windows-prisma-build` run `30281935398` success, job `90030223669`, including `Set up Node.js 24`
   - `static-checks` run `30281932831` success
@@ -159,19 +164,20 @@ Current observable validation baseline recorded for the implemented Node 24 cycl
 - Current Docker/runtime contract remains a single Dockerfile-based deployment with multi-stage build, non-root runtime, and readiness healthcheck.
 - Node 24 is the active runtime baseline across package, Docker, and root hosted workflows.
 - Root workflows continue to execute from repository root with `working-directory: inventory-api`.
+- Restore readiness remains a public docs-backed package contract via `npm run validate:restore-readiness`.
 - The guarded Prisma generation wrapper remains part of the build contract.
 - The dedicated Windows Prisma workflow remains separate from broader repository validation.
 
 ## 14. Known defects
-- Workflow governance is still duplicated between `/.github/workflows/` and `inventory-api/.github/workflows/`; the remaining issue is maintainability drift between duplicated workflow trees, not local validator path mismatch.
 - Local Windows Prisma generation can still encounter the pre-existing `EPERM` rename-lock path before retry succeeds.
 
 ## 15. Architectural debt
 - service-layer orchestration remains broad;
 - strict hexagonal boundaries are not implemented;
-- workflow governance is split across an official root workflow tree, a duplicated application-local mirror tree, and multiple evidence artifacts;
+- workflow governance still depends on scripts, tests, docs, and workflow artifacts that must remain synchronized around the root official workflow tree;
+- the repository now has a deliberate split between a public restore-readiness contract in `docs/` and a broader operational-readiness validator that still uses optional `internal-docs/` overlays for some non-public checks;
 - typecheck expansion remains incremental rather than exhaustive;
-- governance assurance still depends on documentation/tests plus duplicated workflow maintenance instead of a single workflow definition model.
+- governance assurance still depends on documentation/tests and operational artifacts rather than stronger central enforcement beyond the root workflow tree.
 
 ## 16. Security risks
 Current architecture-facing security concerns still visible:
@@ -180,6 +186,6 @@ Current architecture-facing security concerns still visible:
 - broader P11 hardening work outside this runtime baseline slice remains open.
 
 ## 17. Unknowns and assumptions
-- This refresh did not execute commands directly; validation status is taken from the recorded implementation evidence and the user-provided hosted workflow run metadata.
-- No evidence in this refresh contradicts the implemented Node 24 baseline.
-- A future governance decision is still required on whether to keep duplicated workflow copies or converge on a single authoritative workflow source.
+- This refresh did not execute commands directly; validation status is taken from the recorded implementation evidence and the user-provided command results.
+- No evidence in this refresh contradicts the implemented Node 24 baseline, root-only workflow governance, or the public restore-readiness contract.
+- A future documentation/governance review may still converge `validate:operational-readiness` away from optional `internal-docs/` overlays if the repository later requires a fully public operational-readiness contract.

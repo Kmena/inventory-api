@@ -1,0 +1,29 @@
+feature_name: p11-operational-readiness-public-baseline
+status: draft
+implementation_status: pending-approval
+created_by: sdd-implementation-agent-60b08e
+updated_by: sdd-implementation-agent-60b08e
+canonical_spec_dir: inventory-api/specs/p11-operational-readiness-public-baseline
+depends_on:
+  - inventory-api/specs/p11-workflow-governance-and-restore-readiness
+blocking_policy: approval-required-before-changing-operational-readiness-contract
+primary_documents:
+  requirements: requirements.md
+  current_state: current-state.md
+  architecture: architecture.md
+  implementation_plan: implementation-plan.md
+  tasks: tasks.md
+supplemental_documents:
+  domain_analysis: domain-analysis.md
+  traceability: traceability.md
+  risks: risks.md
+  decisions: decisions.md
+  advisor_review: advisor-review.md
+  changelog: changelog.md
+  implementation_report: implementation-report.md
+planning_context:
+  requested_by: user
+  source_issue_summary:
+    - converge validate:operational-readiness onto a public docs-backed contract
+    - close, correct, or document `.env.production.example` references explicitly and verifiably
+approval_required_from: human

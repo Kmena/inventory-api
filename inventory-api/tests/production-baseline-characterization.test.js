@@ -7,7 +7,7 @@ const { spawnSync } = require('node:child_process');
 const { repositoryRoot, skipIfMissing } = require('./internal-docs-optional');
 const composeProdPath = path.join(repositoryRoot, 'docker-compose.prod.yml');
 const readmePath = path.join(repositoryRoot, 'README.md');
-const productionDocPath = path.join(repositoryRoot, 'internal-docs', 'production-baseline.md');
+const productionDocPath = path.join(repositoryRoot, 'docs', 'production-baseline.md');
 
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
@@ -26,11 +26,7 @@ test('production compose baseline includes db, migrate and app services with per
   assert.match(composeSource, /condition: service_healthy/);
 });
 
-test('production baseline documentation covers validation, migrations and health checks', (t) => {
-  if (skipIfMissing(t, ['internal-docs/production-baseline.md'], 'internal-docs production baseline is optional in public repo mode')) {
-    return;
-  }
-
+test('production baseline documentation covers validation, migrations and health checks', () => {
   const docSource = read(productionDocPath);
   const readmeSource = read(readmePath);
 
@@ -69,11 +65,7 @@ test('validate-production-baseline passes with explicit production environment v
   assert.match(result.stdout, /Production baseline validation passed/);
 });
 
-test('validate-restore-readiness passes when restore contract evidence stays versioned', (t) => {
-  if (skipIfMissing(t, ['internal-docs/production-baseline.md', 'internal-docs/restore-readiness-baseline.md', 'internal-docs/production-operations-runbook.md'], 'internal-docs restore readiness artifacts are optional in public repo mode')) {
-    return;
-  }
-
+test('validate-restore-readiness passes when restore contract evidence stays versioned', () => {
   const result = spawnSync('node', ['scripts/validate-restore-readiness.js'], {
     cwd: repositoryRoot,
     encoding: 'utf8',
