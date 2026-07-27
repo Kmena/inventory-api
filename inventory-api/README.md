@@ -249,6 +249,8 @@ El repositorio incluye ahora un baseline productivo mínimo y versionado en:
 
 Flujo resumido:
 
+El archivo `.env.production.example` es parte explícita del baseline versionado y `npm run validate:production-baseline` falla si deja de estar presente.
+
 1. copiar `.env.production.example` a `.env.production`
 2. ejecutar `npm run validate:production-baseline`
 3. ejecutar `docker compose -f docker-compose.prod.yml build`

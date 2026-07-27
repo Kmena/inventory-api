@@ -1,6 +1,6 @@
 feature_name: p11-operational-readiness-public-baseline
-status: draft
-implementation_status: pending-approval
+status: approved
+implementation_status: approved
 created_by: sdd-implementation-agent-60b08e
 updated_by: sdd-implementation-agent-60b08e
 canonical_spec_dir: inventory-api/specs/p11-operational-readiness-public-baseline

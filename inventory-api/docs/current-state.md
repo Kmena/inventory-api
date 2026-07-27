@@ -11,6 +11,8 @@ Current observable implementation:
 
 The `p11-node24-runtime-migration` baseline is now implemented and evidenced on local/mainline, Docker, and hosted GitHub Actions surfaces.
 
+The follow-up `p11-operational-readiness-public-baseline` slice is also implemented: operational-readiness is now validated from public versioned docs under `inventory-api/docs/`, `.env.production.example` is explicitly treated as required baseline evidence, and no third public operational-readiness document was introduced.
+
 ## 2. Repository structure
 High-signal paths verified in this refresh:
 - repository root: `.github/workflows/`, `README.md`, `docker/`, `sql/`
@@ -50,8 +52,9 @@ A second operational layer exists for repository governance:
 - root GitHub Actions workflows are the official hosted automation entry point and operational source of truth;
 - the previously duplicated `inventory-api/.github/workflows/` YAML tree has been removed;
 - local validators and characterization tests read the same root official workflow tree directly;
-- restore-readiness is now exposed as a package script and validated against public versioned docs under `inventory-api/docs/`;
-- operational-readiness remains a separate validator that still accepts optional `internal-docs/` overlays when those private artifacts are present.
+- restore-readiness is exposed as a package script and validated against public versioned docs under `inventory-api/docs/`;
+- operational-readiness is a separate validator, but it now validates the same public `docs/` contract directly instead of depending on optional `internal-docs/` overlays;
+- the public operational-readiness contract is intentionally carried by `docs/production-baseline.md` plus `docs/production-operations-runbook.md`; no third public document was introduced in this slice.
 
 Strict hexagonal boundaries are still not implemented.
 
@@ -75,6 +78,7 @@ Examples still implemented:
 - manage companies, roles, users, clients, products, warehouses, routes, orders, invoices, and payments
 - use embedded root, warehouse, and agent browser screens
 - run repository validation through `npm run lint`, `npm run typecheck`, `npm run build`, `npm test`, `npm run validate:workflow-baseline`, `npm run validate:restore-readiness`, `npm run validate:public-runtime`, `npm run validate:operational-readiness`, `npm run validate:production-baseline`, and `npm run verify`
+- prove the public operational-readiness contract through the versioned pair `docs/production-baseline.md` + `docs/production-operations-runbook.md` together with `.env.production.example` as explicit baseline evidence
 - execute hosted quality gates from repository-root workflows with `working-directory: inventory-api`
 
 ## 6. Current data flows
@@ -89,9 +93,11 @@ Examples still implemented:
 1. Local scripts and tests run from `inventory-api/`.
 2. `scripts/validate-workflow-baseline.js`, `tests/workflow-baseline-characterization.test.js`, and `tests/prisma-windows-build-stabilization.test.js` read `/.github/workflows/` directly.
 3. `scripts/validate-restore-readiness.js` validates `docs/production-operations-runbook.md`, `docs/production-baseline.md`, and `docs/restore-readiness-baseline.md` as the public restore-readiness contract.
-4. `scripts/validate-operational-readiness.js` reads the root `operational-smoke.yml` path but still skips cleanly unless optional `internal-docs/production-operations-runbook.md` and `internal-docs/production-baseline.md` are present.
-5. Hosted GitHub Actions run from repository root `/.github/workflows/` and use `working-directory: inventory-api` plus `cache-dependency-path: inventory-api/package-lock.json`.
-6. Evidence is recorded in workflow logs, artifacts, docs, and spec packages.
+4. `scripts/validate-operational-readiness.js` reads the root `operational-smoke.yml` path and validates the public operational baseline from `docs/production-baseline.md` and `docs/production-operations-runbook.md`.
+5. `scripts/validate-production-baseline.js` requires `.env.production.example` as a versioned production-baseline artifact in addition to required runtime files and environment variables.
+6. `tests/production-baseline-characterization.test.js` asserts `.env.production.example` remains versioned and documented in both `README.md` and `docs/production-baseline.md`.
+7. Hosted GitHub Actions run from repository root `/.github/workflows/` and use `working-directory: inventory-api` plus `cache-dependency-path: inventory-api/package-lock.json`.
+8. Evidence is recorded in workflow logs, artifacts, docs, and spec packages.
 
 ## 7. Database and persistence
 - Prisma schema remains in `inventory-api/prisma/schema.prisma`.
@@ -146,6 +152,7 @@ Current observable validation baseline recorded for the implemented Node 24 and 
   - `npm run validate:workflow-baseline`
   - `npm run validate:restore-readiness`
   - `npm run validate:operational-readiness`
+  - `npm run validate:production-baseline` with explicit production environment values
   - `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`
   - `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`
 - previously recorded mainline Node 24 evidence in the feature implementation report includes successful `npm ci`, `node --test tests/taxpayer-characterization.test.js`, `npm test -- --silent`, `npm run test:e2e:browser`, `npm run validate:public-runtime`, `npm run validate:operational-readiness`, `npm run validate:production-baseline` with required env, and `docker build -t inventory-api:node24-smoke .`
@@ -165,6 +172,8 @@ Current observable validation baseline recorded for the implemented Node 24 and 
 - Node 24 is the active runtime baseline across package, Docker, and root hosted workflows.
 - Root workflows continue to execute from repository root with `working-directory: inventory-api`.
 - Restore readiness remains a public docs-backed package contract via `npm run validate:restore-readiness`.
+- Operational readiness remains a public docs-backed package contract via `npm run validate:operational-readiness` and no longer uses optional private overlays for the public gate.
+- `.env.production.example` remains an explicit required production-baseline artifact.
 - The guarded Prisma generation wrapper remains part of the build contract.
 - The dedicated Windows Prisma workflow remains separate from broader repository validation.
 
@@ -175,7 +184,7 @@ Current observable validation baseline recorded for the implemented Node 24 and 
 - service-layer orchestration remains broad;
 - strict hexagonal boundaries are not implemented;
 - workflow governance still depends on scripts, tests, docs, and workflow artifacts that must remain synchronized around the root official workflow tree;
-- the repository now has a deliberate split between a public restore-readiness contract in `docs/` and a broader operational-readiness validator that still uses optional `internal-docs/` overlays for some non-public checks;
+- operational readiness still depends on synchronization between scripts, tests, workflows, README, `.env.production.example`, and public docs, even though it no longer depends on optional `internal-docs/` overlays;
 - typecheck expansion remains incremental rather than exhaustive;
 - governance assurance still depends on documentation/tests and operational artifacts rather than stronger central enforcement beyond the root workflow tree.
 
@@ -187,5 +196,5 @@ Current architecture-facing security concerns still visible:
 
 ## 17. Unknowns and assumptions
 - This refresh did not execute commands directly; validation status is taken from the recorded implementation evidence and the user-provided command results.
-- No evidence in this refresh contradicts the implemented Node 24 baseline, root-only workflow governance, or the public restore-readiness contract.
-- A future documentation/governance review may still converge `validate:operational-readiness` away from optional `internal-docs/` overlays if the repository later requires a fully public operational-readiness contract.
+- No evidence in this refresh contradicts the implemented Node 24 baseline, root-only workflow governance, the public restore-readiness contract, or the public operational-readiness contract.
+- `.env.production.example` is a verified contractual versioned artifact of the production baseline and should not be removed or renamed without updating README, docs, validators, and tests together.

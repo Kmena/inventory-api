@@ -129,9 +129,29 @@
 **Domain:** Operational governance
 **Requirement:** Operational smoke baseline consistency after root workflow convergence
 **Reason:** `operational-smoke` invoked `npm run validate:restore-readiness` even though `package.json` did not expose that command, and the validator/tests were still split between public `docs/` and optional `internal-docs/` assumptions.
-**Current problem resolved:** The repository now exposes the npm command, validates restore readiness against public `docs/` artifacts, documents the same contract in the production baseline and runbook, and keeps `validate:operational-readiness` aligned to the root workflow path even though that validator still supports optional `internal-docs/` overlays.
+**Current problem resolved:** The repository now exposes the npm command, validates restore readiness against public `docs/` artifacts, documents the same contract in the production baseline and runbook, and keeps `validate:operational-readiness` aligned to the root workflow path.
 **Implemented files:** `inventory-api/package.json`, `inventory-api/scripts/validate-restore-readiness.js`, `inventory-api/scripts/validate-operational-readiness.js`, `inventory-api/tests/workflow-baseline-characterization.test.js`, `inventory-api/tests/production-baseline-characterization.test.js`, `inventory-api/tests/restore-readiness-characterization.test.js`, `inventory-api/docs/production-baseline.md`, `inventory-api/docs/restore-readiness-baseline.md`
 **Validation evidence:** `npm run build`; `npm run lint`; `npm run typecheck`; `npm run validate:workflow-baseline`; `npm run validate:restore-readiness`; `npm run validate:operational-readiness`; `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`; `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`; `git diff --check`
 **Migration considerations:** Preserve the existing `operational-smoke` workflow step while making the package/validator/docs contract real.
 **Rollback or mitigation:** Revert only the restore-readiness contract slice if a later hosted run reveals a second independent operational-smoke defect.
+**Risk:** Medium
+
+## TASK-008: Converge operational-readiness to the public docs baseline and codify `.env.production.example`
+**Status:** Completed
+**Completed at:** 2026-07-27
+**Priority:** High
+**Domain:** Operational governance / Production baseline governance
+**Requirement:** `p11-operational-readiness-public-baseline` FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-009, FR-010; BR-001, BR-002, BR-003; AC-001, AC-002, AC-003, AC-004, AC-005
+**Reason:** After restore-readiness moved to public docs, the public operational-readiness gate still depended on optional private overlays and `.env.production.example` still needed explicit contractual closure.
+**Current problem resolved:** `validate:operational-readiness` now validates `docs/production-baseline.md` and `docs/production-operations-runbook.md` directly, `.env.production.example` is required by the production baseline validator and characterization tests, and the public contract converged without introducing a third operational-readiness document.
+**Implemented files:** `inventory-api/scripts/validate-operational-readiness.js`, `inventory-api/scripts/validate-production-baseline.js`, `inventory-api/tests/production-baseline-characterization.test.js`, `inventory-api/docs/production-baseline.md`, `inventory-api/docs/production-operations-runbook.md`, `inventory-api/README.md`, `inventory-api/docs/current-state.md`, `inventory-api/docs/architecture.md`, `inventory-api/docs/action-plan.md`, `inventory-api/docs/tasks.md`, `inventory-api/specs/p11-operational-readiness-public-baseline/*`
+**Dependencies:** TASK-007
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Medium positive governance impact through auditable public readiness evidence and explicit baseline-artifact validation
+**Acceptance criteria:** Operational-readiness validates public `docs/` artifacts without `internal-docs/` prerequisites; `.env.production.example` remains versioned, documented, and validator-covered; README and public docs describe the same operational-readiness contract; no third public operational-readiness document is required.
+**Required tests:** `npm run validate:operational-readiness`; `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`; `npm run validate:production-baseline` with explicit production environment values; `npm run lint`; `npm run typecheck`; `npm run build`
+**Migration considerations:** Preserve the existing `operational-smoke` workflow path and Node 24 baseline while shifting the gate to public repository artifacts only.
+**Rollback or mitigation:** Revert only this governance slice if a later approved change demonstrates that the two-document public contract is insufficient.
 **Risk:** Medium

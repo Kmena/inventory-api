@@ -98,10 +98,14 @@ Given la revisión final del spec When se inspeccione la trazabilidad Then el tr
 - La convergencia de `validate:operational-readiness` a `docs/` es técnicamente viable sin cambiar comportamiento funcional del runtime.
 - `internal-docs/` puede seguir existiendo como overlay opcional, pero no debería seguir siendo prerrequisito del gate público.
 
-## 11. Open questions
+## 11. Resolved question
 ### OQ-001
-¿`validate:operational-readiness` debe validar exactamente los mismos documentos públicos que hoy usa restore readiness, o necesita un documento público adicional específico para observabilidad/hardening operativo?
-- Recomendación: reutilizar y extender `docs/production-baseline.md` y `docs/production-operations-runbook.md` solo si basta; crear un artefacto público adicional solo si el contrato queda demasiado difuso.
+**Decision provided by human direction:** `validate:operational-readiness` debe apoyarse inicialmente en los mismos dos documentos públicos base, `docs/production-baseline.md` y `docs/production-operations-runbook.md`.
+
+**Create a third public document only if implementation reveals one of these signals:**
+- el validador necesita reglas operativas que no caben claramente en los 2 docs actuales;
+- observabilidad, hardening y readiness quedan mezclados de forma confusa;
+- los tests/documentación terminan demasiado ambiguos para auditar.
 
 ## 12. Out of scope
 - Reestructuración completa de todos los validadores opcionales basados en `internal-docs/`.

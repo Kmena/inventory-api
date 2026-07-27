@@ -12,12 +12,15 @@ Este documento define el baseline productivo **mínimo y verificable** soportado
 - `scripts/validate-operational-readiness.js`
 - `scripts/validate-workflow-baseline.js`
 - `docs/production-operations-runbook.md`
+- `docs/restore-readiness-baseline.md`
 - `src/routes/health.routes.js`
 - `prisma/schema.prisma`
 - `.github/workflows/operational-smoke.yml`
 
 ## Variables y secretos requeridos
 Copie `.env.production.example` a `.env.production` y reemplace todos los placeholders.
+
+`.env.production.example` es un artefacto versionado del baseline productivo y `npm run validate:production-baseline` confirma que siga presente en el repositorio.
 
 Variables obligatorias del baseline:
 - `NODE_ENV=production`
@@ -120,7 +123,8 @@ docker build -t inventory-api:operational-smoke .
 
 ### Configuración de secretos / variables
 - El baseline requiere `.env.production` fuera de git.
-- La validación automatizada rechaza placeholders inseguros.
+- `.env.production.example` permanece versionado como plantilla contractual mínima del baseline.
+- La validación automatizada rechaza placeholders inseguros y confirma que el ejemplo versionado siga presente.
 
 ### Migraciones
 - El servicio `migrate` ejecuta `npm run prisma:deploy`.
@@ -134,7 +138,7 @@ docker build -t inventory-api:operational-smoke .
 - `docs/production-operations-runbook.md` documenta backup lógico, restore validation y checklist posterior al restore.
 - `docs/restore-readiness-baseline.md` define el contrato versionado mínimo y público de restore readiness.
 - `scripts/validate-restore-readiness.js` valida que el contrato público de restore readiness, el runbook y el workflow operativo sigan alineados.
-- `scripts/validate-operational-readiness.js` valida el workflow operativo root y, cuando existen, overlays opcionales bajo `internal-docs/` para señales operativas más amplias no totalmente públicas.
+- `scripts/validate-operational-readiness.js` valida el workflow operativo root junto con los documentos públicos `docs/production-baseline.md` y `docs/production-operations-runbook.md`.
 - El runtime ya emite `X-Request-Id`, logging estructurado fuera de development y contexto útil de error/request.
 
 ### Persistencia
@@ -165,6 +169,6 @@ Límites explícitos del workflow:
 - No incluye TLS, reverse proxy ni certificados.
 - No incluye backups automatizados programados ni restore drill automático con datos reales persistidos.
 - No incluye observabilidad externa ni agregación de logs SaaS; sí preserva señales mínimas versionadas de health, requestId y logging estructurado.
-- El contrato público de restore readiness ya es totalmente verificable desde `docs/`, pero la validación de operational readiness más amplia todavía puede depender de overlays opcionales `internal-docs/`.
+- El contrato público de restore readiness y operational readiness se valida desde artefactos versionados bajo `docs/`.
 - No reemplaza una estrategia cloud específica.
 - `docker-compose.prod.yml` es un baseline mínimo verificable, no una certificación de production-ready total.

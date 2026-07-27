@@ -6,6 +6,7 @@ Este runbook documenta la evidencia operativa adicional versionada que acompaña
 ## Artefactos relacionados
 - `docs/production-baseline.md`
 - `docs/restore-readiness-baseline.md`
+- `.env.production.example`
 - `docker-compose.prod.yml`
 - `Dockerfile`
 - `scripts/validate-production-baseline.js`
@@ -18,6 +19,7 @@ Este runbook documenta la evidencia operativa adicional versionada que acompaña
 
 ## Pre-requisitos
 - Docker y Docker Compose disponibles
+- `.env.production.example` disponible como artefacto versionado del baseline
 - `.env.production` materializado desde `.env.production.example`
 - variables obligatorias validadas con `npm run validate:production-baseline`
 
@@ -37,6 +39,7 @@ Este runbook documenta la evidencia operativa adicional versionada que acompaña
 npm run validate:production-baseline
 npm run validate:restore-readiness
 npm run validate:operational-readiness
+# este comando valida el contrato operativo público versionado del repositorio
 docker compose -f docker-compose.prod.yml config
 docker build -t inventory-api:operational-smoke .
 ```
@@ -99,4 +102,5 @@ docker compose -f docker-compose.prod.yml exec -T db sh -lc 'psql -U "$POSTGRES_
 - no hay backups automáticos programados en el repositorio
 - no hay restore drill automático contra producción real
 - no hay agregación externa de logs ni observabilidad SaaS versionada
+- restore readiness y operational readiness usan contratos públicos versionados bajo `docs/`
 - este runbook eleva la madurez operativa por encima del baseline mínimo, pero no equivale a una plataforma enterprise completa

@@ -1,7 +1,7 @@
 # Architectural Action Plan
 
 ## 1. Objective
-Preserve the implemented Node 24 baseline, keep architecture-facing documentation synchronized with the real repository state, preserve root-only workflow governance, and preserve the repaired public restore-readiness contract.
+Preserve the implemented Node 24 baseline, keep architecture-facing documentation synchronized with the real repository state, preserve root-only workflow governance, preserve the repaired public restore-readiness contract, and preserve the implemented public operational-readiness contract backed by public docs plus explicit `.env.production.example` evidence.
 
 ## 2. Scope
 In scope after the completed Node 24 alignment:
@@ -9,7 +9,9 @@ In scope after the completed Node 24 alignment:
 - preserve hosted root workflow execution from `/.github/workflows/`
 - preserve root-only workflow governance from `/.github/workflows/`
 - preserve the repaired restore-readiness smoke contract used by the official operational workflow
-- preserve the current split where restore readiness is public but broader operational readiness can still use optional internal overlays
+- preserve the public `docs/`-backed contracts for both restore readiness and operational readiness
+- preserve `.env.production.example` as explicit required versioned evidence of the production baseline
+- preserve the implemented two-document public operational-readiness contract without introducing an unnecessary third public document
 - continue broader P11 hardening follow-up already documented in the repository
 
 ## 3. Out of scope
@@ -22,11 +24,13 @@ In scope after the completed Node 24 alignment:
 This plan now focuses on post-implementation governance and remaining hardening objectives:
 - `p11-node24-runtime-migration` FR-008, FR-009, FR-012, FR-016 are already satisfied and must be preserved
 - `p11-workflow-governance-and-restore-readiness` FR-001 through FR-012 are implemented and must be preserved
+- `p11-operational-readiness-public-baseline` FR-001 through FR-010 are implemented and must be preserved
 - Architectural objective AO-001: maintain a trustworthy workflow source of truth after the official root workflow alignment
 - Architectural objective AO-002: keep architecture-facing docs synchronized with actual hosted workflow behavior
+- Architectural objective AO-003: preserve public operational-readiness assurance without optional private-document prerequisites
 
 ## 5. Current problems addressed
-- operational-readiness governance still mixes public docs and optional internal overlays
+- operational-readiness governance still depends on synchronized public docs, validators, tests, README, `.env.production.example`, and workflows
 - pre-existing Windows Prisma rename-lock debt
 - broader P11 hardening debt outside this runtime and workflow-governance slice
 
@@ -42,13 +46,15 @@ This plan now focuses on post-implementation governance and remaining hardening 
 - local workflow validators/tests reading the same root workflow definitions directly
 - dedicated Windows Prisma build classification and artifact publication
 - current API and browser-runtime contracts
+- the current two-document public operational-readiness contract and explicit `.env.production.example` baseline evidence
 
 ## 8. Defects to correct
 ### High
 - none currently identified in this completed governance slice
 
 ### Medium
-- operational-readiness validation still uses optional internal overlays rather than a fully public canonical artifact set
+- operational-readiness and restore-readiness still depend on distributed governance artifacts staying synchronized
+- `.env.production.example`, README, docs, validators, and tests must continue evolving together to avoid reintroducing audit ambiguity
 - pre-existing Windows Prisma `EPERM` rename-lock issue remains operational debt
 
 ### Low
@@ -58,8 +64,10 @@ This plan now focuses on post-implementation governance and remaining hardening 
 Planned incremental changes:
 1. preserve the single authoritative root workflow source already implemented;
 2. preserve the exposed and validated restore-readiness npm gate used by the official operational smoke workflow;
-3. decide in a later approved slice whether `validate:operational-readiness` should remain an optional-overlay validator or converge onto fully public docs;
-4. continue broader P11 hardening slices without reopening the completed Node 24 migration.
+3. preserve the now-public `validate:operational-readiness` contract and only evolve it through approved slices;
+4. preserve the explicit validator/test/documentation treatment of `.env.production.example` as production-baseline evidence;
+5. avoid adding a third public operational-readiness document unless a later approved slice demonstrates a real auditability or clarity gap;
+6. continue broader P11 hardening slices without reopening the completed Node 24 migration.
 
 ## 10. Database changes
 No database change is currently planned.
@@ -88,8 +96,9 @@ Future security-related governance work should:
 Future work should validate in this order:
 1. keep `validate:workflow-baseline` and related tests green against the root official workflow tree;
 2. keep `validate:restore-readiness` green as part of the operational smoke contract;
-3. preserve the documented optional-overlay behavior of `validate:operational-readiness` unless and until a later approved convergence changes it;
-4. preserve Node 24 runtime evidence on local, Docker, and hosted workflows.
+3. keep `validate:operational-readiness` green against the public `docs/` contract and root workflow path;
+4. keep `validate:production-baseline` green with `.env.production.example` remaining versioned and documented;
+5. preserve Node 24 runtime evidence on local, Docker, and hosted workflows.
 
 Evidence already recorded for the completed Node 24 and workflow-governance baselines includes:
 - local `npm run build`
@@ -98,6 +107,7 @@ Evidence already recorded for the completed Node 24 and workflow-governance base
 - local `npm run validate:workflow-baseline`
 - local `npm run validate:restore-readiness`
 - local `npm run validate:operational-readiness`
+- local `npm run validate:production-baseline` with explicit production environment values
 - local `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`
 - local `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`
 - previously recorded Node 24 mainline validation across tests, browser E2E, validators, and Docker build
@@ -132,13 +142,17 @@ Evidence already recorded for the completed Node 24 and workflow-governance base
 - Add `docs/restore-readiness-baseline.md` as the public canonical restore-readiness baseline
 - Keep `validate:operational-readiness` on the root workflow path after the local workflow YAML removal
 
-### Stage 9 — Proposed
+### Stage 9 — Completed
+- Converge `validate:operational-readiness` onto public `docs/` artifacts and close `.env.production.example` as explicit baseline evidence
+- Keep the public operational-readiness contract on `docs/production-baseline.md` plus `docs/production-operations-runbook.md` without introducing a third public document
+
+### Stage 10 — Proposed
 - Continue remaining broader P11 hardening slices unrelated to the now-complete Node 24 and workflow-governance baselines
 
 ## 16. Risks and mitigations
 | Risk | Level | Mitigation |
 |---|---|---|
-| Operational-readiness overlays remain partly private while restore readiness is now public | Medium | keep the residual split explicitly documented and decide later whether to migrate the remaining validator to public docs |
+| Public operational contracts drift across docs, validators, tests, README, `.env.production.example`, and workflows | Medium | preserve focused characterization tests and validator coverage for both readiness contracts and the explicit production-baseline artifact |
 | Windows Prisma build instability obscures later regressions | Medium | preserve dedicated Windows workflow classification and artifact evidence |
 | Broader P11 work accidentally reopens the Node 24 baseline question | Medium | treat Node 24 baseline as implemented and only reopen on new reproduced evidence |
 
@@ -154,8 +168,10 @@ For future approved governance work, manually confirm:
 - cache path still points to `inventory-api/package-lock.json`
 - local validators/tests still read the root official workflow tree directly
 - the restore-readiness npm command exists and matches the documented operational baseline
-- any remaining operational-readiness validator overlay behavior is explicitly documented
+- operational-readiness continues to validate the public `docs/` contract without hidden private prerequisites
+- `.env.production.example` remains versioned, documented, and required by `validate:production-baseline`
+- no third public operational-readiness document was introduced unless a later approved slice justifies it
 - root-only workflow governance is preserved with no reintroduced application-local workflow YAML mirror
 
 ## 19. Approval status
-**Status:** Node 24 runtime migration completed and evidenced; root-only workflow governance and public restore-readiness follow-up implemented; remaining broader operational overlay convergence is still optional future work
+**Status:** Node 24 runtime migration completed and evidenced; root-only workflow governance plus public restore-readiness and operational-readiness contracts are implemented; `.env.production.example` is explicit validated baseline evidence; no third public operational-readiness document was needed; broader P11 hardening follow-up remains optional future work

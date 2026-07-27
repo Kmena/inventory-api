@@ -1,7 +1,9 @@
 # Current State Analysis
 
 ## 1. System overview
-El repositorio ya convergió a root-only workflow governance y ya reparó `validate:restore-readiness` sobre artefactos públicos en `docs/`. Sin embargo, `validate:operational-readiness` todavía depende de overlays opcionales `internal-docs/` para considerar presente su baseline de documentación operativa.
+El repositorio ya convergió a root-only workflow governance, ya reparó `validate:restore-readiness` sobre artefactos públicos en `docs/`, y ahora también convergió `validate:operational-readiness` al mismo modelo público de documentación versionada.
+
+La convergencia final quedó implementada usando solo dos documentos públicos para operational readiness, `docs/production-baseline.md` y `docs/production-operations-runbook.md`, mientras `.env.production.example` quedó codificado como evidencia contractual explícita del baseline productivo.
 
 ## 2. Relevant repository structure
 - `inventory-api/scripts/validate-operational-readiness.js`
@@ -16,25 +18,25 @@ El repositorio ya convergió a root-only workflow governance y ya reparó `valid
 
 ## 3. Current implemented behavior
 ### 3.1 Operational readiness validator
-- `validate-operational-readiness.js` still checks `internal-docs/production-operations-runbook.md` and `internal-docs/production-baseline.md`.
-- When those artifacts are absent, the validator can skip rather than proving a fully public baseline.
+- `validate-operational-readiness.js` now checks `docs/production-operations-runbook.md` and `docs/production-baseline.md`.
+- The validator no longer skips based on missing `internal-docs/` overlays and now proves the public baseline directly.
 
 ### 3.2 Public restore-readiness baseline
-- `validate:restore-readiness` already validates public `docs/production-baseline.md`, `docs/production-operations-runbook.md`, and `docs/restore-readiness-baseline.md`.
-- This means the repository currently uses two different models for two related operational validators.
+- `validate:restore-readiness` validates public `docs/production-baseline.md`, `docs/production-operations-runbook.md`, and `docs/restore-readiness-baseline.md`.
+- `validate:operational-readiness` now shares the same public-docs-backed model, but intentionally uses only `docs/production-baseline.md` and `docs/production-operations-runbook.md` for its contract.
 
 ### 3.3 `.env.production.example`
 - Repository inspection confirms `inventory-api/.env.production.example` exists.
 - Public docs and README reference `.env.production.example` as the starting point for the production baseline flow.
-- The auditor still raised a documentation/evidence concern, so the repository would benefit from making this contract more explicit and testable.
+- `scripts/validate-production-baseline.js` and `tests/production-baseline-characterization.test.js` now codify this artifact as explicit baseline evidence.
 
 ## 4. Current limitations
-- Public operational-readiness is not yet fully self-contained because validator logic still depends on optional private overlays.
-- The existence of `.env.production.example` is real, but its contractual role could be strengthened in validation or characterization to avoid future audit ambiguity.
+- Public operational-readiness is now self-contained in `docs/`, but still depends on synchronized maintenance across validators, tests, README, `.env.production.example`, docs, and workflows.
+- `.env.production.example` is now codified as explicit baseline evidence, but any future rename/removal must update docs, validators, and tests together.
 
 ## 5. Risks in current state
-- Future maintainers may assume operational readiness is as public and reproducible as restore readiness when the validator still has different semantics.
-- Audits may continue to raise false or stale concerns about `.env.production.example` if the repository does not codify its presence in the validated contract.
+- Future maintainers could still introduce drift across public docs, validators, tests, and workflows if they update only one governance artifact.
+- Audits may raise new concerns if `.env.production.example` is changed without keeping the contractual references aligned.
 
 ## 6. Likely affected files
 - `inventory-api/scripts/validate-operational-readiness.js`
@@ -42,4 +44,4 @@ El repositorio ya convergió a root-only workflow governance y ya reparó `valid
 - `inventory-api/docs/production-baseline.md`
 - `inventory-api/docs/production-operations-runbook.md`
 - `inventory-api/README.md`
-- potentially a new public operational-readiness baseline doc if needed
+- `inventory-api/scripts/validate-production-baseline.js`
