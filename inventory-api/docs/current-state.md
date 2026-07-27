@@ -1,215 +1,206 @@
 # Current State
 
 ## 1. System overview
-This repository contains a Node.js 20 + Express + Prisma modular monolith in `inventory-api/`, plus repository-governance assets at the repo root.
+`inventory-api/` is a single-deployable Node.js 24 modular monolith built with Express and Prisma over PostgreSQL.
 
-The runtime still serves:
-- JSON APIs
-- embedded browser screens from `src/public/`
-- Prisma-backed persistence through `src/repositories/`
+The currently implemented system:
+- serves REST-style JSON APIs under `/api/*`;
+- serves static browser assets from `src/public/` from the same Express process;
+- uses Prisma with versioned SQL migrations;
+- enforces authentication, authorization, throttling, request logging, and selected security headers in the HTTP layer;
+- uses repository validation through scripts, tests, GitHub Actions workflows, and an explicit CI critical-controls matrix in `docs/ci-critical-controls.md`.
 
-In the completed `p9-prisma-windows-closeout` cycle, the implemented change was not a production-domain redesign. It was a repository-governance hardening increment focused on Windows Prisma build evidence and documentation.
+P11 (`specs/p11-audit-emergency-hardening`) finished its planning/documentation package (`TASK-001` through `TASK-004`).
 
-Current verified scope for this cycle:
-- the root GitHub Actions workflow `.github/workflows/windows-prisma-build.yml` now captures the Windows build log, publishes a workflow summary, uploads an artifact, and fails explicitly when `npm run build` really fails
-- the same contractual workflow shape is mirrored in `inventory-api/.github/workflows/windows-prisma-build.yml` as an internal baseline/reference copy
-- workflow governance is validated by `scripts/validate-workflow-baseline.js`
-- regression protection exists in `tests/workflow-baseline-characterization.test.js` and `tests/prisma-windows-build-stabilization.test.js`
-- repository evidence is consolidated in `docs/prisma-windows-stability-evidence.md`
-
-The current closeout verdict is **`estabilizado con evidencia CI`** based on multiple successful real Windows runs of the hardened workflow version, including a documented rerun success.
+After that planning package, `specs/p11-tenant-isolation-fixes` completed the first runtime hardening slice:
+- tenant-owned repository writes for client documents, orders, and sales routes are now scoped at the repository mutation boundary;
+- review-required tenant-safety cases for legal entities, payment receipt replacement, and the dormant product update helper were hardened;
+- internal service-to-repository signatures changed where required to propagate `companyId`, but no public API contract, schema, or container contract changed in the slice.
 
 ## 2. Repository structure
-Key paths inspected for this refresh:
-- `.github/workflows/windows-prisma-build.yml` — executable Windows Prisma build workflow at repository root
-- `inventory-api/.github/workflows/windows-prisma-build.yml` — mirrored baseline/reference workflow inside the app folder
-- `inventory-api/scripts/prisma-generate-safe.js` — guarded Prisma generate wrapper used by `npm run build`
-- `inventory-api/scripts/prisma-generate-safe-lib.js` — wrapper classification logic and retry helpers
-- `inventory-api/scripts/validate-workflow-baseline.js` — workflow baseline contract validator
-- `inventory-api/tests/workflow-baseline-characterization.test.js` — characterization tests for workflow contracts
-- `inventory-api/tests/prisma-windows-build-stabilization.test.js` — governance tests for Windows Prisma workflow and wrapper classification
-- `inventory-api/docs/prisma-windows-stability-evidence.md` — source of truth for closeout evidence and verdict
-- `inventory-api/README.md` — links the evidence document as the primary reference
-- `inventory-api/package.json` — exposes `build`, `validate:workflow-baseline`, `test`, and `verify`
+High-signal paths verified in this refresh:
+- `src/app.js`, `src/server.js`
+- `src/routes/`, `src/services/`, `src/repositories/`, `src/middlewares/`, `src/public/`
+- `src/lib/`, `src/security/`, `src/schemas/`
+- `prisma/schema.prisma`, `prisma/migrations/`
+- `.github/workflows/`
+- `tests/`
+- `scripts/`
+- `docs/`
+- `specs/p11-audit-emergency-hardening/`
 
-Relevant package scripts currently implemented:
-- `npm run build` → `node scripts/prisma-generate-safe.js`
-- `npm run validate:workflow-baseline` → validates versioned GitHub workflow contracts
-- `npm run verify` → aggregates lint, typecheck, public-runtime checks, workflow baseline validation, operational readiness, build, and test
+Verified repository-governance workflows:
+- `.github/workflows/static-checks.yml`
+- `.github/workflows/repository-tests.yml`
+- `.github/workflows/db-constraints-tests.yml`
+- `.github/workflows/contract-validations.yml`
+- `.github/workflows/browser-e2e.yml`
+- `.github/workflows/operational-smoke.yml`
+- `.github/workflows/windows-prisma-build.yml`
+- `.github/workflows/build-and-publish.yml`
 
 ## 3. Current architecture
-The application runtime remains a layered modular monolith:
-- routes call services
-- services coordinate business and persistence behavior
-- repositories use Prisma directly
-- static browser assets are served by the same Express process
+Current implemented architecture remains layered:
+- Express app and HTTP middleware at the boundary;
+- route modules delegate to service modules;
+- services coordinate business logic, authorization-aware flows, and repository calls;
+- repositories encapsulate most Prisma access;
+- static browser assets are served by the same runtime process.
 
-In addition, the repository now has a clearer **Platform Runtime Governance** slice for build/CI stabilization:
-- `npm run build` is intentionally a guarded Prisma-generation contract
-- the root Windows workflow is the executable CI adapter for Windows Prisma evidence
-- the mirrored workflow under `inventory-api/.github/workflows/` acts as a versioned baseline/reference contract for the subproject
-- workflow governance is enforced by a local validation script and characterization tests
-- evidence and verdict are centralized in a versioned Markdown document rather than scattered across historical specs
-
-This cycle changed governance architecture and documentation, not the production runtime architecture.
+Strict hexagonal boundaries are not yet implemented. P11 completed planning and governance documentation only; no new runtime modules, ports, or adapters were introduced.
 
 ## 4. Existing domains and modules
-Observed modules relevant to this refresh:
-
-### Platform Runtime Governance
-Current code location:
-- `.github/workflows/windows-prisma-build.yml`
-- `inventory-api/.github/workflows/windows-prisma-build.yml`
-- `scripts/validate-workflow-baseline.js`
-- `tests/workflow-baseline-characterization.test.js`
-- `tests/prisma-windows-build-stabilization.test.js`
-- `docs/prisma-windows-stability-evidence.md`
-
-Responsibility:
-- preserve the contractual shape of workflow baselines
-- validate the dedicated Windows Prisma workflow locally
-- keep Windows build evidence auditable
-- classify workflow failures without masking real build errors
-- document whether the risk remains residual or is stabilized with CI evidence
-
-### Build and Prisma Bootstrap
-Current code location:
-- `scripts/prisma-generate-safe.js`
-- `scripts/prisma-generate-safe-lib.js`
-- `package.json`
-
-Responsibility:
-- generate Prisma Client through the guarded wrapper
-- classify retryable Windows rename-lock failures versus non-retryable failures
-- preserve explicit failure semantics for real build problems
-
-### Core application runtime
-Still present and unchanged in architectural role for this cycle:
-- Identity and Access
-- Company Administration
-- Customer Management
-- Product Catalog
-- Inventory
-- Sales Routing / Agent Workspace
-- Orders
-- Billing and Collections
-- Embedded Browser Runtime
+Current functional areas observable in code and tests:
+- Authentication and authorization
+- Company, role, and user administration
+- Client management and client documents
+- Product catalog and inventory
+- Warehouses and geography
+- Sales routes and agent workspace
+- Orders, invoices, and payments
+- Embedded browser runtime
+- Repository/platform governance
 
 ## 5. Main use cases
-Repository-governance use cases observable from code and docs:
-- execute `npm run build` through the guarded Prisma wrapper
-- run a dedicated Windows GitHub Actions build on `windows-latest`
-- capture a build log file for the Windows run
-- classify failures as `windows_rename_lock`, `non_retryable_failure`, or `runner/environment issue`
-- publish a structured workflow summary with run metadata
-- upload a build-log artifact for auditability
-- fail the workflow explicitly when the guarded build exits non-zero
-- validate the workflow baseline locally with `npm run validate:workflow-baseline`
-- preserve governance contracts with characterization tests
-- consolidate real CI evidence and the repository verdict in `docs/prisma-windows-stability-evidence.md`
+Examples still implemented after the P11 planning package and the first tenant-isolation implementation slice:
+- login via `/api/auth/login`
+- retrieve authenticated context via `/api/auth/me`
+- manage companies, roles, users, clients, products, warehouses, routes, orders, invoices, and payments
+- use embedded root, warehouse, and agent browser screens
+- run repository validation via `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run validate:workflow-baseline`, `npm run validate:public-runtime`, `npm run validate:operational-readiness`, `npm run validate:production-baseline`, and `npm run verify`
 
 ## 6. Current data flows
+### Runtime flow
+1. Express receives requests.
+2. Security, auth, throttling, metrics, logging, and validation middleware execute.
+3. Routes call services.
+4. Services call repositories and Prisma-backed persistence.
+5. Responses return JSON or static assets.
 
-### Guarded Prisma build flow
-1. `npm run build` executes `node scripts/prisma-generate-safe.js`
-2. the wrapper delegates to Prisma generate behavior
-3. failure signals are classified using shared library logic from `scripts/prisma-generate-safe-lib.js`
-4. retryable Windows rename-lock behavior remains distinguished from non-retryable Prisma failures
-5. the command preserves the real exit outcome for callers
-
-### Windows workflow evidence flow
-1. GitHub Actions runs `.github/workflows/windows-prisma-build.yml` on `windows-latest`
-2. the workflow installs dependencies with `npm ci`
-3. the guarded build step runs with `continue-on-error: true` only to allow evidence capture before the explicit failure gate
-4. stdout/stderr are tee'd into `npm-run-build.log`
-5. the workflow stores `build_exit_code` and `build_log_path` in step outputs
-6. a follow-up step classifies the result as `success`, `windows_rename_lock`, `non_retryable_failure`, or `runner/environment issue`
-7. the workflow publishes a structured summary to `GITHUB_STEP_SUMMARY`
-8. the workflow uploads `windows-prisma-build-log-<run_id>` as an artifact
-9. the final failure gate exits non-zero if the guarded build actually failed
-
-### Evidence closeout flow
-1. real CI runs are recorded in `docs/prisma-windows-stability-evidence.md`
-2. the evidence document compares actual runs against the approved closeout criterion
-3. the repository verdict is currently `estabilizado con evidencia CI` because the documented criterion is now met
-4. README links the evidence document as the repository source of truth
+### Repository governance flow
+1. Scripts in `scripts/` implement build and validation checks.
+2. Tests in `tests/` characterize runtime, governance, and selected business behavior.
+3. GitHub Actions workflows under `.github/workflows/` execute static checks, repository tests, dedicated DB-constraints tests, contract validation, browser E2E, operational smoke, Windows Prisma evidence, and build/publish automation.
+4. Spec packages under `specs/` document approved feature and hardening work.
 
 ## 7. Database and persistence
-Persistence remains Prisma + PostgreSQL.
-
-Scope-relevant observations for this cycle:
-- no Prisma schema change was made in this documentation refresh
-- no database migration change was made in this cycle summary
-- the affected `build` contract is about Prisma Client generation and CI evidence, not schema redesign
+- Prisma schema remains in `prisma/schema.prisma`.
+- Versioned migrations remain in `prisma/migrations/`.
+- No migration was added or modified by the P11 planning package, by `p11-tenant-isolation-fixes`, or by `p11-repository-boundary-root-bootstrap`.
+- Persistence remains repository + Prisma based.
+- The former direct-Prisma service-layer exception in `src/services/company.service.js#registerRootCompany` is now removed from the current implementation: duplicate username lookup and the bootstrap transaction now live in `src/repositories/company.repository.js`.
+- `company.repository.js#registerRootCompanyBootstrap(...)` now owns persistence for admin-role upsert, company creation, default client classifications, fiscal config creation, root-user creation, and fiscal-sequence bootstrap.
+- `company.service.js#registerRootCompany(...)` now keeps authorization, password hashing, duplicate-conflict mapping, and audit orchestration only; audit logging is preserved through a repository `onSuccess(result, tx)` hook executed inside the transaction.
+- Tenant-owned write safety remains improved from the earlier P11 implementation slice: client-document writes, order writes, sales-route update, payment-receipt replacement, legal-entity upsert update, and the dormant product update helper enforce tenant scope at the repository mutation boundary.
+- The remaining P11 follow-up work after this refresh is not the Node baseline declaration itself; it is the final closure evidence for `p11-node24-runtime-migration` on a hosted Windows run of the updated workflow.
 
 ## 8. APIs and integrations
-No application API contract changed in this cycle.
+Current observable interfaces:
+- REST-style endpoints under `/api/*`
+- health endpoints under `/health/*`
+- static runtime served from `/`
+- GitHub Actions as repository-governance integration
 
-Repository-governance integrations relevant here:
-- GitHub Actions is the remote execution surface for the dedicated Windows Prisma workflow
-- local repository validation uses Node-based scripts and `node --test`
-- evidence currently depends on versioned Markdown plus previously captured GitHub Actions run metadata
+No public API contract changed during the P11 planning package, the `p11-tenant-isolation-fixes` implementation slice, or the `p11-repository-boundary-root-bootstrap` slice.
 
 ## 9. Authentication and authorization
-No application auth/authorization contract changed in this cycle.
-
-Repository-level observation:
-- initial implementation from this environment could not trigger GitHub Actions directly because `gh` was unavailable and `GITHUB_TOKEN` was absent
-- final closeout evidence was nevertheless obtained through successful remote GitHub Actions executions after push, including a documented rerun
+Current observable behavior:
+- login remains public;
+- authenticated APIs use middleware-based authentication;
+- authorization remains middleware/policy based;
+- login throttling is implemented;
+- browser session data is currently persisted client-side in localStorage.
 
 ## 10. Events and background processing
-No event bus or background-processing architecture changed in this cycle.
+No application event bus or separate background worker was verified in this refresh.
 
-The dedicated Windows workflow is CI orchestration, not an in-application event mechanism.
+GitHub Actions workflows are repository automation, not application background processing.
 
 ## 11. Containers and deployment
-Container/runtime deployment architecture was not changed by this cycle.
+Observed deployment/runtime assets:
+- `Dockerfile`
+- `docker-compose.yml`
+- `docker-compose.dev.yml`
+- `docker-compose.prod.yml`
+- GitHub Actions workflows under `.github/workflows/`
 
-Relevant operational governance additions remain in GitHub Actions rather than Docker:
-- Windows Prisma build evidence workflow at repo root
-- mirrored workflow baseline under `inventory-api/.github/workflows/`
+Current Dockerfile uses:
+- multi-stage build
+- non-root runtime user
+- healthcheck against `/health/ready`
+- `node:24-bullseye-slim` as the declared build/runtime base image
+
+Current platform baseline is now Node 24:
+- `package.json` declares `engines.node: ">=24 <25"`
+- `Dockerfile` uses `node:24-bullseye-slim`
+- inspected repository-governance workflows pin `node-version: '24'`
+
+Local container-build evidence is now present for the implemented baseline: `docker build -t inventory-api:node24-smoke .` passed against the Node 24 Dockerfile.
 
 ## 12. Current testing strategy
-The repository has an active automated baseline using Node tests plus validation scripts.
+Current observable testing/governance baseline:
+- `npm run lint` passed in the Node 24 migration cycle
+- `npm run typecheck` passed in the Node 24 migration cycle and still covers the approved incremental P11 slice: `src/schemas/**`, `src/repositories/sales-route.repository.js`, `src/repositories/order.repository.js`, `src/repositories/payment.repository.js`, and `src/repositories/company.repository.js`
+- `npm run build` passed on Node `v24.16.0`
+- `node --test tests/taxpayer-characterization.test.js` passed on Node `v24.16.0`; the previously documented `PrismaClient is not a constructor` failure did not reproduce after clean `npm ci` + build
+- `npm run validate:workflow-baseline` passed after the Node 24 workflow updates
+- `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js` passed
+- `npm run validate:public-runtime` passed
+- `npm run validate:operational-readiness` passed
+- `npm run validate:production-baseline` passed when executed with the required environment variables
+- `npm test -- --silent` currently passed with `293 pass, 2 skipped` on the Node 24 baseline
+- the CI/typecheck governance slice expanded coverage with `tests/typecheck-ci-hardening-governance.test.js` and the updated workflow baseline characterization for the dedicated DB-constraints workflow
+- the root-bootstrap slice added focused regression coverage in `tests/company-root-bootstrap-boundary.test.js` and `tests/company-repository-bootstrap.test.js`
+- `npm run build` can still hit the pre-existing Windows Prisma `EPERM` rename-lock path locally, but the guarded wrapper retried and succeeded in the validated Node 24 cycle
+- `npm run verify` exists as an aggregate validation command
+- repository tests include characterization, governance, service, integration, browser E2E, and optional/environment-gated evidence
+- browser E2E and Docker build validation now also passed on the Node 24 baseline in the follow-up cycle
+- public GitHub Actions API review shows the latest available hosted `windows-prisma-build` runs succeed, but those runs still reflect the historical `Set up Node.js 20` step and therefore do not validate the updated Node 24 workflow revision
+- `gh` CLI is not installed in the local environment, so no authenticated hosted trigger was available from this cycle
+- the only remaining validation surface pending in this cycle is hosted `windows-prisma-build` workflow evidence review for the updated Node 24 workflow
 
-Cycle-relevant tests and validations:
-- `npm run validate:workflow-baseline` ✅ user-reported passed
-- `node --test tests/workflow-baseline-characterization.test.js` ✅ user-reported passed
-- `node --test tests/prisma-windows-build-stabilization.test.js` ✅ user-reported passed
+P11 confirmed that the suite is broad but not uniform in evidence strength, and `p11-typecheck-ci-hardening` converted that into explicit policy in `docs/ci-critical-controls.md`:
+- strong evidence can close a critical control only when it is exercised by a required workflow;
+- some `*characterization*` tests validate guards/contracts only and remain supportive rather than sufficient;
+- some tests remain optional or environment-gated;
+- `tests/p2-hardening-constraints.test.js` is no longer an implicit gap because `.github/workflows/db-constraints-tests.yml` now provisions the required DB-backed gate.
 
-Additional governance coverage visible in the repository:
-- `npm run build` uses the guarded Prisma wrapper
-- `npm run verify` includes `validate:workflow-baseline`
-
-This document records those results as user-supplied implementation evidence. They were not re-executed during this documentation refresh.
+`p11-tenant-isolation-fixes` added and updated repository/service regressions for tenant-safe mutation enforcement while keeping the evidence inside the mandatory `repository-tests` workflow gate.
 
 ## 13. Behavior to preserve
-- `npm run build` must continue using the guarded Prisma wrapper
-- the root workflow `.github/workflows/windows-prisma-build.yml` must remain the executable Windows evidence workflow
-- the mirrored workflow under `inventory-api/.github/workflows/windows-prisma-build.yml` must remain contract-aligned with the root workflow shape
-- workflow summary publication must remain in place
-- build-log artifact upload must remain in place
-- the explicit failure gate must continue preserving real build failure semantics
-- workflow failure classification taxonomy must remain documented and test-governed
-- `docs/prisma-windows-stability-evidence.md` must remain the primary repository source of truth for closeout evidence
+- Express continues to serve the embedded browser runtime from `src/public/`.
+- Current endpoint paths and browser-runtime contracts remain unchanged.
+- Current Docker/runtime contract remains a single Dockerfile-based deployment with multi-stage build, non-root runtime, and readiness healthcheck.
+- The active runtime baseline is Node 24 across `package.json`, `Dockerfile`, and inspected workflows.
+- `npm run build` continues to use the guarded Prisma generation wrapper.
+- Existing GitHub Actions workflows remain the current CI baseline.
+- Current lint/typecheck/test scripts remain part of the repository contract.
 
 ## 14. Known defects
-- the Prisma/Windows closeout criterion is now satisfied and documented in `docs/prisma-windows-stability-evidence.md`
-- the remaining issues in this area are maintainability-oriented rather than an open closeout gap:
-  - workflow duplication between root executable workflow and app-local mirror
-  - future dependency on keeping evidence docs synchronized with CI reality
+Confirmed or reaffirmed after the completed P11 implementation slices to date:
+- the first confirmed/review-required tenant write backlog slice was hardened in code, but broader repository governance work remains open across the remaining P11 follow-up specs;
+- `tsconfig.typecheck.json` still does not cover the full repository/test surface, but the approved P11 incremental slice now covers `src/schemas/**` and the high-value repositories explicitly selected by the spec;
+- the root bootstrap repository-boundary finding is no longer a current defect; it is now closed by `p11-repository-boundary-root-bootstrap` and should be preserved as current behavior;
+- local Windows Prisma generation still has a pre-existing `EPERM` rename-lock failure mode on some runs, although the guarded wrapper succeeded on retry in the validated Node 24 cycle;
+- full feature-closure evidence for the Node 24 migration is still incomplete because the available public hosted `windows-prisma-build` artifact review still reflects the historical Node 20 workflow, not the updated local Node 24 workflow, even though the latest publicly reviewable hosted runs succeed.
 
 ## 15. Architectural debt
-- workflow evidence depends on both a root executable workflow and a mirrored app-local baseline file, which introduces duplication that must stay synchronized
-- the governance path still includes manual evidence capture and documentation synchronization after real remote runs
-- future Windows/Prisma or runner changes could still require renewed evidence collection, even though the present closeout state is stabilized
+- service-layer orchestration remains broad;
+- strict hexagonal boundaries are not implemented;
+- workflow and governance evidence are distributed across scripts, tests, workflows, docs, and spec packages;
+- duplicated governance artifacts still require drift management;
+- typecheck expansion is still incremental rather than exhaustive;
+- test evidence classification is now documented in `docs/ci-critical-controls.md` and reflected in the dedicated DB-constraints workflow, but broader enforcement remains governance-heavy rather than architecture-enforced in code.
 
 ## 16. Security risks
-- No new application security defect was identified in this refresh scope
-- The hardened workflow reduces false-success risk by preserving the real build exit code
-- Residual risk is operational and audit/governance-oriented rather than a newly confirmed application security vulnerability
+Current architecture-facing security concerns still visible after the completed P11 implementation slices to date:
+- tenant isolation is stronger in the hardened repository methods, but broader repository/platform hardening work remains open;
+- browser session persistence in localStorage;
+- some critical controls are still validated only by characterization or optional/environment-gated tests outside the newly explicit matrix;
+- not every important security, business-logic, or data-quality control identified by P11 has yet been hardened by its own implementation slice.
 
 ## 17. Unknowns and assumptions
-- This refresh records the successful remote runs and rerun as the closeout evidence baseline for the hardened workflow version
-- The evidence document remains the source of truth and must be updated if future Windows behavior changes materially
-- The repository still treats workflow summary, artifact publication and explicit failure-gate behavior as compatibility-sensitive governance contracts
+- This refresh did not execute commands directly; validation status comes from the completed P11 implementation report provided by the implementation cycle.
+- The Windows Prisma build issue is treated as pre-existing because the implementation report records it as baseline behavior before and after the documentation-only work.
+- Exhaustive remediation of tenant-isolation issues still requires future implementation work.
+- The Node 24 baseline migration is implemented in package, Docker, and workflow declarations; browser E2E and Docker build now pass locally, and the only remaining closure item is hosted Windows workflow evidence for the updated Node 24 workflow.

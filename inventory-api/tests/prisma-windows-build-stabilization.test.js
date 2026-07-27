@@ -16,7 +16,7 @@ test('Windows Prisma workflow is dedicated, required and scoped to npm ci plus b
   assert.match(workflowSource, /^name:\s+windows-prisma-build$/m);
   assert.match(workflowSource, /^\s{2}windows-prisma-build:\s*$/m);
   assert.match(workflowSource, /runs-on:\s+windows-latest/);
-  assert.match(workflowSource, /node-version:\s+'20'/);
+  assert.match(workflowSource, /node-version:\s+'24'/);
   assert.match(workflowSource, /run:\s+npm ci/);
   assert.match(workflowSource, /npm run build/);
   assert.match(workflowSource, /id:\s+prisma_build/);

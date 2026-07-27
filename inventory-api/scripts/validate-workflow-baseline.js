@@ -33,11 +33,24 @@ const workflowRules = [
     ],
   },
   {
+    relativePath: 'db-constraints-tests.yml',
+    checks: [
+      { description: 'defines a dedicated db-constraints-tests job', pattern: /^\s{2}db-constraints-tests:\s*$/m },
+      { description: 'provisions the P2 constraints database url', pattern: /P2_CONSTRAINTS_DATABASE_URL:\s+postgresql:\/\/postgres:postgres@127\.0\.0\.1:5432\/inventory_api_constraints\?schema=public/ },
+      { description: 'runs a postgres service for focused constraints evidence', pattern: /^\s{6}postgres:\s*$/m },
+      { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
+      { description: 'generates Prisma client before DB setup', pattern: /run:\s+npm run build/ },
+      { description: 'applies committed migrations', pattern: /run:\s+npm run prisma:apply-committed-migrations/ },
+      { description: 'seeds the constraints database with CI-only credentials', pattern: /run:\s+npm run prisma:seed/ },
+      { description: 'runs the focused p2 constraints test suite', pattern: /run:\s+node --test tests\/p2-hardening-constraints\.test\.js/ },
+    ],
+  },
+  {
     relativePath: 'windows-prisma-build.yml',
     checks: [
       { description: 'defines a dedicated Windows Prisma build job', pattern: /^\s{2}windows-prisma-build:\s*$/m },
       { description: 'runs on windows-latest', pattern: /runs-on:\s+windows-latest/ },
-      { description: 'pins Node.js 20', pattern: /node-version:\s+'20'/ },
+      { description: 'pins Node.js 24', pattern: /node-version:\s+'24'/ },
       { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
       { description: 'runs the guarded Prisma build on Windows', pattern: /npm run build/ },
       { description: 'captures the guarded build step with explicit id', pattern: /id:\s+prisma_build/ },

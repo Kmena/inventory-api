@@ -44,7 +44,7 @@ test('windows Prisma workflow stays dedicated to npm ci plus build on windows-la
 
   assert.match(workflowSource, /^\s{2}windows-prisma-build:\s*$/m);
   assert.match(workflowSource, /runs-on:\s+windows-latest/);
-  assert.match(workflowSource, /node-version:\s+'20'/);
+  assert.match(workflowSource, /node-version:\s+'24'/);
   assert.match(workflowSource, /run:\s+npm ci/);
   assert.match(workflowSource, /npm run build/);
   assert.match(workflowSource, /id:\s+prisma_build/);
@@ -55,6 +55,18 @@ test('windows Prisma workflow stays dedicated to npm ci plus build on windows-la
   assert.doesNotMatch(workflowSource, /npm run verify/);
 });
 
+test('db constraints workflow provisions a dedicated mandatory database-backed gate for the focused P2 evidence', () => {
+  const workflowSource = readWorkflow('db-constraints-tests.yml');
+
+  assert.match(workflowSource, /^\s{2}db-constraints-tests:\s*$/m);
+  assert.match(workflowSource, /^\s{6}postgres:\s*$/m);
+  assert.match(workflowSource, /P2_CONSTRAINTS_DATABASE_URL:\s+postgresql:\/\/postgres:postgres@127\.0\.0\.1:5432\/inventory_api_constraints\?schema=public/);
+  assert.match(workflowSource, /npm run prisma:apply-committed-migrations/);
+  assert.match(workflowSource, /npm run prisma:seed/);
+  assert.match(workflowSource, /node --test tests\/p2-hardening-constraints\.test\.js/);
+  assert.doesNotMatch(workflowSource, /npm run test\b/);
+});
+
 test('validate-workflow-baseline passes when the versioned workflows preserve their contracts', () => {
   const result = spawnSync('node', ['scripts/validate-workflow-baseline.js'], {
     cwd: repositoryRoot,
@@ -62,5 +74,5 @@ test('validate-workflow-baseline passes when the versioned workflows preserve th
   });
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /Validated 7 workflow baseline files/);
+  assert.match(result.stdout, /Validated 8 workflow baseline files/);
 });

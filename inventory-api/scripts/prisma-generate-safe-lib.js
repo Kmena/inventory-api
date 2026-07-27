@@ -112,7 +112,7 @@ function failWithActionableGuidance({ result, platform, attemptNumber, failure }
   if (platform === 'win32') {
     console.error('Windows mitigation guidance:');
     console.error('- close local Node processes that may be holding Prisma engine files;');
-    console.error('- prefer Node.js 20 for this repository baseline;');
+    console.error('- prefer Node.js 24 LTS for this repository baseline;');
     console.error('- re-run `npm run build`;');
     console.error('- if the issue persists, remove stale files under `node_modules/.prisma/client/query_engine-windows.dll.node.tmp*` and retry.');
   }

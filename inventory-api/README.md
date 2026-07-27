@@ -230,12 +230,12 @@ Use valores reales solo en archivos privados locales o en su gestor de secretos.
 
 Contrato explícito actual del repositorio:
 
-- Node.js `20.x`
-- `package.json` declara `"engines": { "node": ">=20 <21" }`
-- la evidencia soportada del repositorio se valida localmente con los scripts versionados en `package.json` sobre Node 20
-- `Dockerfile` base usa `node:20-bullseye-slim`
+- Node.js `24.x`
+- `package.json` declara `"engines": { "node": ">=24 <25" }`
+- la evidencia soportada del repositorio se valida localmente con los scripts versionados en `package.json` sobre Node 24
+- `Dockerfile` base usa `node:24-bullseye-slim`
 
-Fuera de este rango no se considera entorno soportado para la evidencia obligatoria de cierre P0. En esta implementación se observó drift local con Node 24, por lo que las validaciones canónicas deben ejecutarse con Node 20.
+Fuera de este rango no se considera entorno soportado para la evidencia obligatoria de cierre P0. El baseline operativo y de CI quedó migrado a Node.js 24 LTS; cualquier falla histórica de Node 20 debe tratarse como evidencia previa y no como baseline vigente.
 
 ## Baseline productivo verificable
 
@@ -360,7 +360,7 @@ Reglas de uso del contrato actual:
 - `verify` reutiliza exactamente los mismos scripts obligatorios definidos de forma individual, incluyendo `validate:workflow-baseline` y `validate:operational-readiness`.
 - `src/public` ya no depende solo del gate sintáctico: queda cubierto además por `lint:public-runtime` y por validación de referencias HTML locales.
 - `validate:agent-workspace` permanece como diagnóstico opcional mientras no forme parte del gate obligatorio aprobado.
-- La evidencia canónica del repositorio debe seguir ejecutándose con Node 20, aunque localmente puedan observarse otros runtimes.
+- La evidencia canónica del repositorio debe ejecutarse con Node 24 LTS, que es el baseline vigente del repositorio.
 
 ### Lint
 

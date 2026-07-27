@@ -38,7 +38,7 @@
     "zod": "^3.23.8"
   },
   "engines": {
-    "node": ">=20 <21"
+    "node": ">=24 <25"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
