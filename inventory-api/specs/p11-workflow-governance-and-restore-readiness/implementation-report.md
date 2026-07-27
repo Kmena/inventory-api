@@ -116,6 +116,15 @@
 - `npm run validate:operational-readiness`
 - `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`
 - task-level regression validations with `git diff --check`
+- hosted GitHub Actions checks all succeeded for the branch evidence reviewed by the user:
+  - `browser-e2e` (`pull_request`, `push`)
+  - `contract-validations` (`pull_request`, `push`)
+  - `db-constraints-tests` (`pull_request`, `push`)
+  - `operational-smoke` (`pull_request`)
+  - `p0-quality-gates` (`pull_request`)
+  - `repository-tests` (`pull_request`, `push`)
+  - `static-checks` (`pull_request`, `push`)
+  - `windows-prisma-build` (`pull_request`, `push`)
 
 ### Task outcomes
 - Root-only workflow governance is now implemented in local validators/tests.
@@ -141,9 +150,12 @@
 ## 15. Manual validation
 - Local command-level validation confirmed `validate:restore-readiness` and `validate:operational-readiness` both execute successfully from `inventory-api/`.
 - Hosted `operational-smoke` run `30288569602` completed successfully for commit `b278606c89c17435e8be25d605121a37f8bb960a`.
+- Hosted `operational-smoke` run `30288704960` completed successfully for commit `ebb074d94261f3782464ed15d16eac8230962ac7`.
+- The user additionally confirmed 14 successful hosted checks across `pull_request` and `push` contexts for the reviewed branch.
 
 ## 16. Next executable task
 - No remaining pending task inside this approved spec.
+- This specification is closed from the implementation/validation perspective.
 - Recommended later follow-up only if separately approved: converge `validate:operational-readiness` onto public `docs/` artifacts.
 
 ## 17. Post-implementation audit

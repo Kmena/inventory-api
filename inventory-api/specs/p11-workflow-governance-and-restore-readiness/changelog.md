@@ -8,3 +8,4 @@
 - Completed TASK-001 by removing duplicated application-local workflow YAML and updating governance validators/tests/docs to use the root official workflow tree directly.
 - Completed TASK-002 by exposing `validate:restore-readiness`, aligning its validator/tests to public `docs/` artifacts, and creating `docs/restore-readiness-baseline.md`.
 - Completed TASK-003 by refreshing architecture-facing docs, traceability, and implementation evidence for the repaired workflow governance baseline.
+- Confirmed hosted closure with successful `operational-smoke` runs `30288569602` and `30288704960`, plus the reviewed full green check set for the branch.
