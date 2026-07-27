@@ -3,7 +3,7 @@
 ## 1. System overview
 El repositorio ya convergió a root-only workflow governance, ya reparó `validate:restore-readiness` sobre artefactos públicos en `docs/`, y ahora también convergió `validate:operational-readiness` al mismo modelo público de documentación versionada.
 
-La convergencia final quedó implementada usando solo dos documentos públicos para operational readiness, `docs/production-baseline.md` y `docs/production-operations-runbook.md`, mientras `.env.production.example` quedó codificado como evidencia contractual explícita del baseline productivo.
+La convergencia final quedó implementada usando solo dos documentos públicos para operational readiness, `docs/production-baseline.md` y `docs/production-operations-runbook.md`, mientras `.env.production.example` quedó codificado como evidencia contractual explícita del baseline productivo y se mantiene intencionalmente trackeado mediante la excepción `!.env.production.example` en `inventory-api/.gitignore`.
 
 ## 2. Relevant repository structure
 - `inventory-api/scripts/validate-operational-readiness.js`
@@ -12,6 +12,7 @@ La convergencia final quedó implementada usando solo dos documentos públicos p
 - `inventory-api/docs/production-operations-runbook.md`
 - `inventory-api/docs/restore-readiness-baseline.md`
 - `inventory-api/.env.production.example`
+- `inventory-api/.gitignore`
 - `/.github/workflows/operational-smoke.yml`
 - `inventory-api/tests/production-baseline-characterization.test.js`
 - `inventory-api/tests/restore-readiness-characterization.test.js`
@@ -27,6 +28,7 @@ La convergencia final quedó implementada usando solo dos documentos públicos p
 
 ### 3.3 `.env.production.example`
 - Repository inspection confirms `inventory-api/.env.production.example` exists.
+- `inventory-api/.gitignore` ignores `.env.*` broadly but explicitly unignores `!.env.production.example`, confirming the file is meant to stay versioned.
 - Public docs and README reference `.env.production.example` as the starting point for the production baseline flow.
 - `scripts/validate-production-baseline.js` and `tests/production-baseline-characterization.test.js` now codify this artifact as explicit baseline evidence.
 
@@ -37,6 +39,7 @@ La convergencia final quedó implementada usando solo dos documentos públicos p
 ## 5. Risks in current state
 - Future maintainers could still introduce drift across public docs, validators, tests, and workflows if they update only one governance artifact.
 - Audits may raise new concerns if `.env.production.example` is changed without keeping the contractual references aligned.
+- Hosted operational evidence now exists via successful `operational-smoke` run `30291012752`, so future failures should be evaluated as regressions against that known-good state rather than as missing baseline evidence.
 
 ## 6. Likely affected files
 - `inventory-api/scripts/validate-operational-readiness.js`

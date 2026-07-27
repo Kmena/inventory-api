@@ -111,7 +111,7 @@ Evidence already recorded for the completed Node 24 and workflow-governance base
 - local `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`
 - local `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`
 - previously recorded Node 24 mainline validation across tests, browser E2E, validators, and Docker build
-- hosted success runs `30281932831`, `30281933453`, `30281933525`, `30281935485`, `30281937000`, and `30281935398`
+- hosted success runs `30281932831`, `30281933453`, `30281933525`, `30281935485`, `30281937000`, `30281935398`, and `30291012752` (`operational-smoke` after `.env.production.example` was tracked and the temporary compose env file was materialized)
 
 ## 15. Migration stages
 ### Stage 1 — Completed
@@ -174,4 +174,4 @@ For future approved governance work, manually confirm:
 - root-only workflow governance is preserved with no reintroduced application-local workflow YAML mirror
 
 ## 19. Approval status
-**Status:** Node 24 runtime migration completed and evidenced; root-only workflow governance plus public restore-readiness and operational-readiness contracts are implemented; `.env.production.example` is explicit validated baseline evidence; no third public operational-readiness document was needed; broader P11 hardening follow-up remains optional future work
+**Status:** Node 24 runtime migration completed and evidenced; root-only workflow governance plus public restore-readiness and operational-readiness contracts are implemented; `.env.production.example` is explicit validated baseline evidence and intentional tracked git artifact; hosted `operational-smoke` run `30291012752` succeeded after this closure; no third public operational-readiness document was needed; broader P11 hardening follow-up remains optional future work

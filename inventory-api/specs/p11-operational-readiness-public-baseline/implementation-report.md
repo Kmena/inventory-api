@@ -55,6 +55,7 @@
 - `inventory-api/docs/architecture.md`
 - `inventory-api/docs/action-plan.md`
 - `inventory-api/docs/tasks.md`
+- `inventory-api/.gitignore`
 
 ### Spec package
 - `inventory-api/specs/p11-operational-readiness-public-baseline/*`
@@ -90,6 +91,7 @@
 - `npm run build`
 - `npm run validate:production-baseline` => expected failure without required production env variables; confirms the command still enforces its contract
 - `powershell ... npm run validate:production-baseline` with explicit production env variables => pass
+- hosted `operational-smoke` run `30291012752` => pass
 - `git diff --check`
 
 ## 10. Validation results
@@ -100,12 +102,20 @@
 - `npm run typecheck`
 - `npm run build`
 - `powershell ... npm run validate:production-baseline` with explicit production env values
+- hosted `operational-smoke` run `30291012752`
 - `git diff --check`
+
+### Hosted validation note
+- The first hosted rerun for this slice, `operational-smoke` run `30290837860`, failed at `Validate production baseline inputs`.
+- Root cause: `.env.production.example` existed locally but was not versioned because `.gitignore` still ignored `.env.*` except `.env.example`.
+- Corrective action: added `!.env.production.example` to `inventory-api/.gitignore`, tracked `inventory-api/.env.production.example`, pushed the fix, and re-ran the hosted workflow.
+- Result: hosted `operational-smoke` run `30291012752` succeeded.
 
 ### Behavioral outcomes
 - `validate:operational-readiness` no longer depends on `internal-docs/` overlays and now validates the public `docs/` baseline directly.
 - `production-baseline` and `production-operations-runbook` now document the same public operational-readiness contract.
-- `.env.production.example` is now explicitly codified as a required versioned baseline artifact through validator coverage, tests, README, and docs.
+- `.env.production.example` is now explicitly codified as a required versioned baseline artifact through validator coverage, tests, README, docs, and the `!.env.production.example` tracking exception in `inventory-api/.gitignore`.
+- Hosted `operational-smoke` run `30291012752` succeeded after this closure, confirming the root workflow can validate the public baseline and materialize a temporary `.env.production` file for compose smoke.
 - No third public operational-readiness document was needed.
 
 ## 11. Existing failures
@@ -118,7 +128,7 @@
 - None. The approved two-document public contract was sufficient, so the conditional third document was not introduced.
 
 ## 14. Remaining risks
-- Public operational contracts still rely on synchronized maintenance across validators, tests, docs, README, and workflows.
+- Public operational contracts still rely on synchronized maintenance across validators, tests, docs, README, `.gitignore`, and workflows.
 - Future changes to `.env.production.example` must keep validators and docs aligned to avoid reopening audit ambiguity.
 
 ## 15. Manual validation
@@ -126,3 +136,38 @@
 
 ## 16. Next executable task
 - No remaining pending task inside this approved spec.
+
+## 17. Post-implementation audit
+- Delegated agent: `baseline-audit-agent`
+- Verdict: **Acceptable**
+- Score: **8.3/10**
+- Regression signal: **Low risk for the implemented feature**
+- Positive findings:
+  - `validate:operational-readiness` no longer depends on optional `internal-docs/` for the public gate;
+  - `docs/production-baseline.md` and `docs/production-operations-runbook.md` now form a consistent public contract;
+  - `.env.production.example` is now correctly tracked, validated, documented, and used as explicit baseline evidence;
+  - hosted `operational-smoke` succeeded after correcting the ignore/tracking defect.
+- Remaining audit findings:
+  - governance drift risk remains because the readiness contract is distributed across workflow YAML, validators, tests, docs, README, `.gitignore`, and `.env.production.example`;
+  - other repository governance areas still use optional `internal-docs/` skip behavior outside this slice;
+  - browser auth/session state remains stored in `localStorage` as unrelated standing security debt;
+  - README still contains a low-severity stale reference to `docs/er_propuesto_prd.md` outside this feature scope.
+- Warning required by process:
+  - the audit score remains below the required `9.5/10` threshold, so the implementation is completed and validated with documented repository governance debt below the audit target.
+
+## 18. Architecture documentation refresh
+- Delegated agent: `hdd-architecture-agent`
+- Refreshed files reported by the agent:
+  - `docs/current-state.md`
+  - `docs/architecture.md`
+  - `docs/action-plan.md`
+  - `docs/tasks.md`
+  - `specs/p11-operational-readiness-public-baseline/current-state.md`
+  - `specs/p11-operational-readiness-public-baseline/architecture.md`
+  - `specs/p11-operational-readiness-public-baseline/implementation-report.md`
+  - `specs/p11-operational-readiness-public-baseline/tasks.md`
+  - `specs/p11-operational-readiness-public-baseline/traceability.md`
+- Refresh outcome:
+  - operational readiness is documented as a public-docs-backed contract;
+  - `.env.production.example` is documented as explicit tracked baseline evidence;
+  - docs record that no third public operational-readiness document was needed and that hosted `operational-smoke` run `30291012752` succeeded.

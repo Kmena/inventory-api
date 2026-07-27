@@ -47,7 +47,7 @@ Observable current runtime/governance areas:
 - **Root workflows**: official hosted CI/CD jobs, all configured for Node 24 with `working-directory: inventory-api`, and the authoritative hosted workflow source
 - **Restore-readiness contract**: public operational baseline artifacts under `inventory-api/docs/`, validated through `package.json` and `scripts/validate-restore-readiness.js`
 - **Operational-readiness contract**: public operational baseline artifacts under `inventory-api/docs/`, validated through `package.json`, `scripts/validate-operational-readiness.js`, and the root `operational-smoke` workflow path
-- **Production-baseline evidence contract**: `.env.production.example` is treated as required versioned baseline evidence by `scripts/validate-production-baseline.js`, `tests/production-baseline-characterization.test.js`, and the public production docs
+- **Production-baseline evidence contract**: `.env.production.example` is treated as required versioned baseline evidence by `scripts/validate-production-baseline.js`, `tests/production-baseline-characterization.test.js`, the `!.env.production.example` exception in `inventory-api/.gitignore`, and the public production docs
 
 ## 6. Current dependency rules
 Observed dependency direction remains mostly:
@@ -121,7 +121,7 @@ Current implemented testing posture:
 Current Node 24 and workflow-governance evidence in effect:
 - reported local validation executed for `build`, `lint`, `typecheck`, `validate:workflow-baseline`, `validate:restore-readiness`, `validate:operational-readiness`, and the focused workflow/restore characterization suites
 - previously recorded local/mainline Node 24 suite includes focused Prisma regression, aggregate tests, browser E2E, runtime validators, and Docker build
-- hosted runs succeeded for `static-checks`, `db-constraints-tests`, `contract-validations`, `repository-tests`, `browser-e2e`, and `windows-prisma-build`
+- hosted runs succeeded for `static-checks`, `db-constraints-tests`, `contract-validations`, `repository-tests`, `browser-e2e`, `operational-smoke` (`30291012752`), and `windows-prisma-build`
 
 ## 12. Active architectural decisions
 Currently implemented or actively governing decisions:
@@ -134,7 +134,7 @@ Currently implemented or actively governing decisions:
 - keep the duplicated application-local workflow YAML removed rather than mirrored under `inventory-api/.github/workflows/`
 - expose `validate:restore-readiness` in `package.json` and treat it as a public docs-backed repository contract
 - expose `validate:operational-readiness` as a public docs-backed repository contract that validates `docs/production-baseline.md` and `docs/production-operations-runbook.md` directly instead of optional private overlays
-- treat `.env.production.example` as explicit versioned production-baseline evidence that must remain present, documented, and validator-covered
+- treat `.env.production.example` as explicit versioned production-baseline evidence that must remain present, documented, validator-covered, and intentionally unignored for tracking in git
 - preserve `working-directory: inventory-api` and `cache-dependency-path: inventory-api/package-lock.json` in root hosted workflows while the application remains nested
 
 ## 13. Known architectural limitations

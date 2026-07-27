@@ -32,7 +32,7 @@
 **Completed at:** 2026-07-27
 **Priority:** Medium
 **Requirement:** FR-005, FR-006
-**Objective:** Confirmar, documentar y/o validar explícitamente `.env.production.example` como artefacto contractual del baseline productivo.
+**Objective:** Confirmar, documentar y/o validar explícitamente `.env.production.example` como artefacto contractual del baseline productivo y mantenerlo trackeado intencionalmente.
 **Affected files:**
 - `inventory-api/.env.production.example`
 - `inventory-api/docs/production-baseline.md`
@@ -54,7 +54,7 @@
 - `npm run lint`
 - `npm run typecheck`
 - `npm run build`
-- hosted `operational-smoke` run after tracking `.env.production.example`
+- hosted `operational-smoke` run `30291012752` after tracking `.env.production.example`
 **Required tests:**
 - characterization/validator updates proving the artifact is present and referenced consistently
 

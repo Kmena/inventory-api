@@ -11,7 +11,7 @@ Current observable implementation:
 
 The `p11-node24-runtime-migration` baseline is now implemented and evidenced on local/mainline, Docker, and hosted GitHub Actions surfaces.
 
-The follow-up `p11-operational-readiness-public-baseline` slice is also implemented: operational-readiness is now validated from public versioned docs under `inventory-api/docs/`, `.env.production.example` is explicitly treated as required baseline evidence, and no third public operational-readiness document was introduced.
+The follow-up `p11-operational-readiness-public-baseline` slice is also implemented: operational-readiness is now validated from public versioned docs under `inventory-api/docs/`, `.env.production.example` is explicitly treated as required baseline evidence, the file is intentionally tracked in git via the `!.env.production.example` exception in `inventory-api/.gitignore`, and no third public operational-readiness document was introduced.
 
 ## 2. Repository structure
 High-signal paths verified in this refresh:
@@ -96,8 +96,9 @@ Examples still implemented:
 4. `scripts/validate-operational-readiness.js` reads the root `operational-smoke.yml` path and validates the public operational baseline from `docs/production-baseline.md` and `docs/production-operations-runbook.md`.
 5. `scripts/validate-production-baseline.js` requires `.env.production.example` as a versioned production-baseline artifact in addition to required runtime files and environment variables.
 6. `tests/production-baseline-characterization.test.js` asserts `.env.production.example` remains versioned and documented in both `README.md` and `docs/production-baseline.md`.
-7. Hosted GitHub Actions run from repository root `/.github/workflows/` and use `working-directory: inventory-api` plus `cache-dependency-path: inventory-api/package-lock.json`.
-8. Evidence is recorded in workflow logs, artifacts, docs, and spec packages.
+7. `inventory-api/.gitignore` ignores `.env.*` broadly but explicitly unignores `!.env.production.example`, so the production template remains intentionally versioned.
+8. Hosted GitHub Actions run from repository root `/.github/workflows/` and use `working-directory: inventory-api` plus `cache-dependency-path: inventory-api/package-lock.json`.
+9. Evidence is recorded in workflow logs, artifacts, docs, and spec packages.
 
 ## 7. Database and persistence
 - Prisma schema remains in `inventory-api/prisma/schema.prisma`.
@@ -163,6 +164,7 @@ Current observable validation baseline recorded for the implemented Node 24 and 
   - `contract-validations` run `30281933525` success
   - `repository-tests` run `30281935485` success
   - `browser-e2e` run `30281937000` success
+  - `operational-smoke` run `30291012752` success after tracking `.env.production.example` and materializing a temporary `.env.production` file for compose smoke
 - Windows Prisma build evidence remains separately classified through the dedicated workflow and artifact publication.
 
 ## 13. Behavior to preserve
@@ -173,7 +175,7 @@ Current observable validation baseline recorded for the implemented Node 24 and 
 - Root workflows continue to execute from repository root with `working-directory: inventory-api`.
 - Restore readiness remains a public docs-backed package contract via `npm run validate:restore-readiness`.
 - Operational readiness remains a public docs-backed package contract via `npm run validate:operational-readiness` and no longer uses optional private overlays for the public gate.
-- `.env.production.example` remains an explicit required production-baseline artifact.
+- `.env.production.example` remains an explicit required production-baseline artifact and intentionally tracked file.
 - The guarded Prisma generation wrapper remains part of the build contract.
 - The dedicated Windows Prisma workflow remains separate from broader repository validation.
 
