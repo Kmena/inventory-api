@@ -2,6 +2,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.production.example
 coverage/
 dist/
 build/
@@ -31,3 +32,5 @@ internal-docs/**
 # Local planning / cleanup scratch files.
 commit-plan-*.md
 docs-cleanup-report.md
+
+specs/*

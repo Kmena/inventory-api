@@ -40,17 +40,21 @@
 - `inventory-api/README.md`
 - tests/validadores relacionados
 **Implemented files:**
+- `inventory-api/.gitignore`
+- `inventory-api/.env.production.example`
 - `inventory-api/scripts/validate-production-baseline.js`
 - `inventory-api/tests/production-baseline-characterization.test.js`
 - `inventory-api/docs/production-baseline.md`
 - `inventory-api/docs/production-operations-runbook.md`
 - `inventory-api/README.md`
 **Validation evidence:**
+- `git ls-files inventory-api/.env.production.example`
 - `powershell ... npm run validate:production-baseline` with explicit production env values
 - `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`
 - `npm run lint`
 - `npm run typecheck`
 - `npm run build`
+- hosted `operational-smoke` run after tracking `.env.production.example`
 **Required tests:**
 - characterization/validator updates proving the artifact is present and referenced consistently
 
