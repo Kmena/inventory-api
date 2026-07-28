@@ -163,10 +163,18 @@ function createCompanyRoute(data) {
   });
 }
 
-function updateCompanyRoute(routeId, data) {
-  return prisma.salesRoute.update({
-    where: { id: routeId },
+async function updateCompanyRoute(routeId, companyId, data) {
+  const result = await prisma.salesRoute.updateMany({
+    where: { id: routeId, companyId },
     data,
+  });
+
+  if (result.count === 0) {
+    return null;
+  }
+
+  return prisma.salesRoute.findFirst({
+    where: { id: routeId, companyId },
     include: routeInclude(),
   });
 }

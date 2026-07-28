@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { repositoryRoot, skipIfMissing } = require('./internal-docs-optional');
+const { repositoryRoot } = require('./internal-docs-optional');
 const appPath = path.join(repositoryRoot, 'src', 'app.js');
-const openApiPath = path.join(repositoryRoot, 'internal-docs', 'openapi', 'runtime-baseline.openapi.json');
-const manifestPath = path.join(repositoryRoot, 'internal-docs', 'runtime-contract-manifest.json');
-const runtimeCatalogPath = path.join(repositoryRoot, 'internal-docs', 'runtime-endpoint-catalog.md');
+const openApiPath = path.join(repositoryRoot, 'docs', 'openapi', 'runtime-baseline.openapi.json');
+const manifestPath = path.join(repositoryRoot, 'docs', 'runtime-contract-manifest.json');
+const runtimeCatalogPath = path.join(repositoryRoot, 'docs', 'runtime-endpoint-catalog.md');
 
 const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   healthRouter: 'src/routes/health.routes.js',
@@ -83,14 +83,7 @@ function readCoveredOpenApiOperations() {
   return operations;
 }
 
-test('runtime contract manifest exhaustively classifies mounted router operations', (t) => {
-  if (skipIfMissing(t, [
-    'internal-docs/openapi/runtime-baseline.openapi.json',
-    'internal-docs/runtime-contract-manifest.json',
-  ], 'internal-docs runtime contract artifacts are optional in public repo mode')) {
-    return;
-  }
-
+test('runtime contract manifest exhaustively classifies mounted router operations', () => {
   const runtimeOperations = discoverMountedRouterOperations();
   const coveredOperations = readCoveredOpenApiOperations();
   const manifest = JSON.parse(read(manifestPath));
@@ -102,8 +95,8 @@ test('runtime contract manifest exhaustively classifies mounted router operation
 
   assert.equal(manifest.version, 1);
   assert.equal(manifest.classificationMode, 'openapi-covered-plus-explicit-exclusions');
-  assert.equal(manifest.openApiArtifact, 'internal-docs/openapi/runtime-baseline.openapi.json');
-  assert.equal(manifest.criticalContractMatrixArtifact, 'internal-docs/critical-contract-matrix.json');
+  assert.equal(manifest.openApiArtifact, 'docs/openapi/runtime-baseline.openapi.json');
+  assert.equal(manifest.criticalContractMatrixArtifact, 'docs/critical-contract-matrix.json');
   assert.ok(manifest.classificationRule);
   assert.ok(manifest.criticalityRule);
 
@@ -129,24 +122,15 @@ test('runtime contract manifest exhaustively classifies mounted router operation
   )));
 });
 
-test('runtime contract companion artifacts stay cross-linked and human-readable', (t) => {
-  if (skipIfMissing(t, [
-    'internal-docs/openapi/runtime-baseline.openapi.json',
-    'internal-docs/runtime-contract-manifest.json',
-    'internal-docs/runtime-endpoint-catalog.md',
-    'internal-docs/critical-contract-matrix.json',
-  ], 'internal-docs runtime contract artifacts are optional in public repo mode')) {
-    return;
-  }
-
+test('runtime contract companion artifacts stay cross-linked and human-readable', () => {
   const openApi = JSON.parse(read(openApiPath));
   const manifest = JSON.parse(read(manifestPath));
   const runtimeCatalog = read(runtimeCatalogPath);
 
   assert.equal(openApi.info.version, '0.5.0');
-  assert.equal(openApi['x-coverage-scope']?.contractClassification?.excludedOperationsArtifact, 'internal-docs/runtime-contract-manifest.json');
-  assert.equal(openApi['x-coverage-scope']?.contractClassification?.runtimeCatalogArtifact, 'internal-docs/runtime-endpoint-catalog.md');
-  assert.equal(openApi['x-coverage-scope']?.contractClassification?.criticalContractMatrixArtifact, 'internal-docs/critical-contract-matrix.json');
+  assert.equal(openApi['x-coverage-scope']?.contractClassification?.excludedOperationsArtifact, 'docs/runtime-contract-manifest.json');
+  assert.equal(openApi['x-coverage-scope']?.contractClassification?.runtimeCatalogArtifact, 'docs/runtime-endpoint-catalog.md');
+  assert.equal(openApi['x-coverage-scope']?.contractClassification?.criticalContractMatrixArtifact, 'docs/critical-contract-matrix.json');
   assert.match(runtimeCatalog, /No se aceptan rutas montadas sin clasificar/i);
   assert.match(runtimeCatalog, /runtime-contract-manifest\.json/);
   assert.match(runtimeCatalog, /critical-contract-matrix\.json/);

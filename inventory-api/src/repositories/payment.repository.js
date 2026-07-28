@@ -190,11 +190,16 @@ function reverseCompanyPayment(id, companyId, { reversedAt, reversedByUserId, re
   });
 }
 
-function markPaymentReceiptsAsReplaced(paymentId, replacedAt, db = prisma) {
+function markPaymentReceiptsAsReplaced(paymentId, companyId, replacedAt, db = prisma) {
   return db.paymentReceipt.updateMany({
     where: {
       paymentId,
       isCurrent: true,
+      payment: {
+        invoice: {
+          client: { companyId },
+        },
+      },
     },
     data: {
       isCurrent: false,

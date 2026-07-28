@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "task": "P8 TASK-002",
+  "policy": {
+    "approvedOption": "B"
+  },
+  "requiredCriticalSurfaces": [
+    "auth"
+  ],
+  "summary": {
+    "optionSatisfied": "B",
+    "totalRoutes": 2,
+    "criticalRoutes": 1,
+    "criticalCoveredByOpenApi": 1,
+    "criticalExplicitlyExcluded": 0,
+    "supportingRoutes": 1,
+    "supportingExplicitlyExcluded": 1,
+    "criticalResolvedPercentage": 100
+  },
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "surface": "auth",
+      "criticality": "critical",
+      "contractStatus": "covered-by-openapi",
+      "justification": "Login forma parte de la superficie mínima crítica observable del runtime.",
+      "evidence": {
+        "openApiPath": "/api/auth/login"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/clients",
+      "surface": "clients",
+      "criticality": "supporting",
+      "contractStatus": "explicitly-excluded-with-justification",
+      "preferredPath": "/api/clients/company",
+      "justification": "Alias legacy preservado mientras el contrato factual preferido permanece tenant-scoped.",
+      "evidence": {
+        "manifestOperation": {
+          "method": "GET",
+          "mountPath": "/api/clients"
+        }
+      }
+    }
+  ]
+}

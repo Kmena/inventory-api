@@ -225,7 +225,7 @@ async function createCompanyClientDocument(clientId, payload, auth) {
     });
   } catch {
     try {
-      await clientRepository.deleteClientDocument(documentId);
+      await clientRepository.deleteClientDocument(documentId, clientId, companyId);
     } catch (_cleanupError) {
       throw createHttpError(
         500,

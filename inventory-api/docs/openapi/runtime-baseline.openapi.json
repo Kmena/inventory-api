@@ -27,6 +27,7 @@
       "coveredOperationsArtifact": "docs/openapi/runtime-baseline.openapi.json",
       "excludedOperationsArtifact": "docs/runtime-contract-manifest.json",
       "runtimeCatalogArtifact": "docs/runtime-endpoint-catalog.md",
+      "criticalContractMatrixArtifact": "docs/critical-contract-matrix.json",
       "classificationRule": "Toda operación montada en routers debe estar cubierta aquí mediante x-runtime-source o listada explícitamente como exclusión intencional en el manifiesto contractual.",
       "notes": [
         "OpenAPI sigue siendo parcial y factual.",
@@ -36,6 +37,7 @@
     },
     "exclusions": [
       "operaciones runtime listadas explícitamente en docs/runtime-contract-manifest.json",
+      "superficie mínima crítica gobernada adicionalmente en docs/critical-contract-matrix.json",
       "superficies no-HTTP-documentadas de browser/runtime público gobernadas fuera de OpenAPI",
       "cobertura total del monolito"
     ]
@@ -120,6 +122,23 @@
         "responses": {
           "200": { "description": "Contexto autenticado" },
           "401": { "description": "Token faltante o inválido" }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "logoutBrowserOrBearerSession",
+        "summary": "Cerrar la sesión autenticada actual",
+        "tags": ["auth"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/auth",
+          "routeFile": "src/routes/auth.routes.js",
+          "expressPath": "/logout"
+        },
+        "responses": {
+          "204": { "description": "Sesión cerrada" },
+          "401": { "description": "Sesión faltante o inválida" }
         }
       }
     },

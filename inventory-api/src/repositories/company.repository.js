@@ -1,5 +1,11 @@
 const prisma = require('../lib/prisma');
 
+function findUserByUsername(username, db = prisma) {
+  return db.user.findUnique({
+    where: { username },
+  });
+}
+
 async function findAllCompanies() {
   return prisma.company.findMany({
     orderBy: { id: 'asc' },
@@ -74,11 +80,93 @@ async function findCompanyExecutiveDashboard(companyId) {
   return { company, employeesCount };
 }
 
+async function registerRootCompanyBootstrap(payload, options = {}, db = prisma) {
+  const { onSuccess } = options;
+
+  return db.$transaction(async (tx) => {
+    const adminRole = await tx.role.upsert({
+      where: { code: 'admin' },
+      update: { name: 'Administrador', companyId: null, isActive: true },
+      create: { code: 'admin', name: 'Administrador', companyId: null, isActive: true },
+    });
+
+    const company = await tx.company.create({
+      data: {
+        ...payload.company,
+        isActive: true,
+        companyConfig: {
+          create: {
+            taxPercentage: 13,
+            currency: 'CRC',
+            pricingMode: 'standard',
+            allowBackorder: false,
+          },
+        },
+      },
+    });
+
+    await tx.clientClassification.createMany({
+      data: defaultClientClassifications(company.id),
+      skipDuplicates: true,
+    });
+
+    const fiscalConfig = await tx.companyFiscalConfig.create({
+      data: {
+        companyId: company.id,
+        ...payload.fiscalConfig,
+        commercialName: payload.fiscalConfig.commercialName || payload.company.name,
+        email: payload.fiscalConfig.email || payload.company.email,
+        phone: payload.fiscalConfig.phone || payload.company.phone,
+        address: payload.fiscalConfig.address || payload.company.address,
+      },
+    });
+
+    const rootUser = await tx.user.create({
+      data: {
+        companyId: company.id,
+        roleId: adminRole.id,
+        fullName: payload.rootUser.fullName,
+        email: payload.rootUser.email,
+        username: payload.rootUser.username,
+        passwordHash: payload.rootUser.passwordHash,
+        phone: payload.rootUser.phone,
+        status: 'ACTIVE',
+      },
+      include: { role: true },
+    });
+
+    for (const documentType of ['FACTURA_ELECTRONICA', 'TIQUETE_ELECTRONICO', 'NOTA_CREDITO_ELECTRONICA']) {
+      await tx.fiscalSequence.create({
+        data: {
+          companyId: company.id,
+          documentType,
+          branchCode: payload.fiscalConfig.defaultBranchCode,
+          terminalCode: payload.fiscalConfig.defaultTerminalCode,
+          currentNumber: 0,
+          nextNumber: 1,
+          isActive: true,
+        },
+      });
+    }
+
+    const { passwordHash: _passwordHash, ...safeRootUser } = rootUser;
+    const result = { company, fiscalConfig, rootUser: safeRootUser };
+
+    if (typeof onSuccess === 'function') {
+      await onSuccess(result, tx);
+    }
+
+    return result;
+  });
+}
+
 module.exports = {
   defaultClientClassifications,
+  findUserByUsername,
   findAllCompanies,
   findAllCompaniesForRoot,
   createCompany,
   updateCompanyStatus,
   findCompanyExecutiveDashboard,
+  registerRootCompanyBootstrap,
 };

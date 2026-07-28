@@ -1,4 +1,5 @@
 const { createHttpError } = require('../lib/errors');
+const inventoryRepository = require('../repositories/inventory.repository');
 const { deriveLotUsability, lotDateKey } = require('./inventory-lot-policy.service');
 
 function authScope(auth) {
@@ -17,11 +18,12 @@ function number(value) {
 
 async function getInventoryContext(tx, auth, warehouseId, productId, options = {}) {
   const { companyId, userId } = authScope(auth);
-  const [inventory, warehouse, product] = await Promise.all([
-    tx.inventory.findUnique({ where: { companyId } }),
-    tx.warehouse.findFirst({ where: { id: warehouseId, companyId } }),
-    tx.product.findFirst({ where: { id: productId, companyId } }),
-  ]);
+  const { inventory, warehouse, product } = await inventoryRepository.loadInventoryContext(
+    companyId,
+    warehouseId,
+    productId,
+    tx,
+  );
 
   if (!inventory) throw createHttpError(409, 'La empresa no tiene inventario configurado', 'conflict');
   if (!warehouse) throw createHttpError(404, 'Bodega no encontrada para la empresa', 'not_found');
@@ -35,26 +37,22 @@ async function getInventoryContext(tx, auth, warehouseId, productId, options = {
 }
 
 async function changeWarehouseStock(tx, context, quantityDelta = 0, reservedDelta = 0) {
-  const key = {
-    warehouseId_productId: {
-      warehouseId: context.warehouse.id,
-      productId: context.product.id,
-    },
-  };
-  let current = await tx.warehouseStock.findUnique({ where: key });
+  let current = await inventoryRepository.findWarehouseStockRecord(
+    context.warehouse.id,
+    context.product.id,
+    tx,
+  );
 
   if (!current) {
     if (quantityDelta < 0 || reservedDelta !== 0) {
       throw createHttpError(409, 'No existe stock del producto en la bodega', 'conflict');
     }
-    current = await tx.warehouseStock.create({
-      data: {
-        inventoryId: context.inventory.id,
-        warehouseId: context.warehouse.id,
-        productId: context.product.id,
-        quantity: quantityDelta,
-      },
-    });
+    current = await inventoryRepository.createWarehouseStockRecord({
+      inventoryId: context.inventory.id,
+      warehouseId: context.warehouse.id,
+      productId: context.product.id,
+      quantity: quantityDelta,
+    }, tx);
     return { before: 0, after: number(current.quantity), record: current };
   }
 
@@ -73,45 +71,38 @@ async function changeWarehouseStock(tx, context, quantityDelta = 0, reservedDelt
     if (reservedDelta < 0) where.reservedQuantity = { gte: Math.abs(reservedDelta) };
   }
 
-  const updated = await tx.warehouseStock.updateMany({
-    where,
-    data: {
-      ...(quantityDelta > 0 ? { quantity: { increment: quantityDelta } } : {}),
-      ...(quantityDelta < 0 ? { quantity: { decrement: Math.abs(quantityDelta) } } : {}),
-      ...(reservedDelta > 0 ? { reservedQuantity: { increment: reservedDelta } } : {}),
-      ...(reservedDelta < 0 ? { reservedQuantity: { decrement: Math.abs(reservedDelta) } } : {}),
-    },
-  });
+  const updated = await inventoryRepository.updateWarehouseStockRecord(where, {
+    ...(quantityDelta > 0 ? { quantity: { increment: quantityDelta } } : {}),
+    ...(quantityDelta < 0 ? { quantity: { decrement: Math.abs(quantityDelta) } } : {}),
+    ...(reservedDelta > 0 ? { reservedQuantity: { increment: reservedDelta } } : {}),
+    ...(reservedDelta < 0 ? { reservedQuantity: { decrement: Math.abs(reservedDelta) } } : {}),
+  }, tx);
 
   if (updated.count !== 1) {
     throw createHttpError(409, 'El stock cambio durante la operacion o no es suficiente', 'conflict');
   }
 
-  current = await tx.warehouseStock.findUnique({ where: { id: current.id } });
+  current = await inventoryRepository.findWarehouseStockRecordById(current.id, tx);
   return { before, after: number(current.quantity), record: current };
 }
 
 async function changeLotStock(tx, context, lot, quantityDelta = 0, reservedDelta = 0) {
-  const key = {
-    warehouseId_lotId: {
-      warehouseId: context.warehouse.id,
-      lotId: lot.id,
-    },
-  };
-  let current = await tx.warehouseLotStock.findUnique({ where: key });
+  let current = await inventoryRepository.findWarehouseLotStockRecord(
+    context.warehouse.id,
+    lot.id,
+    tx,
+  );
 
   if (!current) {
     if (quantityDelta <= 0 || reservedDelta !== 0) {
       throw createHttpError(409, 'El lote no tiene stock en la bodega', 'conflict');
     }
-    current = await tx.warehouseLotStock.create({
-      data: {
-        warehouseId: context.warehouse.id,
-        lotId: lot.id,
-        productId: context.product.id,
-        quantity: quantityDelta,
-      },
-    });
+    current = await inventoryRepository.createWarehouseLotStockRecord({
+      warehouseId: context.warehouse.id,
+      lotId: lot.id,
+      productId: context.product.id,
+      quantity: quantityDelta,
+    }, tx);
     return { before: 0, after: number(current.quantity), record: current };
   }
 
@@ -134,57 +125,45 @@ async function changeLotStock(tx, context, lot, quantityDelta = 0, reservedDelta
     if (reservedDelta < 0) where.reservedQuantity = { gte: Math.abs(reservedDelta) };
   }
 
-  const updated = await tx.warehouseLotStock.updateMany({
-    where,
-    data: {
-      ...(quantityDelta > 0 ? { quantity: { increment: quantityDelta } } : {}),
-      ...(quantityDelta < 0 ? { quantity: { decrement: Math.abs(quantityDelta) } } : {}),
-      ...(reservedDelta > 0 ? { reservedQuantity: { increment: reservedDelta } } : {}),
-      ...(reservedDelta < 0 ? { reservedQuantity: { decrement: Math.abs(reservedDelta) } } : {}),
-    },
-  });
+  const updated = await inventoryRepository.updateWarehouseLotStockRecord(where, {
+    ...(quantityDelta > 0 ? { quantity: { increment: quantityDelta } } : {}),
+    ...(quantityDelta < 0 ? { quantity: { decrement: Math.abs(quantityDelta) } } : {}),
+    ...(reservedDelta > 0 ? { reservedQuantity: { increment: reservedDelta } } : {}),
+    ...(reservedDelta < 0 ? { reservedQuantity: { decrement: Math.abs(reservedDelta) } } : {}),
+  }, tx);
 
   if (updated.count !== 1) {
     throw createHttpError(409, 'El saldo del lote cambio o no es suficiente', 'conflict');
   }
 
-  current = await tx.warehouseLotStock.findUnique({ where: { id: current.id } });
+  current = await inventoryRepository.findWarehouseLotStockRecordById(current.id, tx);
   return { before, after: number(current.quantity), record: current };
 }
 
 async function createMovement(tx, context, data) {
-  return tx.stockMovement.create({
-    data: {
-      companyId: context.companyId,
-      warehouseId: context.warehouse.id,
-      productId: context.product.id,
-      userId: context.userId,
-      lotId: data.lotId ?? null,
-      movementType: data.movementType,
-      quantity: data.quantity,
-      quantityBefore: data.quantityBefore,
-      quantityAfter: data.quantityAfter,
-      reasonCode: data.reasonCode,
-      movementGroupId: data.movementGroupId ?? null,
-      sourceType: data.sourceType ?? null,
-      sourceId: data.sourceId ?? null,
-      note: data.note ?? null,
-    },
-    include: { product: true, lot: true, warehouse: true },
-  });
+  return inventoryRepository.createStockMovementRecord({
+    companyId: context.companyId,
+    warehouseId: context.warehouse.id,
+    productId: context.product.id,
+    userId: context.userId,
+    lotId: data.lotId ?? null,
+    movementType: data.movementType,
+    quantity: data.quantity,
+    quantityBefore: data.quantityBefore,
+    quantityAfter: data.quantityAfter,
+    reasonCode: data.reasonCode,
+    movementGroupId: data.movementGroupId ?? null,
+    sourceType: data.sourceType ?? null,
+    sourceId: data.sourceId ?? null,
+    note: data.note ?? null,
+  }, tx);
 }
 
 async function resolveUniqueInternalLotNumber(tx, companyId, requestedNumber) {
   let candidate = requestedNumber;
   let suffix = 0;
 
-  while (await tx.lot.findFirst({
-    where: {
-      internalLotNumber: candidate,
-      product: { companyId },
-    },
-    select: { id: true },
-  })) {
+  while (await inventoryRepository.findLotByInternalNumber(companyId, candidate, tx)) {
     suffix += 1;
     if (suffix > 999) {
       throw createHttpError(409, 'No fue posible generar un numero de lote interno unico', 'conflict');
@@ -208,18 +187,11 @@ function sortFefo(items) {
 }
 
 async function reserveLots(tx, context, quantity) {
-  const rawCandidates = await tx.warehouseLotStock.findMany({
-    where: {
-      warehouseId: context.warehouse.id,
-      productId: context.product.id,
-      quantity: { gt: 0 },
-      lot: {
-        status: 'AVAILABLE',
-        qaStatus: 'APPROVED',
-      },
-    },
-    include: { lot: true },
-  });
+  const rawCandidates = await inventoryRepository.findReservableLotStocks(
+    context.warehouse.id,
+    context.product.id,
+    tx,
+  );
   const candidates = sortFefo(rawCandidates.filter((candidate) => deriveLotUsability(candidate.lot).sellable));
 
   let remaining = quantity;
@@ -252,16 +224,12 @@ function assertOrderHasOperationalWarehouse(order) {
 }
 
 async function getActiveAllocations(tx, order) {
-  const movements = await tx.stockMovement.findMany({
-    where: {
-      companyId: order.companyId,
-      warehouseId: order.warehouseId,
-      sourceType: 'order',
-      sourceId: order.id,
-      movementType: { in: ['RESERVE', 'RELEASE', 'OUT'] },
-    },
-    orderBy: { id: 'asc' },
-  });
+  const movements = await inventoryRepository.findOrderAllocations(
+    order.companyId,
+    order.warehouseId,
+    order.id,
+    tx,
+  );
 
   const balances = new Map();
   for (const movement of movements) {

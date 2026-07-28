@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { repositoryRoot, skipIfMissing } = require('./internal-docs-optional');
-const matrixPath = path.join(repositoryRoot, 'internal-docs', 'critical-contract-matrix.json');
-const openApiPath = path.join(repositoryRoot, 'internal-docs', 'openapi', 'runtime-baseline.openapi.json');
-const manifestPath = path.join(repositoryRoot, 'internal-docs', 'runtime-contract-manifest.json');
-const catalogPath = path.join(repositoryRoot, 'internal-docs', 'runtime-endpoint-catalog.md');
+const { repositoryRoot } = require('./internal-docs-optional');
+const matrixPath = path.join(repositoryRoot, 'docs', 'critical-contract-matrix.json');
+const openApiPath = path.join(repositoryRoot, 'docs', 'openapi', 'runtime-baseline.openapi.json');
+const manifestPath = path.join(repositoryRoot, 'docs', 'runtime-contract-manifest.json');
+const catalogPath = path.join(repositoryRoot, 'docs', 'runtime-endpoint-catalog.md');
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -37,16 +37,7 @@ function buildCoveredOpenApiKeySet(openApi) {
   return covered;
 }
 
-test('critical contract matrix resolves the minimum critical surface with approved Option B', (t) => {
-  if (skipIfMissing(t, [
-    'internal-docs/critical-contract-matrix.json',
-    'internal-docs/openapi/runtime-baseline.openapi.json',
-    'internal-docs/runtime-contract-manifest.json',
-    'internal-docs/runtime-endpoint-catalog.md',
-  ], 'internal-docs critical contract artifacts are optional in public repo mode')) {
-    return;
-  }
-
+test('critical contract matrix resolves the minimum critical surface with approved Option B', () => {
   const matrix = readJson(matrixPath);
   const openApi = readJson(openApiPath);
   const manifest = readJson(manifestPath);
@@ -76,8 +67,8 @@ test('critical contract matrix resolves the minimum critical surface with approv
     assert.ok(surfaces.has(requiredSurface), `Missing critical surface ${requiredSurface}`);
   }
 
-  assert.equal(openApi['x-coverage-scope']?.contractClassification?.criticalContractMatrixArtifact, 'internal-docs/critical-contract-matrix.json');
-  assert.equal(manifest.criticalContractMatrixArtifact, 'internal-docs/critical-contract-matrix.json');
+  assert.equal(openApi['x-coverage-scope']?.contractClassification?.criticalContractMatrixArtifact, 'docs/critical-contract-matrix.json');
+  assert.equal(manifest.criticalContractMatrixArtifact, 'docs/critical-contract-matrix.json');
   assert.match(catalog, /Option B satisfied/i);
 
   const coveredOpenApiKeys = buildCoveredOpenApiKeySet(openApi);

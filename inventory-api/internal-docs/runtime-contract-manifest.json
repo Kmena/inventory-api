@@ -1,0 +1,213 @@
+{
+  "version": 1,
+  "classificationMode": "openapi-covered-plus-explicit-exclusions",
+  "openApiArtifact": "internal-docs/openapi/runtime-baseline.openapi.json",
+  "criticalContractMatrixArtifact": "internal-docs/critical-contract-matrix.json",
+  "classificationRule": "Toda operación montada en routers debe estar cubierta por OpenAPI mediante x-runtime-source o listada aquí como exclusión intencional con razón explícita.",
+  "criticalityRule": "La superficie mínima crítica se gobierna adicionalmente mediante internal-docs/critical-contract-matrix.json con la opción aprobada B.",
+  "nonRouteRuntimeSurfaces": [
+    {
+      "surface": "express.static(src/public)",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "browser-runtime-surface-governed-separately",
+      "reason": "La UI embebida y los assets públicos forman parte del runtime soportado, pero no del contrato OpenAPI parcial. Se gobiernan con pruebas HTTP/browser y con la documentación de superficie pública.",
+      "governedBy": [
+        "tests/public-surface-characterization.test.js",
+        "tests/public-runtime-http-smoke.test.js",
+        "tests/browser-e2e.e2e.js"
+      ]
+    }
+  ],
+  "excludedOperations": [
+    {
+      "method": "GET",
+      "mountPath": "/api/users",
+      "expressPath": "/",
+      "routeFile": "src/routes/user.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "root-global-user-admin-outside-partial-openapi",
+      "reason": "La operación root/global de listado de usuarios sigue activa en runtime, pero la cobertura OpenAPI parcial prioriza el flujo company-scoped ya gobernado y no promete todavía la superficie global completa."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/users",
+      "expressPath": "/",
+      "routeFile": "src/routes/user.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "root-global-user-admin-outside-partial-openapi",
+      "reason": "La creación global de usuarios por root sigue soportada en runtime, pero permanece fuera del contrato OpenAPI parcial para no expandirlo sin cobertura más completa del dominio root/global."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/clients",
+      "expressPath": "/",
+      "routeFile": "src/routes/client.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "legacy-client-list-alias-outside-preferred-company-contract",
+      "reason": "`GET /api/clients` preserva una forma legacy compatible del listado tenant-scoped. El contrato factual preferido para este dominio sigue siendo `GET /api/clients/company`.",
+      "preferredOpenApiPath": "/api/clients/company"
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/products",
+      "expressPath": "/:id",
+      "routeFile": "src/routes/product.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "product-detail-lifecycle-outside-current-openapi-baseline",
+      "reason": "El baseline parcial actual cubre listado, creación e importación de productos, pero no promete todavía la superficie completa de detalle/mutación del ciclo de vida del producto."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/products",
+      "expressPath": "/:id",
+      "routeFile": "src/routes/product.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "product-detail-lifecycle-outside-current-openapi-baseline",
+      "reason": "La actualización de productos sigue operativa en runtime, pero queda fuera de la cobertura OpenAPI parcial actual mientras el baseline prioriza superficies más críticas ya caracterizadas."
+    },
+    {
+      "method": "DELETE",
+      "mountPath": "/api/products",
+      "expressPath": "/:id",
+      "routeFile": "src/routes/product.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "product-delete-compatibility-outside-current-openapi-baseline",
+      "reason": "La eliminación compatibilizada de productos sigue gobernada por pruebas de semántica delete, pero permanece fuera del OpenAPI parcial para evitar ampliar el contrato sin documentar toda la compatibilidad histórica."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/orders",
+      "expressPath": "/:id",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "El baseline parcial actual documenta la creación de pedidos y no promete todavía el detalle completo ni todas las transiciones operativas del ciclo de vida del pedido."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/orders",
+      "expressPath": "/:id",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "La edición de pedidos sigue activa en runtime, pero queda fuera del contrato parcial mientras no se expanda con cobertura factual del ciclo completo."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/orders",
+      "expressPath": "/:id/approve",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "La transición de aprobación de pedidos es una superficie operativa real, pero todavía no forma parte del OpenAPI parcial factual."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/orders",
+      "expressPath": "/:id/cancel",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "La cancelación de pedidos permanece fuera del contrato OpenAPI parcial aunque siga soportada en runtime."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/orders",
+      "expressPath": "/:id/dispatch",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "El despacho de pedidos sigue operativo y probado en runtime, pero aún no se declara dentro del contrato OpenAPI parcial."
+    },
+    {
+      "method": "DELETE",
+      "mountPath": "/api/orders",
+      "expressPath": "/:id",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "La remoción/cancelación compatible de pedidos permanece fuera del OpenAPI parcial actual."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/invoices",
+      "expressPath": "/:id",
+      "routeFile": "src/routes/invoice.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "invoice-detail-lifecycle-outside-current-openapi-baseline",
+      "reason": "El OpenAPI parcial cubre listado, creación e inconsistencias de facturas, pero no promete todavía el detalle completo ni sus mutaciones posteriores."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/invoices",
+      "expressPath": "/:id",
+      "routeFile": "src/routes/invoice.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "invoice-detail-lifecycle-outside-current-openapi-baseline",
+      "reason": "La edición de facturas sigue soportada en runtime, pero queda fuera del baseline parcial factual actual."
+    },
+    {
+      "method": "DELETE",
+      "mountPath": "/api/invoices",
+      "expressPath": "/:id",
+      "routeFile": "src/routes/invoice.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "invoice-delete-compatibility-outside-current-openapi-baseline",
+      "reason": "La eliminación compatibilizada de facturas sigue gobernada por pruebas de delete semántico, pero permanece fuera del contrato parcial."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/sales-routes",
+      "expressPath": "/company/:routeId/subzones",
+      "routeFile": "src/routes/sales-route.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "subzone-bulk-mutation-outside-current-openapi-baseline",
+      "reason": "La mutación masiva de subzonas de rutas comerciales sigue soportada, pero todavía no forma parte del recorte factual del OpenAPI parcial."
+    },
+    {
+      "method": "DELETE",
+      "mountPath": "/api/sales-routes",
+      "expressPath": "/company/:routeId/subzones/:subzoneId",
+      "routeFile": "src/routes/sales-route.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "subzone-bulk-mutation-outside-current-openapi-baseline",
+      "reason": "La remoción puntual de subzonas sigue operativa en runtime, pero no se incluye todavía en la cobertura OpenAPI parcial."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/agent",
+      "expressPath": "/stores/:storeId/purchase-history",
+      "routeFile": "src/routes/agent.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "agent-deep-read-subresource-outside-current-openapi-baseline",
+      "reason": "El subrecurso profundo de historial de compras de tienda agente sigue siendo factual de runtime, pero queda fuera del contrato parcial mientras se priorizan las superficies agent workspace ya baselined."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/agent",
+      "expressPath": "/stores/:storeId/sellable-products",
+      "routeFile": "src/routes/agent.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "agent-deep-read-subresource-outside-current-openapi-baseline",
+      "reason": "La vista derivada de productos vendibles por tienda agente permanece fuera del OpenAPI parcial actual, aunque sigue montada y tenant-aware en runtime."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/agent",
+      "expressPath": "/goals",
+      "routeFile": "src/routes/agent.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "agent-goals-read-surface-outside-current-openapi-baseline",
+      "reason": "La consulta de metas del agente sigue soportada, pero no se incluye todavía dentro del baseline contractual parcial."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/economic-activities",
+      "expressPath": "/",
+      "routeFile": "src/routes/economic-activity.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "auxiliary-integration-lookup-outside-current-openapi-baseline",
+      "reason": "La búsqueda de actividades económicas es una integración auxiliar factual del runtime, pero aún no forma parte de la cobertura OpenAPI parcial aprobada."
+    }
+  ]
+}

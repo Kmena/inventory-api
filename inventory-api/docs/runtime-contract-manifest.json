@@ -2,14 +2,17 @@
   "version": 1,
   "classificationMode": "openapi-covered-plus-explicit-exclusions",
   "openApiArtifact": "docs/openapi/runtime-baseline.openapi.json",
+  "criticalContractMatrixArtifact": "docs/critical-contract-matrix.json",
   "classificationRule": "Toda operación montada en routers debe estar cubierta por OpenAPI mediante x-runtime-source o listada aquí como exclusión intencional con razón explícita.",
+  "criticalityRule": "La superficie mínima crítica se gobierna adicionalmente mediante docs/critical-contract-matrix.json con la opción aprobada B.",
   "nonRouteRuntimeSurfaces": [
     {
       "surface": "express.static(src/public)",
       "contractStatus": "intentionally-excluded",
       "reasonCode": "browser-runtime-surface-governed-separately",
-      "reason": "La UI embebida y los assets públicos forman parte del runtime soportado, pero no del contrato OpenAPI parcial. Se gobiernan con pruebas HTTP/browser y con la documentación de superficie pública.",
+      "reason": "La UI embebida y los assets públicos forman parte del runtime soportado, pero no del contrato OpenAPI parcial. Se gobiernan con validación explícita del runtime público, pruebas HTTP/browser y documentación de superficie pública, incluyendo el aterrizaje post-login transicional en `/migration.html?mode=post-login-transition` y el contrato `410 Gone` para rutas HTML legacy retiradas.",
       "governedBy": [
+        "scripts/validate-public-runtime.js",
         "tests/public-surface-characterization.test.js",
         "tests/public-runtime-http-smoke.test.js",
         "tests/browser-e2e.e2e.js"

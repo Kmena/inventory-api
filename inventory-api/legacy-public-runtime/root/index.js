@@ -1,0 +1,167 @@
+const inventorySession = window.InventorySession;
+const inventoryAuth = window.InventoryAuth;
+const session = inventorySession.read();
+const sessionLabel = document.getElementById('root-session');
+const logoutButton = document.getElementById('logout-button');
+const form = document.getElementById('company-form');
+const message = document.getElementById('company-message');
+const createButton = document.getElementById('create-company-button');
+const refreshButton = document.getElementById('refresh-companies-button');
+const companiesBody = document.getElementById('companies-body');
+
+if (!session?.user || session?.user?.role?.code !== 'root') {
+  window.location.href = '/';
+} else if (session?.user?.companyId) {
+  window.location.href = '/root/dashboard.html';
+} else {
+  sessionLabel.textContent = `Sesion activa: ${session.user.fullName} (${session.user.username})`;
+
+function optional(value) {
+  const normalized = value?.toString().trim();
+  return normalized || undefined;
+}
+
+function renderCompanies(companies) {
+  if (!companies.length) {
+    companiesBody.innerHTML = '<tr><td class="empty-state" colspan="6">No hay empresas registradas.</td></tr>';
+    return;
+  }
+
+  companiesBody.innerHTML = companies
+    .map((company) => {
+      const fiscalConfig = company.fiscalConfig;
+      const rootUser = company.users?.[0];
+      return `<tr>
+        <td>${company.name}</td>
+        <td>${company.legalId || '-'}</td>
+        <td>${company.isActive ? 'Activa' : 'Inactiva'}</td>
+        <td>${fiscalConfig?.haciendaEnvironment || '-'}</td>
+        <td>${rootUser ? `${rootUser.username} (${rootUser.fullName})` : '-'}</td>
+        <td>
+          <button class="secondary-button company-status-button" type="button" data-company-id="${company.id}" data-is-active="${company.isActive}">
+            ${company.isActive ? 'Deshabilitar' : 'Activar'}
+          </button>
+        </td>
+      </tr>`;
+    })
+    .join('');
+}
+
+async function loadCompanies() {
+  const data = await inventoryAuth.fetchJson(session, '/api/companies/root/companies', {
+    fallbackMessage: 'No se pudieron cargar las empresas',
+  });
+  renderCompanies(data);
+}
+
+logoutButton.addEventListener('click', () => {
+  window.InventoryAuth.logout(session);
+});
+
+refreshButton.addEventListener('click', async () => {
+  message.textContent = '';
+  message.className = 'message';
+  try {
+    await loadCompanies();
+  } catch (error) {
+    message.textContent = error.message || 'No se pudieron cargar las empresas';
+    message.classList.add('error');
+  }
+});
+
+companiesBody.addEventListener('click', async (event) => {
+  const button = event.target.closest('.company-status-button');
+  if (!button) {
+    return;
+  }
+
+  const companyId = button.dataset.companyId;
+  const isActive = button.dataset.isActive === 'true';
+  message.textContent = '';
+  message.className = 'message';
+  button.disabled = true;
+  button.textContent = isActive ? 'Deshabilitando...' : 'Activando...';
+
+  try {
+    const result = await inventoryAuth.fetchJson(session, `/api/companies/root/companies/${companyId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive: !isActive }),
+      fallbackMessage: 'No se pudo actualizar la empresa',
+    });
+
+    message.textContent = result.isActive ? 'Empresa activada correctamente' : 'Empresa deshabilitada correctamente';
+    await loadCompanies();
+  } catch (error) {
+    message.textContent = error.message || 'No se pudo actualizar la empresa';
+    message.classList.add('error');
+    button.disabled = false;
+    button.textContent = isActive ? 'Deshabilitar' : 'Activar';
+  }
+});
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  message.textContent = '';
+  message.className = 'message';
+  createButton.disabled = true;
+  createButton.textContent = 'Creando...';
+
+  const data = new FormData(form);
+  const payload = {
+    company: {
+      name: data.get('companyName').toString().trim(),
+      legalId: optional(data.get('companyLegalId')),
+      email: optional(data.get('companyEmail')),
+      phone: optional(data.get('companyPhone')),
+      address: optional(data.get('companyAddress')),
+    },
+    fiscalConfig: {
+      legalName: data.get('legalName').toString().trim(),
+      commercialName: optional(data.get('commercialName')),
+      identificationType: data.get('identificationType').toString().trim(),
+      identificationNumber: data.get('identificationNumber').toString().trim(),
+      economicActivityCode: optional(data.get('economicActivityCode')),
+      email: optional(data.get('companyEmail')),
+      phone: optional(data.get('companyPhone')),
+      address: optional(data.get('companyAddress')),
+      haciendaEnvironment: data.get('haciendaEnvironment').toString(),
+      defaultBranchCode: data.get('defaultBranchCode').toString().trim(),
+      defaultTerminalCode: data.get('defaultTerminalCode').toString().trim(),
+    },
+    rootUser: {
+      fullName: data.get('rootFullName').toString().trim(),
+      username: data.get('rootUsername').toString().trim(),
+      email: optional(data.get('rootEmail')),
+      phone: optional(data.get('rootPhone')),
+      password: data.get('rootPassword').toString(),
+    },
+  };
+
+  try {
+    await inventoryAuth.fetchJson(session, '/api/companies/root/companies', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudo crear la empresa',
+    });
+
+    form.reset();
+    form.elements.identificationType.value = '02';
+    form.elements.haciendaEnvironment.value = 'STAGING';
+    form.elements.defaultBranchCode.value = '001';
+    form.elements.defaultTerminalCode.value = '00001';
+    message.textContent = 'Empresa creada correctamente';
+    await loadCompanies();
+  } catch (error) {
+    message.textContent = error.message || 'No se pudo crear la empresa';
+    message.classList.add('error');
+  } finally {
+    createButton.disabled = false;
+    createButton.textContent = 'Crear empresa';
+  }
+});
+
+loadCompanies().catch((error) => {
+  message.textContent = error.message || 'No se pudieron cargar las empresas';
+  message.classList.add('error');
+});
+}

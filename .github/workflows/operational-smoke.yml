@@ -26,6 +26,8 @@ jobs:
       CORS_ORIGIN: https://inventory.example.com
       APP_BASE_URL: https://inventory.example.com
       JWT_SECRET: 0123456789abcdef0123456789abcdef
+      BROWSER_SESSION_STORE_MODE: redis
+      REDIS_URL: redis://redis:6379/0
       ENV_FILE: missing.env.production
 
     steps:
@@ -70,6 +72,8 @@ jobs:
           CORS_ORIGIN=${CORS_ORIGIN}
           APP_BASE_URL=${APP_BASE_URL}
           JWT_SECRET=${JWT_SECRET}
+          BROWSER_SESSION_STORE_MODE=${BROWSER_SESSION_STORE_MODE}
+          REDIS_URL=${REDIS_URL}
           EOF
 
       - name: Validate production compose syntax

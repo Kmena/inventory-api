@@ -21,9 +21,10 @@ function withRepositoryStubs(stubs, run) {
     });
 }
 
-function createRoute(routeId = 5n) {
+function createRoute(routeId = 5n, companyId = 7n) {
   return {
     id: routeId,
+    companyId,
     code: 'R-5',
     name: 'Ruta 5',
     visitFrequencyDays: 7,
@@ -33,6 +34,44 @@ function createRoute(routeId = 5n) {
     assignments: [],
   };
 }
+
+test('updateCompanyRoute passes the authenticated tenant scope to the repository mutation', async () => {
+  let updateCall = null;
+
+  const updatedRoute = await withRepositoryStubs(
+    {
+      findCompanyRouteById: async () => createRoute(),
+      updateCompanyRoute: async (routeId, companyId, payload) => {
+        updateCall = { routeId, companyId, payload };
+        return {
+          ...createRoute(routeId, companyId),
+          ...payload,
+        };
+      },
+    },
+    () => salesRouteService.updateCompanyRoute(5n, {
+      code: 'R-9',
+      name: 'Ruta 9',
+      visitFrequencyDays: 10,
+      nearLimitDays: 3,
+      isActive: true,
+    }, { companyId: '7' }),
+  );
+
+  assert.deepEqual(updateCall, {
+    routeId: 5n,
+    companyId: 7n,
+    payload: {
+      code: 'R-9',
+      name: 'Ruta 9',
+      visitFrequencyDays: 10,
+      nearLimitDays: 3,
+      isActive: true,
+    },
+  });
+  assert.equal(updatedRoute.id, 5n);
+  assert.equal(updatedRoute.code, 'R-9');
+});
 
 test('saveCompanyRouteSubzones rejects subregions that do not belong to the authenticated company', async () => {
   await withRepositoryStubs(

@@ -332,6 +332,44 @@ test('createPaymentReceiptEvidence leaves no private file behind when receipt pe
   await fs.rm(path.join(PRIVATE_PAYMENT_RECEIPTS_ROOT, '91'), { recursive: true, force: true });
 });
 
+test('replacePaymentReceiptEvidence scopes receipt replacement to the authenticated tenant', async () => {
+  const payment = { id: 25n, invoice: { client: { companyId: 91n } } };
+  const receiptFile = {
+    ...buildReceiptFilePayload(),
+    _validatedReceiptPayload: {
+      buffer: Buffer.from('comprobante reemplazo tenant-safe'),
+      mimeType: 'application/pdf',
+    },
+  };
+  let replaceCall = null;
+
+  await withRepositoryStubs(
+    [
+      [paymentRepository, {
+        transaction: async (work) => work({ tx: true }),
+        markPaymentReceiptsAsReplaced: async (paymentId, companyId, replacedAt, db) => {
+          replaceCall = { paymentId, companyId, replacedAt, db };
+          return { count: 1 };
+        },
+        createPaymentReceipt: async () => ({ id: 99n }),
+        findCompanyPaymentById: async () => ({ ...payment, receipts: [] }),
+      }],
+    ],
+    () => receiptEvidenceService.replacePaymentReceiptEvidence(payment, receiptFile, {
+      companyId: '91',
+      sub: '8',
+      permissions: ['collections.manage.own'],
+    }),
+  );
+
+  assert.equal(replaceCall.paymentId, 25n);
+  assert.equal(replaceCall.companyId, 91n);
+  assert.equal(replaceCall.db.tx, true);
+  assert.ok(replaceCall.replacedAt instanceof Date);
+
+  await fs.rm(path.join(PRIVATE_PAYMENT_RECEIPTS_ROOT, '91'), { recursive: true, force: true });
+});
+
 test('replacePaymentReceiptEvidence removes the new private file when the replacement transaction fails', async () => {
   await fs.rm(path.join(PRIVATE_PAYMENT_RECEIPTS_ROOT, '91'), { recursive: true, force: true });
 

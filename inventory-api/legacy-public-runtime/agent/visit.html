@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Visita de tienda</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="agent-shell">
+      <section class="card agent-flow-page">
+        <header class="page-header agent-flow-header">
+          <div>
+            <p class="eyebrow">Visita movil</p>
+            <h1>Registrar visita</h1>
+            <p id="visit-session" class="muted">Sesion activa</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="visit-back-button" class="secondary-button" type="button">Volver</button>
+            <button id="visit-open-order-button" type="button">Iniciar pedido</button>
+          </div>
+        </header>
+
+        <section id="visit-store-summary" class="detail-grid agent-store-detail-grid"></section>
+
+        <article class="import-panel">
+          <div class="section-title-row">
+            <div>
+              <h2>Bitacora de visita</h2>
+              <p class="muted">Venta, seguimiento o cobro con comentario operativo.</p>
+            </div>
+          </div>
+          <form id="visit-form" class="agent-visit-form">
+            <div class="pricing-grid">
+              <label class="field">
+                <span>Motivo</span>
+                <select name="motive" required>
+                  <option value="VENTA">Venta</option>
+                  <option value="COBRO">Cobro</option>
+                  <option value="SEGUIMIENTO">Seguimiento</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Resultado</span>
+                <select name="result" required>
+                  <option value="EXITOSA">Exitosa</option>
+                  <option value="PENDIENTE">Pendiente</option>
+                  <option value="SIN_CONTACTO">Sin contacto</option>
+                  <option value="REPROGRAMADA">Reprogramada</option>
+                </select>
+              </label>
+              <label class="field field-wide">
+                <span>Proxima visita sugerida</span>
+                <input name="suggestedNextVisitAt" type="datetime-local" />
+              </label>
+              <label class="field field-wide">
+                <span>Comentario</span>
+                <textarea name="comment" rows="4" maxlength="2000" placeholder="Que paso en la visita"></textarea>
+              </label>
+            </div>
+            <div class="toolbar-actions">
+              <button id="visit-submit-button" type="submit">Guardar visita</button>
+            </div>
+          </form>
+        </article>
+
+        <article class="import-panel">
+          <div class="section-title-row">
+            <div>
+              <h2>Ultimas visitas</h2>
+              <p class="muted">Contexto rapido de la tienda antes de salir.</p>
+            </div>
+          </div>
+          <div id="visit-history" class="agent-history-list"></div>
+        </article>
+
+        <p id="visit-message" class="message" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="/shared/session.js"></script>
+    <script src="/shared/auth.js"></script>
+    <script src="/agent/visit.js"></script>
+  </body>
+</html>

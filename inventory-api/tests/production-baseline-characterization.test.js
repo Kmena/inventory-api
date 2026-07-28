@@ -33,6 +33,7 @@ test('production baseline documentation covers validation, migrations, health ch
 
   assert.equal(fs.existsSync(productionEnvExamplePath), true, '.env.production.example must remain versioned');
   assert.match(docSource, /\.env\.production\.example/);
+  assert.match(docSource, /REDIS_URL/);
   assert.match(docSource, /npm run validate:production-baseline/);
   assert.match(docSource, /npm run validate:restore-readiness/);
   assert.match(docSource, /npm run validate:operational-readiness/);
@@ -43,6 +44,7 @@ test('production baseline documentation covers validation, migrations, health ch
   assert.match(docSource, /(_prisma_migrations|restore-readiness-baseline\.md)/);
   assert.match(docSource, /\/health\/ready/);
   assert.match(readmeSource, /production-baseline\.md/);
+  assert.match(readmeSource, /REDIS_URL/);
   assert.match(readmeSource, /\.env\.production\.example/);
 });
 
@@ -61,6 +63,7 @@ test('validate-production-baseline passes with explicit production environment v
       CORS_ORIGIN: 'https://inventory.example.com',
       APP_BASE_URL: 'https://inventory.example.com',
       JWT_SECRET: '0123456789abcdef0123456789abcdef',
+      REDIS_URL: 'redis://redis:6379/0',
     },
     encoding: 'utf8',
   });

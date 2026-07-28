@@ -1,33 +1,19 @@
-const form = document.getElementById('login-form');
-const message = document.getElementById('login-message');
-const loginButton = document.getElementById('login-button');
+const inventorySession = /** @type {any} */ (window).InventorySession;
+const inventoryAuth = /** @type {any} */ (window).InventoryAuth;
+const form = /** @type {HTMLFormElement | null} */ (document.getElementById('login-form'));
+const message = /** @type {HTMLElement | null} */ (document.getElementById('login-message'));
+const loginButton = /** @type {HTMLButtonElement | null} */ (document.getElementById('login-button'));
 
-const STORAGE_KEY = 'inventory-api-auth';
 const LOGIN_ENDPOINT = '/api/auth/login';
 const DEFAULT_LOGIN_ERROR_MESSAGE = 'No se pudo iniciar sesion. Intente de nuevo.';
 const UNEXPECTED_LOGIN_ERROR_MESSAGE = 'Ocurrio un error inesperado.';
-const LANDING_BY_ROLE = {
-  root: '/root/index.html',
-  warehouse: '/warehouse/products.html',
-};
+const POST_LOGIN_TRANSITION_PATH = '/migration.html?mode=post-login-transition';
 
-function clearStoredSession() {
-  localStorage.removeItem(STORAGE_KEY);
-}
+let loginAttemptInProgress = false;
+let sessionEstablished = false;
 
 function readStoredSession() {
-  const serializedSession = localStorage.getItem(STORAGE_KEY);
-
-  if (!serializedSession) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(serializedSession);
-  } catch (_error) {
-    clearStoredSession();
-    return null;
-  }
+  return inventorySession.read();
 }
 
 function hasOperationalAgentPermissions(permissions) {
@@ -50,26 +36,26 @@ function getHomeForSession(session) {
   const permissions = session?.user?.permissions || [];
 
   if (roleCode === 'root') {
-    return '/root/index.html';
+    return POST_LOGIN_TRANSITION_PATH;
   }
 
   if (roleCode === 'admin' && session?.user?.companyId) {
-    return '/root/dashboard.html';
+    return POST_LOGIN_TRANSITION_PATH;
   }
 
   if (roleCode === 'sales_supervisor') {
-    return '/root/routes.html';
+    return POST_LOGIN_TRANSITION_PATH;
   }
 
   if (permissions.includes('warehouse.access')) {
-    return '/warehouse/products.html';
+    return POST_LOGIN_TRANSITION_PATH;
   }
 
   if (isOperationalAgentSession(session)) {
-    return '/agent/workspace.html';
+    return POST_LOGIN_TRANSITION_PATH;
   }
 
-  return LANDING_BY_ROLE[roleCode] || '/no-access.html';
+  return '/no-access.html';
 }
 
 function getFriendlyLoginMessage(statusCode, fallbackMessage) {
@@ -88,7 +74,23 @@ function getFriendlyLoginMessage(statusCode, fallbackMessage) {
   return fallbackMessage || DEFAULT_LOGIN_ERROR_MESSAGE;
 }
 
+function getLoginReasonMessage() {
+  const params = new URLSearchParams(window.location.search);
+  const reason = params.get('reason');
+  if (reason === 'session-expired') {
+    return 'Tu sesion expiro. Inicia sesion de nuevo.';
+  }
+  if (reason === 'signed-out') {
+    return 'Sesion cerrada correctamente.';
+  }
+  return '';
+}
+
 function setMessage(text, tone = 'default') {
+  if (!message) {
+    return;
+  }
+
   message.textContent = text;
   message.className = 'message';
 
@@ -97,13 +99,21 @@ function setMessage(text, tone = 'default') {
   }
 }
 
-function setSubmittingState(isSubmitting) {
+function setSubmittingState(isSubmitting, text = null) {
+  if (!loginButton || !form) {
+    return;
+  }
+
   loginButton.disabled = isSubmitting;
-  loginButton.textContent = isSubmitting ? 'Validando...' : 'Iniciar sesión';
+  loginButton.textContent = text || (isSubmitting ? 'Validando...' : 'Iniciar sesión');
   form.setAttribute('aria-busy', isSubmitting ? 'true' : 'false');
 }
 
 function buildLoginPayload() {
+  if (!form) {
+    return { username: '', password: '' };
+  }
+
   const formData = new FormData(form);
 
   return {
@@ -123,7 +133,11 @@ async function parseJsonSafely(response) {
 async function requestLogin(payload) {
   const response = await fetch(LOGIN_ENDPOINT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Inventory-Browser-Session': 'cookie',
+    },
     body: JSON.stringify(payload),
   });
 
@@ -137,32 +151,57 @@ async function requestLogin(payload) {
 }
 
 function persistSession(session) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  return inventorySession.write(session);
 }
 
 function redirectToSessionHome(session) {
   window.location.href = getHomeForSession(session);
 }
 
-function restoreExistingSession() {
-  const existingSession = readStoredSession();
-  if (existingSession?.token) {
+async function restoreExistingSession() {
+  const loginReasonMessage = getLoginReasonMessage();
+  const shouldTrustStoredSession = !loginReasonMessage || loginReasonMessage === 'Sesion cerrada correctamente.';
+  const existingSession = shouldTrustStoredSession ? readStoredSession() : null;
+  if (existingSession?.user) {
     redirectToSessionHome(existingSession);
+    return;
+  }
+
+  try {
+    const bootstrappedSession = await inventoryAuth.bootstrapSession();
+    if (bootstrappedSession?.user) {
+      sessionEstablished = true;
+      redirectToSessionHome(bootstrappedSession);
+    }
+  } catch (_error) {
+    if (!loginAttemptInProgress && !sessionEstablished) {
+      inventorySession.clear();
+    }
   }
 }
 
+const loginReasonMessage = getLoginReasonMessage();
+if (loginReasonMessage) {
+  setMessage(loginReasonMessage);
+}
 restoreExistingSession();
+
+if (!form) {
+  throw new Error('No se encontro el formulario de inicio de sesion.');
+}
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   setMessage('Validando acceso...');
   setSubmittingState(true);
+  loginAttemptInProgress = true;
 
   try {
-    const session = await requestLogin(buildLoginPayload());
-    persistSession(session);
+    const session = persistSession(await requestLogin(buildLoginPayload()));
+    sessionEstablished = true;
     redirectToSessionHome(session);
   } catch (error) {
+    loginAttemptInProgress = false;
     setMessage(error.message || UNEXPECTED_LOGIN_ERROR_MESSAGE, 'error');
   } finally {
     setSubmittingState(false);

@@ -44,6 +44,51 @@ test('getOrder returns not_found when the order is outside the authenticated ten
   );
 });
 
+test('updateOrder passes the authenticated tenant scope to the repository mutation', async () => {
+  let updateCall = null;
+
+  const updatedOrder = await withModuleStubs(
+    [
+      [orderRepository, {
+        findOrderById: async (orderId, companyId) => ({
+          id: orderId,
+          companyId,
+          status: 'DRAFT',
+          approved: false,
+          clientId: 4n,
+          clientStoreId: 6n,
+          warehouseId: 8n,
+          items: [],
+        }),
+        findWarehouse: async () => ({ id: 8n, companyId: 7n, isActive: true, isSellableSource: true, isVirtual: false }),
+        findCompanyClientStore: async () => ({ id: 6n, clientId: 4n, client: { companyId: 7n } }),
+        countCompanyProducts: async () => 0,
+        updateOrder: async (orderId, companyId, payload) => {
+          updateCall = { orderId, companyId, payload };
+          return {
+            id: orderId,
+            companyId,
+            status: 'DRAFT',
+            approved: false,
+            clientId: payload.clientId ?? 4n,
+            clientStoreId: payload.clientStoreId ?? 6n,
+            warehouseId: payload.warehouseId ?? 8n,
+            items: [],
+          };
+        },
+      }],
+    ],
+    () => orderService.updateOrder(12n, { notes: 'actualizado' }, { companyId: '7', sub: '10', role: 'sales' }),
+  );
+
+  assert.deepEqual(updateCall, {
+    orderId: 12n,
+    companyId: 7n,
+    payload: { notes: 'actualizado' },
+  });
+  assert.equal(updatedOrder.id, 12n);
+});
+
 test('cancelOrder transitions a draft order to CANCELLED inside the tenant scope', async () => {
   let updateCall = null;
 
@@ -51,9 +96,9 @@ test('cancelOrder transitions a draft order to CANCELLED inside the tenant scope
     [
       [orderRepository, {
         findOrderById: async (orderId, companyId) => ({ id: orderId, companyId, status: 'DRAFT', approved: false }),
-        updateOrder: async (orderId, payload) => {
-          updateCall = { orderId, payload };
-          return { id: orderId, status: 'CANCELLED', approved: false };
+        updateOrder: async (orderId, companyId, payload) => {
+          updateCall = { orderId, companyId, payload };
+          return { id: orderId, companyId, status: 'CANCELLED', approved: false };
         },
       }],
     ],
@@ -62,6 +107,7 @@ test('cancelOrder transitions a draft order to CANCELLED inside the tenant scope
 
   assert.deepEqual(updateCall, {
     orderId: 12n,
+    companyId: 7n,
     payload: { status: 'CANCELLED' },
   });
   assert.equal(cancelledOrder.status, 'CANCELLED');
@@ -127,14 +173,17 @@ test('removeOrder deletes non-approved and non-delivered orders after tenant-sco
           clientId: 4n,
           warehouseId: 8n,
         }),
-        deleteOrder: async (orderId) => {
-          deleteCall = orderId;
-          return { id: orderId };
+        deleteOrder: async (orderId, companyId) => {
+          deleteCall = { orderId, companyId };
+          return { id: orderId, companyId };
         },
       }],
     ],
     () => orderService.removeOrder(20n, { companyId: '7', sub: '10', role: 'admin' }),
   );
 
-  assert.equal(deleteCall, 20n);
+  assert.deepEqual(deleteCall, {
+    orderId: 20n,
+    companyId: 7n,
+  });
 });

@@ -20,6 +20,7 @@ const requiredVariables = [
   'CORS_ORIGIN',
   'APP_BASE_URL',
   'JWT_SECRET',
+  'REDIS_URL',
 ];
 
 const placeholderPatterns = [
