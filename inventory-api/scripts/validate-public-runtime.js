@@ -188,8 +188,12 @@ function validateMigrationRuntimeContracts() {
     throw new Error('migration.js: missing contract -> query-param mode detection');
   }
 
-  if (!migrationSource.includes('Tu acceso fue actualizado')) {
-    throw new Error('migration.js: missing contract -> generic post-login transition title');
+  if (!migrationSource.includes('Iniciaste sesion correctamente')) {
+    throw new Error('migration.js: missing contract -> explicit post-login transition success title');
+  }
+
+  if (!migrationSource.includes('modulo de destino aun no esta implementado')) {
+    throw new Error('migration.js: missing contract -> explicit not-yet-implemented transition message');
   }
 
   if (!migrationSource.includes('migrationStatusNote.hidden = true;')) {

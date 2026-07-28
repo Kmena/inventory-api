@@ -93,6 +93,10 @@ function handleRedisCommand(sessions, parts) {
     return '+OK\r\n';
   }
 
+  if (normalizedCommand === 'PING') {
+    return '+PONG\r\n';
+  }
+
   if (normalizedCommand === 'SET') {
     const [key, value] = rest;
     sessions.set(key, value);
@@ -166,6 +170,37 @@ test('browser session service invalidates Redis-backed sessions explicitly', asy
     assert.equal(await browserSessionService.invalidateBrowserSession(createdSession.sessionId), true);
     assert.equal(await browserSessionService.getBrowserSession(createdSession.sessionId), null);
   }));
+});
+
+test('browser session service reports Redis-backed readiness as up when the configured store is reachable', async () => {
+  await withFakeRedisServer(({ redisUrl }) => withEnvironment({
+    NODE_ENV: 'development',
+    BROWSER_SESSION_STORE_MODE: 'redis',
+    REDIS_URL: redisUrl,
+  }, async () => {
+    const browserSessionService = requireFreshBrowserSessionService();
+
+    assert.deepEqual(await browserSessionService.checkBrowserSessionStoreReadiness(), {
+      mode: 'redis',
+      status: 'up',
+    });
+  }));
+});
+
+test('browser session service reports Redis-backed readiness as down when the configured store is unavailable', async () => {
+  await withEnvironment({
+    NODE_ENV: 'development',
+    BROWSER_SESSION_STORE_MODE: 'redis',
+    REDIS_URL: 'redis://127.0.0.1:63999/0',
+    REDIS_CONNECT_TIMEOUT_MS: '50',
+  }, async () => {
+    const browserSessionService = requireFreshBrowserSessionService();
+
+    assert.deepEqual(await browserSessionService.checkBrowserSessionStoreReadiness(), {
+      mode: 'redis',
+      status: 'down',
+    });
+  });
 });
 
 test('browser session service fails explicitly when Redis is configured but unavailable', async () => {

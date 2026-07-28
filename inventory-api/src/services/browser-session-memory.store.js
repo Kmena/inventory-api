@@ -60,6 +60,14 @@ class BrowserSessionMemoryStore {
     return this.sessionsById.delete(sessionId);
   }
 
+  async checkReadiness() {
+    this.removeExpiredSessions();
+    return {
+      mode: 'memory',
+      status: 'memory',
+    };
+  }
+
   async resetForTests() {
     this.sessionsById.clear();
   }

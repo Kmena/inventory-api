@@ -239,6 +239,25 @@ class BrowserSessionRedisStore {
     return Number(deletedCount) > 0;
   }
 
+  async checkReadiness() {
+    try {
+      const response = await this.sendCommand(['PING']);
+      return {
+        mode: 'redis',
+        status: response === 'PONG' ? 'up' : 'down',
+      };
+    } catch (error) {
+      if (error instanceof BrowserSessionStoreUnavailableError) {
+        return {
+          mode: 'redis',
+          status: 'down',
+        };
+      }
+
+      throw error;
+    }
+  }
+
   async resetForTests() {
     return null;
   }

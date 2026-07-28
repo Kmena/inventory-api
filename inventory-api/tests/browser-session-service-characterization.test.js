@@ -44,6 +44,13 @@ test('browser session service rejects expired sessions and eagerly removes them 
   });
 });
 
+test('browser session service reports memory readiness without requiring Redis in test mode', async () => {
+  assert.deepEqual(await browserSessionService.checkBrowserSessionStoreReadiness(), {
+    mode: 'memory',
+    status: 'memory',
+  });
+});
+
 test('browser session service invalidates sessions explicitly and ignores unknown session ids', async () => {
   await withPatchedNow(3_000, () => {
     return browserSessionService.createBrowserSession(11n).then(async (session) => {

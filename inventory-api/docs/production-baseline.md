@@ -137,6 +137,8 @@ docker build -t inventory-api:operational-smoke .
 ### Health / readiness
 - `Dockerfile` expone `HEALTHCHECK` contra `/health/ready`.
 - El runtime también conserva `/health` como liveness simple.
+- En el baseline soportado con `BROWSER_SESSION_STORE_MODE=redis`, `/health/ready` solo reporta listo cuando tanto la base de datos como el browser-session store respaldado por Redis están disponibles.
+- En memory mode de test o uso explícito, `/health/ready` sigue siendo compatible y reporta `browserSessionStore: memory` sin requerir Redis.
 
 ### Restore / runbook / observabilidad mínima
 - `docs/production-operations-runbook.md` documenta backup lógico, restore validation y checklist posterior al restore.

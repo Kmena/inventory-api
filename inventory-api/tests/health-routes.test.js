@@ -6,6 +6,7 @@ process.env.NODE_ENV = 'test';
 
 const app = require('../src/app');
 const prisma = require('../src/lib/prisma');
+const browserSessionService = require('../src/services/browser-session.service');
 
 function withModuleStubs(stubsByModule, run) {
   const originals = [];
@@ -63,11 +64,19 @@ test('GET /health preserves the backward-compatible liveness response', async ()
   });
 });
 
-test('GET /health/ready returns database up when Prisma is reachable', async () => {
+test('GET /health/ready returns database and browser-session store up when both dependencies are reachable', async () => {
   await withModuleStubs(
-    [[prisma, {
-      checkDatabaseReadiness: async () => {},
-    }]],
+    [
+      [prisma, {
+        checkDatabaseReadiness: async () => {},
+      }],
+      [browserSessionService, {
+        checkBrowserSessionStoreReadiness: async () => ({
+          mode: 'redis',
+          status: 'up',
+        }),
+      }],
+    ],
     () => withHttpServer(async (baseUrl) => {
       const response = await fetch(`${baseUrl}/health/ready`);
 
@@ -77,6 +86,7 @@ test('GET /health/ready returns database up when Prisma is reachable', async () 
         service: 'inventory-api',
         checks: {
           database: 'up',
+          browserSessionStore: 'up',
         },
       });
     }),
@@ -85,11 +95,19 @@ test('GET /health/ready returns database up when Prisma is reachable', async () 
 
 test('GET /health/ready returns 503 when Prisma readiness check fails', async () => {
   await withModuleStubs(
-    [[prisma, {
-      checkDatabaseReadiness: async () => {
-        throw new Error('db down');
-      },
-    }]],
+    [
+      [prisma, {
+        checkDatabaseReadiness: async () => {
+          throw new Error('db down');
+        },
+      }],
+      [browserSessionService, {
+        checkBrowserSessionStoreReadiness: async () => ({
+          mode: 'redis',
+          status: 'up',
+        }),
+      }],
+    ],
     () => withHttpServer(async (baseUrl) => {
       const response = await fetch(`${baseUrl}/health/ready`);
 
@@ -99,6 +117,65 @@ test('GET /health/ready returns 503 when Prisma readiness check fails', async ()
         service: 'inventory-api',
         checks: {
           database: 'down',
+          browserSessionStore: 'up',
+        },
+      });
+    }),
+  );
+});
+
+test('GET /health/ready returns 503 when Redis-backed browser-session readiness fails', async () => {
+  await withModuleStubs(
+    [
+      [prisma, {
+        checkDatabaseReadiness: async () => {},
+      }],
+      [browserSessionService, {
+        checkBrowserSessionStoreReadiness: async () => ({
+          mode: 'redis',
+          status: 'down',
+        }),
+      }],
+    ],
+    () => withHttpServer(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/health/ready`);
+
+      assert.equal(response.status, 503);
+      assert.deepEqual(await response.json(), {
+        ok: false,
+        service: 'inventory-api',
+        checks: {
+          database: 'up',
+          browserSessionStore: 'down',
+        },
+      });
+    }),
+  );
+});
+
+test('GET /health/ready stays successful in memory mode without requiring Redis', async () => {
+  await withModuleStubs(
+    [
+      [prisma, {
+        checkDatabaseReadiness: async () => {},
+      }],
+      [browserSessionService, {
+        checkBrowserSessionStoreReadiness: async () => ({
+          mode: 'memory',
+          status: 'memory',
+        }),
+      }],
+    ],
+    () => withHttpServer(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/health/ready`);
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), {
+        ok: true,
+        service: 'inventory-api',
+        checks: {
+          database: 'up',
+          browserSessionStore: 'memory',
         },
       });
     }),

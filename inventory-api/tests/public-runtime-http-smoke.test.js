@@ -63,6 +63,7 @@ test('supported post-login transition mode stays on an active 200 URL while depr
   const supportedTransitionResponse = await request(server, '/migration.html?mode=post-login-transition');
   assert.equal(supportedTransitionResponse.statusCode, 200);
   assert.match(String(supportedTransitionResponse.headers['content-security-policy'] || ''), /default-src 'self'/);
+  assert.match(supportedTransitionResponse.body, /migration-home-link/);
 
   const deprecatedRouteResponse = await request(server, '/root/dashboard.html');
   assert.equal(deprecatedRouteResponse.statusCode, 410);

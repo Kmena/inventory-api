@@ -92,7 +92,9 @@ test('public login, no-access and migration screens keep strict same-origin wiri
   assert.match(migrationHtmlSource, /<script src="\/migration\.js"><\/script>/);
   assert.match(migrationSource, /const POST_LOGIN_TRANSITION_MODE = 'post-login-transition';/);
   assert.match(migrationSource, /new URLSearchParams\(window.location.search\)/);
-  assert.match(migrationSource, /Tu acceso fue actualizado/);
+  assert.match(migrationSource, /Iniciaste sesion correctamente/);
+  assert.match(migrationSource, /modulo de destino aun no esta implementado/);
+  assert.match(migrationSource, /Volver al inicio de sesion/);
   assert.match(migrationSource, /migrationStatusNote\.hidden = true/);
   assert.match(migrationSource, /inventorySession\.clearAndRedirectToLogin\(\)/);
 });

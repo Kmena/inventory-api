@@ -28,10 +28,14 @@ function renderDeprecatedRouteMode() {
 }
 
 function renderPostLoginTransitionMode() {
-  migrationTitle.textContent = 'Tu acceso fue actualizado';
-  migrationPrimaryMessage.textContent = 'Iniciaste sesion correctamente, pero esta entrada ya no dirige a una vista operativa anterior.';
-  migrationSecondaryMessage.textContent = 'Para continuar, utiliza el acceso principal disponible en esta plataforma. Si necesitas una funcion vigente, contacta al administrador de tu empresa.';
+  migrationTitle.textContent = 'Iniciaste sesion correctamente';
+  migrationPrimaryMessage.textContent = 'Tu cuenta ingreso correctamente, pero el modulo de destino aun no esta implementado en esta version.';
+  migrationSecondaryMessage.textContent = 'Esta es una pagina temporal informativa. Puedes volver al inicio de sesion o cerrar sesion de forma segura mientras se implementan los destinos finales por rol.';
   migrationStatusNote.hidden = true;
+  const homeLink = /** @type {HTMLAnchorElement | null} */ (document.getElementById('migration-home-link'));
+  if (homeLink) {
+    homeLink.textContent = 'Volver al inicio de sesion';
+  }
 }
 
 function renderMigrationView() {

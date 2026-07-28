@@ -147,6 +147,17 @@ async function invalidateBrowserSession(sessionId, options = {}) {
   }
 }
 
+async function checkBrowserSessionStoreReadiness() {
+  if (typeof browserSessionStoreContainer.store.checkReadiness === 'function') {
+    return browserSessionStoreContainer.store.checkReadiness();
+  }
+
+  return {
+    mode: browserSessionStoreContainer.mode,
+    status: 'down',
+  };
+}
+
 async function resetBrowserSessionStateForTests() {
   if (typeof browserSessionStoreContainer.store.resetForTests === 'function') {
     await browserSessionStoreContainer.store.resetForTests();
@@ -154,6 +165,7 @@ async function resetBrowserSessionStateForTests() {
 }
 
 module.exports = {
+  checkBrowserSessionStoreReadiness,
   createBrowserSession,
   getBrowserSession,
   invalidateBrowserSession,

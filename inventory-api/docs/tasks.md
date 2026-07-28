@@ -280,7 +280,10 @@
 **Risk:** Medium
 
 ## TASK-015: Strengthen Redis operational safeguards for browser-session persistence
-**Status:** Proposed
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `src/services/browser-session-memory.store.js`, `src/services/browser-session-redis.store.js`, `src/services/browser-session.service.js`, `src/routes/health.routes.js`, `docs/production-baseline.md`, `docs/production-operations-runbook.md`, `tests/browser-session-redis-store.test.js`, `tests/browser-session-service-characterization.test.js`, `tests/health-routes.test.js`
+**Validation evidence:** `node --test tests/browser-session-redis-store.test.js`; `node --test tests/browser-session-service-characterization.test.js`; `node --test tests/health-routes.test.js`; `node --test tests/production-baseline-characterization.test.js`; `node --test tests/browser-session-auth-boundary.test.js`; `npm run test:redis-path`; `npm run validate:operational-readiness`; `npm run lint -- --quiet`; `npm run typecheck`; `npm run build`; `npm run test -- --silent`
 **Priority:** Medium
 **Domain:** Frontend/session security governance / Runtime platform
 **Requirement:** Remaining architectural limitation after `p16-browser-session-persistent-store`
@@ -290,11 +293,12 @@
 **Affected files:** `src/services/browser-session-redis.store.js`, `src/services/browser-session.service.js`, `src/routes/health.routes.js`, `docs/production-baseline.md`, `docs/production-operations-runbook.md`, related tests/specs
 **Dependencies:** TASK-013
 **Database impact:** None
-**API impact:** None expected unless health/diagnostic payloads are explicitly extended in an approved slice
+**API impact:** Low; `GET /health/ready` now includes browser-session-store readiness in its operational contract while preserving `GET /health` compatibility
 **Container impact:** Possible additions to Redis/app health signaling only
 **Security impact:** Medium positive impact through faster detection and safer operation of browser-session persistence dependencies
 **Acceptance criteria:** Approved diagnostics or observability improvements make Redis-backed browser-session dependency status easier to detect and operate without weakening current explicit-failure behavior or cookie boundaries.
-**Required tests:** Targeted characterization tests for any approved health/diagnostic additions; existing browser-session boundary, store, workflow-baseline, and production-baseline validation suites remain green
+**Implemented outcome:** `/health/ready` now combines database readiness with browser-session-store readiness, Redis-backed store outages map to explicit `503 service_unavailable` behavior instead of silent downgrade, memory mode stays explicitly compatible for tests, and the production baseline/runbook now document diagnosis and recovery expectations.
+**Required tests:** `node --test tests/browser-session-redis-store.test.js`; `node --test tests/browser-session-service-characterization.test.js`; `node --test tests/health-routes.test.js`; `node --test tests/production-baseline-characterization.test.js`; `node --test tests/browser-session-auth-boundary.test.js`; `npm run test:redis-path`; `npm run validate:operational-readiness`; `npm run lint -- --quiet`; `npm run typecheck`; `npm run build`; `npm run test -- --silent`
 **Migration considerations:** Keep the supported Redis baseline stable while improving operational signals incrementally.
 **Rollback or mitigation:** Revert only the observability/hardening slice if it creates noise or contract drift.
 **Risk:** Medium
@@ -340,23 +344,26 @@
 **Risk:** Medium
 
 ## TASK-018: Define the long-term disposition of `legacy-public-runtime/`
-**Status:** Proposed
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `specs/p24-legacy-runtime-governance-closure/*`
+**Validation evidence:** `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js`; `npm run typecheck`
 **Priority:** Low
 **Domain:** Frontend/runtime governance / Embedded browser runtime
 **Requirement:** Post-implementation follow-up after `p21-legacy-public-html-deprecation-for-spa-transition`
-**Reason:** `p21` moved the functional legacy browser inventory out of `src/public/`, but the repository still needs an eventual explicit archival or replacement decision for that preserved tree.
-**Current problem:** `legacy-public-runtime/` is correctly outside the active runtime, yet its long-term repository role is still transitional rather than final.
-**Proposed change:** Decide whether the preserved legacy browser inventory should remain in-repo until SPA replacement is available, move to a stronger archive package, or be removed in a later approved slice once no longer needed.
+**Reason:** `p21` moved the functional legacy browser inventory out of `src/public/`, and repository governance needed an explicit implemented policy so that preserved files are not mistaken for supported runtime.
+**Current problem resolved:** `legacy-public-runtime/` remains outside the active runtime and is now documented consistently as transitional backup/reference inventory only, not an implicit rollback path.
+**Implemented change:** The repository now states that the preserved legacy browser inventory remains in-repo only until equivalent SPA sections are implemented and validated, after which a later approved slice should remove it. This closed the lifecycle-policy ambiguity without reactivating legacy HTML as supported runtime.
 **Affected files:** `legacy-public-runtime/**`, related validators/tests/docs/specs
 **Dependencies:** `p21-legacy-public-html-deprecation-for-spa-transition`
 **Database impact:** None
 **API impact:** None expected
 **Container impact:** None
 **Security impact:** Low positive impact through clearer governance and lower risk of future confusion between preserved inventory and active runtime
-**Acceptance criteria:** A later approved slice explicitly defines the long-term archival policy for `legacy-public-runtime/` without reintroducing it as supported runtime.
-**Required tests:** `npm run validate:public-runtime`; any future governance tests added by the approved archival slice
+**Acceptance criteria:** Completed. Repository docs now define `legacy-public-runtime/` as transitional backup/reference inventory only, explicitly outside supported runtime and outside implicit rollback behavior, with later removal deferred until equivalent SPA sections are implemented and validated.
+**Required tests:** `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js`; `npm run typecheck`
 **Migration considerations:** Keep `legacy-public-runtime/` outside `src/public/` and outside supported runtime governance unless a new approved spec changes the contract.
-**Rollback or mitigation:** Revert only the archival-packaging change if preservation evidence is still needed.
+**Rollback or mitigation:** Revert only the documentation/governance wording if preservation rationale needs correction; do not reactivate the legacy runtime as a shortcut.
 **Risk:** Low
 
 ## TASK-020: Harden login and no-access CSP without blocking on legacy public-runtime remediation
@@ -380,21 +387,24 @@
 **Risk:** Medium
 
 ## TASK-019: Preserve the reduced public-runtime typecheck allowlist and avoid re-expanding retired legacy pages
-**Status:** Proposed
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `specs/p24-legacy-runtime-governance-closure/*`
+**Validation evidence:** `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js`; `npm run typecheck`
 **Priority:** Medium
 **Domain:** Frontend/runtime quality governance / Embedded browser runtime
 **Requirement:** Reduced supported surface after `p21-legacy-public-html-deprecation-for-spa-transition`
 **Reason:** `p21` removed `src/public/root/**`, `src/public/warehouse/**`, and `src/public/agent/**` from the supported runtime, so the approved typecheck baseline must stay intentionally bounded to the shared login/session seam instead of re-expanding into retired HTML surfaces.
-**Current problem:** Follow-up governance work could incorrectly revive typecheck plans for retired legacy pages even though those files no longer belong to the supported public runtime.
-**Proposed change:** Keep `tsconfig.typecheck.json` bounded to the approved reduced public-runtime baseline (`src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`, and any future explicitly approved reduced-surface additions) unless a new approved spec changes the supported browser contract.
+**Current problem resolved:** Follow-up governance work is now constrained by explicit repository policy so retired legacy pages are not implicitly revived inside the supported public runtime.
+**Implemented change:** The repository now documents that `tsconfig.typecheck.json` remains bounded to the approved reduced public-runtime baseline (`src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`, and any future explicitly approved reduced-surface additions), and that retired legacy pages plus `legacy-public-runtime/` cannot re-enter supported runtime, validator scope, or typecheck scope without a new approved spec.
 **Affected files:** `tsconfig.typecheck.json`, reduced supported `src/public/**` files, related validators/tests/docs/specs
 **Dependencies:** TASK-017, `p21-legacy-public-html-deprecation-for-spa-transition`
 **Database impact:** None
 **API impact:** None expected; existing browser/API contracts must remain stable
 **Container impact:** None
 **Security impact:** Medium positive impact through tighter scope governance and prevention of accidental legacy-surface revival
-**Acceptance criteria:** A later approved slice preserves the reduced supported browser contract, documents any newly approved additions explicitly, and does not reintroduce retired legacy pages into `typecheck` or supported runtime governance.
-**Required tests:** `npm run typecheck`; `npm run lint:public-runtime`; `npm run validate:public-runtime`; updated characterization/governance suites; `npm run build`
+**Acceptance criteria:** Completed. Repository docs now preserve the reduced supported browser contract, require explicit approved planning for any future additions, and do not allow retired legacy pages or `legacy-public-runtime/` to re-enter `typecheck`, validator scope, or supported runtime governance implicitly.
+**Required tests:** `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js`; `npm run typecheck`
 **Migration considerations:** Expand compile-time scope only over the reduced supported public runtime or its explicit successors, not over `legacy-public-runtime/`.
 **Rollback or mitigation:** Revert only the newly added allowlist entries if a future bounded reduced-surface expansion proves unstable.
 **Risk:** Medium
@@ -440,40 +450,46 @@
 **Risk:** Medium
 
 ## TASK-023: Define final functional post-login destinations beyond the interim transition page
-**Status:** Proposed
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `src/public/migration.js`, `scripts/validate-public-runtime.js`, `tests/public-surface-characterization.test.js`, `tests/public-runtime-http-smoke.test.js`, `tests/browser-e2e.e2e.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `specs/p25-post-login-transition-and-test-noise-closure/*`
+**Validation evidence:** `node --test tests/browser-e2e.e2e.js`; `node --test tests/audit-instrumentation.test.js tests/audit-repository.test.js` (with `tests/audit-repository.test.js` skipped when env is absent); `npm run typecheck`; `npm run validate:public-runtime`; `npm run lint -- --quiet`
 **Priority:** Medium
 **Domain:** Frontend/navigation governance / Embedded browser runtime
 **Requirement:** Post-implementation follow-up after `p22-public-runtime-contract-reduction-follow-through`
 **Reason:** The repository now has a supported interim landing for retired-runtime-dependent roles, but it is informational and not a final operational destination.
-**Current problem:** `/migration.html?mode=post-login-transition` confirms successful authentication but does not provide role-specific operational functionality.
-**Proposed change:** Define approved replacement browser entrypoints or a replacement shell for authenticated root/admin/warehouse/agent flows, then update `login.js`, validators, tests, and docs in the same bounded slice.
+**Current problem resolved:** The repository now makes the interim intent explicit: `/migration.html?mode=post-login-transition` is the supported temporary landing for retired-runtime-dependent roles, confirms successful authentication, clearly states that the destination module is not implemented yet, and preserves safe return-to-login/logout behavior without reviving legacy HTML runtime.
+**Implemented change:** The current transition page remains the approved default placeholder while future role-specific SPA destinations are deferred to later approved slices. This closure is governance/runtime-contract work only; it does not claim the role-specific SPA destinations already exist.
 **Affected files:** `src/public/login.js`, `src/public/migration.html`, `src/public/migration.js`, future replacement shell files, related validators/tests/docs/specs
 **Dependencies:** TASK-021, TASK-022
 **Database impact:** None expected unless a later approved replacement flow requires new persistence-backed projections
 **API impact:** None expected unless new authenticated browser entrypoints require supporting endpoints documented by a future approved spec
 **Container impact:** None expected
 **Security impact:** Medium positive impact through removal of transitional UX and tighter supported-role navigation
-**Acceptance criteria:** A later approved slice defines real supported post-login destinations for retired-runtime-dependent roles, removes the interim-only dependency on `/migration.html?mode=post-login-transition` where appropriate, and updates validators/tests/docs without reactivating retired legacy HTML pages.
+**Acceptance criteria:** Completed. The repository now explicitly documents and validates that `/migration.html?mode=post-login-transition` is a supported temporary "not implemented yet" landing with safe exit behavior, while final role-specific SPA destinations remain future approved work and retired legacy HTML pages stay inactive.
 **Required tests:** `npm run lint:public-runtime`; `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js tests/public-runtime-http-smoke.test.js tests/browser-runtime-auth-convergence-inventory.test.js`; `node --test tests/browser-e2e.e2e.js`; any additional approved landing-flow tests; `npm run typecheck`
 **Migration considerations:** Keep the current supported transition page until final destinations are approved; do not introduce speculative routes.
 **Rollback or mitigation:** Revert only the final-destination slice if replacement entrypoints regress, keeping the interim transition landing intact.
 **Risk:** Medium
 
 ## TASK-024: Reduce expected database-unavailable audit-log noise in focused browser/runtime tests
-**Status:** Proposed
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `tests/helpers/db-free-audit.js`, `tests/browser-e2e.e2e.js`, `tests/audit-instrumentation.test.js`, `docs/test-suite-catalog.md`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `CHANGELOG.md`, `specs/p25-post-login-transition-and-test-noise-closure/*`, `specs/p26-browser-runtime-db-free-suite-separation/*`
+**Validation evidence:** `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js tests/public-runtime-http-smoke.test.js`; `node --test tests/browser-e2e.e2e.js`; `npm run typecheck`
 **Priority:** Low
 **Domain:** Test governance / Observability
 **Requirement:** Post-implementation follow-up after `p22-public-runtime-contract-reduction-follow-through`
 **Reason:** Focused browser/runtime tests can pass while still emitting expected audit-log noise for database unavailability (`db:5432`), which can obscure real failures during triage.
-**Current problem:** Test output may include non-blocking operational noise unrelated to the asserted public-runtime behavior.
-**Proposed change:** Isolate, suppress, or clearly classify expected database-unavailable audit-log output in focused browser/runtime test scenarios without hiding genuine failures.
+**Current governance ambiguity resolved:** The repository now has an implemented remediation for the addressed suites: DB-free browser/runtime suites use explicit seam control where audit persistence is not under test, while explicit DB-backed audit coverage remains in dedicated suites.
+**Implemented change:** Governance docs first defined that browser/runtime noise cleanup should prefer separating DB-free browser/runtime suites from explicit DB-backed audit/persistence suites rather than broadly suppressing logs, and the later `p26-browser-runtime-db-free-suite-separation` slice applied that strategy by adding a maintained suite catalog, stabilizing `tests/audit-instrumentation.test.js` as a DB-free suite, and isolating incidental browser E2E audit persistence from Prisma without weakening dedicated audit coverage.
 **Affected files:** selected browser/runtime tests, test helpers, logging/audit seams if needed, related docs
 **Dependencies:** TASK-021
 **Database impact:** None
 **API impact:** None
 **Container impact:** None
 **Security impact:** Low positive impact by improving signal clarity for test evidence without reducing runtime protections
-**Acceptance criteria:** Focused browser/runtime tests keep asserting the same public-runtime behavior while expected database-unavailable audit noise is reduced or clearly classified so real failures remain visible.
+**Acceptance criteria:** Completed. The repository now both documents and implements the first-line remediation for the addressed suites, preserves real-failure visibility, and preserves explicit DB-backed audit/persistence coverage instead of authorizing broad log suppression.
 **Required tests:** affected browser/runtime tests; any logging characterization tests touched by the approved cleanup
 **Migration considerations:** Do not weaken runtime error handling or audit coverage just to silence tests.
 **Rollback or mitigation:** Revert only the noise-reduction slice if it obscures real failures or alters runtime behavior.

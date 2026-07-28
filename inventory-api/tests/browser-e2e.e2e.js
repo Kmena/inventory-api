@@ -8,7 +8,11 @@ process.env.BROWSER_SESSION_STORE_MODE = 'memory';
 
 const { chromium } = require('playwright');
 const app = require('../src/app');
+const { enableDbFreeAuditSeams } = require('./helpers/db-free-audit');
 const browserSessionService = require('../src/services/browser-session.service');
+
+const restoreDbFreeAuditSeams = enableDbFreeAuditSeams();
+process.on('exit', restoreDbFreeAuditSeams);
 const {
   BROWSER_SESSION_COOKIE_NAME,
   BROWSER_SESSION_STATE_COOKIE_NAME,
@@ -170,8 +174,10 @@ test('browser E2E: an existing company-admin browser session now lands directly 
   await page.waitForURL(`${baseUrl}/migration.html?mode=post-login-transition`);
   await page.waitForSelector('#migration-title');
 
-  assert.match(await page.locator('#migration-title').textContent(), /Tu acceso fue actualizado/);
+  assert.match(await page.locator('#migration-title').textContent(), /Iniciaste sesion correctamente/);
   assert.equal(await page.locator('#migration-status-note').isHidden(), true);
+  assert.match(await page.locator('#migration-primary-message').textContent(), /modulo de destino aun no esta implementado/i);
+  assert.match(await page.locator('#migration-home-link').textContent(), /Volver al inicio de sesion/);
   assert.equal(await page.evaluate(() => globalThis.localStorage.getItem('inventory-api-auth')), null);
 });
 
@@ -260,7 +266,7 @@ test('browser E2E: an existing warehouse browser session now lands on the suppor
   await page.goto(`${baseUrl}/`);
   await page.waitForURL(`${baseUrl}/migration.html?mode=post-login-transition`);
   await page.waitForSelector('#migration-title');
-  assert.match(await page.locator('#migration-title').textContent(), /Tu acceso fue actualizado/);
+  assert.match(await page.locator('#migration-title').textContent(), /Iniciaste sesion correctamente/);
   assert.equal(await page.locator('#migration-status-note').isHidden(), true);
   await page.getByRole('button', { name: 'Cerrar sesion' }).click();
   await page.waitForURL(`${baseUrl}/`);

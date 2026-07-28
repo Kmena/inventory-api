@@ -8,16 +8,19 @@ Post-implementation state verified from repository contents:
 - supported HTML documents are `/` and `/index.html` (login), `/no-access.html`, and `/migration.html`;
 - supported shared browser assets are `styles.css`, `login.js`, `no-access.js`, `migration.js`, `shared/session.js`, and `shared/auth.js`;
 - requests to legacy HTML routes under `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html` are intercepted before `express.static(...)` and respond with the common migration screen from the same URL and HTTP `410 Gone`;
-- the former functional legacy browser runtime was preserved outside the active runtime in `legacy-public-runtime/` and is no longer served from `src/public/`.
+- the former functional legacy browser runtime was preserved outside the active runtime in `legacy-public-runtime/` and is no longer served from `src/public/`;
+- `legacy-public-runtime/` now has an explicit governance role as transitional backup/reference inventory only while equivalent root, warehouse, and agent capabilities are integrated and validated in the SPA.
 
-The backend JSON API, Prisma persistence, browser-session cookie model, and repository/workflow governance remain implemented as in prior slices.
+The backend JSON API, Prisma persistence, browser-session cookie model, health/readiness endpoints, and repository/workflow governance remain implemented in the same deployable.
 
 Repository-governance state verified in this refresh:
-- runtime-contract governance now treats reviewed artifacts under `docs/**` as the canonical source of truth;
+- the latest `p26-browser-runtime-db-free-suite-separation` cycle implements the previously approved DB-free vs DB-backed test separation for the affected browser/runtime boundary, removes the known incidental audit-DB noise from `tests/browser-e2e.e2e.js`, stabilizes `tests/audit-instrumentation.test.js` as a DB-free suite, and adds a maintained suite catalog without changing production audit semantics or database schema;
+- runtime-contract governance treats reviewed artifacts under `docs/**` as the canonical source of truth;
 - `internal-docs/**` remains in-repository only as auxiliary support material and is no longer the authoritative enforcement target;
 - `scripts/run-tests.js` is the official aggregate test runner behind `npm run test`;
 - it defaults to `NODE_ENV=test` and `BROWSER_SESSION_STORE_MODE=memory` unless explicitly overridden;
-- the repository also keeps an explicit Redis-path validation lane through `npm run test:redis-path` and the root workflow `.github/workflows/redis-browser-session-tests.yml` so the supported non-test browser-session store path remains separately governed.
+- the repository keeps an explicit Redis-path validation lane through `npm run test:redis-path` and the root workflow `.github/workflows/redis-browser-session-tests.yml` so the supported non-test browser-session store path remains separately governed;
+- the earlier Redis operational-safeguards slice also hardened browser-session persistence visibility by making `/health/ready` depend on both database readiness and browser-session-store readiness.
 
 ## 2. Repository structure
 High-signal paths verified in this refresh:
@@ -56,7 +59,7 @@ For the public browser surface, `src/app.js` now applies three relevant runtime 
 2. a pre-static gate for deprecated legacy HTML routes;
 3. `express.static(...)` for the reduced supported `src/public/` baseline only.
 
-The legacy browser HTML pages are no longer an active runtime module even though their files are still preserved in the repository under `legacy-public-runtime/`.
+The legacy browser HTML pages are no longer an active runtime module even though their files are still preserved in the repository under `legacy-public-runtime/`. That preserved tree is backup/reference material only; it is not an implicit rollback path and should be removed in a later approved slice once equivalent SPA sections are implemented and validated.
 
 ## 4. Existing domains and modules
 Observable current runtime and governance areas:
@@ -79,6 +82,8 @@ Examples currently implemented:
 - serve the supported login document at `/` and `/index.html`;
 - serve the supported fallback documents `/no-access.html` and `/migration.html`;
 - respond to direct legacy HTML requests such as `/root/dashboard.html`, `/warehouse/products.html`, or `/agent/workspace.html` with the shared migration screen and HTTP `410 Gone` without redirect;
+- answer `GET /health` with a backward-compatible liveness payload;
+- answer `GET /health/ready` with database and browser-session-store dependency state, returning `503` when Prisma readiness fails or when the configured Redis session store is down;
 - serve JSON APIs for companies, roles, users, clients, products, orders, invoices, payments, inventory, warehouses, regions, sales routes, agent workflows, taxpayers, geocoding, and economic activities;
 - execute repository validation through lint, typecheck, build, public-runtime validation, the aggregate `npm run test` runner, browser/runtime characterization tests, and hosted GitHub Actions workflows.
 
@@ -98,18 +103,29 @@ Examples currently implemented:
 4. Services call repositories and Prisma-backed persistence.
 5. Responses return JSON errors or data.
 
+### Readiness flow
+1. `GET /health/ready` invokes Prisma database readiness.
+2. The same request invokes `browserSessionService.checkBrowserSessionStoreReadiness()`.
+3. The memory session store reports `{ mode: 'memory', status: 'memory' }` after local cleanup.
+4. The Redis session store reports `{ mode: 'redis', status: 'up' }` when `PING` succeeds and `{ mode: 'redis', status: 'down' }` when the connection fails.
+5. The route returns `200` only when the database is up and the browser-session dependency is acceptable for the active mode; in Redis mode, a down store makes readiness fail with `503`.
+
 ### Legacy-runtime preservation flow
 1. Legacy HTML/JS files remain versioned under `legacy-public-runtime/`.
 2. They are no longer inside `src/public/`.
 3. They are therefore not part of the supported HTTP runtime served by Express.
 4. Validators now treat them as preserved inventory, not active browser surface.
+5. The preserved tree remains transitional only until equivalent SPA coverage exists and has been validated.
 
 ## 7. Database and persistence
 - Prisma schema remains in `inventory-api/prisma/schema.prisma`.
 - Versioned migrations remain in `inventory-api/prisma/migrations/`.
 - Persistence remains repository + Prisma based.
-- Browser-session persistence remains externalized through the store abstraction, with Redis as the supported non-test path.
-- The reduced public-runtime contract and its `p22` follow-through introduced no database or migration changes.
+- Browser-session persistence remains externalized through the store abstraction.
+- `browser-session-store.factory.js` resolves `memory` for test mode by default and `redis` for non-test mode unless `BROWSER_SESSION_STORE_MODE` explicitly overrides it.
+- `BrowserSessionMemoryStore` keeps sessions in-process, eagerly drops expired entries, supports explicit invalidation, and exposes readiness as `memory`.
+- `BrowserSessionRedisStore` persists opaque sessions under the configured key prefix in Redis, uses a raw TCP Redis protocol client, and exposes readiness via `PING` without silently falling back to memory mode.
+- No database schema or migration changed in the inspected `p26` implementation refresh.
 
 ## 8. APIs and integrations
 Current observable interfaces:
@@ -119,11 +135,18 @@ Current observable interfaces:
 - GitHub Actions as repository-governance integration
 - canonical runtime-contract artifacts under `docs/**`, with `internal-docs/**` retained only as auxiliary repository material
 
+Relevant health and operational contracts now in effect:
+- `GET /health` returns `{ ok: true, service: 'inventory-api' }`;
+- `GET /health/ready` returns `{ ok, service, checks }` where `checks.database` and `checks.browserSessionStore` reflect current dependency status;
+- in Redis mode, `checks.browserSessionStore = down` forces readiness `503`;
+- in memory mode, `checks.browserSessionStore = memory` keeps readiness compatible without requiring Redis.
+
 Relevant public-surface behavior now in effect:
 - `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` remain supported and are explicitly outside the HTML deprecation scope;
 - `POST /api/auth/logout` is part of the governed runtime-contract inventory after the `p23` contract-alignment refresh;
 - legacy HTML paths are not redirected to new routes; they return `410 Gone` from the same URL;
 - `legacy-public-runtime/` is a repository artifact, not a served integration surface.
+- `legacy-public-runtime/` is transitional backup/reference inventory only and must not be reactivated as a compatibility shortcut.
 
 ## 9. Authentication and authorization
 Current observable behavior:
@@ -139,6 +162,7 @@ Current observable behavior:
 
 Current post-login behavior in code:
 - `src/public/login.js` now resolves retired-runtime-dependent authenticated users to `/migration.html?mode=post-login-transition`.
+- in that supported transition mode, the page explicitly confirms successful authentication, states that the destination module is not implemented yet, and preserves safe return-to-login/logout actions instead of pretending to be a functional dashboard.
 - direct requests to `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html` still do not open functional legacy screens; they continue to land on the deprecated-route migration response (`410 Gone`).
 
 ## 10. Events and background processing
@@ -157,6 +181,7 @@ Observed deployment/runtime assets:
 Current platform baseline:
 - `inventory-api/package.json` declares `engines.node: ">=24 <25"`
 - `inventory-api/Dockerfile` uses `node:24-bullseye-slim`
+- the Docker image healthcheck probes `GET /health/ready`
 - compose files declare the Redis dependency and browser-session store environment expected by the current session baseline
 - root official workflows use Node 24 and execute in `inventory-api/`
 
@@ -179,33 +204,52 @@ The active browser/runtime governance still relies on:
 - `tests/browser-runtime-auth-convergence-inventory.test.js`
 - `tests/browser-auth-compatibility-inventory.test.js`
 - `tests/browser-e2e.e2e.js`
+- `docs/test-suite-catalog.md`
 - canonical runtime-contract artifacts under `docs/**`
 - optional auxiliary/internal artifacts under `internal-docs/**` when needed for non-canonical support material
 
-Additional post-implementation evidence supplied by the requester for the TASK-026 / TASK-027 follow-up refresh:
-- `node --test tests/runtime-contract-governance.test.js tests/openapi-contract-consistency.test.js tests/critical-contract-governance.test.js` ✅
-- `npm run lint -- --quiet` ✅
+Additional post-implementation evidence supplied by the requester for the latest implemented refresh:
+- `node --test tests/browser-session-redis-store.test.js` ✅
+- `node --test tests/browser-session-service-characterization.test.js` ✅
+- `node --test tests/health-routes.test.js` ✅
+- `node --test tests/production-baseline-characterization.test.js` ✅
+- `node --test tests/browser-session-auth-boundary.test.js` ✅
 - `npm run test:redis-path` ✅
-- `npm run validate:workflow-baseline` ✅
-- `node --test tests/workflow-baseline-characterization.test.js` ✅
+- `npm run validate:operational-readiness` ✅
+- `npm run lint -- --quiet` ✅
+- `npm run typecheck` ✅
+- `npm run build` ✅ (after one transient Windows Prisma rename-lock retry)
 - `npm run test -- --silent` ✅
-- baseline governance audit score: `8.8/10` (acceptable, no meaningful regression found; warning remains because the score is below `9.5`)
+- Additional requester-supplied validation evidence for `p26`:
+  - `node --test tests/browser-e2e.e2e.js` ✅
+  - `node --test tests/audit-instrumentation.test.js tests/audit-repository.test.js` ✅, with `tests/audit-repository.test.js` skipped when `P2_AUDIT_DATABASE_URL` is absent
+  - `npm run typecheck` ✅
+  - `npm run validate:public-runtime` ✅
+  - `npm run lint -- --quiet` ✅
+- baseline audit score: `8.8/10` acceptable, with no meaningful regression reported and the warning remaining only because the score is below `9.5`
 
-This evidence establishes a passing repository-wide baseline for the official aggregate suite, the explicit Redis-path lane, and the root-workflow governance checks.
+This evidence establishes a passing repository-wide baseline for the official aggregate suite, the explicit Redis-path lane, and the operational-readiness checks relevant to browser-session persistence.
 
 ## 13. Behavior to preserve
 - Express must continue serving the reduced active browser runtime from `src/public/`.
 - `/`, `/index.html`, `/no-access.html`, and `/migration.html` must remain the only supported HTML documents in the embedded public runtime.
 - Requests to deprecated legacy HTML routes under `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html` must continue responding from the same URL with the common migration screen and HTTP `410 Gone`, without redirect.
 - `/migration.html?mode=post-login-transition` must remain a supported 200 post-login landing distinct from the deprecated-route `410 Gone` contract.
-- `legacy-public-runtime/` must remain outside the active runtime unless a later approved change explicitly redefines the supported surface.
+- the supported post-login landing must remain explicitly transitional, not-yet-implemented, and safe-exit oriented until future SPA destinations per role are approved and implemented.
+- `legacy-public-runtime/` must remain outside the active runtime and outside implicit rollback behavior unless a later approved change explicitly redefines the supported surface.
 - `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` must remain supported.
+- `GET /health` must remain a backward-compatible liveness endpoint.
+- `GET /health/ready` must continue reflecting both database readiness and browser-session-store readiness, including `503` when Redis mode is configured but unavailable.
 - `shared/session.js`, `shared/auth.js`, and `login.js` must remain the bounded browser-runtime typecheck baseline.
+- Retired legacy pages and `legacy-public-runtime/` must not re-enter supported runtime, validator scope, or typecheck scope unless a later approved spec explicitly changes that contract.
 - Supported browser flows must not reintroduce persisted bearer tokens in `localStorage`.
 
 ## 14. Known defects
 - The supported post-login landing for retired-runtime-dependent roles remains transitional and informational (`/migration.html?mode=post-login-transition`), not a final functional destination.
-- Focused and aggregate tests can still emit expected audit-log noise for database unavailability (`db:5432`) while passing.
+- The current supported wording intentionally tells the user that the destination module is not implemented yet and offers safe return-to-login/logout behavior rather than legacy fallback navigation.
+- The Redis session store implementation uses a small raw-socket protocol client rather than a mature Redis library, which keeps dependencies low but leaves protocol handling responsibility inside application code.
+- Some passing tests can still emit expected operational logs, but the previously known incidental audit-log noise for `tests/browser-e2e.e2e.js` no longer reaches Prisma because that suite now runs through an explicit DB-free audit seam.
+- The approved remediation strategy has now been implemented for the affected browser/runtime boundary through explicit DB-free vs DB-backed suite separation and a maintained suite catalog, rather than broad log suppression.
 
 ## 15. Architectural debt
 - The application remains layered without strict hexagonal separation.
@@ -214,14 +258,17 @@ This evidence establishes a passing repository-wide baseline for the official ag
 - Operational assurance still depends on synchronization across docs, validators, tests, README, env examples, compose files, and workflows.
 - Runtime-contract governance now treats `docs/**` as the sole authoritative reviewed artifact location; `internal-docs/**` is auxiliary only and must not shadow canonical runtime-contract truth.
 - The repository-wide governance baseline remains acceptable but not fully closed by the latest audit score (`8.8/10`), so documentation and workflow/test contracts still require disciplined upkeep to avoid regressions below the desired threshold.
-- The preserved `legacy-public-runtime/` inventory is intentionally outside active support, but it remains in-repo transition debt until replaced by the future SPA or formally archived.
+- The preserved `legacy-public-runtime/` inventory is intentionally outside active support and remains in-repo only as transitional backup/reference debt until equivalent SPA functionality is implemented, validated, and a later approved slice removes it.
 - The interim supported post-login landing remains informational rather than operational for retired-runtime-dependent roles.
 - The reduced public-runtime contract depends on synchronized updates across `login.js`, `migration.html`, `migration.js`, validators, tests, and manifest/docs when transition behavior changes.
 - The aggregate test runner now defaults to memory-backed browser sessions for stability, which reduces default-suite coverage of the supported Redis-backed non-test path.
+- Focused browser/runtime suites should avoid real DB-backed audit dependencies when persistence is not part of the asserted behavior, while dedicated DB-backed tests must continue preserving audit/persistence coverage and unexpected-failure visibility.
+- `docs/test-suite-catalog.md` is now the maintained reference for the affected suite boundary, including DB-free, DB-backed, and Redis-backed classifications.
 
 ## 16. Security risks
 Current architecture-facing security concerns still visible:
 - supported non-test browser-session persistence depends on Redis availability and correct environment configuration;
+- browser-session issuance and validation now fail explicitly with `503 service_unavailable` semantics when Redis mode is configured but the store is unreachable, which is safer than silent downgrade but increases operational dependence on Redis uptime;
 - universal `Secure` cookie enforcement still depends on HTTPS-capable deployment or trusted proxy signaling;
 - this HTTPS/cookie posture remains a documented residual risk and follow-up dependency tracked in `specs/p11-https-browser-session-migration/`, not an in-slice blocker for the current reduced public-runtime contract;
 - mutating cookie-authenticated requests rely on same-origin `Origin` validation rather than a separate CSRF token;
@@ -233,5 +280,5 @@ The reduced public-runtime posture continues to limit public browser exposure by
 - This refresh did not execute commands directly; validation status and audit scoring are taken from the user-provided command results.
 - No evidence in this refresh contradicts the implemented reduced public-runtime contract.
 - The preserved `legacy-public-runtime/` tree was verified as present in the repository, but it was not treated as supported runtime behavior because it is outside `src/public/`.
-- The approved interim replacement destination in `login.js` is `/migration.html?mode=post-login-transition` until a later approved slice defines final functional destinations.
+- The approved interim replacement destination in `login.js` is `/migration.html?mode=post-login-transition` until a later approved slice defines final functional SPA destinations by role.
 - The requester-supplied passing suite evidence is treated as the current repository-wide baseline for `npm run test -- --silent` after the `p23` runner-bootstrap change.
