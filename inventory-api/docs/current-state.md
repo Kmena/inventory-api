@@ -1,112 +1,115 @@
 # Current State
 
 ## 1. System overview
-`inventory-api/` is a single-deployable Node.js 24 Express + Prisma modular monolith inside a repository whose official GitHub Actions workflows now execute from the **repository root**.
+`inventory-api/` is a single-deployable Node.js 24 Express + Prisma application with REST APIs and a small embedded browser surface served from the same runtime.
 
-Current observable implementation:
-- application code, package manifest, scripts, Prisma schema, tests, and architecture-facing docs remain under `inventory-api/`;
-- official hosted CI/CD workflows live under `/.github/workflows/` at repository root;
-- the application still serves REST-style JSON APIs and static browser assets from the same Express runtime;
-- Prisma remains the persistence layer over PostgreSQL with committed migrations.
+Post-implementation state verified from repository contents:
+- the active public browser runtime under `src/public/` is now intentionally reduced to the minimum supported baseline;
+- supported HTML documents are `/` and `/index.html` (login), `/no-access.html`, and `/migration.html`;
+- supported shared browser assets are `styles.css`, `login.js`, `no-access.js`, `migration.js`, `shared/session.js`, and `shared/auth.js`;
+- requests to legacy HTML routes under `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html` are intercepted before `express.static(...)` and respond with the common migration screen from the same URL and HTTP `410 Gone`;
+- the former functional legacy browser runtime was preserved outside the active runtime in `legacy-public-runtime/` and is no longer served from `src/public/`.
 
-The `p11-node24-runtime-migration` baseline is now implemented and evidenced on local/mainline, Docker, and hosted GitHub Actions surfaces.
+The backend JSON API, Prisma persistence, browser-session cookie model, and repository/workflow governance remain implemented as in prior slices.
 
-The follow-up `p11-operational-readiness-public-baseline` slice is also implemented: operational-readiness is now validated from public versioned docs under `inventory-api/docs/`, `.env.production.example` is explicitly treated as required baseline evidence, the file is intentionally tracked in git via the `!.env.production.example` exception in `inventory-api/.gitignore`, and no third public operational-readiness document was introduced.
+Repository-governance state verified in this refresh:
+- runtime-contract governance now treats reviewed artifacts under `docs/**` as the canonical source of truth;
+- `internal-docs/**` remains in-repository only as auxiliary support material and is no longer the authoritative enforcement target;
+- `scripts/run-tests.js` is the official aggregate test runner behind `npm run test`;
+- it defaults to `NODE_ENV=test` and `BROWSER_SESSION_STORE_MODE=memory` unless explicitly overridden;
+- the repository also keeps an explicit Redis-path validation lane through `npm run test:redis-path` and the root workflow `.github/workflows/redis-browser-session-tests.yml` so the supported non-test browser-session store path remains separately governed.
 
 ## 2. Repository structure
 High-signal paths verified in this refresh:
-- repository root: `.github/workflows/`, `README.md`, `docker/`, `sql/`
-- application root: `inventory-api/package.json`, `inventory-api/Dockerfile`, `inventory-api/src/`, `inventory-api/prisma/`, `inventory-api/scripts/`, `inventory-api/tests/`, `inventory-api/docs/`, `inventory-api/specs/`
+- repository root: `.github/workflows/`, `inventory-api/`
+- application root: `inventory-api/package.json`, `inventory-api/Dockerfile`, `inventory-api/src/`, `inventory-api/prisma/`, `inventory-api/scripts/`, `inventory-api/tests/`, `inventory-api/docs/`, `inventory-api/internal-docs/`, `inventory-api/README.md`
+- active public runtime: `inventory-api/src/public/`
+- preserved but inactive legacy browser inventory: `inventory-api/legacy-public-runtime/`
 
-Verified root official workflows:
-- `.github/workflows/static-checks.yml`
-- `.github/workflows/repository-tests.yml`
-- `.github/workflows/db-constraints-tests.yml`
-- `.github/workflows/contract-validations.yml`
-- `.github/workflows/browser-e2e.yml`
-- `.github/workflows/operational-smoke.yml`
-- `.github/workflows/windows-prisma-build.yml`
-- `.github/workflows/build-and-publish.yml`
-- `.github/workflows/p0-quality-gates.yml`
+Observed active `src/public/` inventory:
+- `index.html`
+- `migration.html`
+- `no-access.html`
+- `styles.css`
+- `login.js`
+- `migration.js`
+- `no-access.js`
+- `shared/session.js`
+- `shared/auth.js`
 
-Verified root official workflow tree contents:
-- `static-checks.yml`
-- `repository-tests.yml`
-- `db-constraints-tests.yml`
-- `contract-validations.yml`
-- `browser-e2e.yml`
-- `operational-smoke.yml`
-- `windows-prisma-build.yml`
-- `build-and-publish.yml`
-- `p0-quality-gates.yml`
+Observed preserved legacy inventory outside runtime:
+- `legacy-public-runtime/root/**`
+- `legacy-public-runtime/warehouse/**`
+- `legacy-public-runtime/agent/**`
+- `legacy-public-runtime/shared/lot-dates.js`
 
 ## 3. Current architecture
-Current implemented architecture remains layered:
+Current implemented architecture remains layered rather than hexagonal:
 - Express app and middleware at the HTTP boundary;
-- route modules delegate to service modules;
-- services coordinate business flows and repository calls;
-- repositories encapsulate most Prisma access;
-- static browser assets are served by the same runtime process.
+- route modules delegating to service modules;
+- services coordinating business logic and repositories;
+- repositories encapsulating most Prisma access;
+- static browser assets served by the same Express process.
 
-A second operational layer exists for repository governance:
-- root GitHub Actions workflows are the official hosted automation entry point and operational source of truth;
-- the previously duplicated `inventory-api/.github/workflows/` YAML tree has been removed;
-- local validators and characterization tests read the same root official workflow tree directly;
-- restore-readiness is exposed as a package script and validated against public versioned docs under `inventory-api/docs/`;
-- operational-readiness is a separate validator, but it now validates the same public `docs/` contract directly instead of depending on optional `internal-docs/` overlays;
-- the public operational-readiness contract is intentionally carried by `docs/production-baseline.md` plus `docs/production-operations-runbook.md`; no third public document was introduced in this slice.
+For the public browser surface, `src/app.js` now applies three relevant runtime behaviors:
+1. route-segmented security headers including CSP;
+2. a pre-static gate for deprecated legacy HTML routes;
+3. `express.static(...)` for the reduced supported `src/public/` baseline only.
 
-Strict hexagonal boundaries are still not implemented.
+The legacy browser HTML pages are no longer an active runtime module even though their files are still preserved in the repository under `legacy-public-runtime/`.
 
 ## 4. Existing domains and modules
-Observable runtime and governance areas:
+Observable current runtime and governance areas:
 - Authentication and authorization
 - Company, role, and user administration
 - Client management and client documents
 - Product catalog and inventory
 - Warehouses and geography
-- Sales routes and agent workspace
+- Sales routes and agent workspace APIs
 - Orders, invoices, and payments
-- Embedded browser runtime
+- Embedded browser runtime (reduced baseline only)
 - Repository/platform governance
 - CI/workflow governance
 
 ## 5. Main use cases
-Examples still implemented:
-- login via `/api/auth/login`
-- retrieve authenticated context via `/api/auth/me`
-- manage companies, roles, users, clients, products, warehouses, routes, orders, invoices, and payments
-- use embedded root, warehouse, and agent browser screens
-- run repository validation through `npm run lint`, `npm run typecheck`, `npm run build`, `npm test`, `npm run validate:workflow-baseline`, `npm run validate:restore-readiness`, `npm run validate:public-runtime`, `npm run validate:operational-readiness`, `npm run validate:production-baseline`, and `npm run verify`
-- prove the public operational-readiness contract through the versioned pair `docs/production-baseline.md` + `docs/production-operations-runbook.md` together with `.env.production.example` as explicit baseline evidence
-- execute hosted quality gates from repository-root workflows with `working-directory: inventory-api`
+Examples currently implemented:
+- login via `/api/auth/login`, including browser-session issuance when `X-Inventory-Browser-Session: cookie` is requested;
+- retrieve authenticated context via `/api/auth/me`;
+- close an authenticated browser session via `/api/auth/logout`;
+- serve the supported login document at `/` and `/index.html`;
+- serve the supported fallback documents `/no-access.html` and `/migration.html`;
+- respond to direct legacy HTML requests such as `/root/dashboard.html`, `/warehouse/products.html`, or `/agent/workspace.html` with the shared migration screen and HTTP `410 Gone` without redirect;
+- serve JSON APIs for companies, roles, users, clients, products, orders, invoices, payments, inventory, warehouses, regions, sales routes, agent workflows, taxpayers, geocoding, and economic activities;
+- execute repository validation through lint, typecheck, build, public-runtime validation, the aggregate `npm run test` runner, browser/runtime characterization tests, and hosted GitHub Actions workflows.
 
 ## 6. Current data flows
-### Runtime flow
-1. Express receives requests.
-2. Security, auth, throttling, metrics, logging, and validation middleware execute.
+### Public browser flow
+1. A browser requests a public document or asset.
+2. `src/app.js` applies security headers.
+3. If the path matches `/root/*.html`, `/warehouse/*.html`, or `/agent/*.html`, the request is intercepted by `serveDeprecatedLegacyHtml`.
+4. The response returns `migration.html` from the same requested URL with HTTP `410 Gone`.
+5. Non-deprecated public requests fall through to `express.static(src/public)`.
+6. Login and other supported public pages bootstrap session/auth behavior through `shared/session.js` and `shared/auth.js`.
+
+### API flow
+1. Express receives `/api/*` requests.
+2. Middleware performs logging, request context, throttling, validation, authentication, and authorization as applicable.
 3. Routes call services.
 4. Services call repositories and Prisma-backed persistence.
-5. Responses return JSON or static assets.
+5. Responses return JSON errors or data.
 
-### Repository-governance flow
-1. Local scripts and tests run from `inventory-api/`.
-2. `scripts/validate-workflow-baseline.js`, `tests/workflow-baseline-characterization.test.js`, and `tests/prisma-windows-build-stabilization.test.js` read `/.github/workflows/` directly.
-3. `scripts/validate-restore-readiness.js` validates `docs/production-operations-runbook.md`, `docs/production-baseline.md`, and `docs/restore-readiness-baseline.md` as the public restore-readiness contract.
-4. `scripts/validate-operational-readiness.js` reads the root `operational-smoke.yml` path and validates the public operational baseline from `docs/production-baseline.md` and `docs/production-operations-runbook.md`.
-5. `scripts/validate-production-baseline.js` requires `.env.production.example` as a versioned production-baseline artifact in addition to required runtime files and environment variables.
-6. `tests/production-baseline-characterization.test.js` asserts `.env.production.example` remains versioned and documented in both `README.md` and `docs/production-baseline.md`.
-7. `inventory-api/.gitignore` ignores `.env.*` broadly but explicitly unignores `!.env.production.example`, so the production template remains intentionally versioned.
-8. Hosted GitHub Actions run from repository root `/.github/workflows/` and use `working-directory: inventory-api` plus `cache-dependency-path: inventory-api/package-lock.json`.
-9. Evidence is recorded in workflow logs, artifacts, docs, and spec packages.
+### Legacy-runtime preservation flow
+1. Legacy HTML/JS files remain versioned under `legacy-public-runtime/`.
+2. They are no longer inside `src/public/`.
+3. They are therefore not part of the supported HTTP runtime served by Express.
+4. Validators now treat them as preserved inventory, not active browser surface.
 
 ## 7. Database and persistence
 - Prisma schema remains in `inventory-api/prisma/schema.prisma`.
 - Versioned migrations remain in `inventory-api/prisma/migrations/`.
 - Persistence remains repository + Prisma based.
-- No database schema or migration changes were introduced by the Node 24 runtime migration.
-- Root bootstrap persistence remains repository-owned in `src/repositories/company.repository.js`.
-- Tenant-safe repository write hardening from earlier P11 slices remains implemented.
+- Browser-session persistence remains externalized through the store abstraction, with Redis as the supported non-test path.
+- The reduced public-runtime contract and its `p22` follow-through introduced no database or migration changes.
 
 ## 8. APIs and integrations
 Current observable interfaces:
@@ -114,21 +117,34 @@ Current observable interfaces:
 - health endpoints under `/health/*`
 - static runtime served from `/`
 - GitHub Actions as repository-governance integration
+- canonical runtime-contract artifacts under `docs/**`, with `internal-docs/**` retained only as auxiliary repository material
 
-The Node 24 alignment did not change public API contracts.
+Relevant public-surface behavior now in effect:
+- `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` remain supported and are explicitly outside the HTML deprecation scope;
+- `POST /api/auth/logout` is part of the governed runtime-contract inventory after the `p23` contract-alignment refresh;
+- legacy HTML paths are not redirected to new routes; they return `410 Gone` from the same URL;
+- `legacy-public-runtime/` is a repository artifact, not a served integration surface.
 
 ## 9. Authentication and authorization
 Current observable behavior:
 - login remains public;
 - authenticated APIs use middleware-based authentication;
 - authorization remains middleware/policy based;
-- login throttling is implemented;
-- browser session data is currently persisted client-side in `localStorage`.
+- browser login can request a backend-owned browser session by sending `X-Inventory-Browser-Session: cookie` to `/api/auth/login`;
+- supported embedded browser flows use the cookie pair `inventory_browser_session` + `inventory_browser_state` instead of persisted bearer tokens in `localStorage`;
+- `shared/session.js` and `shared/auth.js` remain the active browser helper seam for the reduced supported public runtime;
+- `/api/auth/me` returns the browser-session user projection and refreshes cookies for cookie-authenticated browser requests;
+- `/api/auth/logout` invalidates the backend-owned browser session and clears both browser cookies;
+- mutating cookie-authenticated requests enforce same-origin `Origin` validation in `authenticate.js`.
+
+Current post-login behavior in code:
+- `src/public/login.js` now resolves retired-runtime-dependent authenticated users to `/migration.html?mode=post-login-transition`.
+- direct requests to `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html` still do not open functional legacy screens; they continue to land on the deprecated-route migration response (`410 Gone`).
 
 ## 10. Events and background processing
 No application event bus or separate background worker was verified.
 
-GitHub Actions workflows are repository automation, not application background processing.
+GitHub Actions workflows remain repository automation, not application background processing.
 
 ## 11. Containers and deployment
 Observed deployment/runtime assets:
@@ -141,62 +157,81 @@ Observed deployment/runtime assets:
 Current platform baseline:
 - `inventory-api/package.json` declares `engines.node: ">=24 <25"`
 - `inventory-api/Dockerfile` uses `node:24-bullseye-slim`
+- compose files declare the Redis dependency and browser-session store environment expected by the current session baseline
 - root official workflows use Node 24 and execute in `inventory-api/`
-- root official workflows cache `inventory-api/package-lock.json`
 
 ## 12. Current testing strategy
-Current observable validation baseline recorded for the implemented Node 24 and workflow-governance cycles:
-- reported local validation executed from `inventory-api/` for this governance refresh:
-  - `npm run build`
-  - `npm run lint`
-  - `npm run typecheck`
-  - `npm run validate:workflow-baseline`
-  - `npm run validate:restore-readiness`
-  - `npm run validate:operational-readiness`
-  - `npm run validate:production-baseline` with explicit production environment values
-  - `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`
-  - `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`
-- previously recorded mainline Node 24 evidence in the feature implementation report includes successful `npm ci`, `node --test tests/taxpayer-characterization.test.js`, `npm test -- --silent`, `npm run test:e2e:browser`, `npm run validate:public-runtime`, `npm run validate:operational-readiness`, `npm run validate:production-baseline` with required env, and `docker build -t inventory-api:node24-smoke .`
-- hosted GitHub Actions evidence now exists for the official root workflows:
-  - `windows-prisma-build` run `30281935398` success, job `90030223669`, including `Set up Node.js 24`
-  - `static-checks` run `30281932831` success
-  - `db-constraints-tests` run `30281933453` success
-  - `contract-validations` run `30281933525` success
-  - `repository-tests` run `30281935485` success
-  - `browser-e2e` run `30281937000` success
-  - `operational-smoke` run `30291012752` success after tracking `.env.production.example` and materializing a temporary `.env.production` file for compose smoke
-- Windows Prisma build evidence remains separately classified through the dedicated workflow and artifact publication.
+This refresh did not execute commands directly. Validation status is taken from the user-provided post-implementation evidence for the current repository-governance refresh.
+
+Current repository-wide testing posture now includes:
+- `scripts/run-tests.js` as the official aggregate test runner behind `npm run test`;
+- deterministic default test bootstrap via `NODE_ENV=test` and `BROWSER_SESSION_STORE_MODE=memory` unless explicitly overridden;
+- a dedicated non-default Redis-path validation command at `npm run test:redis-path`;
+- targeted governance and characterization suites for browser/runtime, contract coverage, authorization, audit instrumentation, integrations, and repository policies;
+- focused browser/runtime validation through `scripts/validate-public-runtime.js` and related tests;
+- workflow-governance validation through `scripts/validate-workflow-baseline.js` and `tests/workflow-baseline-characterization.test.js` against the root workflow tree;
+- optional environment-gated suites such as `tests/p2-hardening-constraints.test.js` when dedicated database configuration is supplied.
+
+The active browser/runtime governance still relies on:
+- `scripts/validate-public-runtime.js`
+- `tests/public-surface-characterization.test.js`
+- `tests/public-runtime-http-smoke.test.js`
+- `tests/browser-runtime-auth-convergence-inventory.test.js`
+- `tests/browser-auth-compatibility-inventory.test.js`
+- `tests/browser-e2e.e2e.js`
+- canonical runtime-contract artifacts under `docs/**`
+- optional auxiliary/internal artifacts under `internal-docs/**` when needed for non-canonical support material
+
+Additional post-implementation evidence supplied by the requester for the TASK-026 / TASK-027 follow-up refresh:
+- `node --test tests/runtime-contract-governance.test.js tests/openapi-contract-consistency.test.js tests/critical-contract-governance.test.js` ✅
+- `npm run lint -- --quiet` ✅
+- `npm run test:redis-path` ✅
+- `npm run validate:workflow-baseline` ✅
+- `node --test tests/workflow-baseline-characterization.test.js` ✅
+- `npm run test -- --silent` ✅
+- baseline governance audit score: `8.8/10` (acceptable, no meaningful regression found; warning remains because the score is below `9.5`)
+
+This evidence establishes a passing repository-wide baseline for the official aggregate suite, the explicit Redis-path lane, and the root-workflow governance checks.
 
 ## 13. Behavior to preserve
-- Express continues to serve the embedded browser runtime from `src/public/`.
-- Current endpoint paths and browser-runtime contracts remain unchanged.
-- Current Docker/runtime contract remains a single Dockerfile-based deployment with multi-stage build, non-root runtime, and readiness healthcheck.
-- Node 24 is the active runtime baseline across package, Docker, and root hosted workflows.
-- Root workflows continue to execute from repository root with `working-directory: inventory-api`.
-- Restore readiness remains a public docs-backed package contract via `npm run validate:restore-readiness`.
-- Operational readiness remains a public docs-backed package contract via `npm run validate:operational-readiness` and no longer uses optional private overlays for the public gate.
-- `.env.production.example` remains an explicit required production-baseline artifact and intentionally tracked file.
-- The guarded Prisma generation wrapper remains part of the build contract.
-- The dedicated Windows Prisma workflow remains separate from broader repository validation.
+- Express must continue serving the reduced active browser runtime from `src/public/`.
+- `/`, `/index.html`, `/no-access.html`, and `/migration.html` must remain the only supported HTML documents in the embedded public runtime.
+- Requests to deprecated legacy HTML routes under `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html` must continue responding from the same URL with the common migration screen and HTTP `410 Gone`, without redirect.
+- `/migration.html?mode=post-login-transition` must remain a supported 200 post-login landing distinct from the deprecated-route `410 Gone` contract.
+- `legacy-public-runtime/` must remain outside the active runtime unless a later approved change explicitly redefines the supported surface.
+- `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` must remain supported.
+- `shared/session.js`, `shared/auth.js`, and `login.js` must remain the bounded browser-runtime typecheck baseline.
+- Supported browser flows must not reintroduce persisted bearer tokens in `localStorage`.
 
 ## 14. Known defects
-- Local Windows Prisma generation can still encounter the pre-existing `EPERM` rename-lock path before retry succeeds.
+- The supported post-login landing for retired-runtime-dependent roles remains transitional and informational (`/migration.html?mode=post-login-transition`), not a final functional destination.
+- Focused and aggregate tests can still emit expected audit-log noise for database unavailability (`db:5432`) while passing.
 
 ## 15. Architectural debt
-- service-layer orchestration remains broad;
-- strict hexagonal boundaries are not implemented;
-- workflow governance still depends on scripts, tests, docs, and workflow artifacts that must remain synchronized around the root official workflow tree;
-- operational readiness still depends on synchronization between scripts, tests, workflows, README, `.env.production.example`, and public docs, even though it no longer depends on optional `internal-docs/` overlays;
-- typecheck expansion remains incremental rather than exhaustive;
-- governance assurance still depends on documentation/tests and operational artifacts rather than stronger central enforcement beyond the root workflow tree.
+- The application remains layered without strict hexagonal separation.
+- Service-layer responsibilities remain broad in several modules.
+- API runtime, static public delivery, and governance concerns still coexist in the same deployable.
+- Operational assurance still depends on synchronization across docs, validators, tests, README, env examples, compose files, and workflows.
+- Runtime-contract governance now treats `docs/**` as the sole authoritative reviewed artifact location; `internal-docs/**` is auxiliary only and must not shadow canonical runtime-contract truth.
+- The repository-wide governance baseline remains acceptable but not fully closed by the latest audit score (`8.8/10`), so documentation and workflow/test contracts still require disciplined upkeep to avoid regressions below the desired threshold.
+- The preserved `legacy-public-runtime/` inventory is intentionally outside active support, but it remains in-repo transition debt until replaced by the future SPA or formally archived.
+- The interim supported post-login landing remains informational rather than operational for retired-runtime-dependent roles.
+- The reduced public-runtime contract depends on synchronized updates across `login.js`, `migration.html`, `migration.js`, validators, tests, and manifest/docs when transition behavior changes.
+- The aggregate test runner now defaults to memory-backed browser sessions for stability, which reduces default-suite coverage of the supported Redis-backed non-test path.
 
 ## 16. Security risks
 Current architecture-facing security concerns still visible:
-- browser session persistence in `localStorage`;
-- some critical controls still rely on governance and characterization patterns rather than stronger architectural boundaries;
-- broader P11 hardening work outside this runtime baseline slice remains open.
+- supported non-test browser-session persistence depends on Redis availability and correct environment configuration;
+- universal `Secure` cookie enforcement still depends on HTTPS-capable deployment or trusted proxy signaling;
+- this HTTPS/cookie posture remains a documented residual risk and follow-up dependency tracked in `specs/p11-https-browser-session-migration/`, not an in-slice blocker for the current reduced public-runtime contract;
+- mutating cookie-authenticated requests rely on same-origin `Origin` validation rather than a separate CSRF token;
+- broader architectural boundaries are still layered rather than strongly isolated.
+
+The reduced public-runtime posture continues to limit public browser exposure by removing the functional legacy HTML runtime from the served surface.
 
 ## 17. Unknowns and assumptions
-- This refresh did not execute commands directly; validation status is taken from the recorded implementation evidence and the user-provided command results.
-- No evidence in this refresh contradicts the implemented Node 24 baseline, root-only workflow governance, the public restore-readiness contract, or the public operational-readiness contract.
-- `.env.production.example` is a verified contractual versioned artifact of the production baseline and should not be removed or renamed without updating README, docs, validators, and tests together.
+- This refresh did not execute commands directly; validation status and audit scoring are taken from the user-provided command results.
+- No evidence in this refresh contradicts the implemented reduced public-runtime contract.
+- The preserved `legacy-public-runtime/` tree was verified as present in the repository, but it was not treated as supported runtime behavior because it is outside `src/public/`.
+- The approved interim replacement destination in `login.js` is `/migration.html?mode=post-login-transition` until a later approved slice defines final functional destinations.
+- The requester-supplied passing suite evidence is treated as the current repository-wide baseline for `npm run test -- --silent` after the `p23` runner-bootstrap change.

@@ -69,6 +69,15 @@ const workflowRules = [
     ],
   },
   {
+    relativePath: 'redis-browser-session-tests.yml',
+    checks: [
+      { description: 'defines a dedicated redis-browser-session-tests job', pattern: /^\s{2}redis-browser-session-tests:\s*$/m },
+      { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
+      { description: 'generates Prisma client before Redis-path validation', pattern: /run:\s+npm run build/ },
+      { description: 'runs the dedicated Redis-path browser-session validation command', pattern: /run:\s+npm run test:redis-path/ },
+    ],
+  },
+  {
     relativePath: 'build-and-publish.yml',
     checks: [
       { description: 'builds Docker image', pattern: /docker build \\/ },
@@ -85,6 +94,7 @@ const workflowRules = [
       { description: 'validates restore readiness evidence', pattern: /npm run validate:restore-readiness/ },
       { description: 'validates operational readiness evidence', pattern: /npm run validate:operational-readiness/ },
       { description: 'materializes a temporary production env file for compose smoke', pattern: /cat > \.env\.production <<EOF/ },
+      { description: 'provisions Redis URL for the production browser-session store baseline', pattern: /REDIS_URL:\s+redis:\/\/redis:6379\/0/ },
       { description: 'cleans temporary production env materialization', pattern: /rm -f \.env\.production/ },
       { description: 'validates compose syntax', pattern: /docker compose -f docker-compose\.prod\.yml config/ },
       { description: 'builds the production image without deploy', pattern: /docker build -t inventory-api:operational-smoke \./ },

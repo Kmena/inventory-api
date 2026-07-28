@@ -32,10 +32,13 @@ Variables obligatorias del baseline:
 - `CORS_ORIGIN`
 - `APP_BASE_URL`
 - `JWT_SECRET`
+- `REDIS_URL`
 
 Notas:
 - `JWT_SECRET` debe ser real, no placeholder, y suficientemente largo.
 - `config.js` ya impide arrancar en producción con el secret inseguro por defecto.
+- `REDIS_URL` es obligatorio porque la persistencia soportada de browser sessions fuera de test usa Redis como store explícito.
+- La gobernanza del repositorio ahora conserva además un lane dedicado `redis-browser-session-tests` para validar explícitamente la ruta Redis fuera del suite agregado estable en memory mode.
 
 ## Flujo ejecutable mínimo
 Desde `inventory-api/`:
@@ -61,7 +64,7 @@ docker compose -f docker-compose.prod.yml build
 
 ### 4. Levantar base de datos
 ```bash
-docker compose -f docker-compose.prod.yml up -d db
+docker compose -f docker-compose.prod.yml up -d db redis
 ```
 
 ### 5. Aplicar migraciones versionadas
@@ -90,6 +93,7 @@ Alcance del workflow:
 - `npm run build`
 - `node scripts/validate-workflow-baseline.js`
 - `npm run validate:production-baseline`
+- materialización temporal de `REDIS_URL` y `BROWSER_SESSION_STORE_MODE` junto con el `.env.production` temporal del smoke
 - `npm run validate:restore-readiness`
 - `npm run validate:operational-readiness`
 - materialización temporal de `.env.production` en el runner para satisfacer `env_file` del compose smoke
@@ -143,6 +147,7 @@ docker build -t inventory-api:operational-smoke .
 
 ### Persistencia
 - PostgreSQL persiste en el volumen `postgres_data`.
+- Redis sostiene la persistencia soportada de browser sessions fuera de test y se referencia vía `REDIS_URL`.
 - Archivos operativos del runtime persisten en `app_storage`.
 
 ## Build/publicación controlada sin deploy
