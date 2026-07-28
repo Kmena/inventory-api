@@ -164,6 +164,186 @@ async function updateInventoryAlert(id, companyId, data, db = prisma) {
   return findInventoryAlertById(id, companyId, db);
 }
 
+function acquireCompanyInventoryAdvisoryLock(companyId, db = prisma) {
+  return db.$executeRaw`SELECT pg_advisory_xact_lock(${companyId})`;
+}
+
+function loadInventoryContext(companyId, warehouseId, productId, db = prisma) {
+  return Promise.all([
+    db.inventory.findUnique({ where: { companyId } }),
+    db.warehouse.findFirst({ where: { id: warehouseId, companyId } }),
+    db.product.findFirst({ where: { id: productId, companyId } }),
+  ]).then(([inventory, warehouse, product]) => ({ inventory, warehouse, product }));
+}
+
+function findWarehouseStockRecord(warehouseId, productId, db = prisma) {
+  return db.warehouseStock.findUnique({
+    where: {
+      warehouseId_productId: {
+        warehouseId,
+        productId,
+      },
+    },
+  });
+}
+
+function createWarehouseStockRecord(data, db = prisma) {
+  return db.warehouseStock.create({ data });
+}
+
+function updateWarehouseStockRecord(where, data, db = prisma) {
+  return db.warehouseStock.updateMany({ where, data });
+}
+
+function findWarehouseStockRecordById(id, db = prisma) {
+  return db.warehouseStock.findUnique({ where: { id } });
+}
+
+function findWarehouseLotStockRecord(warehouseId, lotId, db = prisma) {
+  return db.warehouseLotStock.findUnique({
+    where: {
+      warehouseId_lotId: {
+        warehouseId,
+        lotId,
+      },
+    },
+  });
+}
+
+function createWarehouseLotStockRecord(data, db = prisma) {
+  return db.warehouseLotStock.create({ data });
+}
+
+function updateWarehouseLotStockRecord(where, data, db = prisma) {
+  return db.warehouseLotStock.updateMany({ where, data });
+}
+
+function findWarehouseLotStockRecordById(id, db = prisma) {
+  return db.warehouseLotStock.findUnique({ where: { id } });
+}
+
+function createStockMovementRecord(data, db = prisma) {
+  return db.stockMovement.create({
+    data,
+    include: { product: true, lot: true, warehouse: true },
+  });
+}
+
+function findLotByInternalNumber(companyId, internalLotNumber, db = prisma) {
+  return db.lot.findFirst({
+    where: {
+      internalLotNumber,
+      product: { companyId },
+    },
+    select: { id: true },
+  });
+}
+
+function findReservableLotStocks(warehouseId, productId, db = prisma) {
+  return db.warehouseLotStock.findMany({
+    where: {
+      warehouseId,
+      productId,
+      quantity: { gt: 0 },
+      lot: {
+        status: 'AVAILABLE',
+        qaStatus: 'APPROVED',
+      },
+    },
+    include: { lot: true },
+  });
+}
+
+function findOrderAllocations(companyId, warehouseId, orderId, db = prisma) {
+  return db.stockMovement.findMany({
+    where: {
+      companyId,
+      warehouseId,
+      sourceType: 'order',
+      sourceId: orderId,
+      movementType: { in: ['RESERVE', 'RELEASE', 'OUT'] },
+    },
+    orderBy: { id: 'asc' },
+  });
+}
+
+function createLot(data, db = prisma) {
+  return db.lot.create({ data });
+}
+
+function createInventoryAlert(data, db = prisma) {
+  return db.inventoryAlert.create({ data });
+}
+
+function updateProductById(id, data, db = prisma) {
+  return db.product.update({ where: { id }, data });
+}
+
+function findLotForCompanyWithActiveWarehouseStocks(lotId, companyId, db = prisma) {
+  return db.lot.findFirst({
+    where: { id: lotId, companyId },
+    include: {
+      warehouseLotStocks: {
+        where: { quantity: { gt: 0 } },
+        include: { warehouse: true },
+      },
+    },
+  });
+}
+
+function updateLotById(id, data, db = prisma) {
+  return db.lot.update({ where: { id }, data });
+}
+
+function updateLotByIdWithWarehouseStocks(id, data, db = prisma) {
+  return db.lot.update({
+    where: { id },
+    data,
+    include: { warehouseLotStocks: { include: { warehouse: true } } },
+  });
+}
+
+function createLotStatusHistory(data, db = prisma) {
+  return db.lotStatusHistory.create({ data });
+}
+
+function resolveOpenLotAlerts(companyId, lotId, resolvedAt, db = prisma) {
+  return db.inventoryAlert.updateMany({
+    where: {
+      companyId,
+      lotId,
+      status: 'OPEN',
+      alertType: { in: ['QA_FAILURE', 'LOT_BLOCKED'] },
+    },
+    data: { status: 'RESOLVED', resolvedAt },
+  });
+}
+
+function findLotForProduct(lotId, productId, db = prisma) {
+  return db.lot.findFirst({
+    where: { id: lotId, productId },
+  });
+}
+
+function findOrderForCompany(orderId, companyId, include = {}, db = prisma) {
+  return db.order.findFirst({
+    where: { id: orderId, companyId },
+    include,
+  });
+}
+
+function updateOrderById(orderId, data, include = {}, db = prisma) {
+  return db.order.update({
+    where: { id: orderId },
+    data,
+    include,
+  });
+}
+
+function findLotById(id, db = prisma) {
+  return db.lot.findUnique({ where: { id } });
+}
+
 module.exports = {
   transaction,
   findAllMovements,
@@ -172,4 +352,30 @@ module.exports = {
   findInventoryAlerts,
   findInventoryAlertById,
   updateInventoryAlert,
+  acquireCompanyInventoryAdvisoryLock,
+  loadInventoryContext,
+  findWarehouseStockRecord,
+  createWarehouseStockRecord,
+  updateWarehouseStockRecord,
+  findWarehouseStockRecordById,
+  findWarehouseLotStockRecord,
+  createWarehouseLotStockRecord,
+  updateWarehouseLotStockRecord,
+  findWarehouseLotStockRecordById,
+  createStockMovementRecord,
+  findLotByInternalNumber,
+  findReservableLotStocks,
+  findOrderAllocations,
+  createLot,
+  createInventoryAlert,
+  updateProductById,
+  findLotForCompanyWithActiveWarehouseStocks,
+  updateLotById,
+  updateLotByIdWithWarehouseStocks,
+  createLotStatusHistory,
+  resolveOpenLotAlerts,
+  findLotForProduct,
+  findOrderForCompany,
+  updateOrderById,
+  findLotById,
 };

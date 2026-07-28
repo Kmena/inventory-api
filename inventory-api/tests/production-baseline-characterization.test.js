@@ -4,10 +4,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const { repositoryRoot, skipIfMissing } = require('./internal-docs-optional');
+const { repositoryRoot } = require('./internal-docs-optional');
 const composeProdPath = path.join(repositoryRoot, 'docker-compose.prod.yml');
 const readmePath = path.join(repositoryRoot, 'README.md');
-const productionDocPath = path.join(repositoryRoot, 'internal-docs', 'production-baseline.md');
+const productionDocPath = path.join(repositoryRoot, 'docs', 'production-baseline.md');
+const productionEnvExamplePath = path.join(repositoryRoot, '.env.production.example');
 
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
@@ -26,14 +27,13 @@ test('production compose baseline includes db, migrate and app services with per
   assert.match(composeSource, /condition: service_healthy/);
 });
 
-test('production baseline documentation covers validation, migrations and health checks', (t) => {
-  if (skipIfMissing(t, ['internal-docs/production-baseline.md'], 'internal-docs production baseline is optional in public repo mode')) {
-    return;
-  }
-
+test('production baseline documentation covers validation, migrations, health checks and the versioned production env example', () => {
   const docSource = read(productionDocPath);
   const readmeSource = read(readmePath);
 
+  assert.equal(fs.existsSync(productionEnvExamplePath), true, '.env.production.example must remain versioned');
+  assert.match(docSource, /\.env\.production\.example/);
+  assert.match(docSource, /REDIS_URL/);
   assert.match(docSource, /npm run validate:production-baseline/);
   assert.match(docSource, /npm run validate:restore-readiness/);
   assert.match(docSource, /npm run validate:operational-readiness/);
@@ -44,6 +44,8 @@ test('production baseline documentation covers validation, migrations and health
   assert.match(docSource, /(_prisma_migrations|restore-readiness-baseline\.md)/);
   assert.match(docSource, /\/health\/ready/);
   assert.match(readmeSource, /production-baseline\.md/);
+  assert.match(readmeSource, /REDIS_URL/);
+  assert.match(readmeSource, /\.env\.production\.example/);
 });
 
 test('validate-production-baseline passes with explicit production environment values', () => {
@@ -61,6 +63,7 @@ test('validate-production-baseline passes with explicit production environment v
       CORS_ORIGIN: 'https://inventory.example.com',
       APP_BASE_URL: 'https://inventory.example.com',
       JWT_SECRET: '0123456789abcdef0123456789abcdef',
+      REDIS_URL: 'redis://redis:6379/0',
     },
     encoding: 'utf8',
   });
@@ -69,11 +72,7 @@ test('validate-production-baseline passes with explicit production environment v
   assert.match(result.stdout, /Production baseline validation passed/);
 });
 
-test('validate-restore-readiness passes when restore contract evidence stays versioned', (t) => {
-  if (skipIfMissing(t, ['internal-docs/production-baseline.md', 'internal-docs/restore-readiness-baseline.md', 'internal-docs/production-operations-runbook.md'], 'internal-docs restore readiness artifacts are optional in public repo mode')) {
-    return;
-  }
-
+test('validate-restore-readiness passes when restore contract evidence stays versioned', () => {
   const result = spawnSync('node', ['scripts/validate-restore-readiness.js'], {
     cwd: repositoryRoot,
     encoding: 'utf8',
@@ -83,11 +82,7 @@ test('validate-restore-readiness passes when restore contract evidence stays ver
   assert.match(result.stdout, /Restore readiness validation passed/);
 });
 
-test('validate-operational-readiness passes when runbook and workflow evidence stay versioned', (t) => {
-  if (skipIfMissing(t, ['internal-docs/production-baseline.md', 'internal-docs/production-operations-runbook.md'], 'internal-docs operational readiness artifacts are optional in public repo mode')) {
-    return;
-  }
-
+test('validate-operational-readiness passes when public runbook and workflow evidence stay versioned', () => {
   const result = spawnSync('node', ['scripts/validate-operational-readiness.js'], {
     cwd: repositoryRoot,
     encoding: 'utf8',
@@ -95,4 +90,5 @@ test('validate-operational-readiness passes when runbook and workflow evidence s
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /Operational readiness validation passed/);
+  assert.doesNotMatch(result.stdout, /skipped/i);
 });

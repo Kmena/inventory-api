@@ -30,6 +30,9 @@ const {
 } = require('./middlewares/request-payload');
 
 const app = express();
+const publicRootDirectory = path.join(__dirname, 'public');
+const migrationDocumentPath = path.join(publicRootDirectory, 'migration.html');
+
 app.set('trust proxy', trustProxy);
 app.set('json replacer', (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
 
@@ -60,26 +63,65 @@ function getFriendlyError(error) {
   };
 }
 
-function setSecurityHeaders(_req, res, next) {
-  res.setHeader(
-    'Content-Security-Policy',
-    [
+const strictPublicDocumentPaths = new Set(['/', '/index.html', '/no-access.html', '/migration.html']);
+const deprecatedLegacyHtmlPathPattern = /^\/(?:root|warehouse|agent)\/[^/?]+\.html$/;
+
+function buildContentSecurityPolicy(directives) {
+  return directives.join('; ');
+}
+
+function isDeprecatedLegacyHtmlPath(pathName) {
+  return deprecatedLegacyHtmlPathPattern.test(pathName);
+}
+
+function selectContentSecurityPolicy(pathName) {
+  if (strictPublicDocumentPaths.has(pathName) || isDeprecatedLegacyHtmlPath(pathName)) {
+    return buildContentSecurityPolicy([
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
       "frame-ancestors 'none'",
       "form-action 'self'",
-      "script-src 'self' https://unpkg.com",
-      "style-src 'self' 'unsafe-inline' https://unpkg.com",
-      "img-src 'self' data: https:",
-      "font-src 'self' https://unpkg.com data:",
-      "connect-src 'self' https://nominatim.openstreetmap.org",
-    ].join('; '),
-  );
+      "script-src 'self'",
+      "style-src 'self'",
+      "img-src 'self' data:",
+      "font-src 'self' data:",
+      "connect-src 'self'",
+    ]);
+  }
+
+  return buildContentSecurityPolicy([
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "script-src 'self' https://unpkg.com https://cdn.jsdelivr.net",
+    "style-src 'self' 'unsafe-inline' https://unpkg.com",
+    "img-src 'self' data: https:",
+    "font-src 'self' https://unpkg.com data:",
+    "connect-src 'self' https://nominatim.openstreetmap.org",
+  ]);
+}
+
+function setSecurityHeaders(req, res, next) {
+  res.setHeader('Content-Security-Policy', selectContentSecurityPolicy(req.path));
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   next();
+}
+
+function serveDeprecatedLegacyHtml(req, res, next) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return next();
+  }
+
+  if (!isDeprecatedLegacyHtmlPath(req.path)) {
+    return next();
+  }
+
+  return res.status(410).sendFile(migrationDocumentPath);
 }
 
 app.use(cors({ origin: corsOrigin }));
@@ -87,7 +129,8 @@ app.use(setSecurityHeaders);
 app.use(createRequestContextMiddleware());
 app.use(createHeavyEndpointMetricsMiddleware());
 app.use(createRequestLogger(nodeEnv));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(serveDeprecatedLegacyHtml);
+app.use(express.static(publicRootDirectory));
 
 app.use('/health', healthRouter);
 app.use('/api/auth', ...smallPayloadParsers, authRouter);

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Ruta retirada</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="auth-layout">
+      <section class="card auth-card migration-card">
+        <p class="eyebrow">Actualizacion de acceso</p>
+        <h1 id="migration-title">Esta ruta ya no se encuentra disponible</h1>
+        <p id="migration-primary-message">El acceso publico a esta URL fue retirado como parte de una actualizacion de la plataforma. Para continuar, ingresa desde el acceso principal.</p>
+        <p id="migration-secondary-message" class="muted">Si necesitas acceder a una funcion vigente, contacta al administrador de tu empresa.</p>
+        <div class="action-row">
+          <a id="migration-home-link" class="button-link" href="/">Ir al inicio</a>
+          <button id="migration-logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+        </div>
+        <p id="migration-status-note" class="status-note">Codigo de estado: 410</p>
+      </section>
+    </main>
+
+    <script src="/shared/session.js"></script>
+    <script src="/migration.js"></script>
+  </body>
+</html>

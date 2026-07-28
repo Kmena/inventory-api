@@ -48,7 +48,7 @@ El PRD plantea una plataforma web responsive para centralizar:
 Los ERD de `docs/` aterrizan ese alcance en dos niveles:
 
 - `docs/er_mvp_prd.md` define el modelo minimo viable
-- `docs/er_propuesto_prd.md` define el modelo ampliado recomendado
+- `docs/ERD_v1.md` define un modelo ampliado/recomendado alineado a decisiones posteriores del dominio
 
 ## Estado implementado
 
@@ -105,6 +105,7 @@ Para congelar el alcance real del repositorio, use como referencia principal:
 - `docs/architecture.md`
 - `docs/runtime-endpoint-catalog.md`
 - `docs/runtime-contract-manifest.json`
+- `docs/critical-contract-matrix.json`
 - `docs/ui-guidelines.md`
 
 Ese baseline separa explícitamente:
@@ -120,11 +121,13 @@ Ese baseline separa explícitamente:
 La separación real actual del repositorio es la siguiente:
 
 - `src/routes/`, `src/services/`, `src/repositories/`, `src/lib/` y `src/middlewares/` forman el backend ejecutable
-- `src/public/` forma parte del runtime real porque `src/app.js` lo sirve con `express.static(...)`
+- `src/public/` forma parte del runtime real porque `src/app.js` lo sirve con `express.static(...)`, pero su baseline soportado quedó reducido a login (`/`, `/index.html`), `no-access`, pantalla común de migración y helpers/assets mínimos same-origin
+- el contrato post-login soportado para roles cuyo panel legacy fue retirado ahora aterriza en `/migration.html?mode=post-login-transition`, sin reactivar `root/**`, `warehouse/**` ni `agent/**`
+- las rutas HTML legacy `root/**`, `warehouse/**` y `agent/**` ya no son pantallas soportadas: responden `410 Gone` por la misma URL y el inventario preservado para transición SPA vive fuera del runtime público en `legacy-public-runtime/`
 - no existe en este repositorio un proyecto frontend separado, con build independiente o pipeline autónomo verificable
 - por lo tanto, la UI embebida no debe tratarse como demo descartable: es una superficie soportada del backend y sus contratos deben mantenerse gobernados junto con la API
 
-Use estos documentos como referencia contractual:
+Use estos documentos como referencia contractual. Estos artefactos bajo `docs/**` son la fuente autoritativa versionada del runtime-contract governance y deben permanecer en git para revisión:
 
 - `docs/runtime-endpoint-catalog.md`
 - `docs/runtime-contract-manifest.json`
@@ -159,6 +162,8 @@ El repositorio versiona los siguientes workflows de baseline y gobernanza en Git
 - `.github/workflows/build-and-publish.yml`
 
 En conjunto cubren instalación, generación de Prisma, validaciones de contratos, test suite, browser E2E, smoke operativo y el gate dedicado de Prisma/Windows en `push`, `pull_request` y `workflow_dispatch` según corresponda.
+
+El workflow `static-checks` es además la fuente obligatoria del baseline de Node 24 y del typecheck incremental aprobado para superficies de alto valor del runtime, repositorios y validadores versionados.
 
 Para el estado auditable del riesgo Prisma/Windows y la evidencia CI consolidada, use como fuente primaria:
 
@@ -230,12 +235,12 @@ Use valores reales solo en archivos privados locales o en su gestor de secretos.
 
 Contrato explícito actual del repositorio:
 
-- Node.js `20.x`
-- `package.json` declara `"engines": { "node": ">=20 <21" }`
-- la evidencia soportada del repositorio se valida localmente con los scripts versionados en `package.json` sobre Node 20
-- `Dockerfile` base usa `node:20-bullseye-slim`
+- Node.js `24.x`
+- `package.json` declara `"engines": { "node": ">=24 <25" }`
+- la evidencia soportada del repositorio se valida localmente con los scripts versionados en `package.json` sobre Node 24
+- `Dockerfile` base usa `node:24-bullseye-slim`
 
-Fuera de este rango no se considera entorno soportado para la evidencia obligatoria de cierre P0. En esta implementación se observó drift local con Node 24, por lo que las validaciones canónicas deben ejecutarse con Node 20.
+Fuera de este rango no se considera entorno soportado para la evidencia obligatoria de cierre P0. El baseline operativo y de CI quedó migrado a Node.js 24 LTS; cualquier falla histórica de Node 20 debe tratarse como evidencia previa y no como baseline vigente.
 
 ## Baseline productivo verificable
 
@@ -249,10 +254,13 @@ El repositorio incluye ahora un baseline productivo mínimo y versionado en:
 
 Flujo resumido:
 
+El archivo `.env.production.example` es parte explícita del baseline versionado y `npm run validate:production-baseline` falla si deja de estar presente.
+El baseline productivo versionado también exige `REDIS_URL` porque las browser sessions soportadas fuera de test usan Redis como store persistente.
+
 1. copiar `.env.production.example` a `.env.production`
 2. ejecutar `npm run validate:production-baseline`
 3. ejecutar `docker compose -f docker-compose.prod.yml build`
-4. ejecutar `docker compose -f docker-compose.prod.yml up -d db`
+4. ejecutar `docker compose -f docker-compose.prod.yml up -d db redis`
 5. ejecutar `docker compose -f docker-compose.prod.yml run --rm migrate`
 6. ejecutar `docker compose -f docker-compose.prod.yml up -d app`
 7. verificar `/health` y `/health/ready`
@@ -360,7 +368,7 @@ Reglas de uso del contrato actual:
 - `verify` reutiliza exactamente los mismos scripts obligatorios definidos de forma individual, incluyendo `validate:workflow-baseline` y `validate:operational-readiness`.
 - `src/public` ya no depende solo del gate sintáctico: queda cubierto además por `lint:public-runtime` y por validación de referencias HTML locales.
 - `validate:agent-workspace` permanece como diagnóstico opcional mientras no forme parte del gate obligatorio aprobado.
-- La evidencia canónica del repositorio debe seguir ejecutándose con Node 20, aunque localmente puedan observarse otros runtimes.
+- La evidencia canónica del repositorio debe ejecutarse con Node 24 LTS, que es el baseline vigente del repositorio.
 
 ### Lint
 
@@ -500,7 +508,8 @@ Prerequisitos:
 
 Para la clasificación oficial dev/local vs productivo, use también:
 
-- `docs/runtime-deployment-reality.md`
+- `docs/production-baseline.md`
+- `docs/production-operations-runbook.md`
 
 El flujo oficial de Docker Compose comprometido en este repositorio es **solo para desarrollo local**.
 
@@ -562,7 +571,7 @@ Resumen operativo:
 - readiness / healthcheck de contenedor: `GET /health/ready`
 - replay de constraints: base disposable + `npm run prisma:apply-committed-migrations` + `tests/p2-hardening-constraints.test.js`
 - auditoría transversal: eventos persistidos en `audit_events` para login, denegaciones de seguridad/autorización, pedidos, pagos, facturas, inventario sensible y cambios administrativos priorizados
-- estrategia productiva: no debe considerarse cerrada solo por estos artefactos; revise `docs/runtime-deployment-reality.md`
+- estrategia productiva: no debe considerarse cerrada solo por estos artefactos; revise `docs/production-baseline.md` y `docs/production-operations-runbook.md`
 
 ## Auditoría transversal P2
 
@@ -753,11 +762,9 @@ Para entornos controlados, configure valores privados fuera de Git mediante las 
 
 - `docs/Proyecto Inventario Interno - Prd V1.pdf`
 - `docs/prd_actualizacion_catalogo_precios.md`
-- `docs/facturacion_hacienda_costa_rica.md`
-- `docs/mvp_1_prd.md`
 - `docs/erd_mvp_1.mmd`
 - `docs/er_mvp_prd.md`
-- `docs/er_propuesto_prd.md`
+- `docs/ERD_v1.md`
 
 ## Nota de alcance
 

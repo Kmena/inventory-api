@@ -16,6 +16,15 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   migrate:
     build: .
     restart: "no"
@@ -29,12 +38,16 @@ services:
       APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      BROWSER_SESSION_STORE_MODE: ${BROWSER_SESSION_STORE_MODE:-redis}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       HACIENDA_TAXPAYER_LOOKUP_URL: ${HACIENDA_TAXPAYER_LOOKUP_URL:-https://api.hacienda.go.cr/fe/ae?identificacion={identification}}
       GEOCODING_SEARCH_URL: ${GEOCODING_SEARCH_URL:-https://nominatim.openstreetmap.org/search}
     command: ["npm", "run", "prisma:deploy"]
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   app:
@@ -50,11 +63,15 @@ services:
       APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      BROWSER_SESSION_STORE_MODE: ${BROWSER_SESSION_STORE_MODE:-redis}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       HACIENDA_TAXPAYER_LOOKUP_URL: ${HACIENDA_TAXPAYER_LOOKUP_URL:-https://api.hacienda.go.cr/fe/ae?identificacion={identification}}
       GEOCODING_SEARCH_URL: ${GEOCODING_SEARCH_URL:-https://nominatim.openstreetmap.org/search}
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "${PORT:-2500}:2500"

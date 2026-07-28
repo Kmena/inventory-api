@@ -57,12 +57,43 @@ function createOrder(data) {
   return prisma.order.create({ data, include: includeOrder() });
 }
 
-function updateOrder(id, data) {
-  return prisma.order.update({ where: { id }, data, include: includeOrder() });
+async function updateOrder(id, companyId, data) {
+  const result = await prisma.order.updateMany({
+    where: { id, companyId },
+    data,
+  });
+
+  if (result.count === 0) {
+    return null;
+  }
+
+  return prisma.order.findFirst({
+    where: { id, companyId },
+    include: includeOrder(),
+  });
 }
 
-function deleteOrder(id) {
-  return prisma.order.delete({ where: { id } });
+async function deleteOrder(id, companyId) {
+  return prisma.$transaction(async (tx) => {
+    const existingOrder = await tx.order.findFirst({
+      where: { id, companyId },
+      include: includeOrder(),
+    });
+
+    if (!existingOrder) {
+      return null;
+    }
+
+    const result = await tx.order.deleteMany({
+      where: { id, companyId },
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return existingOrder;
+  });
 }
 
 module.exports = {

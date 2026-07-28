@@ -1,45 +1,564 @@
-## TASK-001: Capture the missing documented remote Windows workflow execution for final closeout reassessment
-**Status:** Proposed
-**Priority:** High
-**Domain:** Platform Runtime Governance
-**Requirement:** BR-006, AC-003, AC-007
-**Reason:** The repository has hardened workflow governance and 4 successful historical Windows runs, but it still lacks the documented `workflow_dispatch` run or rerun required by the approved criterion.
-**Current problem:** The implemented closeout is auditable and stronger than before, but the evidence set still does not satisfy the full threshold for `estabilizado con evidencia CI`.
-**Proposed change:** When GitHub execution access is available, trigger or rerun `.github/workflows/windows-prisma-build.yml`, capture run metadata and artifact/summary evidence, then update `docs/prisma-windows-stability-evidence.md` and architecture-facing docs.
-**Affected files:** `.github/workflows/windows-prisma-build.yml`, `inventory-api/docs/prisma-windows-stability-evidence.md`, `inventory-api/docs/current-state.md`, `inventory-api/docs/architecture.md`, `inventory-api/docs/action-plan.md`
+# Tasks
+
+## TASK-001: Implement confirmed tenant-isolation fixes from P11 inventory
+**Status:** Completed
+**Priority:** Critical
+**Domain:** Multi-tenant repository governance
+**Requirement:** P11 FR-004, FR-005, FR-006, FR-007, FR-008, BR-002, BR-003, AC-002, AC-004
+**Reason:** P11 planning identified unsafe or review-required tenant-owned repository writes.
+**Current problem:** Confirmed and review-required mutations relied on `id`-only writes or derived context instead of preserving company scope at the repository mutation boundary.
+**Proposed change:** Harden the confirmed P11 inventory cases and resolve review-required cases with explicit tenant-safe behavior.
+**Affected files:** `src/repositories/client.repository.js`, `src/repositories/order.repository.js`, `src/repositories/sales-route.repository.js`, `src/repositories/payment.repository.js`, `src/repositories/product.repository.js`, related services/tests/docs/specs
 **Dependencies:** None
-**Database impact:** None
-**API impact:** None
+**Database impact:** None expected initially; new migration only if an approved integrity constraint becomes necessary
+**API impact:** None expected
 **Container impact:** None
-**Security impact:** Low positive impact by improving auditability and reducing false closure claims
-**Acceptance criteria:**
-- A documented remote `workflow_dispatch` run or rerun exists.
-- The run records run ID, run attempt, event, branch, commit SHA, result, and artifact/summary presence.
-- The evidence document and architecture-facing docs reflect the updated real verdict.
-**Required tests:** Existing `npm run validate:workflow-baseline`, `node --test tests/workflow-baseline-characterization.test.js`, `node --test tests/prisma-windows-build-stabilization.test.js`
-**Migration considerations:** Keep scope limited to evidence capture and documentation refresh; do not broaden into unrelated workflow redesign.
-**Rollback or mitigation:** If the remote run cannot be performed yet, preserve the current `residual gobernado` verdict and keep the evidence gap explicit.
+**Security impact:** Critical positive impact
+**Acceptance criteria:** Confirmed unsafe repository writes are tenant-safe at the mutation boundary; legitimate root-global flows remain functional.
+**Required tests:** Cross-tenant regression tests for client documents, orders, routes, legal entities, and payment receipt replacement
+**Migration considerations:** Preserve current public behavior while tightening internal write scoping.
+**Rollback or mitigation:** Revert affected repository/service slice if a legitimate flow breaks; keep regression evidence.
+**Risk:** High
+
+## TASK-002: Remove direct Prisma usage from root company bootstrap flow
+**Status:** Completed
+**Priority:** High
+**Domain:** Company administration / Architecture governance
+**Requirement:** P11 FR-004, FR-005, FR-007, BR-002, AC-003
+**Reason:** P11 confirmed a repository-boundary violation in `src/services/company.service.js#registerRootCompany`.
+**Current problem:** The service layer performed direct Prisma reads and transaction orchestration instead of delegating persistence ownership to repositories.
+**Proposed change:** Introduce repository-owned persistence orchestration for root company bootstrap while preserving transaction semantics, audit behavior, and root-global authorization constraints.
+**Affected files:** `src/services/company.service.js`, `src/repositories/company.repository.js`, related tests/docs/specs
+**Dependencies:** TASK-001
+**Database impact:** None
+**API impact:** None expected
+**Container impact:** None
+**Security impact:** Medium positive impact through cleaner boundary enforcement
+**Acceptance criteria:** `company.service.js` no longer uses Prisma directly in the root bootstrap flow; transaction and audit behavior remain functionally equivalent.
+**Required tests:** Service/repository regression tests for root company bootstrap and duplicate-admin conflict handling
+**Migration considerations:** Preserve root-global exception behavior while moving persistence responsibilities.
+**Rollback or mitigation:** Revert repository extraction slice if bootstrap semantics drift.
 **Risk:** Medium
 
-## TASK-002: Preserve workflow-baseline and Windows Prisma governance anti-regression coverage
-**Status:** Proposed
+## TASK-009: Document browser-session HTTPS dependency and prepare partial hardening slice
+**Status:** Completed
 **Priority:** Medium
-**Domain:** Platform Runtime Governance
-**Requirement:** FR-002, FR-004, FR-008, NFR-001
-**Reason:** The implemented hardening is contractual and can regress if workflow shape or failure-gate behavior drifts.
-**Current problem:** Root and mirrored workflow definitions must stay synchronized enough to preserve the governed contract, and build-evidence semantics must not be weakened later.
-**Proposed change:** Keep `scripts/validate-workflow-baseline.js`, `tests/workflow-baseline-characterization.test.js`, and `tests/prisma-windows-build-stabilization.test.js` as required repository governance coverage for future changes touching Windows Prisma build behavior.
-**Affected files:** `inventory-api/scripts/validate-workflow-baseline.js`, `inventory-api/tests/workflow-baseline-characterization.test.js`, `inventory-api/tests/prisma-windows-build-stabilization.test.js`, future related workflow files and docs
-**Dependencies:** None
+**Domain:** Frontend/session security governance
+**Requirement:** future P11 hardening follow-up for browser session risk
+**Reason:** Browser auth/session state still depends on `localStorage`, but the environment is still test-only and does not yet expose the final HTTPS capability required for a full `Secure` cookie-based closure.
+**Current problem:** The repository needs explicit documentation that final browser-session hardening is blocked from full closure by the lack of HTTPS, while still allowing partial mitigations that reduce client-side exposure before the final deployment model exists.
+**Proposed change:** Record the HTTPS dependency as technical debt in architecture/current-state/action-plan docs and implement a separate approved preparatory slice for partial mitigations such as centralized session access, reduced client persistence, and improved session cleanup without claiming full closure.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, future spec package for session-hardening prep, browser runtime files under `src/public/**` when approved
+**Dependencies:** TASK-008
+**Database impact:** None
+**API impact:** None unless a later approved session-hardening prep slice requires compatibility-safe auth response changes
+**Container impact:** None
+**Security impact:** Medium positive governance impact through explicit risk framing before partial mitigations
+**Acceptance criteria:** Docs explicitly state the HTTPS dependency for final session hardening; a follow-up spec exists for partial mitigations; no false claim is made that `localStorage` session risk is fully closed before HTTPS exists.
+**Implemented outcome:** Technical debt was documented and the approved preparatory mitigation slice centralized browser-session read/write/cleanup through `src/public/shared/session.js` while preserving the current runtime contract.
+**Required tests:** documentation/spec review for this planning slice; future session-hardening prep validations to be defined by the approved follow-up spec
+**Risk:** Medium
+
+## TASK-012: Converge browser-runtime auth helpers before HTTPS-backed cookie migration
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Frontend/session security governance
+**Requirement:** future P11 browser-session hardening follow-up
+**Reason:** After centralizing browser-session read/write/cleanup, browser auth header construction and `401` handling are still distributed across multiple public runtime pages.
+**Current problem:** Future auth/security changes still require broad edits because many pages keep local `authHeaders()` patterns or inline unauthorized-response handling.
+**Proposed change:** Create and approve a follow-up slice that converges authenticated request construction and unauthorized-response cleanup onto shared public-runtime helper(s) while preserving the current `localStorage` compatibility baseline and deferring HTTPS-backed secure-cookie migration.
+**Affected files:** `src/public/shared/**`, selected `src/public/agent/**`, `src/public/warehouse/**`, selected `src/public/root/**`, `scripts/validate-public-runtime.js`, related tests, follow-up spec package
+**Dependencies:** TASK-009
+**Database impact:** None
+**API impact:** None unless a later approved auth/logout slice changes backend contracts
+**Container impact:** None
+**Security impact:** Medium positive impact through reduced auth drift and narrower regression surface
+**Acceptance criteria:** Shared auth-runtime helper(s) cover approved priority pages; duplicated `401` handling is reduced; docs/tests reflect that HTTPS is still required for final session closure.
+**Implemented outcome:** `src/public/shared/auth.js` now centralizes auth-header construction and approved `401` cleanup for priority runtime pages, with migrated agent, warehouse, and selected root helpers plus updated validators/tests.
+**Required tests:** public-runtime validators, characterization tests, browser E2E for affected flows
+**Validation evidence:** `npm run lint:public-runtime`; `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js tests/public-session-helper-characterization.test.js tests/public-auth-helper-characterization.test.js`; `node --test tests/browser-e2e.e2e.js`; `npm run lint`; `npm run typecheck`; `npm run build`
+**Risk:** Medium
+
+## TASK-003: Expand typecheck coverage and enforce stronger CI evidence for critical controls
+**Status:** Completed
+**Priority:** High
+**Domain:** Platform / CI governance
+**Requirement:** P11 FR-005, FR-011, FR-012, FR-013, FR-014, FR-015, BR-005, AC-003, AC-006, AC-007
+**Reason:** P11 classified evidence strength but the repository needed stronger mandatory CI mapping and incremental static coverage.
+**Current problem:** Relevant repository/schema areas were excluded from typecheck and some important controls lacked a dedicated required CI gate.
+**Proposed change:** Expand approved typecheck coverage incrementally, classify critical tests in repository docs/workflows, and ensure important controls are covered by required jobs or documented exceptions.
+**Affected files:** `tsconfig.typecheck.json`, `.github/workflows/*`, `tests/*.test.js`, `scripts/run-tests.js`, governance docs/specs
+**Dependencies:** TASK-001, TASK-002
+**Database impact:** None directly
+**API impact:** None
+**Container impact:** Possible CI/runtime image alignment later
+**Security impact:** High positive impact through stronger verification
+**Acceptance criteria:** Typecheck coverage expands over approved surfaces; critical controls have required CI jobs or approved documented exceptions.
+**Required tests:** Updated static checks, workflow validation, and CI-governance tests
+**Migration considerations:** Expand coverage incrementally to keep signal actionable.
+**Rollback or mitigation:** Revert the last coverage expansion slice if it blocks unrelated work without clear remediation path.
+**Risk:** High
+
+## TASK-004: Migrate the repository baseline to Node.js 24 LTS and record mainline validation
+**Status:** Completed
+**Priority:** High
+**Domain:** Runtime platform baseline
+**Requirement:** P11 FR-003, FR-004, FR-005, FR-006, FR-007, FR-009, FR-010, FR-013, FR-015, AC-001, AC-002, AC-003, AC-005, AC-007
+**Reason:** P11 required the real repository baseline to move from Node 20 to Node.js 24 LTS with compatibility evidence rather than a documentation-only version bump.
+**Current problem:** The repository previously declared Node 20 in package, Docker, and workflows, and historical Node 24 evidence had reported Prisma/runtime uncertainty.
+**Proposed change:** Align package/runtime/workflow Node baselines to Node 24, preserve the existing Prisma bootstrap when compatible, and revalidate the mainline path.
+**Affected files:** `package.json`, `Dockerfile`, `.github/workflows/*`, `scripts/prisma-generate-safe-lib.js`, `scripts/validate-workflow-baseline.js`, workflow characterization tests, `README.md`, relevant specs/docs
+**Dependencies:** TASK-003
+**Database impact:** None
+**API impact:** None
+**Container impact:** Runtime/build image updated to Node 24 and validated through Docker build evidence
+**Security impact:** Medium positive impact through supported-platform alignment
+**Acceptance criteria:** Repository baseline targets Node.js 24 in package/runtime/workflow configuration and the previously reported Prisma constructor incompatibility is no longer reproduced on the validated clean path.
+**Required tests:** `npm ci`, `npm run build`, `npm run lint`, `npm run typecheck`, `node --test tests/taxpayer-characterization.test.js`, `npm run validate:workflow-baseline`, workflow characterization tests, validators, and aggregate tests
+**Migration considerations:** Keep the Windows Prisma rename-lock behavior classified as a pre-existing baseline issue unless new evidence proves otherwise.
+**Rollback or mitigation:** Revert Node baseline declarations only if a later critical incompatibility is reproduced and cannot be isolated safely.
+**Risk:** Medium
+
+## TASK-005: Complete cross-surface closure evidence for the Node.js 24 baseline
+**Status:** Completed
+**Priority:** High
+**Domain:** Runtime platform baseline / CI evidence
+**Requirement:** P11 FR-008, FR-009, FR-012, FR-016, AC-003, AC-004, AC-006, AC-008
+**Reason:** The Node 24 baseline needed evidence across local/mainline, Docker, and hosted workflow surfaces before the feature could be treated as closed.
+**Current problem:** Closure previously lacked hosted root-workflow evidence after the official workflow location changed to repository root.
+**Proposed change:** Align the root official workflows, preserve `working-directory: inventory-api`, and record hosted success evidence for the Node 24 baseline.
+**Affected files:** `/.github/workflows/windows-prisma-build.yml`, `/.github/workflows/p0-quality-gates.yml`, `/.github/workflows/static-checks.yml`, `/.github/workflows/repository-tests.yml`, `/.github/workflows/contract-validations.yml`, `/.github/workflows/browser-e2e.yml`, `/.github/workflows/operational-smoke.yml`, `/.github/workflows/build-and-publish.yml`, `/.github/workflows/db-constraints-tests.yml`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `specs/p11-node24-runtime-migration/*`
+**Dependencies:** TASK-004
+**Database impact:** None
+**API impact:** None
+**Container impact:** None beyond preserving the implemented Node 24 image baseline
+**Security impact:** Low direct impact; medium governance impact through stronger release evidence
+**Acceptance criteria:** Browser E2E and Docker evidence are recorded; a hosted Node 24 Windows workflow run is reviewed successfully; documentation distinguishes the root official workflow location from application-local workflow copies.
+**Required tests:** Local `npm run validate:workflow-baseline`; `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`; hosted runs `30281932831`, `30281933453`, `30281933525`, `30281935485`, `30281937000`, `30281935398`
+**Migration considerations:** Treat any future hosted Windows failure signature separately from the historical rename-lock path.
+**Rollback or mitigation:** If a future surface fails, reopen the compatibility task instead of rolling back documented evidence.
+**Risk:** Medium
+
+## TASK-006: Retire duplicated application-local workflow YAML and preserve root-only governance
+**Status:** Completed
+**Completed at:** 2026-07-27
+**Priority:** High
+**Domain:** CI/workflow governance
+**Requirement:** Architectural objective AO-001 workflow source-of-truth governance after root alignment
+**Reason:** The repository already established `/.github/workflows/` as the official source of truth; the remaining application-local workflow YAML only adds maintainability drift.
+**Current problem:** Although validators/tests already anchor to the official root workflow tree, the repository still versions duplicated YAML under `inventory-api/.github/workflows/`.
+**Proposed change:** Remove the duplicated application-local workflow YAML, update validators/tests to read the root official workflows directly, and refresh architecture-facing docs accordingly.
+**Affected files:** `scripts/validate-workflow-baseline.js`, `tests/workflow-baseline-characterization.test.js`, `tests/prisma-windows-build-stabilization.test.js`, `inventory-api/.github/workflows/*`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
+**Dependencies:** TASK-005
 **Database impact:** None
 **API impact:** None
 **Container impact:** None
-**Security impact:** Low positive impact through stronger evidence integrity
-**Acceptance criteria:**
-- Workflow baseline validation remains part of supported repository governance.
-- Characterization tests continue guarding summary publication, artifact upload, and explicit failure-gate behavior.
-- Future workflow changes do not silently remove the governed contract.
-**Required tests:** `npm run validate:workflow-baseline`, `node --test tests/workflow-baseline-characterization.test.js`, `node --test tests/prisma-windows-build-stabilization.test.js`
-**Migration considerations:** Keep governance assertions focused on contractually relevant behavior; avoid overfitting to incidental YAML formatting.
-**Rollback or mitigation:** If workflow structure must evolve later, update tests and validator together while preserving the auditable contract.
+**Security impact:** Medium positive impact through stronger governance integrity
+**Acceptance criteria:** Root workflows are the only versioned workflow definitions; validators/tests use the root tree directly; documentation no longer describes an active duplicated mirror.
+**Implemented files:** `inventory-api/scripts/validate-workflow-baseline.js`, `inventory-api/tests/workflow-baseline-characterization.test.js`, `inventory-api/tests/prisma-windows-build-stabilization.test.js`, `inventory-api/docs/current-state.md`, `inventory-api/docs/architecture.md`, `inventory-api/docs/action-plan.md`, `inventory-api/docs/tasks.md`, `inventory-api/docs/prisma-windows-stability-evidence.md`, removed `inventory-api/.github/workflows/*.yml`
+**Validation evidence:** `npm run validate:workflow-baseline`; `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`; `git diff --check`
+**Migration considerations:** Preserve current root hosted workflow behavior while removing local duplication.
+**Rollback or mitigation:** Revert only the governance slice if a hidden local reference to the deleted YAML is discovered.
+**Risk:** Medium
+
+## TASK-007: Repair restore-readiness smoke contract and publish its public baseline
+**Status:** Completed
+**Completed at:** 2026-07-27
+**Priority:** High
+**Domain:** Operational governance
+**Requirement:** Operational smoke baseline consistency after root workflow convergence
+**Reason:** `operational-smoke` invoked `npm run validate:restore-readiness` even though `package.json` did not expose that command, and the validator/tests were still split between public `docs/` and optional `internal-docs/` assumptions.
+**Current problem resolved:** The repository now exposes the npm command, validates restore readiness against public `docs/` artifacts, documents the same contract in the production baseline and runbook, and keeps `validate:operational-readiness` aligned to the root workflow path.
+**Implemented files:** `inventory-api/package.json`, `inventory-api/scripts/validate-restore-readiness.js`, `inventory-api/scripts/validate-operational-readiness.js`, `inventory-api/tests/workflow-baseline-characterization.test.js`, `inventory-api/tests/production-baseline-characterization.test.js`, `inventory-api/tests/restore-readiness-characterization.test.js`, `inventory-api/docs/production-baseline.md`, `inventory-api/docs/restore-readiness-baseline.md`
+**Validation evidence:** `npm run build`; `npm run lint`; `npm run typecheck`; `npm run validate:workflow-baseline`; `npm run validate:restore-readiness`; `npm run validate:operational-readiness`; `node --test tests/workflow-baseline-characterization.test.js tests/prisma-windows-build-stabilization.test.js`; `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`; `git diff --check`
+**Migration considerations:** Preserve the existing `operational-smoke` workflow step while making the package/validator/docs contract real.
+**Rollback or mitigation:** Revert only the restore-readiness contract slice if a later hosted run reveals a second independent operational-smoke defect.
+**Risk:** Medium
+
+## TASK-008: Converge operational-readiness to the public docs baseline and codify `.env.production.example`
+**Status:** Completed
+**Completed at:** 2026-07-27
+**Priority:** High
+**Domain:** Operational governance / Production baseline governance
+**Requirement:** `p11-operational-readiness-public-baseline` FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-009, FR-010; BR-001, BR-002, BR-003; AC-001, AC-002, AC-003, AC-004, AC-005
+**Reason:** After restore-readiness moved to public docs, the public operational-readiness gate still depended on optional private overlays and `.env.production.example` still needed explicit contractual closure.
+**Current problem resolved:** `validate:operational-readiness` now validates `docs/production-baseline.md` and `docs/production-operations-runbook.md` directly, `.env.production.example` is required by the production baseline validator and characterization tests, remains intentionally tracked through the `!.env.production.example` exception in `inventory-api/.gitignore`, and the public contract converged without introducing a third operational-readiness document.
+**Implemented files:** `inventory-api/.gitignore`, `inventory-api/scripts/validate-operational-readiness.js`, `inventory-api/scripts/validate-production-baseline.js`, `inventory-api/tests/production-baseline-characterization.test.js`, `inventory-api/docs/production-baseline.md`, `inventory-api/docs/production-operations-runbook.md`, `inventory-api/README.md`, `inventory-api/docs/current-state.md`, `inventory-api/docs/architecture.md`, `inventory-api/docs/action-plan.md`, `inventory-api/docs/tasks.md`, `inventory-api/specs/p11-operational-readiness-public-baseline/*`
+**Dependencies:** TASK-007
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Medium positive governance impact through auditable public readiness evidence and explicit baseline-artifact validation
+**Acceptance criteria:** Operational-readiness validates public `docs/` artifacts without `internal-docs/` prerequisites; `.env.production.example` remains versioned, documented, and validator-covered; README and public docs describe the same operational-readiness contract; no third public operational-readiness document is required.
+**Required tests:** `npm run validate:operational-readiness`; `node --test tests/production-baseline-characterization.test.js tests/restore-readiness-characterization.test.js`; `npm run validate:production-baseline` with explicit production environment values; `npm run lint`; `npm run typecheck`; `npm run build`; hosted `operational-smoke` run `30291012752`
+**Migration considerations:** Preserve the existing `operational-smoke` workflow path and Node 24 baseline while shifting the gate to public repository artifacts only.
+**Rollback or mitigation:** Revert only this governance slice if a later approved change demonstrates that the two-document public contract is insufficient.
+**Risk:** Medium
+
+## TASK-010: Centralize browser-session read/write/cleanup for the embedded public runtime
+**Status:** Completed
+**Completed at:** 2026-07-27
+**Priority:** High
+**Domain:** Frontend/session security governance
+**Requirement:** `p11-session-hardening-prep` FR-002, FR-003, FR-004, FR-005, FR-006; BR-001, BR-002, BR-003
+**Reason:** The browser runtime still depended on client-side session persistence, but session bootstrap and cleanup behavior needed a safer compatibility seam before any future HTTPS-backed cookie migration.
+**Current problem resolved:** Session read/write/cleanup was previously open-coded across public pages. The repository now uses `src/public/shared/session.js` as the active helper for storage-key ownership, payload sanitization, malformed-session cleanup, and redirect-to-login behavior, while preserving the current `localStorage` compatibility baseline.
+**Proposed change:** Add a shared browser-session helper, converge critical login/root/warehouse/agent screens onto it, and add characterization/runtime validation coverage without changing the overall auth model or claiming full security closure.
+**Affected files:** `src/public/shared/session.js`, `src/public/index.html`, `src/public/login.js`, `src/public/no-access.html`, `src/public/agent/*.html`, `src/public/agent/*.js`, `src/public/root/*.html`, `src/public/root/*.js`, `src/public/warehouse/products.html`, `src/public/warehouse/products.js`, `scripts/validate-public-runtime.js`, `tests/public-surface-characterization.test.js`, `tests/public-session-helper-characterization.test.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
+**Dependencies:** TASK-009
+**Database impact:** None
+**API impact:** None; `/api/auth/login` and protected API contracts remain unchanged
+**Container impact:** None
+**Security impact:** Medium positive impact through centralized browser-session cleanup, payload minimization, and corrupt-session removal; residual token-exposure risk remains because `localStorage` is still used
+**Acceptance criteria:** The embedded login screen persists sessions through the shared helper; malformed stored sessions are cleared automatically; protected root/warehouse/agent screens bootstrap from the helper; logout and unauthorized cleanup use helper-driven redirect behavior; runtime validators and characterization tests cover the shared helper contract.
+**Implemented files:** `inventory-api/src/public/shared/session.js`, `inventory-api/src/public/index.html`, `inventory-api/src/public/login.js`, `inventory-api/src/public/no-access.html`, `inventory-api/src/public/agent/order-entry.html`, `inventory-api/src/public/agent/order-entry.js`, `inventory-api/src/public/agent/visit.html`, `inventory-api/src/public/agent/visit.js`, `inventory-api/src/public/agent/workspace.html`, `inventory-api/src/public/agent/workspace.js`, `inventory-api/src/public/root/client-detail.html`, `inventory-api/src/public/root/client-detail.js`, `inventory-api/src/public/root/client-detail.shared.js`, `inventory-api/src/public/root/clients.html`, `inventory-api/src/public/root/clients.js`, `inventory-api/src/public/root/dashboard.html`, `inventory-api/src/public/root/dashboard.js`, `inventory-api/src/public/root/index.html`, `inventory-api/src/public/root/index.js`, `inventory-api/src/public/root/invoice-inconsistencies.html`, `inventory-api/src/public/root/invoice-inconsistencies.js`, `inventory-api/src/public/root/products.html`, `inventory-api/src/public/root/products.js`, `inventory-api/src/public/root/products.shared.js`, `inventory-api/src/public/root/roles.html`, `inventory-api/src/public/root/roles.js`, `inventory-api/src/public/root/routes.html`, `inventory-api/src/public/root/routes.js`, `inventory-api/src/public/root/users.html`, `inventory-api/src/public/root/users.js`, `inventory-api/src/public/root/warehouses.html`, `inventory-api/src/public/root/warehouses.js`, `inventory-api/src/public/root/zones.html`, `inventory-api/src/public/root/zones.js`, `inventory-api/src/public/warehouse/products.html`, `inventory-api/src/public/warehouse/products.js`, `inventory-api/scripts/validate-public-runtime.js`, `inventory-api/tests/public-surface-characterization.test.js`, `inventory-api/tests/public-session-helper-characterization.test.js`, `inventory-api/docs/current-state.md`, `inventory-api/docs/architecture.md`, `inventory-api/docs/action-plan.md`, `inventory-api/docs/tasks.md`
+**Validation evidence:** `npm run build`; `npm run lint`; `npm run typecheck`; `npm run lint:public-runtime`; `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js tests/public-session-helper-characterization.test.js`; `node --test tests/browser-e2e.e2e.js`; `git diff --check`
+**Migration considerations:** Preserve the current bearer-token and `localStorage` behavior until a separate HTTPS-capable secure-cookie migration is approved.
+**Rollback or mitigation:** Revert only the browser-runtime helper slice if a protected page bootstrap regression appears; preserve the characterization tests for diagnosis.
+**Risk:** Medium
+
+## TASK-011: Close browser bearer persistence with a backend-owned browser-session boundary
+**Status:** Completed
+**Priority:** High
+**Domain:** Frontend/session security governance
+**Requirement:** `p12-browser-session-closure` FR-001, FR-002, FR-003, FR-004, FR-005; BR-001, BR-002, BR-003, BR-004; AC-001, AC-002, AC-003, AC-004, AC-005
+**Reason:** The helper-based preparation baseline still left the supported browser runtime dependent on browser-readable persisted bearer credentials and client-only logout semantics.
+**Current problem resolved:** Supported embedded browser flows no longer persist bearer tokens in `localStorage`. The backend now owns browser-session issuance, validation, refresh, and invalidation through a cookie boundary, and the later `p17-browser-auth-compatibility-removal` slice removed the supported-page compatibility sentinel bridge so those pages are now cookie-auth only.
+**Proposed change:** Issue browser sessions from `/api/auth/login` when `X-Inventory-Browser-Session: cookie` is requested, validate cookie sessions in `authenticate.js`, refresh browser cookies through `/api/auth/me`, invalidate them through `/api/auth/logout`, bootstrap supported pages from cookie-backed state via `src/public/shared/session.js`, and preserve same-origin/browser compatibility with shared helpers and characterization coverage.
+**Affected files:** `src/services/browser-session.service.js`, `src/lib/browser-session.js`, `src/services/auth.service.js`, `src/middlewares/authenticate.js`, `src/routes/auth.routes.js`, `src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`, selected `src/public/root/**`, `src/public/warehouse/products.js`, `src/public/agent/workspace.js`, `scripts/validate-public-runtime.js`, `tests/browser-session-auth-boundary.test.js`, `tests/public-session-helper-characterization.test.js`, `tests/public-auth-helper-characterization.test.js`, `tests/public-surface-characterization.test.js`, `tests/browser-e2e.e2e.js`, related docs/specs
+**Dependencies:** TASK-010, TASK-012
+**Database impact:** None
+**API impact:** Yes; `/api/auth/login` now supports browser-session issuance via `X-Inventory-Browser-Session: cookie`, `/api/auth/me` refreshes browser-session cookies for cookie-authenticated requests, and `/api/auth/logout` is part of the supported auth surface
+**Container impact:** None
+**Security impact:** High positive impact through removal of supported browser bearer persistence and introduction of backend-owned invalidation semantics
+**Acceptance criteria:** Supported browser flows no longer persist bearer tokens in `localStorage`; `/api/auth/login` can issue browser sessions; `/api/auth/me` returns the browser-session user projection and refreshes cookies; `/api/auth/logout` invalidates the browser session and clears cookies; mutating cookie-authenticated requests enforce same-origin `Origin` validation; docs/runtime validators/tests reflect the implemented state.
+**Implemented outcome:** The repository now uses an opaque `inventory_browser_session` `HttpOnly` cookie plus a signed `inventory_browser_state` cookie, shared browser helpers bootstrap/logout through same-origin requests, and supported browser pages now authenticate through cookie auth without a browser-visible compatibility sentinel.
+**Required tests:** `node --test tests/browser-session-auth-boundary.test.js tests/public-session-helper-characterization.test.js tests/public-auth-helper-characterization.test.js tests/public-surface-characterization.test.js tests/browser-e2e.e2e.js`; `npm run validate:public-runtime`; `npm run lint`; `npm run typecheck`; `npm run build`
+**Migration considerations:** Do not reintroduce persisted browser bearer storage or browser-visible compatibility bearer paths on supported pages.
+**Rollback or mitigation:** Revert only the browser-session closure slice if a supported browser flow regresses; preserve the boundary/helper/browser characterization suites for diagnosis.
+**Risk:** Medium
+
+## TASK-013: Externalize browser-session storage beyond the in-memory process boundary
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Frontend/session security governance / Runtime platform
+**Requirement:** Current architectural limitation after `p12-browser-session-closure`; implemented by `p16-browser-session-persistent-store`
+**Reason:** The implemented browser-session boundary was backend-owned, but the original session store was a process-local `Map`.
+**Current problem resolved:** Supported non-test browser sessions no longer depend on process-local memory. `src/services/browser-session.service.js` now resolves its backing store through `src/services/browser-session-store.factory.js`, defaults to Redis outside explicit test-memory mode, uses async store calls across auth/login/logout/middleware callsites, and is now operationally aligned with the versioned baseline that explicitly declares `BROWSER_SESSION_STORE_MODE=redis` plus `REDIS_URL`.
+**Proposed change:** Introduce a shared browser-session store abstraction that preserves the current cookie contracts while removing the supported production single-process limitation, keep explicit memory mode for tests, fail explicitly when the configured Redis-backed store is unavailable, and align env examples, compose files, validators, docs, README, and workflow smoke coverage around that supported Redis baseline.
+**Affected files:** `src/services/browser-session.service.js`, `src/services/browser-session-store.factory.js`, `src/services/browser-session-memory.store.js`, `src/services/browser-session-redis.store.js`, auth middleware/routes/services callsites, `.env.example`, `.env.production.example`, `docker-compose.yml`, `docker-compose.dev.yml`, `docker-compose.prod.yml`, `scripts/validate-production-baseline.js`, `scripts/validate-workflow-baseline.js`, `.github/workflows/operational-smoke.yml`, `README.md`, `docs/production-baseline.md`, related docs/tests
+**Dependencies:** TASK-011
+**Database impact:** None
+**API impact:** None expected; cookie contracts remain stable
+**Container impact:** Environment/runtime now requires Redis configuration for the supported non-test path; compose baselines now declare the Redis service plus `BROWSER_SESSION_STORE_MODE` and `REDIS_URL`
+**Security impact:** Medium positive impact through stronger session durability and explicit failure semantics
+**Acceptance criteria:** Browser-session validation and invalidation survive process restarts or multi-instance deployment according to the Redis-backed store model; test mode remains explicit memory mode; Redis-unavailable runtime fails explicitly rather than silently downgrading; the versioned operational baseline documents and validates `BROWSER_SESSION_STORE_MODE=redis` plus `REDIS_URL` consistently.
+**Implemented outcome:** Browser-session persistence is now externalized behind the store abstraction and the final operational baseline alignment explicitly declares Redis as the supported non-test store across env examples, compose files, validators, docs, README, and hosted operational smoke coverage.
+**Required tests:** `node --test tests/browser-session-service-characterization.test.js tests/browser-session-redis-store.test.js tests/browser-session-callsite-characterization.test.js tests/browser-session-auth-boundary.test.js tests/browser-e2e.e2e.js`; `node --test tests/production-baseline-characterization.test.js tests/workflow-baseline-characterization.test.js`; `npm run validate:public-runtime`; `npm run validate:workflow-baseline`; `npm run validate:production-baseline` with explicit production environment values; `docker compose -f docker-compose.prod.yml config` with temporary `.env.production`; `npm run lint`; `npm run typecheck`; `npm run build`
+**Migration considerations:** Preserve the current cookie names and helper contracts; keep memory mode explicit and scoped to tests or explicit configuration; keep workflow/docs/env/compose alignment synchronized with the Redis baseline.
+**Rollback or mitigation:** Revert only the externalized-session storage slice or the follow-up operational-baseline alignment if deployment-specific regressions appear.
+**Risk:** Medium
+
+## TASK-014: Retire compatibility-sentinel drift from remaining browser modules
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Frontend/session security governance
+**Requirement:** Current architectural limitation after `p12-browser-session-closure`
+**Reason:** Supported flows now use the backend-owned cookie session boundary, but some modules still rely on direct request patterns and the compatibility sentinel bridge.
+**Current problem resolved:** Supported root, warehouse, and agent pages no longer depend on `session.token` guards, compatibility bearer headers, or the sentinel-aware browser branch in `authenticate.js`. Browser auth behavior is still partially distributed structurally across some non-priority page scripts, which is now convergence debt rather than a supported auth-contract gap.
+**Proposed change:** Incrementally move remaining browser modules to `src/public/shared/auth.js` and remove explicit sentinel/header assumptions where no longer needed.
+**Affected files:** `src/public/root/**`, `src/public/warehouse/**`, `src/public/agent/**`, `scripts/validate-public-runtime.js`, related tests/docs/specs
+**Dependencies:** TASK-011
+**Database impact:** None
+**API impact:** None expected
+**Container impact:** None
+**Security impact:** Medium positive impact through narrower browser auth drift surface
+**Acceptance criteria:** Remaining approved browser modules delegate authenticated fetch/bootstrap/logout behavior to the shared helpers; compatibility-sentinel assumptions are removed from supported flows without breaking them.
+**Required tests:** `tests/public-auth-helper-characterization.test.js`, `tests/public-surface-characterization.test.js`, `tests/browser-e2e.e2e.js`, `npm run validate:public-runtime`
+**Migration considerations:** Remove compatibility-path assumptions incrementally and preserve current browser routes/user journeys.
+**Rollback or mitigation:** Revert only the affected browser-module slice if a supported page flow regresses.
+**Risk:** Medium
+
+## TASK-015: Strengthen Redis operational safeguards for browser-session persistence
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `src/services/browser-session-memory.store.js`, `src/services/browser-session-redis.store.js`, `src/services/browser-session.service.js`, `src/routes/health.routes.js`, `docs/production-baseline.md`, `docs/production-operations-runbook.md`, `tests/browser-session-redis-store.test.js`, `tests/browser-session-service-characterization.test.js`, `tests/health-routes.test.js`
+**Validation evidence:** `node --test tests/browser-session-redis-store.test.js`; `node --test tests/browser-session-service-characterization.test.js`; `node --test tests/health-routes.test.js`; `node --test tests/production-baseline-characterization.test.js`; `node --test tests/browser-session-auth-boundary.test.js`; `npm run test:redis-path`; `npm run validate:operational-readiness`; `npm run lint -- --quiet`; `npm run typecheck`; `npm run build`; `npm run test -- --silent`
+**Priority:** Medium
+**Domain:** Frontend/session security governance / Runtime platform
+**Requirement:** Remaining architectural limitation after `p16-browser-session-persistent-store`
+**Reason:** The supported non-test browser-session path is now correctly aligned on Redis, but runtime assurance still relies mainly on configuration validation and explicit failure behavior.
+**Current problem:** Redis-backed browser-session persistence lacks stronger repository-level observability and recovery guidance beyond validators, smoke coverage, and explicit runtime failure semantics.
+**Proposed change:** Add incremental Redis operational hardening such as clearer health/diagnostic signals, improved failure observability, and documented recovery expectations without changing the active cookie contract.
+**Affected files:** `src/services/browser-session-redis.store.js`, `src/services/browser-session.service.js`, `src/routes/health.routes.js`, `docs/production-baseline.md`, `docs/production-operations-runbook.md`, related tests/specs
+**Dependencies:** TASK-013
+**Database impact:** None
+**API impact:** Low; `GET /health/ready` now includes browser-session-store readiness in its operational contract while preserving `GET /health` compatibility
+**Container impact:** Possible additions to Redis/app health signaling only
+**Security impact:** Medium positive impact through faster detection and safer operation of browser-session persistence dependencies
+**Acceptance criteria:** Approved diagnostics or observability improvements make Redis-backed browser-session dependency status easier to detect and operate without weakening current explicit-failure behavior or cookie boundaries.
+**Implemented outcome:** `/health/ready` now combines database readiness with browser-session-store readiness, Redis-backed store outages map to explicit `503 service_unavailable` behavior instead of silent downgrade, memory mode stays explicitly compatible for tests, and the production baseline/runbook now document diagnosis and recovery expectations.
+**Required tests:** `node --test tests/browser-session-redis-store.test.js`; `node --test tests/browser-session-service-characterization.test.js`; `node --test tests/health-routes.test.js`; `node --test tests/production-baseline-characterization.test.js`; `node --test tests/browser-session-auth-boundary.test.js`; `npm run test:redis-path`; `npm run validate:operational-readiness`; `npm run lint -- --quiet`; `npm run typecheck`; `npm run build`; `npm run test -- --silent`
+**Migration considerations:** Keep the supported Redis baseline stable while improving operational signals incrementally.
+**Rollback or mitigation:** Revert only the observability/hardening slice if it creates noise or contract drift.
+**Risk:** Medium
+
+## TASK-016: Converge supported root browser auth runtime on shared helper ownership
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Frontend/session security governance / Embedded browser runtime
+**Requirement:** `p18-browser-runtime-auth-convergence-final` FR-001, FR-002, FR-003, FR-004, FR-005; AC-001, AC-002, AC-003, AC-004
+**Reason:** After `p17`, the backend-owned cookie session boundary was implemented, but several supported root pages still kept page-local auth-header builders and distributed JSON auth behavior.
+**Current problem resolved:** The targeted supported root screens now delegate authenticated JSON fetch, logout, protected downloads, or unauthorized cleanup through `src/public/shared/auth.js` and supporting shared modules instead of maintaining page-local auth-header builders.
+**Proposed change:** Freeze the remaining supported auth divergence with characterization coverage, converge the targeted root pages on direct shared-helper ownership, remove redundant page-local auth logic, and refresh validator/documentation coverage to the final converged cookie-auth runtime model.
+**Affected files:** `src/public/root/index.js`, `src/public/root/users.js`, `src/public/root/roles.js`, `src/public/root/warehouses.js`, `src/public/root/zones.js`, `src/public/root/routes.js`, `src/public/root/routes.shared.js`, `src/public/root/clients.js`, `src/public/root/clients.shared.js`, `src/public/root/client-detail.shared.js`, `src/public/root/client-detail.references.js`, `scripts/validate-public-runtime.js`, `tests/browser-runtime-auth-convergence-inventory.test.js`, `tests/public-surface-characterization.test.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `specs/p18-browser-runtime-auth-convergence-final/*`
+**Dependencies:** TASK-014
+**Database impact:** None
+**API impact:** None; browser pages continue using the existing `/api/auth/*` and existing domain endpoints
+**Container impact:** None
+**Security impact:** Medium positive impact through reduced browser auth drift and removal of duplicated page-local auth-header logic on supported root pages
+**Acceptance criteria:** Targeted supported root pages no longer keep page-local auth-header builders; shared browser helpers remain the supported auth-runtime seam; residual divergence is explicitly inventoried; validators/tests/docs reflect the converged cookie-auth browser model.
+**Required tests:** `node --test tests/browser-runtime-auth-convergence-inventory.test.js tests/public-surface-characterization.test.js tests/public-session-helper-characterization.test.js tests/public-auth-helper-characterization.test.js tests/browser-session-auth-boundary.test.js tests/browser-e2e.e2e.js`; `npm run validate:public-runtime`; `npm run lint`; `npm run typecheck`; `npm run build`
+**Migration considerations:** Preserve current root routes and page-specific guards while removing only duplicated auth-header ownership on the targeted supported pages.
+**Rollback or mitigation:** Revert only the supported-root convergence slice if a browser regression appears; preserve the convergence inventory and public-surface characterization tests for diagnosis.
+**Risk:** Medium
+
+## TASK-017: Expand the first approved public-runtime typecheck allowlist
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Frontend/runtime quality governance / Embedded browser runtime
+**Requirement:** `p19-public-runtime-typecheck-expansion` FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008
+**Reason:** `npm run typecheck` was still green without checking the browser login/session helper seam that now owns the supported cookie-auth runtime baseline.
+**Current problem resolved:** The approved first browser-runtime slice is now inside the `typecheck` baseline, so regressions in `src/public/shared/session.js`, `src/public/shared/auth.js`, and `src/public/login.js` gain compile-time governance without broadening scope to the rest of `src/public/**`.
+**Proposed change:** Add an explicit allowlist for `src/public/shared/session.js`, `src/public/shared/auth.js`, and `src/public/login.js`; make only the minimal JSDoc/browser-typing adjustments needed to keep that slice green; freeze the allowlist through governance tests and baseline docs without expanding to all of `src/public/**`.
+**Affected files:** `tsconfig.typecheck.json`, `src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`, `scripts/validate-public-runtime.js`, `tests/typecheck-ci-hardening-governance.test.js`, `tests/public-surface-characterization.test.js`, `tests/browser-runtime-auth-convergence-inventory.test.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/ci-critical-controls.md`, `specs/p19-public-runtime-typecheck-expansion/*`
+**Dependencies:** TASK-016
+**Database impact:** None
+**API impact:** None; public login and shared browser helper contracts remain unchanged
+**Container impact:** None
+**Security impact:** Medium positive impact through stronger compile-time assurance on the supported browser login/session seam without broadening runtime permissions or routes
+**Acceptance criteria:** `npm run typecheck` covers only the approved first public-runtime allowlist; no accidental expansion to the rest of `src/public/**` occurs; validators/tests/docs freeze the new baseline and keep the remaining browser files explicitly out of scope.
+**Required tests:** Passed `npm run typecheck`; passed `npm run lint:public-runtime`; passed `npm run validate:public-runtime`; passed `node --test tests/typecheck-ci-hardening-governance.test.js tests/public-surface-characterization.test.js tests/browser-runtime-auth-convergence-inventory.test.js`; passed `npm run build`
+**Migration considerations:** Preserve the current browser runtime contracts, routes, and helper ownership from `p18` while adding only enough typing to make the first slice safe under `checkJs`.
+**Rollback or mitigation:** Revert only the public-runtime allowlist and helper typing slice if the browser baseline regresses; keep the governance inventory to separate pre-existing debt from new regressions.
+**Risk:** Medium
+
+## TASK-018: Define the long-term disposition of `legacy-public-runtime/`
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `specs/p24-legacy-runtime-governance-closure/*`
+**Validation evidence:** `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js`; `npm run typecheck`
+**Priority:** Low
+**Domain:** Frontend/runtime governance / Embedded browser runtime
+**Requirement:** Post-implementation follow-up after `p21-legacy-public-html-deprecation-for-spa-transition`
+**Reason:** `p21` moved the functional legacy browser inventory out of `src/public/`, and repository governance needed an explicit implemented policy so that preserved files are not mistaken for supported runtime.
+**Current problem resolved:** `legacy-public-runtime/` remains outside the active runtime and is now documented consistently as transitional backup/reference inventory only, not an implicit rollback path.
+**Implemented change:** The repository now states that the preserved legacy browser inventory remains in-repo only until equivalent SPA sections are implemented and validated, after which a later approved slice should remove it. This closed the lifecycle-policy ambiguity without reactivating legacy HTML as supported runtime.
+**Affected files:** `legacy-public-runtime/**`, related validators/tests/docs/specs
+**Dependencies:** `p21-legacy-public-html-deprecation-for-spa-transition`
+**Database impact:** None
+**API impact:** None expected
+**Container impact:** None
+**Security impact:** Low positive impact through clearer governance and lower risk of future confusion between preserved inventory and active runtime
+**Acceptance criteria:** Completed. Repository docs now define `legacy-public-runtime/` as transitional backup/reference inventory only, explicitly outside supported runtime and outside implicit rollback behavior, with later removal deferred until equivalent SPA sections are implemented and validated.
+**Required tests:** `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js`; `npm run typecheck`
+**Migration considerations:** Keep `legacy-public-runtime/` outside `src/public/` and outside supported runtime governance unless a new approved spec changes the contract.
+**Rollback or mitigation:** Revert only the documentation/governance wording if preservation rationale needs correction; do not reactivate the legacy runtime as a shortcut.
 **Risk:** Low
+
+## TASK-020: Harden login and no-access CSP without blocking on legacy public-runtime remediation
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Frontend/security hardening / Embedded browser runtime
+**Requirement:** `p20-login-csp-hardening` FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008
+**Reason:** The login screen and static no-access fallback were still inheriting a CSP broad enough for legacy browser pages with third-party and inline-style dependencies.
+**Current problem resolved:** `src/app.js` now selects a stricter same-origin CSP for `/`, `/index.html`, `/no-access.html`, and the post-`p21` migration surface, while `src/public/no-access.html` no longer relies on inline script because its logout behavior moved to `/no-access.js`.
+**Proposed change:** Segment CSP by route/surface, preserve non-CSP security headers, add focused header assertions, and document temporary legacy allowances rather than blocking closure on full legacy remediation.
+**Affected files:** `src/app.js`, `src/public/no-access.html`, `src/public/no-access.js`, `tests/auth-hardening-characterization.test.js`, `tests/public-surface-characterization.test.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `specs/p20-login-csp-hardening/*`
+**Dependencies:** TASK-017
+**Database impact:** None
+**API impact:** None; browser-session login/bootstrap/logout contracts remain unchanged
+**Container impact:** None
+**Security impact:** Medium positive impact through tighter CSP on the mandatory public login and static fallback surfaces while keeping legacy allowances explicit and temporary
+**Acceptance criteria:** `/`, `/index.html`, and `/no-access.html` receive the stricter CSP baseline; the browser-first login/session flow remains functional; and later slices document any remaining compatibility allowances without reviving retired legacy HTML pages as supported runtime.
+**Required tests:** Passed `node --test tests/auth-hardening-characterization.test.js tests/public-surface-characterization.test.js`; passed `node --test tests/browser-e2e.e2e.js`; passed `npm run typecheck`; passed `npm run lint:public-runtime`; passed `npm run validate:public-runtime`; passed `git diff --check`
+**Migration considerations:** Preserve the strict CSP on the reduced supported documents and avoid re-expanding the supported runtime back into retired legacy HTML pages.
+**Rollback or mitigation:** Revert only the CSP segmentation and `no-access.js` extraction if the public login or static fallback screen regresses; preserve the focused header tests and the documented legacy-allowance inventory.
+**Risk:** Medium
+
+## TASK-019: Preserve the reduced public-runtime typecheck allowlist and avoid re-expanding retired legacy pages
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `specs/p24-legacy-runtime-governance-closure/*`
+**Validation evidence:** `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js`; `npm run typecheck`
+**Priority:** Medium
+**Domain:** Frontend/runtime quality governance / Embedded browser runtime
+**Requirement:** Reduced supported surface after `p21-legacy-public-html-deprecation-for-spa-transition`
+**Reason:** `p21` removed `src/public/root/**`, `src/public/warehouse/**`, and `src/public/agent/**` from the supported runtime, so the approved typecheck baseline must stay intentionally bounded to the shared login/session seam instead of re-expanding into retired HTML surfaces.
+**Current problem resolved:** Follow-up governance work is now constrained by explicit repository policy so retired legacy pages are not implicitly revived inside the supported public runtime.
+**Implemented change:** The repository now documents that `tsconfig.typecheck.json` remains bounded to the approved reduced public-runtime baseline (`src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`, and any future explicitly approved reduced-surface additions), and that retired legacy pages plus `legacy-public-runtime/` cannot re-enter supported runtime, validator scope, or typecheck scope without a new approved spec.
+**Affected files:** `tsconfig.typecheck.json`, reduced supported `src/public/**` files, related validators/tests/docs/specs
+**Dependencies:** TASK-017, `p21-legacy-public-html-deprecation-for-spa-transition`
+**Database impact:** None
+**API impact:** None expected; existing browser/API contracts must remain stable
+**Container impact:** None
+**Security impact:** Medium positive impact through tighter scope governance and prevention of accidental legacy-surface revival
+**Acceptance criteria:** Completed. Repository docs now preserve the reduced supported browser contract, require explicit approved planning for any future additions, and do not allow retired legacy pages or `legacy-public-runtime/` to re-enter `typecheck`, validator scope, or supported runtime governance implicitly.
+**Required tests:** `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js`; `npm run typecheck`
+**Migration considerations:** Expand compile-time scope only over the reduced supported public runtime or its explicit successors, not over `legacy-public-runtime/`.
+**Rollback or mitigation:** Revert only the newly added allowlist entries if a future bounded reduced-surface expansion proves unstable.
+**Risk:** Medium
+
+## TASK-021: Replace deprecated post-login HTML aliases with the supported transition landing
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Frontend/navigation governance / Embedded browser runtime
+**Requirement:** `p22-public-runtime-contract-reduction-follow-through`
+**Reason:** After `p21`, `login.js` still sent authenticated users to historical role-based HTML aliases that now landed on the controlled `410` migration response instead of a supported post-login destination.
+**Current problem resolved:** Company-admin, warehouse, supervisor, root, and agent sessions no longer resolve to `/root/*.html`, `/warehouse/*.html`, or `/agent/*.html` from `src/public/login.js`. They now land on `/migration.html?mode=post-login-transition`, while direct requests to retired legacy HTML routes still return the same-URL `410 Gone` migration response.
+**Proposed change:** Preserve `/migration.html?mode=post-login-transition` as the supported interim landing until a later approved slice defines real functional destinations.
+**Affected files:** `src/public/login.js`, `src/public/migration.html`, `src/public/migration.js`, `scripts/validate-public-runtime.js`, `tests/public-surface-characterization.test.js`, `tests/public-runtime-http-smoke.test.js`, `tests/browser-runtime-auth-convergence-inventory.test.js`, `tests/browser-e2e.e2e.js`, `docs/runtime-contract-manifest.json`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `README.md`
+**Dependencies:** TASK-022
+**Database impact:** None
+**API impact:** None for backend auth/session APIs; supported browser post-login navigation now targets `/migration.html?mode=post-login-transition` instead of deprecated legacy HTML aliases
+**Container impact:** None
+**Security impact:** Medium positive impact through removal of confusing deprecated-route landings and clearer supported-surface boundaries
+**Acceptance criteria:** Authenticated retired-runtime roles no longer land on `/root/*.html`, `/warehouse/*.html`, or `/agent/*.html`; `/migration.html?mode=post-login-transition` is the supported interim landing; `migration.html` + `migration.js` distinguish post-login transition rendering from deprecated-route `410` rendering; direct legacy HTML requests still return the same-URL `410 Gone` migration response.
+**Required tests:** Passed `npm run lint:public-runtime`; passed `npm run validate:public-runtime`; passed `node --test tests/public-surface-characterization.test.js tests/public-runtime-http-smoke.test.js tests/browser-runtime-auth-convergence-inventory.test.js`; passed `node --test tests/browser-e2e.e2e.js`; passed `npm run typecheck`
+**Migration considerations:** Keep the supported transition landing explicit in validators, tests, manifest metadata, and docs until final functional destinations are approved.
+**Rollback or mitigation:** Revert only the landing-target follow-through if the supported transition contract regresses; keep direct retired legacy HTML routes on the `410 Gone` contract.
+**Risk:** Medium
+
+## TASK-022: Record the reduced supported public-runtime baseline from `p21`
+**Status:** Completed
+**Priority:** High
+**Domain:** Frontend/runtime governance / Embedded browser runtime
+**Requirement:** `p21-legacy-public-html-deprecation-for-spa-transition` FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009
+**Reason:** The embedded public runtime needed a real reduction of supported HTML surface before the SPA transition, not just documentation-only deprecation.
+**Current problem resolved:** `src/public/` now contains only the reduced supported baseline; deprecated role-specific HTML routes respond from the same URL with the shared migration page and HTTP `410 Gone`; the former functional legacy runtime was relocated to `legacy-public-runtime/`; and validators/tests/docs were updated to govern the reduced contract.
+**Proposed change:** Preserve the reduced active runtime baseline, the pre-static `410` gate, the out-of-runtime legacy relocation, and the bounded validator/typecheck contract.
+**Affected files:** `src/app.js`, `src/public/index.html`, `src/public/migration.html`, `src/public/migration.js`, `src/public/no-access.html`, `src/public/no-access.js`, `src/public/login.js`, `src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/styles.css`, `legacy-public-runtime/**`, `scripts/validate-public-runtime.js`, `tests/public-surface-characterization.test.js`, `tests/public-runtime-http-smoke.test.js`, `tests/auth-hardening-characterization.test.js`, `tests/browser-runtime-auth-convergence-inventory.test.js`, `tests/browser-e2e.e2e.js`, `tests/post-audit-baseline-hardening.test.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `specs/p21-legacy-public-html-deprecation-for-spa-transition/*`
+**Dependencies:** TASK-017, TASK-020
+**Database impact:** None
+**API impact:** None for backend auth/session APIs; legacy HTML contract changed to same-URL `410 Gone` migration response
+**Container impact:** None
+**Security impact:** High positive impact through reduction of the functional public HTML surface and elimination of active support for retired role-specific browser pages
+**Acceptance criteria:** Supported HTML is limited to login, no-access, and migration documents; `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html` return the shared migration response with `410 Gone` and no redirect; preserved legacy runtime lives outside `src/public/`; validators/tests/docs reflect the reduced contract.
+**Required tests:** Passed `npm run lint:public-runtime`; passed `npm run validate:public-runtime`; passed `npm run lint`; passed `npm run typecheck`; passed `node --test tests/public-surface-characterization.test.js tests/public-runtime-http-smoke.test.js tests/auth-hardening-characterization.test.js tests/browser-runtime-auth-convergence-inventory.test.js`; passed `node --test tests/browser-e2e.e2e.js`; passed `node --test tests/post-audit-baseline-hardening.test.js`
+**Migration considerations:** Preserve the reduced public-runtime contract and do not resume governing `root/**`, `warehouse/**`, or `agent/**` as supported browser runtime unless a later approved spec explicitly changes the support model.
+**Rollback or mitigation:** If a future approved replacement shell is not yet ready, keep the `410` migration response rather than restoring the functional legacy runtime as implicit support.
+**Risk:** Medium
+
+## TASK-023: Define final functional post-login destinations beyond the interim transition page
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `src/public/migration.js`, `scripts/validate-public-runtime.js`, `tests/public-surface-characterization.test.js`, `tests/public-runtime-http-smoke.test.js`, `tests/browser-e2e.e2e.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `specs/p25-post-login-transition-and-test-noise-closure/*`
+**Validation evidence:** `node --test tests/browser-e2e.e2e.js`; `node --test tests/audit-instrumentation.test.js tests/audit-repository.test.js` (with `tests/audit-repository.test.js` skipped when env is absent); `npm run typecheck`; `npm run validate:public-runtime`; `npm run lint -- --quiet`
+**Priority:** Medium
+**Domain:** Frontend/navigation governance / Embedded browser runtime
+**Requirement:** Post-implementation follow-up after `p22-public-runtime-contract-reduction-follow-through`
+**Reason:** The repository now has a supported interim landing for retired-runtime-dependent roles, but it is informational and not a final operational destination.
+**Current problem resolved:** The repository now makes the interim intent explicit: `/migration.html?mode=post-login-transition` is the supported temporary landing for retired-runtime-dependent roles, confirms successful authentication, clearly states that the destination module is not implemented yet, and preserves safe return-to-login/logout behavior without reviving legacy HTML runtime.
+**Implemented change:** The current transition page remains the approved default placeholder while future role-specific SPA destinations are deferred to later approved slices. This closure is governance/runtime-contract work only; it does not claim the role-specific SPA destinations already exist.
+**Affected files:** `src/public/login.js`, `src/public/migration.html`, `src/public/migration.js`, future replacement shell files, related validators/tests/docs/specs
+**Dependencies:** TASK-021, TASK-022
+**Database impact:** None expected unless a later approved replacement flow requires new persistence-backed projections
+**API impact:** None expected unless new authenticated browser entrypoints require supporting endpoints documented by a future approved spec
+**Container impact:** None expected
+**Security impact:** Medium positive impact through removal of transitional UX and tighter supported-role navigation
+**Acceptance criteria:** Completed. The repository now explicitly documents and validates that `/migration.html?mode=post-login-transition` is a supported temporary "not implemented yet" landing with safe exit behavior, while final role-specific SPA destinations remain future approved work and retired legacy HTML pages stay inactive.
+**Required tests:** `npm run lint:public-runtime`; `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js tests/public-runtime-http-smoke.test.js tests/browser-runtime-auth-convergence-inventory.test.js`; `node --test tests/browser-e2e.e2e.js`; any additional approved landing-flow tests; `npm run typecheck`
+**Migration considerations:** Keep the current supported transition page until final destinations are approved; do not introduce speculative routes.
+**Rollback or mitigation:** Revert only the final-destination slice if replacement entrypoints regress, keeping the interim transition landing intact.
+**Risk:** Medium
+
+## TASK-024: Reduce expected database-unavailable audit-log noise in focused browser/runtime tests
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `tests/helpers/db-free-audit.js`, `tests/browser-e2e.e2e.js`, `tests/audit-instrumentation.test.js`, `docs/test-suite-catalog.md`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `CHANGELOG.md`, `specs/p25-post-login-transition-and-test-noise-closure/*`, `specs/p26-browser-runtime-db-free-suite-separation/*`
+**Validation evidence:** `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js tests/public-runtime-http-smoke.test.js`; `node --test tests/browser-e2e.e2e.js`; `npm run typecheck`
+**Priority:** Low
+**Domain:** Test governance / Observability
+**Requirement:** Post-implementation follow-up after `p22-public-runtime-contract-reduction-follow-through`
+**Reason:** Focused browser/runtime tests can pass while still emitting expected audit-log noise for database unavailability (`db:5432`), which can obscure real failures during triage.
+**Current governance ambiguity resolved:** The repository now has an implemented remediation for the addressed suites: DB-free browser/runtime suites use explicit seam control where audit persistence is not under test, while explicit DB-backed audit coverage remains in dedicated suites.
+**Implemented change:** Governance docs first defined that browser/runtime noise cleanup should prefer separating DB-free browser/runtime suites from explicit DB-backed audit/persistence suites rather than broadly suppressing logs, and the later `p26-browser-runtime-db-free-suite-separation` slice applied that strategy by adding a maintained suite catalog, stabilizing `tests/audit-instrumentation.test.js` as a DB-free suite, and isolating incidental browser E2E audit persistence from Prisma without weakening dedicated audit coverage.
+**Affected files:** selected browser/runtime tests, test helpers, logging/audit seams if needed, related docs
+**Dependencies:** TASK-021
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low positive impact by improving signal clarity for test evidence without reducing runtime protections
+**Acceptance criteria:** Completed. The repository now both documents and implements the first-line remediation for the addressed suites, preserves real-failure visibility, and preserves explicit DB-backed audit/persistence coverage instead of authorizing broad log suppression.
+**Required tests:** affected browser/runtime tests; any logging characterization tests touched by the approved cleanup
+**Migration considerations:** Do not weaken runtime error handling or audit coverage just to silence tests.
+**Rollback or mitigation:** Revert only the noise-reduction slice if it obscures real failures or alters runtime behavior.
+**Risk:** Low
+
+## TASK-025: Align repository-wide test baseline and runtime-contract coverage after `p23`
+**Status:** Completed
+**Priority:** High
+**Domain:** Repository/platform governance / Embedded browser runtime
+**Requirement:** `p23-repository-test-failure-contract-alignment` FR-003, FR-004, FR-005, FR-006, FR-009, FR-010; BR-001, BR-002, BR-003, BR-005, BR-006; AC-001, AC-002, AC-003, AC-004, AC-005
+**Reason:** The aggregate repository suite was failing due to stale reduced-runtime expectations, unclassified logout governance, and missing default test-environment bootstrap.
+**Current problem resolved:** `tests/browser-auth-compatibility-inventory.test.js` now targets the approved reduced public runtime instead of retired browser files, `POST /api/auth/logout` is explicitly covered in the runtime-contract artifacts, and `scripts/run-tests.js` now defaults the official aggregate suite to `NODE_ENV=test` plus `BROWSER_SESSION_STORE_MODE=memory` unless explicitly overridden.
+**Proposed change:** Preserve the bounded `p23` alignment across tests, runtime-contract artifacts, and the official aggregate test runner without reactivating retired browser runtime or redesigning auth/session behavior.
+**Affected files:** `tests/browser-auth-compatibility-inventory.test.js`, `internal-docs/openapi/runtime-baseline.openapi.json`, `internal-docs/runtime-endpoint-catalog.md`, `scripts/run-tests.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `specs/p23-repository-test-failure-contract-alignment/*`
+**Dependencies:** TASK-021, TASK-022
+**Database impact:** None
+**API impact:** No runtime API behavior change; `POST /api/auth/logout` contract governance is now explicit
+**Container impact:** None
+**Security impact:** Medium positive impact through stronger contract/test alignment and stable auth-suite execution defaults
+**Acceptance criteria:** `npm run test -- --silent` passes with the official test runner, reduced-runtime browser inventory tests match current support boundaries, and `POST /api/auth/logout` is no longer unclassified in runtime-contract governance.
+**Required tests:** `npm run validate:public-runtime`; `npm run test -- --silent`; `npm run lint -- --quiet`; `npm run typecheck`; `npm run build`
+**Migration considerations:** Preserve explicit override ability for non-default test environments and do not treat the memory default as a change to the supported non-test Redis baseline.
+**Rollback or mitigation:** Revert only the bounded `p23` runner/governance alignment if a hidden suite dependency is discovered; preserve the updated failing-baseline evidence for diagnosis.
+**Risk:** Medium
+
+## TASK-026: Converge runtime-contract artifact governance between `docs/**` and `internal-docs/**`
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `README.md`, `.gitignore`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
+**Validation evidence:** `node --test tests/runtime-contract-governance.test.js tests/openapi-contract-consistency.test.js tests/critical-contract-governance.test.js`; `npm run lint -- --quiet`
+**Follow-up audit:** Baseline governance score `8.8/10` (acceptable, no meaningful regression found; warning remains below `9.5`)
+**Priority:** Medium
+**Domain:** Repository/platform governance / Documentation
+**Requirement:** Audit warning after `p23`; runtime-contract governance integrity
+**Reason:** The repository currently carries runtime-contract artifacts in public `docs/**` and companion `internal-docs/**` locations, which increases drift risk and weakens enforcement clarity.
+**Current problem:** Architecture-facing docs describe public `docs/**` artifacts while repository governance tests consume `internal-docs/**`; maintaining both locations requires synchronized updates and can allow confidence gaps if one side lags.
+**Proposed change:** Choose and implement one explicit governance strategy: a single authoritative artifact location, or a clearly documented mirrored/public-private model with automated synchronization rules and tests.
+**Affected files:** `docs/openapi/runtime-baseline.openapi.json`, `docs/runtime-endpoint-catalog.md`, `docs/runtime-contract-manifest.json`, `internal-docs/openapi/runtime-baseline.openapi.json`, `internal-docs/runtime-endpoint-catalog.md`, `internal-docs/runtime-contract-manifest.json`, related governance tests, architecture docs, README
+**Dependencies:** TASK-025
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance integrity impact
+**Acceptance criteria:** The repository documents one authoritative runtime-contract artifact strategy, tests enforce it, and future route changes have one unambiguous update path.
+**Required tests:** `tests/runtime-contract-governance.test.js`; `tests/openapi-contract-consistency.test.js`; any added synchronization/governance tests; `npm run test -- --silent`
+**Migration considerations:** Preserve current runtime behavior and route classification completeness while changing only governance/documentation ownership.
+**Rollback or mitigation:** Revert only the artifact-location convergence slice if it introduces public/private documentation regressions.
+**Risk:** Medium
+
+## TASK-027: Add explicit Redis-path validation alongside the stable memory-mode aggregate suite
+**Status:** Completed
+**Completed at:** 2026-07-28
+**Implemented files:** `package.json`, `.github/workflows/redis-browser-session-tests.yml`, `scripts/validate-workflow-baseline.js`, `tests/workflow-baseline-characterization.test.js`, `docs/ci-critical-controls.md`, `docs/production-baseline.md`
+**Validation evidence:** `npm run test:redis-path`; `npm run validate:workflow-baseline`; `node --test tests/workflow-baseline-characterization.test.js`; `npm run test -- --silent`
+**Follow-up audit:** Baseline governance score `8.8/10` (acceptable, no meaningful regression found; warning remains below `9.5`)
+**Priority:** Medium
+**Domain:** Frontend/session security governance / Test governance
+**Requirement:** Post-`p23` repository-wide test baseline follow-up
+**Reason:** The aggregate suite now boots reliably by default in memory mode, but the supported non-test browser-session path still depends on Redis.
+**Current problem:** Plain `npm run test` no longer exercises Redis-backed browser-session persistence unless developers or CI explicitly override the default environment.
+**Proposed change:** Add or document a dedicated Redis-path validation command or CI lane that exercises browser-session behavior with `BROWSER_SESSION_STORE_MODE=redis` and the required infrastructure, without destabilizing the default aggregate suite.
+**Affected files:** `package.json`, `scripts/run-tests.js`, browser-session tests, CI workflows if approved, production/readiness docs
+**Dependencies:** TASK-025
+**Database impact:** None
+**API impact:** None
+**Container impact:** Possible CI or compose usage additions for Redis-backed validation
+**Security impact:** Medium positive impact through better coverage of the supported non-test session path
+**Acceptance criteria:** The repository keeps the stable default aggregate suite and also has an explicit, repeatable Redis-path validation path for browser-session behavior.
+**Required tests:** existing browser-session boundary/store tests under Redis mode; repository or CI validation command added by the approved slice
+**Migration considerations:** Keep Redis validation explicit and additive rather than folding it back into the default aggregate suite.
+**Rollback or mitigation:** Revert only the dedicated Redis-path validation slice if it proves too unstable, while preserving the stable default suite.
+**Risk:** Medium

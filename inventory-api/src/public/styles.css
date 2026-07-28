@@ -295,6 +295,26 @@ button:hover { background: var(--primary-dark); }
 button:disabled { opacity: 0.7; cursor: progress; }
 .secondary-button { background: #e9eefb; color: var(--primary-dark); }
 .secondary-button:hover { background: #dce6ff; }
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  padding: 12px 16px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+.button-link:hover { background: var(--primary-dark); }
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+.migration-card { display: grid; gap: 12px; }
+.status-note { margin: 0; color: var(--muted); font-size: 0.9rem; }
 .company-status-button { padding: 8px 12px; }
 .message { min-height: 20px; margin: 0; color: var(--muted); }
 .message:not(:empty) { padding: 10px 12px; border-radius: 10px; background: #f8fafc; border: 1px solid rgba(208, 215, 222, 0.7); }

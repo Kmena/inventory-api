@@ -81,7 +81,10 @@ async function updateOrder(id, payload, auth, req = null) {
     data.items = { deleteMany: {}, create: toOrderItemsCreate(payload.items) };
   }
 
-  const updatedOrder = await orderRepository.updateOrder(id, data);
+  const updatedOrder = await orderRepository.updateOrder(id, authScope.companyId, data);
+  if (!updatedOrder) {
+    throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  }
   await audit.recordAuditEventIfAvailable({
     req,
     action: 'orders.update',
@@ -127,7 +130,11 @@ async function cancelOrder(id, auth, req = null) {
   if (order.status === 'APPROVED') {
     return inventoryService.releaseStockReservation(id, true, auth, req);
   }
-  const cancelledOrder = await orderRepository.updateOrder(id, { status: 'CANCELLED' });
+  const { companyId } = scope(auth);
+  const cancelledOrder = await orderRepository.updateOrder(id, companyId, { status: 'CANCELLED' });
+  if (!cancelledOrder) {
+    throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  }
   await audit.recordAuditEventIfAvailable({
     req,
     action: 'orders.cancel',
@@ -161,7 +168,11 @@ async function removeOrder(id, auth, req = null) {
   if (order.status === 'DELIVERED') {
     throw createHttpError(409, 'No se puede eliminar un pedido ya despachado', 'conflict');
   }
-  const deletedOrder = await orderRepository.deleteOrder(id);
+  const { companyId } = scope(auth);
+  const deletedOrder = await orderRepository.deleteOrder(id, companyId);
+  if (!deletedOrder) {
+    throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  }
   await audit.recordAuditEventIfAvailable({
     req,
     action: 'orders.delete',

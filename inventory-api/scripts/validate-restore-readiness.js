@@ -2,12 +2,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const repositoryRoot = path.join(__dirname, '..');
-const { internalDocsExist, writeSkip } = require('./internal-docs-optional');
-const runbookPath = path.join(repositoryRoot, 'internal-docs', 'production-operations-runbook.md');
-const baselineDocPath = path.join(repositoryRoot, 'internal-docs', 'production-baseline.md');
-const restoreBaselinePath = path.join(repositoryRoot, 'internal-docs', 'restore-readiness-baseline.md');
+const runbookPath = path.join(repositoryRoot, 'docs', 'production-operations-runbook.md');
+const baselineDocPath = path.join(repositoryRoot, 'docs', 'production-baseline.md');
+const restoreBaselinePath = path.join(repositoryRoot, 'docs', 'restore-readiness-baseline.md');
 const composePath = path.join(repositoryRoot, 'docker-compose.prod.yml');
-const workflowPath = path.join(repositoryRoot, '.github', 'workflows', 'operational-smoke.yml');
+const workflowPath = path.join(repositoryRoot, '..', '.github', 'workflows', 'operational-smoke.yml');
 const healthRoutePath = path.join(repositoryRoot, 'src', 'routes', 'health.routes.js');
 
 function read(filePath) {
@@ -21,15 +20,6 @@ function assertPattern(source, pattern, message, failures) {
 }
 
 function main() {
-  if (!internalDocsExist([
-    'internal-docs/production-operations-runbook.md',
-    'internal-docs/production-baseline.md',
-    'internal-docs/restore-readiness-baseline.md',
-  ])) {
-    writeSkip('Restore readiness validation skipped: internal-docs artifacts are not present.');
-    return;
-  }
-
   const failures = [];
 
   for (const requiredPath of [runbookPath, baselineDocPath, restoreBaselinePath, composePath, workflowPath, healthRoutePath]) {

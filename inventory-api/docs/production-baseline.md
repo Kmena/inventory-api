@@ -8,15 +8,19 @@ Este documento define el baseline productivo **mínimo y verificable** soportado
 - `docker-compose.prod.yml`
 - `.env.production.example`
 - `scripts/validate-production-baseline.js`
+- `scripts/validate-restore-readiness.js`
 - `scripts/validate-operational-readiness.js`
 - `scripts/validate-workflow-baseline.js`
 - `docs/production-operations-runbook.md`
+- `docs/restore-readiness-baseline.md`
 - `src/routes/health.routes.js`
 - `prisma/schema.prisma`
 - `.github/workflows/operational-smoke.yml`
 
 ## Variables y secretos requeridos
 Copie `.env.production.example` a `.env.production` y reemplace todos los placeholders.
+
+`.env.production.example` es un artefacto versionado del baseline productivo y `npm run validate:production-baseline` confirma que siga presente en el repositorio.
 
 Variables obligatorias del baseline:
 - `NODE_ENV=production`
@@ -28,10 +32,13 @@ Variables obligatorias del baseline:
 - `CORS_ORIGIN`
 - `APP_BASE_URL`
 - `JWT_SECRET`
+- `REDIS_URL`
 
 Notas:
 - `JWT_SECRET` debe ser real, no placeholder, y suficientemente largo.
 - `config.js` ya impide arrancar en producción con el secret inseguro por defecto.
+- `REDIS_URL` es obligatorio porque la persistencia soportada de browser sessions fuera de test usa Redis como store explícito.
+- La gobernanza del repositorio ahora conserva además un lane dedicado `redis-browser-session-tests` para validar explícitamente la ruta Redis fuera del suite agregado estable en memory mode.
 
 ## Flujo ejecutable mínimo
 Desde `inventory-api/`:
@@ -41,6 +48,7 @@ Desde `inventory-api/`:
 cp .env.production.example .env.production
 # editar .env.production
 npm run validate:production-baseline
+npm run validate:restore-readiness
 npm run validate:operational-readiness
 ```
 
@@ -56,7 +64,7 @@ docker compose -f docker-compose.prod.yml build
 
 ### 4. Levantar base de datos
 ```bash
-docker compose -f docker-compose.prod.yml up -d db
+docker compose -f docker-compose.prod.yml up -d db redis
 ```
 
 ### 5. Aplicar migraciones versionadas
@@ -85,6 +93,8 @@ Alcance del workflow:
 - `npm run build`
 - `node scripts/validate-workflow-baseline.js`
 - `npm run validate:production-baseline`
+- materialización temporal de `REDIS_URL` y `BROWSER_SESSION_STORE_MODE` junto con el `.env.production` temporal del smoke
+- `npm run validate:restore-readiness`
 - `npm run validate:operational-readiness`
 - materialización temporal de `.env.production` en el runner para satisfacer `env_file` del compose smoke
 - `docker compose -f docker-compose.prod.yml config`
@@ -104,6 +114,7 @@ Desde `inventory-api/` con Docker disponible:
 cp .env.production.example .env.production
 # editar .env.production
 npm run validate:production-baseline
+npm run validate:restore-readiness
 npm run validate:operational-readiness
 docker compose -f docker-compose.prod.yml config
 docker build -t inventory-api:operational-smoke .
@@ -116,7 +127,8 @@ docker build -t inventory-api:operational-smoke .
 
 ### Configuración de secretos / variables
 - El baseline requiere `.env.production` fuera de git.
-- La validación automatizada rechaza placeholders inseguros.
+- `.env.production.example` permanece versionado como plantilla contractual mínima del baseline.
+- La validación automatizada rechaza placeholders inseguros y confirma que el ejemplo versionado siga presente.
 
 ### Migraciones
 - El servicio `migrate` ejecuta `npm run prisma:deploy`.
@@ -125,14 +137,19 @@ docker build -t inventory-api:operational-smoke .
 ### Health / readiness
 - `Dockerfile` expone `HEALTHCHECK` contra `/health/ready`.
 - El runtime también conserva `/health` como liveness simple.
+- En el baseline soportado con `BROWSER_SESSION_STORE_MODE=redis`, `/health/ready` solo reporta listo cuando tanto la base de datos como el browser-session store respaldado por Redis están disponibles.
+- En memory mode de test o uso explícito, `/health/ready` sigue siendo compatible y reporta `browserSessionStore: memory` sin requerir Redis.
 
 ### Restore / runbook / observabilidad mínima
 - `docs/production-operations-runbook.md` documenta backup lógico, restore validation y checklist posterior al restore.
-- `scripts/validate-operational-readiness.js` valida que el runbook, las señales de observabilidad mínima y el workflow operativo sigan presentes.
+- `docs/restore-readiness-baseline.md` define el contrato versionado mínimo y público de restore readiness.
+- `scripts/validate-restore-readiness.js` valida que el contrato público de restore readiness, el runbook y el workflow operativo sigan alineados.
+- `scripts/validate-operational-readiness.js` valida el workflow operativo root junto con los documentos públicos `docs/production-baseline.md` y `docs/production-operations-runbook.md`.
 - El runtime ya emite `X-Request-Id`, logging estructurado fuera de development y contexto útil de error/request.
 
 ### Persistencia
 - PostgreSQL persiste en el volumen `postgres_data`.
+- Redis sostiene la persistencia soportada de browser sessions fuera de test y se referencia vía `REDIS_URL`.
 - Archivos operativos del runtime persisten en `app_storage`.
 
 ## Build/publicación controlada sin deploy
@@ -159,5 +176,6 @@ Límites explícitos del workflow:
 - No incluye TLS, reverse proxy ni certificados.
 - No incluye backups automatizados programados ni restore drill automático con datos reales persistidos.
 - No incluye observabilidad externa ni agregación de logs SaaS; sí preserva señales mínimas versionadas de health, requestId y logging estructurado.
+- El contrato público de restore readiness y operational readiness se valida desde artefactos versionados bajo `docs/`.
 - No reemplaza una estrategia cloud específica.
 - `docker-compose.prod.yml` es un baseline mínimo verificable, no una certificación de production-ready total.

@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Clientes</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Inventori</p>
+          <h2>Empresa</h2>
+        </div>
+        <nav class="sidebar-nav" aria-label="Navegacion principal">
+          <a class="sidebar-link" href="/root/dashboard.html">Dashboard</a>
+          <a class="sidebar-link" href="/root/users.html">Usuarios</a>
+          <a class="sidebar-link" href="/root/roles.html">Roles</a>
+          <a class="sidebar-link" href="/root/warehouses.html">Bodegas</a>
+          <a class="sidebar-link" href="/root/products.html">Productos</a>
+          <a class="sidebar-link" href="/root/zones.html">Zonas</a>
+          <a class="sidebar-link" href="/root/routes.html">Rutas</a>
+          <a class="sidebar-link active" href="/root/clients.html">Clientes</a>
+        </nav>
+      </aside>
+
+      <section class="card app-content clients-page">
+        <header class="page-header clients-header">
+          <div>
+            <p class="eyebrow">Comercial</p>
+            <h1>Clientes</h1>
+            <p id="clients-session" class="muted">Sesion activa</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="refresh-clients-button" class="secondary-button" type="button">Actualizar</button>
+            <button id="open-client-panel-button" type="button">Nuevo cliente</button>
+            <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+          </div>
+        </header>
+
+        <section class="clients-workspace">
+          <section class="client-command-bar" aria-label="Busqueda y filtros de clientes">
+            <label class="field client-search-field">
+              <span>Buscar cliente</span>
+              <input id="client-search-input" type="search" placeholder="Nombre, codigo, identificacion o telefono" />
+            </label>
+            <label class="field">
+              <span>Clasificacion</span>
+              <select id="client-classification-filter">
+                <option value="">Todas</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Estado</span>
+              <select id="client-status-filter">
+                <option value="">Todos</option>
+                <option value="missing-store">Sin tienda</option>
+                <option value="missing-fiscal">Sin datos fiscales</option>
+                <option value="with-credit">Credito</option>
+              </select>
+            </label>
+            <button id="clear-client-filters-button" class="secondary-button" type="button">Limpiar</button>
+          </section>
+
+          <section id="clients-summary" class="client-metrics" aria-label="Resumen de clientes">
+            <article class="dashboard-tile">
+              <span>Total</span>
+              <strong id="clients-total-count">0</strong>
+            </article>
+            <article class="dashboard-tile">
+              <span>Sin tienda</span>
+              <strong id="clients-without-store-count">0</strong>
+            </article>
+            <article class="dashboard-tile">
+              <span>Sin fiscal</span>
+              <strong id="clients-without-fiscal-count">0</strong>
+            </article>
+            <article class="dashboard-tile">
+              <span>Credito</span>
+              <strong id="clients-credit-count">0</strong>
+            </article>
+          </section>
+
+          <section class="clients-list-section">
+            <div class="section-title-row">
+              <div>
+                <h2>Clientes registrados</h2>
+                <p id="clients-results-label" class="muted">Cargando clientes...</p>
+              </div>
+            </div>
+
+            <div class="table-wrapper clients-table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Codigo</th>
+                    <th>Clasificacion</th>
+                    <th>Telefono</th>
+                    <th>Estado</th>
+                    <th>Tiendas</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="clients-body">
+                  <tr>
+                    <td class="empty-state" colspan="7">Cargando clientes...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <p id="clients-message" class="message" aria-live="polite"></p>
+        </section>
+      </section>
+    </main>
+
+    <div id="client-panel-backdrop" class="drawer-backdrop hidden" role="presentation"></div>
+    <aside id="client-panel" class="client-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="client-panel-title">
+      <header class="drawer-header">
+        <div>
+          <p class="eyebrow">Cliente</p>
+          <h2 id="client-panel-title">Nuevo cliente</h2>
+          <p id="client-panel-subtitle" class="muted">Complete primero los datos esenciales. Puede agregar tiendas antes de guardar.</p>
+        </div>
+        <button id="close-client-panel-button" class="secondary-button" type="button">Cerrar</button>
+      </header>
+
+      <nav class="tabs-nav drawer-tabs" aria-label="Secciones del cliente">
+        <button class="tab-button active" type="button" data-client-tab="general">General</button>
+        <button class="tab-button" type="button" data-client-tab="fiscal">Fiscal</button>
+        <button class="tab-button" type="button" data-client-tab="credit">Credito</button>
+        <button class="tab-button" type="button" data-client-tab="references">Referencias</button>
+        <button class="tab-button" type="button" data-client-tab="documents">Documentos</button>
+        <button class="tab-button" type="button" data-client-tab="stores">Tiendas</button>
+      </nav>
+
+      <section class="drawer-panel" data-client-panel="general">
+        <form id="client-form" class="pricing-grid">
+          <input name="clientId" type="hidden" />
+          <label class="field field-wide">
+            <span>Nombre comercial</span>
+            <input name="name" type="text" required />
+          </label>
+          <label class="field">
+            <span>Codigo cliente</span>
+            <input name="code" type="text" />
+          </label>
+          <label class="field">
+            <span>Clasificacion</span>
+            <select name="clientClassificationId">
+              <option value="">Sin clasificacion</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Telefono</span>
+            <input name="phone" type="text" />
+          </label>
+          <label class="field field-wide">
+            <span>Direccion</span>
+            <input name="address" type="text" />
+          </label>
+        </form>
+      </section>
+
+      <section class="drawer-panel hidden" data-client-panel="fiscal">
+        <div class="pricing-grid">
+          <label class="field">
+            <span>Razon social</span>
+            <input name="legalName" type="text" form="client-form" />
+          </label>
+          <label class="field">
+            <span>Nombre comercial fiscal</span>
+            <input name="commercialName" type="text" form="client-form" />
+          </label>
+          <label class="field">
+            <span>Tipo identificacion</span>
+            <select name="documentType" form="client-form">
+              <option value="01">Cedula fisica</option>
+              <option value="02">Cedula juridica</option>
+              <option value="03">DIMEX</option>
+              <option value="04">NITE</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Identificacion</span>
+            <input name="legalId" type="text" form="client-form" />
+          </label>
+          <div class="field">
+            <span>Hacienda</span>
+            <button id="lookup-taxpayer-button" class="secondary-button" type="button">Consultar identificacion</button>
+          </div>
+          <label class="field">
+            <span>Correo facturacion</span>
+            <input name="emailBilling" type="email" form="client-form" />
+          </label>
+          <label class="field">
+            <span>Codigo actividad</span>
+            <input name="economicActivityCode" type="text" list="economic-activity-options" form="client-form" />
+          </label>
+          <label class="field">
+            <span>Actividad economica</span>
+            <input name="economicActivityName" type="text" list="economic-activity-options" form="client-form" />
+            <datalist id="economic-activity-options"></datalist>
+          </label>
+        </div>
+      </section>
+
+      <section class="drawer-panel hidden" data-client-panel="credit">
+        <div class="pricing-grid">
+          <label class="field">
+            <span>Tipo de pago</span>
+            <select name="paymentType" form="client-form">
+              <option value="CASH">Contado</option>
+              <option value="CREDIT">Credito</option>
+              <option value="TRANSFER">Transferencia</option>
+              <option value="CARD">Tarjeta</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Dias de credito</span>
+            <input name="paymentDays" type="number" min="0" step="1" form="client-form" />
+          </label>
+          <label class="field">
+            <span>Limite de credito</span>
+            <input name="creditLimit" type="number" min="0" step="0.01" form="client-form" />
+          </label>
+          <label class="field">
+            <span>Deuda actual</span>
+            <input name="creditBalance" type="number" min="0" step="0.01" form="client-form" />
+          </label>
+        </div>
+      </section>
+
+      <section class="drawer-panel hidden" data-client-panel="references">
+        <form id="client-reference-form" class="pricing-grid">
+          <label class="field">
+            <span>Nombre referencia</span>
+            <input name="name" type="text" placeholder="Empresa o persona" />
+          </label>
+          <label class="field">
+            <span>Contacto</span>
+            <input name="contact" type="text" placeholder="Nombre del contacto" />
+          </label>
+          <label class="field">
+            <span>Telefono principal</span>
+            <input name="phone1" type="text" />
+          </label>
+          <label class="field">
+            <span>Telefono secundario</span>
+            <input name="phone2" type="text" />
+          </label>
+          <label class="field">
+            <span>Plazo (dias)</span>
+            <input name="termDays" type="number" min="0" step="1" />
+          </label>
+          <label class="field">
+            <span>Monto</span>
+            <input name="amount" type="number" min="0" step="0.01" />
+          </label>
+          <label class="field">
+            <span>Aprobado por</span>
+            <input name="approvedBy" type="text" placeholder="Nombre de aprobacion o validacion" />
+          </label>
+          <label class="field checkbox-field">
+            <span>Referencia aprobada</span>
+            <input name="approved" type="checkbox" />
+          </label>
+        </form>
+
+        <div class="import-actions drawer-inline-actions">
+          <button id="add-client-reference-button" class="secondary-button" type="submit" form="client-reference-form">Agregar referencia</button>
+        </div>
+
+        <section class="representative-panel">
+          <div>
+            <h3>Referencias pendientes</h3>
+            <p class="muted">Se guardaran como datos del cliente, no como archivos.</p>
+          </div>
+          <div id="pending-client-references-list" class="role-list"></div>
+        </section>
+
+        <section class="representative-panel">
+          <div>
+            <h3>Referencias ya guardadas</h3>
+            <p class="muted">Estas referencias tambien se muestran en el detalle del cliente.</p>
+          </div>
+          <div id="existing-client-references-list" class="role-list"></div>
+        </section>
+      </section>
+
+      <section class="drawer-panel hidden" data-client-panel="documents">
+        <form id="client-document-form" class="pricing-grid">
+          <label class="field">
+            <span>Tipo de documento</span>
+            <select id="client-document-type" name="documentType">
+              <option value="">Seleccione tipo</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Numero o referencia</span>
+            <input name="documentNumber" type="text" placeholder="Folio, consecutivo o identificador" />
+          </label>
+          <label class="field field-wide">
+            <span>Archivo</span>
+            <input id="client-document-file" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,application/pdf,image/png,image/jpeg,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+          </label>
+          <label class="field field-wide">
+            <span>Notas</span>
+            <input name="notes" type="text" placeholder="Observaciones sobre este documento" />
+          </label>
+        </form>
+
+        <div class="import-actions drawer-inline-actions">
+          <button id="add-client-document-button" class="secondary-button" type="submit" form="client-document-form">Agregar documento</button>
+        </div>
+
+        <section class="representative-panel">
+          <div>
+            <h3>Documentos pendientes por subir</h3>
+            <p class="muted">Estos archivos se guardaran cuando confirme el cliente.</p>
+          </div>
+          <div id="pending-client-documents-list" class="role-list"></div>
+        </section>
+
+        <section class="representative-panel">
+          <div>
+            <h3>Documentos ya guardados</h3>
+            <p class="muted">Disponible al editar o consultar el detalle del cliente.</p>
+          </div>
+          <div id="existing-client-documents-list" class="role-list"></div>
+        </section>
+      </section>
+
+      <section class="drawer-panel hidden" data-client-panel="stores">
+        <form id="store-form" class="pricing-grid">
+          <label class="field">
+            <span>Nombre tienda</span>
+            <input name="name" type="text" />
+          </label>
+          <label class="field">
+            <span>Codigo tienda</span>
+            <input name="code" type="text" />
+          </label>
+          <label class="field">
+            <span>Tipo tienda</span>
+            <input name="storeType" type="text" placeholder="Sucursal, supermercado, kiosco" />
+          </label>
+          <label class="field">
+            <span>Horario atencion</span>
+            <input name="attentionSchedule" type="text" placeholder="Lun-Sab 8:00 a 17:00" />
+          </label>
+          <label class="field">
+            <span>Zona</span>
+            <select name="regionId" required>
+              <option value="">Sin zona</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Subzona</span>
+            <select name="subregionId" required>
+              <option value="">Sin subzona</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Telefono</span>
+            <input name="phone" type="text" />
+          </label>
+          <label class="field field-wide">
+            <span>Direccion</span>
+            <input name="address" type="text" />
+          </label>
+          <label class="field field-wide">
+            <span>Referencia ubicacion</span>
+            <input name="locationReference" type="text" placeholder="Frente a..., contiguo a..., dentro de..." />
+          </label>
+          <label class="field">
+            <span>Latitud</span>
+            <input name="latitude" type="number" min="-90" max="90" step="0.0000001" placeholder="9.9280694" />
+          </label>
+          <label class="field">
+            <span>Longitud</span>
+            <input name="longitude" type="number" min="-180" max="180" step="0.0000001" placeholder="-84.0907246" />
+          </label>
+          <div class="field">
+            <span>Mapa</span>
+            <button id="open-store-map-button" class="secondary-button" type="button">Seleccionar en mapa</button>
+          </div>
+        </form>
+
+        <div class="import-actions drawer-inline-actions">
+          <button id="add-store-button" class="secondary-button" type="submit" form="store-form">Agregar tienda a la lista</button>
+        </div>
+
+        <section class="representative-panel">
+          <div>
+            <h3>Representantes y personal de esta tienda</h3>
+          </div>
+
+          <form id="representative-form" class="pricing-grid">
+            <label class="field">
+              <span>Nombre completo</span>
+              <input name="fullName" type="text" />
+            </label>
+            <label class="field">
+              <span>Identificacion</span>
+              <input name="identificationNumber" type="text" />
+            </label>
+            <label class="field">
+              <span>Cargo</span>
+              <input name="position" type="text" placeholder="Encargado, cajero, propietario" />
+            </label>
+            <label class="field">
+              <span>Rol en tienda</span>
+              <input name="role" type="text" placeholder="Compras, ventas, administracion" />
+            </label>
+            <label class="field">
+              <span>Correo</span>
+              <input name="email" type="email" />
+            </label>
+            <label class="field">
+              <span>Telefono principal</span>
+              <input name="phonePrimary" type="text" />
+            </label>
+            <label class="field">
+              <span>Telefono secundario</span>
+              <input name="phoneSecondary" type="text" />
+            </label>
+            <label class="field">
+              <span>Cumpleanos</span>
+              <input name="birthday" type="date" />
+            </label>
+            <label class="field">
+              <span>Fecha importante</span>
+              <input name="importantDate" type="date" />
+            </label>
+            <label class="field">
+              <span>Tipo fecha</span>
+              <input name="importantDateType" type="text" placeholder="Aniversario, visita, contrato" />
+            </label>
+            <label class="field field-wide">
+              <span>Comentario</span>
+              <input name="comment" type="text" />
+            </label>
+            <label class="field checkbox-field">
+              <span>Contacto principal</span>
+              <input name="isPrimaryContact" type="checkbox" />
+            </label>
+          </form>
+
+          <div class="import-actions drawer-inline-actions">
+            <button id="add-representative-button" class="secondary-button" type="submit" form="representative-form">Agregar personal</button>
+          </div>
+
+          <div id="pending-representatives-list" class="role-list"></div>
+        </section>
+
+        <div id="pending-stores-list" class="role-list"></div>
+      </section>
+
+      <footer class="drawer-footer">
+        <button id="cancel-client-panel-button" class="secondary-button" type="button">Cancelar</button>
+        <button id="create-client-button" type="submit" form="client-form">Guardar cliente</button>
+      </footer>
+    </aside>
+
+    <div id="store-map-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="store-map-title">
+      <section class="modal-card">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Ubicacion</p>
+            <h2 id="store-map-title">Seleccionar tienda en mapa</h2>
+          </div>
+          <button id="close-store-map-button" class="secondary-button" type="button">Cerrar</button>
+        </header>
+        <form id="map-search-form" class="map-search-form">
+          <label class="field">
+            <span>Buscar lugar</span>
+            <input name="query" type="search" placeholder="Ej. Curridabat, Multiplaza Escazu, Cartago centro" />
+          </label>
+          <button id="map-search-button" class="secondary-button" type="submit">Buscar</button>
+        </form>
+        <div id="map-search-results" class="map-search-results"></div>
+        <div id="store-map" class="map-picker"></div>
+        <div class="import-actions">
+          <button id="use-store-map-button" type="button">Usar ubicacion</button>
+          <p id="store-map-message" class="message" aria-live="polite"></p>
+        </div>
+      </section>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/shared/session.js"></script>
+    <script src="/shared/auth.js"></script>
+    <script src="/root/root-sidebar.js"></script>
+    <script src="/root/clients.shared.js"></script>
+    <script src="/root/clients.js"></script>
+  </body>
+</html>

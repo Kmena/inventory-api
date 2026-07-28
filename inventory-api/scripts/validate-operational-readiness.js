@@ -2,10 +2,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const repositoryRoot = path.join(__dirname, '..');
-const { internalDocsExist, writeSkip } = require('./internal-docs-optional');
-const runbookPath = path.join(repositoryRoot, 'internal-docs', 'production-operations-runbook.md');
-const productionBaselinePath = path.join(repositoryRoot, 'internal-docs', 'production-baseline.md');
-const workflowPath = path.join(repositoryRoot, '.github', 'workflows', 'operational-smoke.yml');
+const runbookPath = path.join(repositoryRoot, 'docs', 'production-operations-runbook.md');
+const productionBaselinePath = path.join(repositoryRoot, 'docs', 'production-baseline.md');
+const workflowPath = path.join(repositoryRoot, '..', '.github', 'workflows', 'operational-smoke.yml');
 const loggingPath = path.join(repositoryRoot, 'src', 'lib', 'logging.js');
 const requestContextPath = path.join(repositoryRoot, 'src', 'lib', 'request-context.js');
 
@@ -20,14 +19,6 @@ function assertPattern(source, pattern, message, failures) {
 }
 
 function main() {
-  if (!internalDocsExist([
-    'internal-docs/production-operations-runbook.md',
-    'internal-docs/production-baseline.md',
-  ])) {
-    writeSkip('Operational readiness validation skipped: internal-docs artifacts are not present.');
-    return;
-  }
-
   const failures = [];
 
   for (const requiredPath of [runbookPath, productionBaselinePath, workflowPath, loggingPath, requestContextPath]) {
@@ -61,6 +52,7 @@ function main() {
   assertPattern(productionBaselineSource, /production-operations-runbook\.md/, 'Production baseline must reference the operations runbook.', failures);
   assertPattern(productionBaselineSource, /validate:operational-readiness/, 'Production baseline must include operational readiness validation command.', failures);
   assertPattern(productionBaselineSource, /(## Medidas extra de hardening operativo versionadas|observabilidad mínima|señales mínimas versionadas)/i, 'Production baseline must document operational hardening or observability limits.', failures);
+  assertPattern(productionBaselineSource, /docs\/production-operations-runbook\.md|production-operations-runbook\.md/, 'Production baseline must keep the public runbook in the documented contract.', failures);
 
   assertPattern(workflowSource, /npm run validate:operational-readiness/, 'Operational smoke workflow must validate operational readiness.', failures);
   assertPattern(workflowSource, /rm -f \.env\.production/, 'Operational smoke workflow must clean up temporary production env materialization.', failures);

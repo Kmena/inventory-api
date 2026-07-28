@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Bodegas</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Inventori</p>
+          <h2>Empresa</h2>
+        </div>
+        <nav class="sidebar-nav" aria-label="Navegacion principal">
+          <a class="sidebar-link" href="/root/dashboard.html">Dashboard</a>
+          <a class="sidebar-link" href="/root/users.html">Usuarios</a>
+          <a class="sidebar-link" href="/root/roles.html">Roles</a>
+          <a class="sidebar-link active" href="/root/warehouses.html">Bodegas</a>
+          <a class="sidebar-link" href="/root/products.html">Productos</a>
+          <a class="sidebar-link" href="/root/zones.html">Zonas</a>
+          <a class="sidebar-link" href="/root/routes.html">Rutas</a>
+          <a class="sidebar-link" href="/root/clients.html">Clientes</a>
+          <a class="sidebar-link" href="/root/invoice-inconsistencies.html">Revision de facturas</a>
+        </nav>
+      </aside>
+
+      <section class="card app-content">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Inventario</p>
+            <h1>Bodegas</h1>
+            <p id="warehouses-session" class="muted">Sesion activa</p>
+          </div>
+          <div class="import-actions">
+            <button id="refresh-warehouses-button" class="secondary-button" type="button">Actualizar</button>
+            <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+          </div>
+        </header>
+
+        <section class="dashboard-grid">
+          <article class="dashboard-tile">
+            <span>Total</span>
+            <strong id="summary-total">0</strong>
+          </article>
+          <article class="dashboard-tile">
+            <span>Activas</span>
+            <strong id="summary-active">0</strong>
+          </article>
+          <article class="dashboard-tile">
+            <span>Despachables</span>
+            <strong id="summary-sellable">0</strong>
+          </article>
+          <article class="dashboard-tile">
+            <span>Virtuales</span>
+            <strong id="summary-virtual">0</strong>
+          </article>
+        </section>
+
+        <section class="import-panel">
+          <div>
+            <h2>Crear bodega</h2>
+            <p id="warehouse-type-hint" class="muted"></p>
+          </div>
+
+          <form id="warehouse-form" class="pricing-grid">
+            <label class="field">
+              <span>Codigo</span>
+              <input name="code" type="text" placeholder="BOD-PT" required />
+            </label>
+            <label class="field">
+              <span>Nombre</span>
+              <input name="name" type="text" placeholder="Bodega producto terminado" required />
+            </label>
+            <label class="field">
+              <span>Tipo</span>
+              <select name="warehouseType" required>
+                <option value="">Seleccione un tipo</option>
+              </select>
+            </label>
+            <label class="field checkbox-field">
+              <span>Es fuente de venta</span>
+              <input name="isSellableSource" type="checkbox" />
+            </label>
+            <label class="field checkbox-field">
+              <span>Activa</span>
+              <input name="isActive" type="checkbox" checked />
+            </label>
+          </form>
+
+          <div class="import-actions">
+            <button id="create-warehouse-button" type="submit" form="warehouse-form">Crear bodega</button>
+            <p id="warehouses-message" class="message" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <section class="import-panel">
+          <div>
+            <h2>Buscar bodegas</h2>
+          </div>
+
+          <form id="warehouse-filter-form" class="pricing-grid">
+            <label class="field">
+              <span>Buscar</span>
+              <input id="warehouse-search-input" name="search" type="text" placeholder="Nombre o codigo" />
+            </label>
+            <label class="field">
+              <span>Tipo</span>
+              <select id="warehouse-type-filter" name="warehouseType">
+                <option value="">Todos</option>
+              </select>
+            </label>
+          </form>
+        </section>
+
+        <section>
+          <div class="section-title-row">
+            <h2>Bodegas registradas</h2>
+          </div>
+
+          <div id="warehouses-list" class="role-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/shared/session.js"></script>
+    <script src="/shared/auth.js"></script>
+    <script src="/root/root-sidebar.js"></script>
+    <script src="/root/warehouses.js"></script>
+  </body>
+</html>

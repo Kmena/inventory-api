@@ -237,11 +237,15 @@ async function createCompanyRoute(payload, auth) {
 
 async function updateCompanyRoute(routeId, payload, auth) {
   assertCompanyUser(auth);
+  const companyId = BigInt(auth.companyId);
   await getCompanyRouteDetail(routeId, auth);
   const data = normalizeRoutePayload(payload);
 
   try {
-    const route = await salesRouteRepository.updateCompanyRoute(routeId, data);
+    const route = await salesRouteRepository.updateCompanyRoute(routeId, companyId, data);
+    if (!route) {
+      throw createHttpError(404, 'Ruta no encontrada', 'not_found');
+    }
     return serializeRoute(route);
   } catch (error) {
     if (error.code === 'P2002') {

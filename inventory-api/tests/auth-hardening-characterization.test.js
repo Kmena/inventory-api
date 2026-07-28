@@ -79,6 +79,10 @@ async function postLogin(baseUrl, body) {
   });
 }
 
+async function get(baseUrl, pathName) {
+  return fetch(`${baseUrl}${pathName}`);
+}
+
 function getRouteMiddleware(router, pathName, method, index) {
   const layer = router.stack.find((entry) => entry.route && entry.route.path === pathName && entry.route.methods[method]);
   assert.ok(layer, `${method.toUpperCase()} ${pathName} route should exist`);
@@ -113,6 +117,38 @@ async function runThrottleMiddleware(middleware, reqOverrides = {}) {
     responseHeaders,
   };
 }
+
+test('public login, no-access and retired legacy html routes all receive the strict CSP baseline', async () => {
+  await withHttpServer(async (baseUrl) => {
+    const loginResponse = await get(baseUrl, '/');
+    const noAccessResponse = await get(baseUrl, '/no-access.html');
+    const migrationResponse = await get(baseUrl, '/migration.html');
+    const retiredLegacyResponse = await get(baseUrl, '/root/clients.html');
+
+    const loginCsp = loginResponse.headers.get('content-security-policy');
+    const noAccessCsp = noAccessResponse.headers.get('content-security-policy');
+    const migrationCsp = migrationResponse.headers.get('content-security-policy');
+    const retiredLegacyCsp = retiredLegacyResponse.headers.get('content-security-policy');
+
+    for (const headerResponse of [loginResponse, noAccessResponse, migrationResponse, retiredLegacyResponse]) {
+      assert.equal(headerResponse.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+      assert.equal(headerResponse.headers.get('x-content-type-options'), 'nosniff');
+      assert.equal(headerResponse.headers.get('x-frame-options'), 'DENY');
+    }
+
+    assert.equal(retiredLegacyResponse.status, 410);
+    assert.match(loginCsp, /default-src 'self'/);
+    assert.match(loginCsp, /script-src 'self'/);
+    assert.match(loginCsp, /style-src 'self'/);
+    assert.match(loginCsp, /connect-src 'self'/);
+    assert.doesNotMatch(loginCsp, /unpkg\.com/);
+    assert.doesNotMatch(loginCsp, /cdn\.jsdelivr\.net/);
+    assert.doesNotMatch(loginCsp, /nominatim\.openstreetmap\.org/);
+    assert.equal(noAccessCsp, loginCsp);
+    assert.equal(migrationCsp, loginCsp);
+    assert.equal(retiredLegacyCsp, loginCsp);
+  });
+});
 
 test('POST /api/auth/login throttles repeated failed attempts with 429 and Retry-After', async () => {
   resetLoginThrottleStateForTests();

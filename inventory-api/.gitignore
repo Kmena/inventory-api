@@ -2,6 +2,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.production.example
 coverage/
 dist/
 build/
@@ -25,9 +26,16 @@ prisma/dev.db
 # Keep the audit directory ignored in public mode.
 docs/audit/**
 
-# Internal/private technical artifacts kept out of the public repo.
-internal-docs/**
+# Internal auxiliary technical artifacts kept out of the reviewed contract baseline.
+internal-docs/generated/**
+internal-docs/tmp/**
+internal-docs/cache/**
+
+# Temporary test artifacts.
+tests/tmp-prisma-lock-*/
 
 # Local planning / cleanup scratch files.
 commit-plan-*.md
 docs-cleanup-report.md
+
+specs/*

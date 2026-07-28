@@ -1,0 +1,1346 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "inventory-api runtime baseline",
+    "version": "0.5.0",
+    "description": "Baseline OpenAPI parcial y factual para superficies críticas verificadas en runtime. No cubre todo el monolito y se complementa con un manifiesto explícito de exclusiones contractuales."
+  },
+  "x-coverage-scope": {
+    "coverage": "partial",
+    "domains": [
+      "health",
+      "auth",
+      "companies/users/roles",
+      "clients",
+      "agent workspace",
+      "external integrations",
+      "payments lifecycle",
+      "inventory alerts",
+      "products",
+      "orders",
+      "invoices",
+      "warehouses",
+      "regions",
+      "sales-routes"
+    ],
+    "contractClassification": {
+      "coveredOperationsArtifact": "internal-docs/openapi/runtime-baseline.openapi.json",
+      "excludedOperationsArtifact": "internal-docs/runtime-contract-manifest.json",
+      "runtimeCatalogArtifact": "internal-docs/runtime-endpoint-catalog.md",
+      "criticalContractMatrixArtifact": "internal-docs/critical-contract-matrix.json",
+      "classificationRule": "Toda operación montada en routers debe estar cubierta aquí mediante x-runtime-source o listada explícitamente como exclusión intencional en el manifiesto contractual.",
+      "notes": [
+        "OpenAPI sigue siendo parcial y factual.",
+        "Las exclusiones explícitas no implican endpoints no soportados; implican superficies runtime fuera del recorte contractual actual.",
+        "La UI embebida servida por express.static se gobierna fuera de OpenAPI mediante pruebas y documentación dedicadas."
+      ]
+    },
+    "exclusions": [
+      "operaciones runtime listadas explícitamente en internal-docs/runtime-contract-manifest.json",
+      "superficies no-HTTP-documentadas de browser/runtime público gobernadas fuera de OpenAPI",
+      "cobertura total del monolito"
+    ]
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Liveness del servicio",
+        "tags": ["health"],
+        "x-runtime-source": {
+          "mountPath": "/health",
+          "routeFile": "src/routes/health.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "200": {
+            "description": "Servicio activo"
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "getHealthReady",
+        "summary": "Readiness con chequeo de base de datos",
+        "tags": ["health"],
+        "x-runtime-source": {
+          "mountPath": "/health",
+          "routeFile": "src/routes/health.routes.js",
+          "expressPath": "/ready"
+        },
+        "responses": {
+          "200": { "description": "Dependencias disponibles" },
+          "503": { "description": "Dependencias no disponibles" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Autenticar usuario con throttle de credenciales",
+        "description": "Endpoint público sensible protegido por login throttle y payload pequeño.",
+        "tags": ["auth"],
+        "x-runtime-source": {
+          "mountPath": "/api/auth",
+          "routeFile": "src/routes/auth.routes.js",
+          "expressPath": "/login"
+        },
+        "responses": {
+          "200": { "description": "Login exitoso" },
+          "401": { "description": "Credenciales inválidas" },
+          "429": { "description": "Demasiados intentos de login" }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "getAuthenticatedActor",
+        "summary": "Consultar actor autenticado actual",
+        "tags": ["auth"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/auth",
+          "routeFile": "src/routes/auth.routes.js",
+          "expressPath": "/me"
+        },
+        "responses": {
+          "200": { "description": "Contexto autenticado" },
+          "401": { "description": "Token faltante o inválido" }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "logoutBrowserOrBearerSession",
+        "summary": "Cerrar la sesión autenticada actual",
+        "tags": ["auth"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/auth",
+          "routeFile": "src/routes/auth.routes.js",
+          "expressPath": "/logout"
+        },
+        "responses": {
+          "204": { "description": "Sesión cerrada" },
+          "401": { "description": "Sesión faltante o inválida" }
+        }
+      }
+    },
+    "/api/companies/root/dashboard": {
+      "get": {
+        "operationId": "getRootDashboardLegacyAlias",
+        "summary": "Alias legacy engañoso aún soportado para dashboard ejecutivo de compañía",
+        "description": "Ruta preservada por compatibilidad. Aunque contiene `/root/`, en runtime resuelve el mismo dashboard ejecutivo de compañía que `/api/companies/company/dashboard` y no un dashboard root global.",
+        "tags": ["companies"],
+        "security": [{ "bearerAuth": [] }],
+        "x-compatibility": {
+          "status": "legacy-alias",
+          "preferredPath": "/api/companies/company/dashboard",
+          "removalStrategy": "preserve-until-canonical-contract-review"
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/companies",
+          "routeFile": "src/routes/company.routes.js",
+          "expressPath": "/root/dashboard"
+        },
+        "responses": {
+          "200": { "description": "Dashboard ejecutivo" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/companies/company/dashboard": {
+      "get": {
+        "operationId": "getCompanyDashboardPreferredAlias",
+        "summary": "Alias semántico preferido para dashboard ejecutivo de compañía",
+        "description": "Ruta recomendada para administradores de empresa sobre su propio tenant.",
+        "tags": ["companies"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/companies",
+          "routeFile": "src/routes/company.routes.js",
+          "expressPath": "/company/dashboard"
+        },
+        "responses": {
+          "200": { "description": "Dashboard ejecutivo" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/companies": {
+      "get": {
+        "operationId": "listCompaniesLegacyGlobalShape",
+        "summary": "Ruta global legacy preservada para listado root de empresas",
+        "description": "Superficie histórica preservada. Mantiene semántica root/global y no debe reinterpretarse como listado tenant-admin.",
+        "tags": ["companies"],
+        "security": [{ "bearerAuth": [] }],
+        "x-compatibility": {
+          "status": "legacy-global-shape",
+          "preferredPath": "/api/companies/root/companies",
+          "removalStrategy": "preserve-while-root-consumers-exist"
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/companies",
+          "routeFile": "src/routes/company.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "200": { "description": "Listado global de empresas para root" },
+          "403": { "description": "Sin permisos root" }
+        }
+      },
+      "post": {
+        "operationId": "createCompanyLegacyGlobalShape",
+        "summary": "Ruta global legacy preservada para registro root de empresas",
+        "description": "Superficie histórica preservada. Mantiene semántica root/global y no debe reinterpretarse como alta tenant-admin.",
+        "tags": ["companies"],
+        "security": [{ "bearerAuth": [] }],
+        "x-compatibility": {
+          "status": "legacy-global-shape",
+          "preferredPath": "/api/companies/root/companies",
+          "removalStrategy": "preserve-while-root-consumers-exist"
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/companies",
+          "routeFile": "src/routes/company.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "201": { "description": "Empresa creada vía forma global legacy" },
+          "403": { "description": "Sin permisos root" }
+        }
+      }
+    },
+    "/api/companies/root/companies": {
+      "get": {
+        "operationId": "listCompaniesForRoot",
+        "summary": "Listar empresas para root global",
+        "tags": ["companies"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/companies",
+          "routeFile": "src/routes/company.routes.js",
+          "expressPath": "/root/companies"
+        },
+        "responses": {
+          "200": { "description": "Listado de empresas" },
+          "403": { "description": "Sin permisos root" }
+        }
+      },
+      "post": {
+        "operationId": "createRootCompany",
+        "summary": "Registrar empresa desde flujo root",
+        "tags": ["companies"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/companies",
+          "routeFile": "src/routes/company.routes.js",
+          "expressPath": "/root/companies"
+        },
+        "responses": {
+          "201": { "description": "Empresa creada" },
+          "403": { "description": "Sin permisos root" }
+        }
+      }
+    },
+    "/api/companies/root/companies/{companyId}/status": {
+      "patch": {
+        "operationId": "updateRootCompanyStatus",
+        "summary": "Activar o deshabilitar empresa desde root",
+        "tags": ["companies"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/companies",
+          "routeFile": "src/routes/company.routes.js",
+          "expressPath": "/root/companies/:companyId/status"
+        },
+        "responses": {
+          "200": { "description": "Estado actualizado" },
+          "403": { "description": "Sin permisos root" },
+          "404": { "description": "Empresa no encontrada" }
+        }
+      }
+    },
+    "/api/roles/permissions": {
+      "get": {
+        "operationId": "listRolePermissions",
+        "summary": "Listar permisos asignables para roles de compañía",
+        "tags": ["roles"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/roles",
+          "routeFile": "src/routes/role.routes.js",
+          "expressPath": "/permissions"
+        },
+        "responses": {
+          "200": { "description": "Listado de permisos" },
+          "403": { "description": "Sin permisos admin" }
+        }
+      }
+    },
+    "/api/roles/company": {
+      "get": {
+        "operationId": "listCompanyRoles",
+        "summary": "Listar roles asignables de compañía",
+        "tags": ["roles"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/roles",
+          "routeFile": "src/routes/role.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "200": { "description": "Listado de roles" },
+          "403": { "description": "Sin permisos admin" }
+        }
+      },
+      "post": {
+        "operationId": "createCompanyRole",
+        "summary": "Crear rol personalizado de compañía",
+        "tags": ["roles"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/roles",
+          "routeFile": "src/routes/role.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "201": { "description": "Rol creado" },
+          "403": { "description": "Sin permisos admin" }
+        }
+      }
+    },
+    "/api/users/company": {
+      "get": {
+        "operationId": "listCompanyUsers",
+        "summary": "Listar usuarios de la empresa autenticada",
+        "tags": ["users"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/users",
+          "routeFile": "src/routes/user.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "200": { "description": "Listado de usuarios" },
+          "403": { "description": "Sin permisos admin" }
+        }
+      },
+      "post": {
+        "operationId": "createCompanyUser",
+        "summary": "Registrar usuario en la empresa autenticada",
+        "tags": ["users"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/users",
+          "routeFile": "src/routes/user.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "201": { "description": "Usuario creado" },
+          "403": { "description": "Sin permisos admin" }
+        }
+      }
+    },
+    "/api/clients/company": {
+      "get": {
+        "operationId": "listCompanyClients",
+        "summary": "Listar clientes visibles de la empresa autenticada",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "200": { "description": "Listado de clientes" },
+          "403": { "description": "Sin permisos" }
+        }
+      },
+      "post": {
+        "operationId": "createCompanyClient",
+        "summary": "Registrar cliente para la empresa autenticada",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "201": { "description": "Cliente creado" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/clients/classifications/company": {
+      "get": {
+        "operationId": "listCompanyClientClassifications",
+        "summary": "Listar clasificaciones de clientes de la empresa autenticada",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/classifications/company"
+        },
+        "responses": {
+          "200": { "description": "Listado de clasificaciones" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/clients/document-types": {
+      "get": {
+        "operationId": "listClientDocumentTypes",
+        "summary": "Listar tipos de documento soportados para clientes",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/document-types"
+        },
+        "responses": {
+          "200": { "description": "Listado de tipos de documento" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/clients/company/{clientId}/stores": {
+      "post": {
+        "operationId": "createCompanyClientStore",
+        "summary": "Registrar tienda para un cliente visible de la empresa autenticada",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/company/:clientId/stores"
+        },
+        "responses": {
+          "201": { "description": "Tienda creada" },
+          "403": { "description": "Sin permisos" },
+          "404": { "description": "Cliente no encontrado" }
+        }
+      }
+    },
+    "/api/clients/{clientId}/references": {
+      "post": {
+        "operationId": "createClientReference",
+        "summary": "Registrar referencia de cliente",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/:clientId/references"
+        },
+        "responses": {
+          "201": { "description": "Referencia creada" },
+          "403": { "description": "Sin permisos" },
+          "404": { "description": "Cliente no encontrado" }
+        }
+      }
+    },
+    "/api/clients": {
+      "post": {
+        "operationId": "createClientLegacyAlias",
+        "summary": "Alias legacy preservado para crear clientes de compañía",
+        "description": "Ruta histórica preservada por compatibilidad. Se prefiere `/api/clients/company` para documentación y consumidores nuevos.",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-compatibility": {
+          "status": "legacy-alias",
+          "preferredPath": "/api/clients/company",
+          "removalStrategy": "preserve-until-broader-contract-coverage"
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "201": { "description": "Cliente creado vía alias legacy" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/clients/{id}": {
+      "get": {
+        "operationId": "getClient",
+        "summary": "Consultar detalle de cliente",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/:id"
+        },
+        "responses": {
+          "200": { "description": "Detalle de cliente" },
+          "404": { "description": "Cliente no encontrado" }
+        }
+      },
+      "put": {
+        "operationId": "updateClient",
+        "summary": "Actualizar cliente visible para la empresa autenticada",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/:id"
+        },
+        "responses": {
+          "200": { "description": "Cliente actualizado" },
+          "404": { "description": "Cliente no encontrado" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteClient",
+        "summary": "Eliminar cliente desde rol admin de compañía",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/:id"
+        },
+        "responses": {
+          "204": { "description": "Cliente eliminado" },
+          "403": { "description": "Sin permisos admin" }
+        }
+      }
+    },
+    "/api/clients/{clientId}/documents": {
+      "post": {
+        "operationId": "uploadClientDocument",
+        "summary": "Registrar documento privado de cliente",
+        "description": "Superficie de payload alto justificado por carga base64 documentada.",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/:clientId/documents"
+        },
+        "responses": {
+          "201": { "description": "Documento registrado" },
+          "403": { "description": "Sin permisos" },
+          "413": { "description": "Payload demasiado grande" }
+        }
+      }
+    },
+    "/api/clients/{clientId}/documents/{documentId}/download": {
+      "get": {
+        "operationId": "downloadClientDocument",
+        "summary": "Descargar documento privado de cliente",
+        "tags": ["clients"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/:clientId/documents/:documentId/download"
+        },
+        "responses": {
+          "200": { "description": "Descarga autorizada" },
+          "403": { "description": "Sin permisos o fuera del tenant" },
+          "404": { "description": "Documento no encontrado" }
+        }
+      }
+    },
+    "/api/products": {
+      "get": {
+        "operationId": "listProducts",
+        "summary": "Listar productos visibles para la empresa autenticada",
+        "tags": ["products"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/products",
+          "routeFile": "src/routes/product.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "200": { "description": "Listado de productos" },
+          "403": { "description": "Sin permisos" }
+        }
+      },
+      "post": {
+        "operationId": "createProduct",
+        "summary": "Registrar producto para la empresa autenticada",
+        "tags": ["products"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/products",
+          "routeFile": "src/routes/product.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "201": { "description": "Producto creado" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/products/import": {
+      "post": {
+        "operationId": "importProducts",
+        "summary": "Importar productos con payload alto justificado",
+        "tags": ["products"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/products",
+          "routeFile": "src/routes/product.routes.js",
+          "expressPath": "/import"
+        },
+        "responses": {
+          "200": { "description": "Importación procesada" },
+          "403": { "description": "Sin permisos de importación" }
+        }
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "operationId": "listOrders",
+        "summary": "Listar pedidos visibles para roles operativos habilitados",
+        "tags": ["orders"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/orders",
+          "routeFile": "src/routes/order.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "200": { "description": "Listado de pedidos" },
+          "403": { "description": "Sin permisos" }
+        }
+      },
+      "post": {
+        "operationId": "createOrder",
+        "summary": "Registrar pedido de ventas",
+        "tags": ["orders"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/orders",
+          "routeFile": "src/routes/order.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "201": { "description": "Pedido creado" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/invoices": {
+      "get": {
+        "operationId": "listInvoices",
+        "summary": "Listar facturas visibles para la empresa autenticada",
+        "tags": ["invoices"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/invoices",
+          "routeFile": "src/routes/invoice.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "200": { "description": "Listado de facturas" },
+          "403": { "description": "Sin permisos" }
+        }
+      },
+      "post": {
+        "operationId": "createInvoice",
+        "summary": "Registrar factura para la empresa autenticada",
+        "tags": ["invoices"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/invoices",
+          "routeFile": "src/routes/invoice.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "201": { "description": "Factura creada" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/invoices/inconsistencies": {
+      "get": {
+        "operationId": "listInvoiceDebtInconsistencies",
+        "summary": "Listar inconsistencias de deuda de facturas para administración",
+        "tags": ["invoices"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/invoices",
+          "routeFile": "src/routes/invoice.routes.js",
+          "expressPath": "/inconsistencies"
+        },
+        "responses": {
+          "200": { "description": "Listado de inconsistencias" },
+          "403": { "description": "Sin permisos admin" }
+        }
+      }
+    },
+    "/api/warehouses/company": {
+      "get": {
+        "operationId": "listCompanyWarehouses",
+        "summary": "Listar bodegas de la empresa autenticada",
+        "tags": ["warehouses"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/warehouses",
+          "routeFile": "src/routes/warehouse.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "200": { "description": "Listado de bodegas" },
+          "403": { "description": "Sin permisos" }
+        }
+      },
+      "post": {
+        "operationId": "createCompanyWarehouse",
+        "summary": "Registrar bodega para la empresa autenticada",
+        "tags": ["warehouses"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/warehouses",
+          "routeFile": "src/routes/warehouse.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "201": { "description": "Bodega creada" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/regions/company": {
+      "get": {
+        "operationId": "listCompanyRegions",
+        "summary": "Listar regiones de la empresa autenticada",
+        "tags": ["regions"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/regions",
+          "routeFile": "src/routes/region.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "200": { "description": "Listado de regiones" },
+          "403": { "description": "Sin permisos admin" }
+        }
+      },
+      "post": {
+        "operationId": "createCompanyRegion",
+        "summary": "Registrar región para la empresa autenticada",
+        "tags": ["regions"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/regions",
+          "routeFile": "src/routes/region.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "201": { "description": "Región creada" },
+          "403": { "description": "Sin permisos admin" }
+        }
+      }
+    },
+    "/api/regions/company/{regionId}/subregions": {
+      "post": {
+        "operationId": "createCompanySubregion",
+        "summary": "Registrar subregión para una región de la empresa autenticada",
+        "tags": ["regions"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/regions",
+          "routeFile": "src/routes/region.routes.js",
+          "expressPath": "/company/:regionId/subregions"
+        },
+        "responses": {
+          "201": { "description": "Subregión creada" },
+          "403": { "description": "Sin permisos admin" }
+        }
+      }
+    },
+    "/api/sales-routes/company": {
+      "get": {
+        "operationId": "listCompanySalesRoutes",
+        "summary": "Listar rutas comerciales de la empresa autenticada",
+        "tags": ["sales-routes"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/sales-routes",
+          "routeFile": "src/routes/sales-route.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "200": { "description": "Listado de rutas" },
+          "403": { "description": "Sin permisos" }
+        }
+      },
+      "post": {
+        "operationId": "createCompanySalesRoute",
+        "summary": "Registrar ruta comercial para la empresa autenticada",
+        "tags": ["sales-routes"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/sales-routes",
+          "routeFile": "src/routes/sales-route.routes.js",
+          "expressPath": "/company"
+        },
+        "responses": {
+          "201": { "description": "Ruta creada" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/sales-routes/company/{routeId}": {
+      "get": {
+        "operationId": "getCompanySalesRouteDetail",
+        "summary": "Consultar detalle de ruta comercial",
+        "tags": ["sales-routes"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/sales-routes",
+          "routeFile": "src/routes/sales-route.routes.js",
+          "expressPath": "/company/:routeId"
+        },
+        "responses": {
+          "200": { "description": "Detalle de ruta" },
+          "403": { "description": "Sin permisos" }
+        }
+      },
+      "put": {
+        "operationId": "updateCompanySalesRoute",
+        "summary": "Actualizar ruta comercial de la empresa autenticada",
+        "tags": ["sales-routes"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/sales-routes",
+          "routeFile": "src/routes/sales-route.routes.js",
+          "expressPath": "/company/:routeId"
+        },
+        "responses": {
+          "200": { "description": "Ruta actualizada" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/sales-routes/company/{routeId}/assignments": {
+      "put": {
+        "operationId": "saveCompanySalesRouteAssignments",
+        "summary": "Guardar asignaciones de una ruta comercial",
+        "tags": ["sales-routes"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/sales-routes",
+          "routeFile": "src/routes/sales-route.routes.js",
+          "expressPath": "/company/:routeId/assignments"
+        },
+        "responses": {
+          "200": { "description": "Asignaciones actualizadas" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/sales-routes/company/agents/{userId}/goals": {
+      "put": {
+        "operationId": "saveCompanySalesRouteAgentGoals",
+        "summary": "Guardar metas de agente para rutas comerciales",
+        "tags": ["sales-routes"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/sales-routes",
+          "routeFile": "src/routes/sales-route.routes.js",
+          "expressPath": "/company/agents/:userId/goals"
+        },
+        "responses": {
+          "200": { "description": "Metas actualizadas" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/geocoding/search": {
+      "get": {
+        "operationId": "searchGeocodingPlaces",
+        "summary": "Buscar lugares con throttle de lookup autenticado",
+        "tags": ["external-integrations"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/geocoding",
+          "routeFile": "src/routes/geocoding.routes.js",
+          "expressPath": "/search"
+        },
+        "responses": {
+          "200": { "description": "Resultados normalizados" },
+          "400": { "description": "Consulta inválida" },
+          "429": { "description": "Demasiadas consultas de geocodificación" },
+          "502": { "description": "Proveedor geocoding no disponible" }
+        }
+      }
+    },
+    "/api/taxpayers/lookup": {
+      "get": {
+        "operationId": "lookupTaxpayer",
+        "summary": "Consultar datos tributarios con throttle autenticado",
+        "tags": ["external-integrations"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/taxpayers",
+          "routeFile": "src/routes/taxpayer.routes.js",
+          "expressPath": "/lookup"
+        },
+        "responses": {
+          "200": { "description": "Contribuyente normalizado" },
+          "400": { "description": "Identificación inválida" },
+          "404": { "description": "No encontrado" },
+          "429": { "description": "Demasiadas consultas tributarias" },
+          "502": { "description": "Proveedor tributario no disponible" }
+        }
+      }
+    },
+    "/api/agent/dashboard": {
+      "get": {
+        "operationId": "getAgentDashboard",
+        "summary": "Consultar dashboard del workspace de agente",
+        "tags": ["agent-workspace"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/agent",
+          "routeFile": "src/routes/agent.routes.js",
+          "expressPath": "/dashboard"
+        },
+        "responses": {
+          "200": { "description": "Dashboard de agente" },
+          "401": { "description": "Token faltante o inválido" }
+        }
+      }
+    },
+    "/api/agent/stores": {
+      "get": {
+        "operationId": "listAgentStores",
+        "summary": "Listar tiendas visibles en el workspace del agente",
+        "tags": ["agent-workspace"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/agent",
+          "routeFile": "src/routes/agent.routes.js",
+          "expressPath": "/stores"
+        },
+        "responses": {
+          "200": { "description": "Listado de tiendas" },
+          "401": { "description": "Token faltante o inválido" }
+        }
+      }
+    },
+    "/api/agent/stores/{storeId}": {
+      "get": {
+        "operationId": "getAgentStoreDetail",
+        "summary": "Consultar detalle de tienda en workspace de agente",
+        "tags": ["agent-workspace"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/agent",
+          "routeFile": "src/routes/agent.routes.js",
+          "expressPath": "/stores/:storeId"
+        },
+        "responses": {
+          "200": { "description": "Detalle de tienda" },
+          "404": { "description": "Tienda no encontrada" }
+        }
+      }
+    },
+    "/api/agent/stores/{storeId}/order-context": {
+      "get": {
+        "operationId": "getAgentStoreOrderContext",
+        "summary": "Consultar contexto de pedido de una tienda",
+        "tags": ["agent-workspace"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/agent",
+          "routeFile": "src/routes/agent.routes.js",
+          "expressPath": "/stores/:storeId/order-context"
+        },
+        "responses": {
+          "200": { "description": "Contexto de pedido" },
+          "404": { "description": "Tienda no encontrada" }
+        }
+      }
+    },
+    "/api/agent/stores/{storeId}/orders": {
+      "post": {
+        "operationId": "createAgentStoreOrder",
+        "summary": "Crear pedido de agente para una tienda",
+        "tags": ["agent-workspace"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/agent",
+          "routeFile": "src/routes/agent.routes.js",
+          "expressPath": "/stores/:storeId/orders"
+        },
+        "responses": {
+          "201": { "description": "Pedido creado" },
+          "401": { "description": "Token faltante o inválido" },
+          "403": { "description": "Fuera del tenant o permisos insuficientes" }
+        }
+      }
+    },
+    "/api/agent/visits": {
+      "get": {
+        "operationId": "listAgentVisits",
+        "summary": "Listar visitas registradas del agente",
+        "tags": ["agent-workspace"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/agent",
+          "routeFile": "src/routes/agent.routes.js",
+          "expressPath": "/visits"
+        },
+        "responses": {
+          "200": { "description": "Listado de visitas" },
+          "401": { "description": "Token faltante o inválido" }
+        }
+      },
+      "post": {
+        "operationId": "createAgentVisit",
+        "summary": "Registrar visita del agente",
+        "tags": ["agent-workspace"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/agent",
+          "routeFile": "src/routes/agent.routes.js",
+          "expressPath": "/visits"
+        },
+        "responses": {
+          "201": { "description": "Visita registrada" },
+          "401": { "description": "Token faltante o inválido" }
+        }
+      }
+    },
+    "/api/payments": {
+      "get": {
+        "operationId": "listPayments",
+        "summary": "Listar pagos visibles para el actor autenticado",
+        "tags": ["payments"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/payments",
+          "routeFile": "src/routes/payment.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "200": { "description": "Listado de pagos" },
+          "403": { "description": "Sin permisos" }
+        }
+      },
+      "post": {
+        "operationId": "createPayment",
+        "summary": "Registrar pago pendiente de aprobación",
+        "description": "Superficie de payload alto justificado por comprobante opcional base64.",
+        "tags": ["payments"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/payments",
+          "routeFile": "src/routes/payment.routes.js",
+          "expressPath": "/"
+        },
+        "responses": {
+          "201": { "description": "Pago registrado" },
+          "403": { "description": "Sin permisos" },
+          "413": { "description": "Payload demasiado grande" }
+        }
+      }
+    },
+    "/api/payments/{id}": {
+      "get": {
+        "operationId": "getPayment",
+        "summary": "Consultar detalle de pago",
+        "tags": ["payments"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/payments",
+          "routeFile": "src/routes/payment.routes.js",
+          "expressPath": "/:id"
+        },
+        "responses": {
+          "200": { "description": "Detalle de pago" },
+          "404": { "description": "Pago no encontrado" }
+        }
+      },
+      "put": {
+        "operationId": "updatePayment",
+        "summary": "Editar pago aún editable",
+        "tags": ["payments"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/payments",
+          "routeFile": "src/routes/payment.routes.js",
+          "expressPath": "/:id"
+        },
+        "responses": {
+          "200": { "description": "Pago actualizado" },
+          "404": { "description": "Pago no encontrado" }
+        }
+      },
+      "delete": {
+        "operationId": "deletePaymentCompatibilityReverse",
+        "summary": "Compatibilidad de delete que internamente reversa pagos aprobados",
+        "tags": ["payments"],
+        "security": [{ "bearerAuth": [] }],
+        "x-compatibility": {
+          "status": "compatibility-delete-reverse",
+          "preferredPath": "/api/payments/{id}/reverse",
+          "removalStrategy": "preserve-while-delete-consumers-exist"
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/payments",
+          "routeFile": "src/routes/payment.routes.js",
+          "expressPath": "/:id"
+        },
+        "responses": {
+          "204": { "description": "Pago reversado vía flujo de compatibilidad" },
+          "409": { "description": "El pago no puede reversarse" }
+        }
+      }
+    },
+    "/api/payments/{id}/under-review": {
+      "post": {
+        "operationId": "markPaymentUnderReview",
+        "summary": "Mover pago a revisión",
+        "tags": ["payments"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/payments",
+          "routeFile": "src/routes/payment.routes.js",
+          "expressPath": "/:id/under-review"
+        },
+        "responses": {
+          "200": { "description": "Pago en revisión" },
+          "409": { "description": "Transición inválida" }
+        }
+      }
+    },
+    "/api/payments/{id}/approve": {
+      "post": {
+        "operationId": "approvePayment",
+        "summary": "Aprobar pago",
+        "tags": ["payments"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/payments",
+          "routeFile": "src/routes/payment.routes.js",
+          "expressPath": "/:id/approve"
+        },
+        "responses": {
+          "200": { "description": "Pago aprobado" },
+          "409": { "description": "Transición inválida o sobrepago" }
+        }
+      }
+    },
+    "/api/payments/{id}/reject": {
+      "post": {
+        "operationId": "rejectPayment",
+        "summary": "Rechazar pago",
+        "tags": ["payments"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/payments",
+          "routeFile": "src/routes/payment.routes.js",
+          "expressPath": "/:id/reject"
+        },
+        "responses": {
+          "200": { "description": "Pago rechazado" },
+          "409": { "description": "Transición inválida" }
+        }
+      }
+    },
+    "/api/payments/{id}/reverse": {
+      "post": {
+        "operationId": "reversePayment",
+        "summary": "Reversar pago aprobado",
+        "tags": ["payments"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/payments",
+          "routeFile": "src/routes/payment.routes.js",
+          "expressPath": "/:id/reverse"
+        },
+        "responses": {
+          "200": { "description": "Pago reversado" },
+          "409": { "description": "Transición inválida" }
+        }
+      }
+    },
+    "/api/payments/{id}/receipts/{receiptId}/download": {
+      "get": {
+        "operationId": "downloadPaymentReceipt",
+        "summary": "Descargar comprobante privado de pago",
+        "tags": ["payments"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/payments",
+          "routeFile": "src/routes/payment.routes.js",
+          "expressPath": "/:id/receipts/:receiptId/download"
+        },
+        "responses": {
+          "200": { "description": "Descarga autorizada" },
+          "403": { "description": "Sin permisos o fuera del tenant" },
+          "404": { "description": "Comprobante no encontrado" }
+        }
+      }
+    },
+    "/api/inventory/alerts": {
+      "get": {
+        "operationId": "listInventoryAlerts",
+        "summary": "Listar alertas operables de inventario/lotes",
+        "tags": ["inventory-alerts"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/alerts"
+        },
+        "responses": {
+          "200": { "description": "Listado paginado de alertas" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/inventory/alerts/{id}": {
+      "get": {
+        "operationId": "getInventoryAlert",
+        "summary": "Consultar detalle de alerta de inventario/lote",
+        "tags": ["inventory-alerts"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/alerts/:id"
+        },
+        "responses": {
+          "200": { "description": "Detalle de alerta" },
+          "404": { "description": "Alerta no encontrada" }
+        }
+      }
+    },
+    "/api/inventory/alerts/{id}/status": {
+      "patch": {
+        "operationId": "updateInventoryAlertStatus",
+        "summary": "Actualizar estado de alerta de inventario/lote",
+        "tags": ["inventory-alerts"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/alerts/:id/status"
+        },
+        "responses": {
+          "200": { "description": "Estado actualizado" },
+          "403": { "description": "Sin permisos" },
+          "409": { "description": "Transición inválida" }
+        }
+      }
+    },
+    "/api/inventory/stocks": {
+      "get": {
+        "operationId": "listInventoryStocks",
+        "summary": "Listar existencias visibles por bodega y producto",
+        "tags": ["inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/stocks"
+        },
+        "responses": {
+          "200": { "description": "Listado de existencias" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/inventory/movements": {
+      "get": {
+        "operationId": "listInventoryMovements",
+        "summary": "Listar movimientos de inventario visibles para el actor autenticado",
+        "tags": ["inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/movements"
+        },
+        "responses": {
+          "200": { "description": "Listado paginado de movimientos" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/inventory/entries": {
+      "post": {
+        "operationId": "registerInventoryEntry",
+        "summary": "Registrar ingreso de inventario",
+        "tags": ["inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/entries"
+        },
+        "responses": {
+          "201": { "description": "Ingreso registrado" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    },
+    "/api/inventory/lots/{id}/qa": {
+      "patch": {
+        "operationId": "updateInventoryLotQa",
+        "summary": "Actualizar estado QA de un lote",
+        "tags": ["inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/lots/:id/qa"
+        },
+        "responses": {
+          "200": { "description": "Estado QA actualizado" },
+          "403": { "description": "Sin permisos" },
+          "404": { "description": "Lote no encontrado" }
+        }
+      }
+    },
+    "/api/inventory/adjustments": {
+      "post": {
+        "operationId": "createInventoryAdjustment",
+        "summary": "Registrar ajuste manual de inventario",
+        "tags": ["inventory"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/adjustments"
+        },
+        "responses": {
+          "201": { "description": "Ajuste registrado" },
+          "403": { "description": "Sin permisos" }
+        }
+      }
+    }
+  }
+}

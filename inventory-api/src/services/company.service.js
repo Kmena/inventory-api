@@ -1,7 +1,6 @@
 const bcrypt = require('bcrypt');
 
 const { bcryptRounds } = require('../config');
-const prisma = require('../lib/prisma');
 const { createHttpError } = require('../lib/errors');
 const companyRepository = require('../repositories/company.repository');
 const audit = require('../lib/audit');
@@ -118,97 +117,36 @@ async function getExecutiveDashboard(auth) {
 async function registerRootCompany(payload, auth, req = null) {
   assertRootCreator(auth);
 
-  const existingUser = await prisma.user.findUnique({
-    where: { username: payload.rootUser.username },
-  });
+  const existingUser = await companyRepository.findUserByUsername(payload.rootUser.username);
   if (existingUser) {
     throw createHttpError(409, 'El usuario administrador ya existe', 'conflict');
   }
 
   const passwordHash = await bcrypt.hash(payload.rootUser.password, bcryptRounds);
 
-  return prisma.$transaction(async (tx) => {
-    const adminRole = await tx.role.upsert({
-      where: { code: 'admin' },
-      update: { name: 'Administrador', companyId: null, isActive: true },
-      create: { code: 'admin', name: 'Administrador', companyId: null, isActive: true },
-    });
-
-    const company = await tx.company.create({
-      data: {
-        ...payload.company,
-        isActive: true,
-        companyConfig: {
-          create: {
-            taxPercentage: 13,
-            currency: 'CRC',
-            pricingMode: 'standard',
-            allowBackorder: false,
-          },
+  return companyRepository.registerRootCompanyBootstrap({
+    company: payload.company,
+    fiscalConfig: payload.fiscalConfig,
+    rootUser: {
+      ...payload.rootUser,
+      passwordHash,
+    },
+  }, {
+    onSuccess: async (result, tx) => {
+      await audit.recordAuditEventIfAvailable({
+        req,
+        action: 'companies.root.create',
+        resourceType: 'company',
+        resourceId: result.company.id,
+        outcome: 'SUCCESS',
+        afterState: {
+          companyId: result.company.id,
+          companyName: result.company.name,
+          rootUserId: result.rootUser.id,
+          rootUsername: result.rootUser.username,
         },
-      },
-    });
-
-    await tx.clientClassification.createMany({
-      data: companyRepository.defaultClientClassifications(company.id),
-      skipDuplicates: true,
-    });
-
-    const fiscalConfig = await tx.companyFiscalConfig.create({
-      data: {
-        companyId: company.id,
-        ...payload.fiscalConfig,
-        commercialName: payload.fiscalConfig.commercialName || payload.company.name,
-        email: payload.fiscalConfig.email || payload.company.email,
-        phone: payload.fiscalConfig.phone || payload.company.phone,
-        address: payload.fiscalConfig.address || payload.company.address,
-      },
-    });
-
-    const rootUser = await tx.user.create({
-      data: {
-        companyId: company.id,
-        roleId: adminRole.id,
-        fullName: payload.rootUser.fullName,
-        email: payload.rootUser.email,
-        username: payload.rootUser.username,
-        passwordHash,
-        phone: payload.rootUser.phone,
-        status: 'ACTIVE',
-      },
-      include: { role: true },
-    });
-
-    for (const documentType of ['FACTURA_ELECTRONICA', 'TIQUETE_ELECTRONICO', 'NOTA_CREDITO_ELECTRONICA']) {
-      await tx.fiscalSequence.create({
-        data: {
-          companyId: company.id,
-          documentType,
-          branchCode: payload.fiscalConfig.defaultBranchCode,
-          terminalCode: payload.fiscalConfig.defaultTerminalCode,
-          currentNumber: 0,
-          nextNumber: 1,
-          isActive: true,
-        },
-      });
-    }
-
-    const { passwordHash: _passwordHash, ...safeRootUser } = rootUser;
-    const result = { company, fiscalConfig, rootUser: safeRootUser };
-    await audit.recordAuditEventIfAvailable({
-      req,
-      action: 'companies.root.create',
-      resourceType: 'company',
-      resourceId: company.id,
-      outcome: 'SUCCESS',
-      afterState: {
-        companyId: company.id,
-        companyName: company.name,
-        rootUserId: safeRootUser.id,
-        rootUsername: safeRootUser.username,
-      },
-    }, { prismaClient: tx });
-    return result;
+      }, { prismaClient: tx });
+    },
   });
 }
 

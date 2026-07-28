@@ -154,7 +154,7 @@ async function replacePaymentReceiptEvidence(payment, receiptFile, auth) {
 
   try {
     await paymentRepository.transaction(async (tx) => {
-      await paymentRepository.markPaymentReceiptsAsReplaced(payment.id, new Date(), tx);
+      await paymentRepository.markPaymentReceiptsAsReplaced(payment.id, plan.companyId, new Date(), tx);
       await paymentRepository.createPaymentReceipt({
         paymentId: payment.id,
         storageRef: plan.storageRef,

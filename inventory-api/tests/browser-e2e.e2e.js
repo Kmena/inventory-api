@@ -3,13 +3,24 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+process.env.NODE_ENV = 'test';
+process.env.BROWSER_SESSION_STORE_MODE = 'memory';
+
 const { chromium } = require('playwright');
-
 const app = require('../src/app');
+const { enableDbFreeAuditSeams } = require('./helpers/db-free-audit');
+const browserSessionService = require('../src/services/browser-session.service');
 
-const STORAGE_KEY = 'inventory-api-auth';
+const restoreDbFreeAuditSeams = enableDbFreeAuditSeams();
+process.on('exit', restoreDbFreeAuditSeams);
+const {
+  BROWSER_SESSION_COOKIE_NAME,
+  BROWSER_SESSION_STATE_COOKIE_NAME,
+  buildBrowserStateCookieValue,
+} = require('../src/lib/browser-session');
 
-function createSession({
+function createBrowserSessionUser({
+  id = '7',
   roleCode,
   companyId = null,
   permissions = [],
@@ -17,17 +28,14 @@ function createSession({
   username = 'demo',
 } = {}) {
   return {
-    token: 'browser-e2e-token',
-    user: {
-      id: 'user-browser-e2e',
-      fullName,
-      username,
-      companyId,
-      role: {
-        code: roleCode,
-      },
-      permissions,
+    id,
+    fullName,
+    username,
+    companyId,
+    role: {
+      code: roleCode,
     },
+    permissions,
   };
 }
 
@@ -60,15 +68,15 @@ async function startServer() {
 }
 
 async function stopServer(server, sockets = new Set()) {
+  for (const socket of sockets) {
+    socket.destroy();
+  }
+
   await new Promise((resolve, reject) => {
     server.close((error) => {
       if (error) {
         reject(error);
         return;
-      }
-
-      for (const socket of sockets) {
-        socket.destroy();
       }
 
       resolve();
@@ -121,100 +129,68 @@ async function createBrowserPage(t, options = {}) {
   return page;
 }
 
-async function seedSession(page, baseUrl, session) {
-  await page.goto(`${baseUrl}/`);
-  await page.evaluate(({ storageKey, serializedSession }) => {
-    globalThis.localStorage.setItem(storageKey, serializedSession);
-  }, {
-    storageKey: STORAGE_KEY,
-    serializedSession: JSON.stringify(session),
-  });
+async function seedBrowserSession(page, baseUrl, user) {
+  const browserSession = await browserSessionService.createBrowserSession(BigInt(user.id));
+  await page.context().addCookies([
+    {
+      name: BROWSER_SESSION_COOKIE_NAME,
+      value: browserSession.sessionId,
+      url: baseUrl,
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+    {
+      name: BROWSER_SESSION_STATE_COOKIE_NAME,
+      value: buildBrowserStateCookieValue(user),
+      url: baseUrl,
+      sameSite: 'Lax',
+    },
+  ]);
+  return browserSession;
 }
 
-async function stubWarehouseRuntimeDependencies(page) {
-  await page.route('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/javascript',
-      body: 'window.XLSX = { read() { return { SheetNames: [\'Sheet1\'], Sheets: { Sheet1: {} } }; }, utils: { sheet_to_json() { return []; } } };',
-    });
-  });
-}
-
-test('browser E2E: login redirects an authenticated company admin to the executive dashboard and renders live data', async (t) => {
+test('browser E2E: an existing company-admin browser session now lands directly on the supported post-login transition page without persisting bearer tokens in localStorage', async (t) => {
   const { server, sockets, baseUrl } = await startServer();
   t.after(() => stopServer(server, sockets));
 
   const page = await createBrowserPage(t);
-  let receivedLoginPayload = null;
-
-  await page.route(`${baseUrl}/api/auth/login`, async (route) => {
-    receivedLoginPayload = JSON.parse(route.request().postData() || '{}');
+  await page.route(`${baseUrl}/api/auth/me`, async (route) => {
     await route.fulfill({
-      status: 200,
+      status: 401,
       contentType: 'application/json',
-      body: JSON.stringify(createSession({
-        roleCode: 'admin',
-        companyId: 'cmp-77',
-        fullName: 'Admin Demo',
-        username: 'admin-demo',
-      })),
+      body: JSON.stringify({ error: 'unauthorized', message: 'Token no enviado' }),
     });
   });
-
-  await page.route(`${baseUrl}/api/companies/company/dashboard`, async (route) => {
-    assert.equal(await route.request().headerValue('authorization'), 'Bearer browser-e2e-token');
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        company: {
-          name: 'Farmacia Central',
-          isActive: true,
-          legalId: '3-101-999999',
-          description: 'Cobertura comercial prioritaria.',
-          fiscalConfig: {
-            identificationNumber: '3-101-999999',
-          },
-        },
-        metrics: {
-          employeesCount: 12,
-        },
-      }),
-    });
-  });
-
-  await page.goto(`${baseUrl}/`);
-  await page.getByLabel('Usuario').fill('admin-demo');
-  await page.getByLabel('Contrasena').fill('secret-demo');
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
-
-  await page.waitForURL(`${baseUrl}/root/dashboard.html`);
-  await page.waitForSelector('#company-name');
-
-  assert.deepEqual(receivedLoginPayload, {
+  await seedBrowserSession(page, baseUrl, createBrowserSessionUser({
+    id: '77',
+    roleCode: 'admin',
+    companyId: 'cmp-77',
+    fullName: 'Admin Demo',
     username: 'admin-demo',
-    password: 'secret-demo',
-  });
-  assert.equal(await page.locator('#company-name').textContent(), 'Farmacia Central');
-  assert.equal(await page.locator('#employees-count').textContent(), '12');
-  assert.match(await page.locator('#root-session').textContent(), /Admin Demo/);
+  }));
 
-  const storedSession = await page.evaluate((storageKey) => JSON.parse(globalThis.localStorage.getItem(storageKey)), STORAGE_KEY);
-  assert.equal(storedSession?.user?.role?.code, 'admin');
-  assert.equal(storedSession?.user?.companyId, 'cmp-77');
+  const response = await page.goto(`${baseUrl}/`);
+  assert.equal(response.status(), 200);
+  await page.waitForURL(`${baseUrl}/migration.html?mode=post-login-transition`);
+  await page.waitForSelector('#migration-title');
+
+  assert.match(await page.locator('#migration-title').textContent(), /Iniciaste sesion correctamente/);
+  assert.equal(await page.locator('#migration-status-note').isHidden(), true);
+  assert.match(await page.locator('#migration-primary-message').textContent(), /modulo de destino aun no esta implementado/i);
+  assert.match(await page.locator('#migration-home-link').textContent(), /Volver al inicio de sesion/);
+  assert.equal(await page.evaluate(() => globalThis.localStorage.getItem('inventory-api-auth')), null);
 });
 
-test('browser E2E: direct navigation to a protected executive screen redirects anonymous users to the public login', async (t) => {
+test('browser E2E: direct navigation to a retired legacy route returns the migration screen with 410 Gone instead of the old protected UI', async (t) => {
   const { server, sockets, baseUrl } = await startServer();
   t.after(() => stopServer(server, sockets));
 
   const page = await createBrowserPage(t);
+  const response = await page.goto(`${baseUrl}/root/dashboard.html`);
 
-  await page.goto(`${baseUrl}/root/dashboard.html`);
-  await page.waitForURL(`${baseUrl}/`);
-
-  assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');
+  assert.equal(response.status(), 410);
+  assert.match(await page.locator('#migration-title').textContent(), /Esta ruta ya no se encuentra disponible/);
+  assert.match(await page.locator('#migration-home-link').textContent(), /Ir al inicio/);
 });
 
 test('browser E2E: login renders the form action above the fold at 1366x768', async (t) => {
@@ -237,14 +213,18 @@ test('browser E2E: login shows a visible authentication error and restores the f
 
   const page = await createBrowserPage(t);
 
+  await page.route(`${baseUrl}/api/auth/me`, async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'unauthorized', message: 'Token no enviado' }),
+    });
+  });
   await page.route(`${baseUrl}/api/auth/login`, async (route) => {
     await route.fulfill({
       status: 401,
       contentType: 'application/json',
-      body: JSON.stringify({
-        error: 'invalid_credentials',
-        message: 'Credenciales invalidas.',
-      }),
+      body: JSON.stringify({ error: 'unauthorized', message: 'Credenciales invalidas.' }),
     });
   });
 
@@ -254,248 +234,42 @@ test('browser E2E: login shows a visible authentication error and restores the f
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
   await page.waitForFunction(() => {
-    const message = globalThis.document.getElementById('login-message');
+    const loginMessage = globalThis.document.getElementById('login-message');
     const button = globalThis.document.getElementById('login-button');
-    return message?.textContent?.includes('Usuario o contrasena incorrectos.') && button?.textContent === 'Iniciar sesión' && button?.disabled === false;
+    return loginMessage?.textContent?.includes('Usuario o contrasena incorrectos.') && button?.textContent === 'Iniciar sesión' && button?.disabled === false;
   });
 
-  assert.equal(await page.locator('#login-message').textContent(), 'Usuario o contrasena incorrectos.');
-  assert.equal(await page.locator('#login-button').textContent(), 'Iniciar sesión');
-  assert.equal(await page.locator('#login-button').isDisabled(), false);
+  assert.match(await page.locator('#login-message').textContent(), /Usuario o contrasena incorrectos/);
 });
 
-test('browser E2E: corrupt stored login session does not break bootstrap and is cleared before normal login continues', async (t) => {
+test('browser E2E: an existing warehouse browser session now lands on the supported transition page and can close the session from there', async (t) => {
   const { server, sockets, baseUrl } = await startServer();
   t.after(() => stopServer(server, sockets));
 
   const page = await createBrowserPage(t);
-  let receivedLoginPayload = null;
-
-  await page.route(`${baseUrl}/api/auth/login`, async (route) => {
-    receivedLoginPayload = JSON.parse(route.request().postData() || '{}');
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(createSession({
-        roleCode: 'admin',
-        companyId: 'cmp-corrupt',
-        fullName: 'Admin Recuperado',
-        username: 'admin-recuperado',
-      })),
-    });
-  });
-
-  await page.route(`${baseUrl}/api/companies/company/dashboard`, async (route) => {
-    assert.equal(await route.request().headerValue('authorization'), 'Bearer browser-e2e-token');
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        company: {
-          name: 'Empresa Recuperada',
-          isActive: true,
-          legalId: '3-101-123456',
-          description: 'Validacion de storage corrupto.',
-          fiscalConfig: {
-            identificationNumber: '3-101-123456',
-          },
-        },
-        metrics: {
-          employeesCount: 4,
-        },
-      }),
-    });
-  });
-
-  await page.goto(`${baseUrl}/`);
-  await page.evaluate(({ storageKey }) => {
-    globalThis.localStorage.setItem(storageKey, '{sesion-corrupta');
-  }, { storageKey: STORAGE_KEY });
-
-  await page.goto(`${baseUrl}/`);
-  await page.waitForURL(`${baseUrl}/`);
-
-  assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');
-  assert.equal(await page.evaluate((storageKey) => globalThis.localStorage.getItem(storageKey), STORAGE_KEY), null);
-
-  await page.getByLabel('Usuario').fill('admin-recuperado');
-  await page.getByLabel('Contrasena').fill('secret-recuperado');
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
-
-  await page.waitForURL(`${baseUrl}/root/dashboard.html`);
-  assert.deepEqual(receivedLoginPayload, {
-    username: 'admin-recuperado',
-    password: 'secret-recuperado',
-  });
-  assert.equal(await page.locator('#company-name').textContent(), 'Empresa Recuperada');
-});
-
-test('browser E2E: an existing warehouse session redirects immediately to the approved landing', async (t) => {
-  const { server, sockets, baseUrl } = await startServer();
-  t.after(() => stopServer(server, sockets));
-
-  const page = await createBrowserPage(t);
-  await stubWarehouseRuntimeDependencies(page);
-
-  await page.route(`${baseUrl}/api/warehouses/company`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ items: [] }),
-    });
-  });
-
-  await page.route(`${baseUrl}/api/products`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([]),
-    });
-  });
-
-  await page.route(`${baseUrl}/api/inventory/alerts?page=1&pageSize=20`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ items: [] }),
-    });
-  });
-
-  await seedSession(page, baseUrl, createSession({
-    roleCode: 'warehouse',
-    companyId: 'cmp-existing-warehouse',
-    username: 'warehouse-existing',
-    fullName: 'Warehouse Existing',
-    permissions: ['warehouse.access'],
-  }));
-
-  await page.goto(`${baseUrl}/`);
-  await page.waitForURL(`${baseUrl}/warehouse/products.html`);
-  assert.match(await page.locator('#welcome-message').textContent(), /Warehouse Existing/);
-});
-
-test('browser E2E: warehouse users can inspect inventory alerts and are logged out on unauthorized API responses', async (t) => {
-  const { server, sockets, baseUrl } = await startServer();
-  t.after(() => stopServer(server, sockets));
-
-  const warehouseSession = createSession({
-    roleCode: 'warehouse',
-    companyId: 'cmp-warehouse-1',
-    username: 'warehouse-demo',
-    fullName: 'Warehouse Demo',
-    permissions: ['warehouse.access', 'inventory.view'],
-  });
-
-  const page = await createBrowserPage(t);
-  await stubWarehouseRuntimeDependencies(page);
-  await seedSession(page, baseUrl, warehouseSession);
-
-  await page.route(`${baseUrl}/api/warehouses/company`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        items: [
-          {
-            id: 'wh-1',
-            code: 'CENTRAL',
-            name: 'Bodega Central',
-            isActive: true,
-          },
-        ],
-      }),
-    });
-  });
-
-  await page.route(`${baseUrl}/api/products`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([
-        {
-          id: 'prod-1',
-          code: 'PT-001',
-          name: 'Jarabe infantil',
-          unit: 'UN',
-          price: '1250.00',
-          quantity: '24',
-          reservedQuantity: '3',
-          warehouseLotStocks: [],
-        },
-      ]),
-    });
-  });
-
-  await page.route(`${baseUrl}/api/inventory/alerts?page=1&pageSize=20`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        items: [
-          {
-            id: 'alert-1',
-            status: 'NEW',
-            alertType: 'LOW_STOCK',
-            severity: 'HIGH',
-            message: 'Stock bajo detectado',
-            availableActions: [],
-            product: { name: 'Jarabe infantil' },
-            lot: { internalLotNumber: 'LOT-01' },
-            warehouse: { name: 'Bodega Central' },
-          },
-        ],
-      }),
-    });
-  });
-
-  await page.route(`${baseUrl}/api/inventory/alerts/alert-1`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: 'alert-1',
-        status: 'NEW',
-        alertType: 'LOW_STOCK',
-        severity: 'HIGH',
-        message: 'Stock bajo detectado',
-        metadata: {
-          threshold: 10,
-          availableQuantity: 4,
-        },
-        product: { name: 'Jarabe infantil', code: 'PT-001' },
-        lot: { internalLotNumber: 'LOT-01' },
-        warehouse: { name: 'Bodega Central' },
-      }),
-    });
-  });
-
-  await page.goto(`${baseUrl}/warehouse/products.html`);
-  await page.waitForSelector('#products-body tr');
-
-  assert.match(await page.locator('#welcome-message').textContent(), /Warehouse Demo/);
-  assert.match(await page.locator('#products-body').textContent(), /Jarabe infantil/);
-  assert.match(await page.locator('#alerts-body').textContent(), /Stock bajo detectado/);
-
-  await page.getByRole('button', { name: 'Ver detalle' }).click();
-  await page.waitForSelector('#alert-detail-panel:not(.hidden)');
-  assert.match(await page.locator('#alert-detail-content').textContent(), /availableQuantity/);
-
-  await page.unroute(`${baseUrl}/api/products`);
-  await page.route(`${baseUrl}/api/products`, async (route) => {
+  await page.route(`${baseUrl}/api/auth/me`, async (route) => {
     await route.fulfill({
       status: 401,
       contentType: 'application/json',
-      body: JSON.stringify({
-        error: 'unauthorized',
-        message: 'Token expirado.',
-      }),
+      body: JSON.stringify({ error: 'unauthorized', message: 'Token no enviado' }),
     });
   });
+  await seedBrowserSession(page, baseUrl, createBrowserSessionUser({
+    id: '21',
+    roleCode: 'warehouse',
+    companyId: 'cmp-21',
+    permissions: ['warehouse.access'],
+    fullName: 'Bodega Demo',
+    username: 'warehouse-demo',
+  }));
 
-  await page.reload();
+  await page.goto(`${baseUrl}/`);
+  await page.waitForURL(`${baseUrl}/migration.html?mode=post-login-transition`);
+  await page.waitForSelector('#migration-title');
+  assert.match(await page.locator('#migration-title').textContent(), /Iniciaste sesion correctamente/);
+  assert.equal(await page.locator('#migration-status-note').isHidden(), true);
+  await page.getByRole('button', { name: 'Cerrar sesion' }).click();
   await page.waitForURL(`${baseUrl}/`);
-  await page.waitForLoadState('domcontentloaded');
 
-  const storedSession = await page.evaluate((storageKey) => globalThis.localStorage.getItem(storageKey), STORAGE_KEY);
-  assert.equal(storedSession, null);
+  assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');
 });

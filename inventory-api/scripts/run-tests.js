@@ -95,6 +95,11 @@ function run() {
   const child = spawn(process.execPath, ['--test', ...forwardedArguments, ...testFiles], {
     stdio: 'inherit',
     cwd: process.cwd(),
+    env: {
+      ...process.env,
+      NODE_ENV: process.env.NODE_ENV || 'test',
+      BROWSER_SESSION_STORE_MODE: process.env.BROWSER_SESSION_STORE_MODE || 'memory',
+    },
   });
 
   child.on('exit', (code, signal) => {

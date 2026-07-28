@@ -86,7 +86,7 @@ function assertInventoryAlertTransition(currentStatus, targetStatus) {
 }
 
 async function acquireCompanyInventoryAdvisoryLock(tx, companyId) {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${companyId})`;
+  await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, tx);
 }
 
 async function listMovements(auth, filters = {}, pagination = null) {
@@ -213,32 +213,31 @@ async function registerStockEntryInTransaction(tx, payload, auth) {
   const qaStatus = isQuarantineEntry ? 'PENDING' : 'APPROVED';
   const normalizedDates = normalizeLotDates(payload);
 
-  const lot = await tx.lot.create({
-    data: {
-      companyId: context.companyId,
-      productId: context.product.id,
-      supplierId: payload.supplierId ?? null,
-      invoiceNumber: payload.invoiceNumber,
-      lotNumber: internalLotNumber,
-      internalLotNumber,
-      manufacturerLotNumber: payload.manufacturerLotNumber ?? payload.lotNumber ?? null,
-      productionDate: normalizedDates.productionDate,
-      expirationDate: normalizedDates.expirationDate,
-      entryDate: normalizedDates.entryDate,
-      quantity: payload.quantity,
-      originalQuantity: payload.quantity,
-      status: lotStatus,
-      qaStatus,
-      casNumber: payload.casNumber,
-    },
-  });
+  const lot = await inventoryRepository.createLot({
+    companyId: context.companyId,
+    productId: context.product.id,
+    supplierId: payload.supplierId ?? null,
+    invoiceNumber: payload.invoiceNumber,
+    lotNumber: internalLotNumber,
+    internalLotNumber,
+    manufacturerLotNumber: payload.manufacturerLotNumber ?? payload.lotNumber ?? null,
+    productionDate: normalizedDates.productionDate,
+    expirationDate: normalizedDates.expirationDate,
+    entryDate: normalizedDates.entryDate,
+    quantity: payload.quantity,
+    originalQuantity: payload.quantity,
+    status: lotStatus,
+    qaStatus,
+    casNumber: payload.casNumber,
+  }, tx);
 
   const lotStock = await changeLotStock(tx, context, lot, payload.quantity, 0);
   const warehouseStock = await changeWarehouseStock(tx, context, payload.quantity, 0);
-  const product = await tx.product.update({
-    where: { id: context.product.id },
-    data: { quantity: { increment: payload.quantity } },
-  });
+  const product = await inventoryRepository.updateProductById(
+    context.product.id,
+    { quantity: { increment: payload.quantity } },
+    tx,
+  );
   const movement = await createMovement(tx, context, {
     lotId: lot.id,
     movementType: 'IN',
@@ -254,23 +253,21 @@ async function registerStockEntryInTransaction(tx, payload, auth) {
   });
 
   if (lotNumberResolution.collision) {
-    await tx.inventoryAlert.create({
-      data: {
-        companyId: context.companyId,
-        productId: context.product.id,
-        lotId: lot.id,
-        warehouseId: context.warehouse.id,
-        alertType: 'DUPLICATE_INTERNAL_LOT',
-        severity: 'WARNING',
-        status: 'OPEN',
-        message: `El lote ${lotNumberResolution.requested} ya existia; se asigno ${lotNumberResolution.assigned}`,
-        metadata: {
-          requestedLotNumber: lotNumberResolution.requested,
-          assignedLotNumber: lotNumberResolution.assigned,
-          movementId: movement.id.toString(),
-        },
+    await inventoryRepository.createInventoryAlert({
+      companyId: context.companyId,
+      productId: context.product.id,
+      lotId: lot.id,
+      warehouseId: context.warehouse.id,
+      alertType: 'DUPLICATE_INTERNAL_LOT',
+      severity: 'WARNING',
+      status: 'OPEN',
+      message: `El lote ${lotNumberResolution.requested} ya existia; se asigno ${lotNumberResolution.assigned}`,
+      metadata: {
+        requestedLotNumber: lotNumberResolution.requested,
+        assignedLotNumber: lotNumberResolution.assigned,
+        movementId: movement.id.toString(),
       },
-    });
+    }, tx);
   }
 
   return {
@@ -312,15 +309,7 @@ async function updateLotQa(lotId, payload, auth, req = null) {
   const { companyId, userId } = authScope(auth);
 
   const result = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
-    const lot = await tx.lot.findFirst({
-      where: { id: lotId, companyId },
-      include: {
-        warehouseLotStocks: {
-          where: { quantity: { gt: 0 } },
-          include: { warehouse: true },
-        },
-      },
-    });
+    const lot = await inventoryRepository.findLotForCompanyWithActiveWarehouseStocks(lotId, companyId, tx);
     if (!lot) throw createHttpError(404, 'Lote no encontrado para la empresa', 'not_found');
 
     const { expired } = deriveLotUsability(lot);
@@ -352,55 +341,43 @@ async function updateLotQa(lotId, payload, auth, req = null) {
         throw createHttpError(400, 'Accion QA no soportada', 'validation_error');
     }
 
-    const updatedLot = await tx.lot.update({
-      where: { id: lot.id },
-      data: { status: newStatus, qaStatus: newQaStatus },
-      include: { warehouseLotStocks: { include: { warehouse: true } } },
-    });
+    const updatedLot = await inventoryRepository.updateLotByIdWithWarehouseStocks(
+      lot.id,
+      { status: newStatus, qaStatus: newQaStatus },
+      tx,
+    );
 
-    await tx.lotStatusHistory.create({
-      data: {
-        companyId,
-        lotId: lot.id,
-        userId,
-        action: payload.action,
-        previousStatus: lot.status,
-        newStatus,
-        previousQaStatus: lot.qaStatus,
-        newQaStatus,
-        reason: payload.reason,
-      },
-    });
+    await inventoryRepository.createLotStatusHistory({
+      companyId,
+      lotId: lot.id,
+      userId,
+      action: payload.action,
+      previousStatus: lot.status,
+      newStatus,
+      previousQaStatus: lot.qaStatus,
+      newQaStatus,
+      reason: payload.reason,
+    }, tx);
 
     const warehouseId = lot.warehouseLotStocks[0]?.warehouseId ?? null;
     if (['REJECT', 'FAIL', 'BLOCK'].includes(payload.action)) {
-      await tx.inventoryAlert.create({
-        data: {
-          companyId,
-          productId: lot.productId,
-          lotId: lot.id,
-          warehouseId,
-          alertType: payload.action === 'FAIL' ? 'QA_FAILURE' : 'LOT_BLOCKED',
-          severity: 'CRITICAL',
-          status: 'OPEN',
-          message: payload.reason,
-          metadata: {
-            action: payload.action,
-            previousStatus: lot.status,
-            previousQaStatus: lot.qaStatus,
-          },
+      await inventoryRepository.createInventoryAlert({
+        companyId,
+        productId: lot.productId,
+        lotId: lot.id,
+        warehouseId,
+        alertType: payload.action === 'FAIL' ? 'QA_FAILURE' : 'LOT_BLOCKED',
+        severity: 'CRITICAL',
+        status: 'OPEN',
+        message: payload.reason,
+        metadata: {
+          action: payload.action,
+          previousStatus: lot.status,
+          previousQaStatus: lot.qaStatus,
         },
-      });
+      }, tx);
     } else {
-      await tx.inventoryAlert.updateMany({
-        where: {
-          companyId,
-          lotId: lot.id,
-          status: 'OPEN',
-          alertType: { in: ['QA_FAILURE', 'LOT_BLOCKED'] },
-        },
-        data: { status: 'RESOLVED', resolvedAt: new Date() },
-      });
+      await inventoryRepository.resolveOpenLotAlerts(companyId, lot.id, new Date(), tx);
     }
 
     return { updatedLot, previousLot: lot };
@@ -440,9 +417,7 @@ async function adjustStock(payload, auth, req = null) {
 
     let lot = null;
     if (payload.lotId) {
-      lot = await tx.lot.findFirst({
-        where: { id: payload.lotId, productId: context.product.id },
-      });
+      lot = await inventoryRepository.findLotForProduct(payload.lotId, context.product.id, tx);
       if (!lot) throw createHttpError(404, 'Lote no encontrado para el producto', 'not_found');
     }
 
@@ -450,20 +425,22 @@ async function adjustStock(payload, auth, req = null) {
     const warehouseStock = await changeWarehouseStock(tx, context, quantityDelta, 0);
     const lotStock = lot ? await changeLotStock(tx, context, lot, quantityDelta, 0) : null;
 
-    const product = await tx.product.update({
-      where: { id: context.product.id },
-      data: payload.direction === 'IN'
+    const product = await inventoryRepository.updateProductById(
+      context.product.id,
+      payload.direction === 'IN'
         ? { quantity: { increment: payload.quantity } }
         : { quantity: { decrement: payload.quantity } },
-    });
+      tx,
+    );
 
     if (lot) {
-      lot = await tx.lot.update({
-        where: { id: lot.id },
-        data: payload.direction === 'IN'
+      lot = await inventoryRepository.updateLotById(
+        lot.id,
+        payload.direction === 'IN'
           ? { quantity: { increment: payload.quantity } }
           : { quantity: { decrement: payload.quantity } },
-      });
+        tx,
+      );
     }
 
     const movement = await createMovement(tx, context, {
@@ -508,10 +485,12 @@ async function adjustStock(payload, auth, req = null) {
 async function reserveStockForOrder(orderId, auth, req = null) {
   const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const scope = authScope(auth);
-    const order = await tx.order.findFirst({
-      where: { id: orderId, companyId: scope.companyId },
-      include: { items: true, warehouse: true },
-    });
+    const order = /** @type {any} */ (await inventoryRepository.findOrderForCompany(
+      orderId,
+      scope.companyId,
+      { items: true, warehouse: true },
+      tx,
+    ));
 
     if (!order) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
     if (order.status === 'APPROVED' || order.approved) {
@@ -535,10 +514,11 @@ async function reserveStockForOrder(orderId, auth, req = null) {
         allocations = await reserveLots(tx, context, quantity);
       }
 
-      await tx.product.update({
-        where: { id: context.product.id },
-        data: { reservedQuantity: { increment: quantity } },
-      });
+      await inventoryRepository.updateProductById(
+        context.product.id,
+        { reservedQuantity: { increment: quantity } },
+        tx,
+      );
 
       for (const allocation of allocations) {
         await createMovement(tx, context, {
@@ -556,16 +536,12 @@ async function reserveStockForOrder(orderId, auth, req = null) {
       }
     }
 
-    return tx.order.update({
-      where: { id: orderId },
-      data: {
-        approved: true,
-        approvedAt: new Date(),
-        approvedById: scope.userId,
-        status: 'APPROVED',
-      },
-      include: { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } },
-    });
+    return inventoryRepository.updateOrderById(orderId, {
+      approved: true,
+      approvedAt: new Date(),
+      approvedById: scope.userId,
+      status: 'APPROVED',
+    }, { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } }, tx);
   }));
 
   await audit.recordAuditEventIfAvailable({
@@ -590,10 +566,12 @@ async function reserveStockForOrder(orderId, auth, req = null) {
 async function releaseStockReservation(orderId, cancel, auth, req = null) {
   const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const scope = authScope(auth);
-    const order = await tx.order.findFirst({
-      where: { id: orderId, companyId: scope.companyId },
-      include: { items: true },
-    });
+    const order = /** @type {any} */ (await inventoryRepository.findOrderForCompany(
+      orderId,
+      scope.companyId,
+      { items: true },
+      tx,
+    ));
 
     if (!order) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
     if (!order.approved || order.status !== 'APPROVED') {
@@ -614,15 +592,16 @@ async function releaseStockReservation(orderId, cancel, auth, req = null) {
       }
 
       const stock = await changeWarehouseStock(tx, context, 0, -reserved);
-      await tx.product.update({
-        where: { id: context.product.id },
-        data: { reservedQuantity: { decrement: reserved } },
-      });
+      await inventoryRepository.updateProductById(
+        context.product.id,
+        { reservedQuantity: { decrement: reserved } },
+        tx,
+      );
 
       for (const allocation of itemAllocations) {
         let lot = null;
         if (allocation.lotId) {
-          lot = await tx.lot.findUnique({ where: { id: allocation.lotId } });
+          lot = await inventoryRepository.findLotById(allocation.lotId, tx);
           await changeLotStock(tx, context, lot, 0, -allocation.quantity);
         }
         await createMovement(tx, context, {
@@ -642,16 +621,12 @@ async function releaseStockReservation(orderId, cancel, auth, req = null) {
       }
     }
 
-    return tx.order.update({
-      where: { id: orderId },
-      data: {
-        approved: false,
-        approvedAt: null,
-        approvedById: null,
-        status: cancel ? 'CANCELLED' : 'DRAFT',
-      },
-      include: { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } },
-    });
+    return inventoryRepository.updateOrderById(orderId, {
+      approved: false,
+      approvedAt: null,
+      approvedById: null,
+      status: cancel ? 'CANCELLED' : 'DRAFT',
+    }, { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } }, tx);
   }));
 
   await audit.recordAuditEventIfAvailable({
@@ -674,10 +649,12 @@ async function releaseStockReservation(orderId, cancel, auth, req = null) {
 async function dispatchOrder(orderId, auth, req = null) {
   const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const scope = authScope(auth);
-    const order = await tx.order.findFirst({
-      where: { id: orderId, companyId: scope.companyId },
-      include: { items: true },
-    });
+    const order = /** @type {any} */ (await inventoryRepository.findOrderForCompany(
+      orderId,
+      scope.companyId,
+      { items: true },
+      tx,
+    ));
 
     if (!order) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
     if (!order.approved || order.status !== 'APPROVED') {
@@ -700,23 +677,25 @@ async function dispatchOrder(orderId, auth, req = null) {
       }
 
       const stock = await changeWarehouseStock(tx, context, -quantity, -quantity);
-      await tx.product.update({
-        where: { id: context.product.id },
-        data: {
+      await inventoryRepository.updateProductById(
+        context.product.id,
+        {
           quantity: { decrement: quantity },
           reservedQuantity: { decrement: quantity },
         },
-      });
+        tx,
+      );
 
       for (const allocation of itemAllocations) {
         let lot = null;
         if (allocation.lotId) {
-          lot = await tx.lot.findUnique({ where: { id: allocation.lotId } });
+          lot = await inventoryRepository.findLotById(allocation.lotId, tx);
           await changeLotStock(tx, context, lot, -allocation.quantity, -allocation.quantity);
-          await tx.lot.update({
-            where: { id: lot.id },
-            data: { quantity: { decrement: allocation.quantity } },
-          });
+          await inventoryRepository.updateLotById(
+            lot.id,
+            { quantity: { decrement: allocation.quantity } },
+            tx,
+          );
         }
 
         await createMovement(tx, context, {
@@ -734,11 +713,12 @@ async function dispatchOrder(orderId, auth, req = null) {
       }
     }
 
-    return tx.order.update({
-      where: { id: orderId },
-      data: { status: 'DELIVERED' },
-      include: { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } },
-    });
+    return inventoryRepository.updateOrderById(
+      orderId,
+      { status: 'DELIVERED' },
+      { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } },
+      tx,
+    );
   }));
 
   await audit.recordAuditEventIfAvailable({

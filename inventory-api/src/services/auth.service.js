@@ -5,6 +5,7 @@ const { signAccessToken } = require('../lib/auth');
 const { createHttpError } = require('../lib/errors');
 const audit = require('../lib/audit');
 const { attachAuthenticatedActor } = require('../lib/request-context');
+const browserSessionService = require('./browser-session.service');
 
 function mapPermissions(role) {
   return role?.rolePermissions
@@ -12,7 +13,7 @@ function mapPermissions(role) {
     .map((item) => item.permission.code) || [];
 }
 
-async function login(payload, req = null) {
+async function login(payload, req = null, options = {}) {
   const loginMetadata = {
     username: payload.username,
   };
@@ -110,12 +111,22 @@ async function login(payload, req = null) {
     },
   });
 
+  const serializedUser = {
+    ...safeUser,
+    permissions: mapPermissions(user.role),
+  };
+
+  if (options.issueBrowserSession === true) {
+    const browserSession = await browserSessionService.createBrowserSession(user.id, { req });
+    return {
+      user: serializedUser,
+      browserSession,
+    };
+  }
+
   return {
     token,
-    user: {
-      ...safeUser,
-      permissions: mapPermissions(user.role),
-    },
+    user: serializedUser,
   };
 }
 

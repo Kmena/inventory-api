@@ -20,7 +20,7 @@ Estas reglas aplican a:
 ## 1. Navigation and session rules
 - La navegación inicial debe derivarse de la sesión autenticada, rol y permisos efectivos observables.
 - `login.js` es la referencia actual para resolver landing pages por rol/permisos.
-- La clave de storage soportada para sesión es `inventory-api-auth`; no cambiarla casualmente.
+- La sesión browser soportada se deriva del boundary backend-owned formado por las cookies `inventory_browser_session` y `inventory_browser_state`; la clave `inventory-api-auth` solo permanece como puente de limpieza/compatibilidad legacy y no debe volver a usarse para persistir bearer tokens soportados.
 - Si una pantalla requiere un perfil específico, debe validar la sesión al cargar y redirigir fuera del flujo cuando no exista acceso.
 - No introducir navegación basada solo en ocultar botones; el backend sigue siendo la autoridad final.
 - Las pantallas actuales deben permanecer separadas por contexto operativo:
@@ -29,7 +29,8 @@ Estas reglas aplican a:
   - `agent/*` para operación comercial en campo
 
 ## 2. Authenticated fetch conventions
-- Los requests autenticados deben enviar `Authorization: Bearer <token>`.
+- Los requests autenticados del runtime browser deben usar `credentials: 'same-origin'` y reutilizar `src/public/shared/auth.js` cuando corresponda.
+- Solo enviar `Authorization: Bearer <token>` cuando el helper realmente reciba un bearer token explícito; para la sesión browser soportada, el helper omite ese header y depende de la cookie same-origin.
 - Cuando el request envía JSON, incluir también `Content-Type: application/json`.
 - Reutilizar helpers compartidos cuando ya existan para headers, mensajes y utilidades de sesión.
 - No hardcodear tokens, IDs de tenant ni permisos en archivos públicos.
@@ -41,7 +42,7 @@ Estas reglas aplican a:
 - No asumir que toda respuesta contiene JSON válido; cuando el código actual ya contempla parse defensivo, mantener ese patrón.
 - El estado visual del formulario o acción debe restaurarse después de errores (`disabled`, labels de botón, mensajes).
 - No ocultar silenciosamente errores críticos de carga inicial; deben reflejarse en la pantalla con un mensaje visible.
-- Si existe una sesión corrupta en storage, debe limpiarse y permitirse continuar con login normal.
+- Si existe una sesión legacy o corrupta en storage, debe limpiarse y permitirse continuar con login normal.
 
 ## 4. Business-logic boundary
 - La UI puede:
@@ -90,7 +91,7 @@ Estas reglas aplican a:
 ## 9. Login-screen specific rules
 - El login público puede evolucionar visualmente, pero debe preservar:
   - `POST /api/auth/login`
-  - la clave `inventory-api-auth`
+  - el request header `X-Inventory-Browser-Session: cookie` para el flujo browser soportado
   - la lógica actual de landing por rol/permisos
 - El mensaje de ayuda debe describir una acción real soportada. Actualmente el wording correcto es contactar al administrador de la empresa, no prometer recuperación de contraseña inexistente.
 - En desktop, el login actual usa una composición de dos columnas hero/form.
@@ -98,7 +99,7 @@ Estas reglas aplican a:
 - La acción primaria de login debe permanecer visible above the fold en el viewport cubierto por regresión (`1366x768`).
 
 ## 10. Current practical examples
-- `login.js` decide la redirección inicial por rol/permisos, limpia sesiones corruptas y guarda la sesión autenticada.
+- `login.js` decide la redirección inicial por rol/permisos, solicita la sesión browser al backend con `X-Inventory-Browser-Session: cookie`, limpia estado legacy/corrupto y bootstrapea la sesión mediante cookies same-origin.
 - `index.html` muestra un hero editorial más fuerte sin cambiar el contrato de autenticación.
 - `tests/browser-e2e.e2e.js` valida la redirección al dashboard, el retorno de usuarios anónimos al login y la visibilidad del CTA above the fold.
 - `root/dashboard.js` consume el alias semántico `/api/companies/company/dashboard` y no el path legacy.

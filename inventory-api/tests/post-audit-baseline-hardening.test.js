@@ -43,13 +43,13 @@ test('tracked seed source no longer contains explicit bootstrap passwords and re
   assert.match(envExample, /SEED_WAREHOUSE_PASSWORD=replace_me_private_seed_password/);
 });
 
-test('public runtime validator phase 2 uses stable helper-based checks for dashboard, warehouse and workspace', () => {
+test('public runtime validator phase 3 enforces the reduced supported public inventory and migration contracts', () => {
   const validatorSource = readFile(publicValidatorPath);
 
-  assert.match(validatorSource, /validateRootDashboardRuntimeContracts/);
-  assert.match(validatorSource, /validateWarehouseProductsRuntimeContracts/);
-  assert.match(validatorSource, /validateAgentWorkspaceRuntimeContracts/);
-  assert.match(validatorSource, /validateRuntimeSourceContracts/);
+  assert.match(validatorSource, /validatePublicRuntimeInventory/);
+  assert.match(validatorSource, /validateLoginRuntimeContracts/);
+  assert.match(validatorSource, /validateMigrationRuntimeContracts/);
+  assert.match(validatorSource, /legacy-public-runtime/);
   assert.doesNotMatch(validatorSource, /relativePath: 'root\/dashboard\.js'/);
   assert.doesNotMatch(validatorSource, /relativePath: 'warehouse\/products\.js'/);
   assert.doesNotMatch(validatorSource, /relativePath: 'agent\/workspace\.js'/);

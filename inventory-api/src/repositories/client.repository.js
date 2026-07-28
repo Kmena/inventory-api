@@ -180,16 +180,56 @@ function createClientDocument(data) {
   });
 }
 
-function updateClientDocument(id, data) {
-  return prisma.clientDocument.update({
-    where: { id },
+async function updateClientDocument(id, clientId, companyId, data, prismaClient = prisma) {
+  const result = await prismaClient.clientDocument.updateMany({
+    where: {
+      id,
+      clientId,
+      client: { companyId },
+    },
     data,
+  });
+
+  if (result.count === 0) {
+    return null;
+  }
+
+  return prismaClient.clientDocument.findFirst({
+    where: {
+      id,
+      clientId,
+      client: { companyId },
+    },
   });
 }
 
-function deleteClientDocument(id) {
-  return prisma.clientDocument.delete({
-    where: { id },
+async function deleteClientDocument(id, clientId, companyId, prismaClient = prisma) {
+  return prismaClient.$transaction(async (tx) => {
+    const existingDocument = await tx.clientDocument.findFirst({
+      where: {
+        id,
+        clientId,
+        client: { companyId },
+      },
+    });
+
+    if (!existingDocument) {
+      return null;
+    }
+
+    const result = await tx.clientDocument.deleteMany({
+      where: {
+        id,
+        clientId,
+        client: { companyId },
+      },
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return existingDocument;
   });
 }
 
@@ -224,8 +264,8 @@ async function findOrCreateLegalEntity(companyId, payload) {
       where: { companyId, identificationNumber },
     });
     if (existing) {
-      return prisma.clientLegalEntity.update({
-        where: { id: existing.id },
+      const result = await prisma.clientLegalEntity.updateMany({
+        where: { id: existing.id, companyId },
         data: {
           legalName: payload.legalName || existing.legalName,
           commercialName: payload.commercialName ?? existing.commercialName,
@@ -237,6 +277,14 @@ async function findOrCreateLegalEntity(companyId, payload) {
           phone: payload.phone ?? existing.phone,
           isActive: true,
         },
+      });
+
+      if (result.count === 0) {
+        return null;
+      }
+
+      return prisma.clientLegalEntity.findFirst({
+        where: { id: existing.id, companyId },
       });
     }
   }

@@ -20,6 +20,7 @@ const requiredVariables = [
   'CORS_ORIGIN',
   'APP_BASE_URL',
   'JWT_SECRET',
+  'REDIS_URL',
 ];
 
 const placeholderPatterns = [
@@ -59,6 +60,7 @@ if (hasPlaceholderValue(process.env.JWT_SECRET) || String(process.env.JWT_SECRET
 const requiredFiles = [
   'Dockerfile',
   'docker-compose.prod.yml',
+  '.env.production.example',
   'src/routes/health.routes.js',
   'prisma/schema.prisma',
 ];

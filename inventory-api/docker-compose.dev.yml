@@ -15,10 +15,13 @@ services:
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       JWT_SECRET: ${JWT_SECRET:-}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      BROWSER_SESSION_STORE_MODE: ${BROWSER_SESSION_STORE_MODE:-redis}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       HACIENDA_TAXPAYER_LOOKUP_URL: ${HACIENDA_TAXPAYER_LOOKUP_URL:-https://api.hacienda.go.cr/fe/ae?identificacion={identification}}
       GEOCODING_SEARCH_URL: ${GEOCODING_SEARCH_URL:-https://nominatim.openstreetmap.org/search}
     depends_on:
       - db
+      - redis
     volumes:
       - ./src:/app/src
       - ./prisma:/app/prisma
@@ -33,6 +36,11 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
 
 volumes:
   postgres_data:

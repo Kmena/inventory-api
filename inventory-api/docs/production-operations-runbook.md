@@ -6,6 +6,7 @@ Este runbook documenta la evidencia operativa adicional versionada que acompaña
 ## Artefactos relacionados
 - `docs/production-baseline.md`
 - `docs/restore-readiness-baseline.md`
+- `.env.production.example`
 - `docker-compose.prod.yml`
 - `Dockerfile`
 - `scripts/validate-production-baseline.js`
@@ -18,6 +19,7 @@ Este runbook documenta la evidencia operativa adicional versionada que acompaña
 
 ## Pre-requisitos
 - Docker y Docker Compose disponibles
+- `.env.production.example` disponible como artefacto versionado del baseline
 - `.env.production` materializado desde `.env.production.example`
 - variables obligatorias validadas con `npm run validate:production-baseline`
 
@@ -26,17 +28,60 @@ Este runbook documenta la evidencia operativa adicional versionada que acompaña
 - liveness: `GET /health`
 - readiness: `GET /health/ready`
 - el contenedor usa `HEALTHCHECK` contra `/health/ready`
+- en el baseline soportado con browser sessions sobre Redis, readiness exige dos prerequisitos: `checks.database = up` y `checks.browserSessionStore = up`
+- en memory mode explícito o de test, readiness sigue siendo compatible y puede reportar `checks.browserSessionStore = memory` sin requerir Redis
 
 ### Logging y trazabilidad de requests
 - el runtime genera `requestId` por request
 - en entornos no development el log HTTP es estructurado JSON
 - los errores de request preservan `requestId`, `method`, `path`, `statusCode` y `errorCode`
 
+## Diagnóstico y recuperación de browser sessions sobre Redis
+### Síntomas esperados
+- `GET /health/ready` responde `503`
+- el payload de readiness muestra `checks.browserSessionStore = down`
+- login browser-cookie, `/api/auth/me` o logout pueden responder errores explícitos de servicio no disponible relacionados con sesiones browser
+- el runtime no hace fallback silencioso a memory mode
+
+### Diagnóstico mínimo
+1. Verificar liveness y readiness:
+```bash
+curl http://localhost:${PORT:-2500}/health
+curl http://localhost:${PORT:-2500}/health/ready
+```
+2. Confirmar que el baseline productivo mantiene `REDIS_URL` y `BROWSER_SESSION_STORE_MODE=redis` cuando corresponda.
+3. Validar que el servicio Redis esté levantado en el entorno/compose esperado.
+4. Revisar logs estructurados del runtime buscando fallos de `service_unavailable` o de `auth.browser_session_store` sin exponer secretos.
+5. Reproducir la verificación repositorio-controlada con el lane dedicado:
+```bash
+npm run test:redis-path
+```
+
+### Recuperación mínima
+1. Restablecer conectividad y disponibilidad del servicio Redis configurado por `REDIS_URL`.
+2. Verificar que la aplicación siga apuntando al host/base correcta y que no exista configuración faltante en variables productivas.
+3. Si aplica al entorno local o de smoke, relanzar dependencias y app:
+```bash
+docker compose -f docker-compose.prod.yml up -d db redis
+docker compose -f docker-compose.prod.yml up -d app
+```
+4. Revalidar readiness:
+```bash
+curl http://localhost:${PORT:-2500}/health/ready
+```
+
+### Verificación posterior a la recuperación
+- `/health/ready` vuelve a responder `200`
+- el payload refleja `checks.database = up` y `checks.browserSessionStore = up` en Redis mode
+- el flujo browser-cookie vuelve a permitir login, `/api/auth/me` y logout sin errores de store no disponible
+- `npm run test:redis-path` permanece verde cuando se ejecuta en un entorno con Redis disponible
+
 ### Smoke operacional local
 ```bash
 npm run validate:production-baseline
 npm run validate:restore-readiness
 npm run validate:operational-readiness
+# este comando valida el contrato operativo público versionado del repositorio
 docker compose -f docker-compose.prod.yml config
 docker build -t inventory-api:operational-smoke .
 ```
@@ -99,4 +144,5 @@ docker compose -f docker-compose.prod.yml exec -T db sh -lc 'psql -U "$POSTGRES_
 - no hay backups automáticos programados en el repositorio
 - no hay restore drill automático contra producción real
 - no hay agregación externa de logs ni observabilidad SaaS versionada
+- restore readiness y operational readiness usan contratos públicos versionados bajo `docs/`
 - este runbook eleva la madurez operativa por encima del baseline mínimo, pero no equivale a una plataforma enterprise completa

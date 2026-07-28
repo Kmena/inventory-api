@@ -1,215 +1,284 @@
 # Current State
 
 ## 1. System overview
-This repository contains a Node.js 20 + Express + Prisma modular monolith in `inventory-api/`, plus repository-governance assets at the repo root.
+`inventory-api/` is a single-deployable Node.js 24 Express + Prisma application with REST APIs and a small embedded browser surface served from the same runtime.
 
-The runtime still serves:
-- JSON APIs
-- embedded browser screens from `src/public/`
-- Prisma-backed persistence through `src/repositories/`
+Post-implementation state verified from repository contents:
+- the active public browser runtime under `src/public/` is now intentionally reduced to the minimum supported baseline;
+- supported HTML documents are `/` and `/index.html` (login), `/no-access.html`, and `/migration.html`;
+- supported shared browser assets are `styles.css`, `login.js`, `no-access.js`, `migration.js`, `shared/session.js`, and `shared/auth.js`;
+- requests to legacy HTML routes under `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html` are intercepted before `express.static(...)` and respond with the common migration screen from the same URL and HTTP `410 Gone`;
+- the former functional legacy browser runtime was preserved outside the active runtime in `legacy-public-runtime/` and is no longer served from `src/public/`;
+- `legacy-public-runtime/` now has an explicit governance role as transitional backup/reference inventory only while equivalent root, warehouse, and agent capabilities are integrated and validated in the SPA.
 
-In the completed `p9-prisma-windows-closeout` cycle, the implemented change was not a production-domain redesign. It was a repository-governance hardening increment focused on Windows Prisma build evidence and documentation.
+The backend JSON API, Prisma persistence, browser-session cookie model, health/readiness endpoints, and repository/workflow governance remain implemented in the same deployable.
 
-Current verified scope for this cycle:
-- the root GitHub Actions workflow `.github/workflows/windows-prisma-build.yml` now captures the Windows build log, publishes a workflow summary, uploads an artifact, and fails explicitly when `npm run build` really fails
-- the same contractual workflow shape is mirrored in `inventory-api/.github/workflows/windows-prisma-build.yml` as an internal baseline/reference copy
-- workflow governance is validated by `scripts/validate-workflow-baseline.js`
-- regression protection exists in `tests/workflow-baseline-characterization.test.js` and `tests/prisma-windows-build-stabilization.test.js`
-- repository evidence is consolidated in `docs/prisma-windows-stability-evidence.md`
-
-The current closeout verdict is **`estabilizado con evidencia CI`** based on multiple successful real Windows runs of the hardened workflow version, including a documented rerun success.
+Repository-governance state verified in this refresh:
+- the latest `p26-browser-runtime-db-free-suite-separation` cycle implements the previously approved DB-free vs DB-backed test separation for the affected browser/runtime boundary, removes the known incidental audit-DB noise from `tests/browser-e2e.e2e.js`, stabilizes `tests/audit-instrumentation.test.js` as a DB-free suite, and adds a maintained suite catalog without changing production audit semantics or database schema;
+- runtime-contract governance treats reviewed artifacts under `docs/**` as the canonical source of truth;
+- `internal-docs/**` remains in-repository only as auxiliary support material and is no longer the authoritative enforcement target;
+- `scripts/run-tests.js` is the official aggregate test runner behind `npm run test`;
+- it defaults to `NODE_ENV=test` and `BROWSER_SESSION_STORE_MODE=memory` unless explicitly overridden;
+- the repository keeps an explicit Redis-path validation lane through `npm run test:redis-path` and the root workflow `.github/workflows/redis-browser-session-tests.yml` so the supported non-test browser-session store path remains separately governed;
+- the earlier Redis operational-safeguards slice also hardened browser-session persistence visibility by making `/health/ready` depend on both database readiness and browser-session-store readiness.
 
 ## 2. Repository structure
-Key paths inspected for this refresh:
-- `.github/workflows/windows-prisma-build.yml` — executable Windows Prisma build workflow at repository root
-- `inventory-api/.github/workflows/windows-prisma-build.yml` — mirrored baseline/reference workflow inside the app folder
-- `inventory-api/scripts/prisma-generate-safe.js` — guarded Prisma generate wrapper used by `npm run build`
-- `inventory-api/scripts/prisma-generate-safe-lib.js` — wrapper classification logic and retry helpers
-- `inventory-api/scripts/validate-workflow-baseline.js` — workflow baseline contract validator
-- `inventory-api/tests/workflow-baseline-characterization.test.js` — characterization tests for workflow contracts
-- `inventory-api/tests/prisma-windows-build-stabilization.test.js` — governance tests for Windows Prisma workflow and wrapper classification
-- `inventory-api/docs/prisma-windows-stability-evidence.md` — source of truth for closeout evidence and verdict
-- `inventory-api/README.md` — links the evidence document as the primary reference
-- `inventory-api/package.json` — exposes `build`, `validate:workflow-baseline`, `test`, and `verify`
+High-signal paths verified in this refresh:
+- repository root: `.github/workflows/`, `inventory-api/`
+- application root: `inventory-api/package.json`, `inventory-api/Dockerfile`, `inventory-api/src/`, `inventory-api/prisma/`, `inventory-api/scripts/`, `inventory-api/tests/`, `inventory-api/docs/`, `inventory-api/internal-docs/`, `inventory-api/README.md`
+- active public runtime: `inventory-api/src/public/`
+- preserved but inactive legacy browser inventory: `inventory-api/legacy-public-runtime/`
 
-Relevant package scripts currently implemented:
-- `npm run build` → `node scripts/prisma-generate-safe.js`
-- `npm run validate:workflow-baseline` → validates versioned GitHub workflow contracts
-- `npm run verify` → aggregates lint, typecheck, public-runtime checks, workflow baseline validation, operational readiness, build, and test
+Observed active `src/public/` inventory:
+- `index.html`
+- `migration.html`
+- `no-access.html`
+- `styles.css`
+- `login.js`
+- `migration.js`
+- `no-access.js`
+- `shared/session.js`
+- `shared/auth.js`
+
+Observed preserved legacy inventory outside runtime:
+- `legacy-public-runtime/root/**`
+- `legacy-public-runtime/warehouse/**`
+- `legacy-public-runtime/agent/**`
+- `legacy-public-runtime/shared/lot-dates.js`
 
 ## 3. Current architecture
-The application runtime remains a layered modular monolith:
-- routes call services
-- services coordinate business and persistence behavior
-- repositories use Prisma directly
-- static browser assets are served by the same Express process
+Current implemented architecture remains layered rather than hexagonal:
+- Express app and middleware at the HTTP boundary;
+- route modules delegating to service modules;
+- services coordinating business logic and repositories;
+- repositories encapsulating most Prisma access;
+- static browser assets served by the same Express process.
 
-In addition, the repository now has a clearer **Platform Runtime Governance** slice for build/CI stabilization:
-- `npm run build` is intentionally a guarded Prisma-generation contract
-- the root Windows workflow is the executable CI adapter for Windows Prisma evidence
-- the mirrored workflow under `inventory-api/.github/workflows/` acts as a versioned baseline/reference contract for the subproject
-- workflow governance is enforced by a local validation script and characterization tests
-- evidence and verdict are centralized in a versioned Markdown document rather than scattered across historical specs
+For the public browser surface, `src/app.js` now applies three relevant runtime behaviors:
+1. route-segmented security headers including CSP;
+2. a pre-static gate for deprecated legacy HTML routes;
+3. `express.static(...)` for the reduced supported `src/public/` baseline only.
 
-This cycle changed governance architecture and documentation, not the production runtime architecture.
+The legacy browser HTML pages are no longer an active runtime module even though their files are still preserved in the repository under `legacy-public-runtime/`. That preserved tree is backup/reference material only; it is not an implicit rollback path and should be removed in a later approved slice once equivalent SPA sections are implemented and validated.
 
 ## 4. Existing domains and modules
-Observed modules relevant to this refresh:
-
-### Platform Runtime Governance
-Current code location:
-- `.github/workflows/windows-prisma-build.yml`
-- `inventory-api/.github/workflows/windows-prisma-build.yml`
-- `scripts/validate-workflow-baseline.js`
-- `tests/workflow-baseline-characterization.test.js`
-- `tests/prisma-windows-build-stabilization.test.js`
-- `docs/prisma-windows-stability-evidence.md`
-
-Responsibility:
-- preserve the contractual shape of workflow baselines
-- validate the dedicated Windows Prisma workflow locally
-- keep Windows build evidence auditable
-- classify workflow failures without masking real build errors
-- document whether the risk remains residual or is stabilized with CI evidence
-
-### Build and Prisma Bootstrap
-Current code location:
-- `scripts/prisma-generate-safe.js`
-- `scripts/prisma-generate-safe-lib.js`
-- `package.json`
-
-Responsibility:
-- generate Prisma Client through the guarded wrapper
-- classify retryable Windows rename-lock failures versus non-retryable failures
-- preserve explicit failure semantics for real build problems
-
-### Core application runtime
-Still present and unchanged in architectural role for this cycle:
-- Identity and Access
-- Company Administration
-- Customer Management
-- Product Catalog
-- Inventory
-- Sales Routing / Agent Workspace
-- Orders
-- Billing and Collections
-- Embedded Browser Runtime
+Observable current runtime and governance areas:
+- Authentication and authorization
+- Company, role, and user administration
+- Client management and client documents
+- Product catalog and inventory
+- Warehouses and geography
+- Sales routes and agent workspace APIs
+- Orders, invoices, and payments
+- Embedded browser runtime (reduced baseline only)
+- Repository/platform governance
+- CI/workflow governance
 
 ## 5. Main use cases
-Repository-governance use cases observable from code and docs:
-- execute `npm run build` through the guarded Prisma wrapper
-- run a dedicated Windows GitHub Actions build on `windows-latest`
-- capture a build log file for the Windows run
-- classify failures as `windows_rename_lock`, `non_retryable_failure`, or `runner/environment issue`
-- publish a structured workflow summary with run metadata
-- upload a build-log artifact for auditability
-- fail the workflow explicitly when the guarded build exits non-zero
-- validate the workflow baseline locally with `npm run validate:workflow-baseline`
-- preserve governance contracts with characterization tests
-- consolidate real CI evidence and the repository verdict in `docs/prisma-windows-stability-evidence.md`
+Examples currently implemented:
+- login via `/api/auth/login`, including browser-session issuance when `X-Inventory-Browser-Session: cookie` is requested;
+- retrieve authenticated context via `/api/auth/me`;
+- close an authenticated browser session via `/api/auth/logout`;
+- serve the supported login document at `/` and `/index.html`;
+- serve the supported fallback documents `/no-access.html` and `/migration.html`;
+- respond to direct legacy HTML requests such as `/root/dashboard.html`, `/warehouse/products.html`, or `/agent/workspace.html` with the shared migration screen and HTTP `410 Gone` without redirect;
+- answer `GET /health` with a backward-compatible liveness payload;
+- answer `GET /health/ready` with database and browser-session-store dependency state, returning `503` when Prisma readiness fails or when the configured Redis session store is down;
+- serve JSON APIs for companies, roles, users, clients, products, orders, invoices, payments, inventory, warehouses, regions, sales routes, agent workflows, taxpayers, geocoding, and economic activities;
+- execute repository validation through lint, typecheck, build, public-runtime validation, the aggregate `npm run test` runner, browser/runtime characterization tests, and hosted GitHub Actions workflows.
 
 ## 6. Current data flows
+### Public browser flow
+1. A browser requests a public document or asset.
+2. `src/app.js` applies security headers.
+3. If the path matches `/root/*.html`, `/warehouse/*.html`, or `/agent/*.html`, the request is intercepted by `serveDeprecatedLegacyHtml`.
+4. The response returns `migration.html` from the same requested URL with HTTP `410 Gone`.
+5. Non-deprecated public requests fall through to `express.static(src/public)`.
+6. Login and other supported public pages bootstrap session/auth behavior through `shared/session.js` and `shared/auth.js`.
 
-### Guarded Prisma build flow
-1. `npm run build` executes `node scripts/prisma-generate-safe.js`
-2. the wrapper delegates to Prisma generate behavior
-3. failure signals are classified using shared library logic from `scripts/prisma-generate-safe-lib.js`
-4. retryable Windows rename-lock behavior remains distinguished from non-retryable Prisma failures
-5. the command preserves the real exit outcome for callers
+### API flow
+1. Express receives `/api/*` requests.
+2. Middleware performs logging, request context, throttling, validation, authentication, and authorization as applicable.
+3. Routes call services.
+4. Services call repositories and Prisma-backed persistence.
+5. Responses return JSON errors or data.
 
-### Windows workflow evidence flow
-1. GitHub Actions runs `.github/workflows/windows-prisma-build.yml` on `windows-latest`
-2. the workflow installs dependencies with `npm ci`
-3. the guarded build step runs with `continue-on-error: true` only to allow evidence capture before the explicit failure gate
-4. stdout/stderr are tee'd into `npm-run-build.log`
-5. the workflow stores `build_exit_code` and `build_log_path` in step outputs
-6. a follow-up step classifies the result as `success`, `windows_rename_lock`, `non_retryable_failure`, or `runner/environment issue`
-7. the workflow publishes a structured summary to `GITHUB_STEP_SUMMARY`
-8. the workflow uploads `windows-prisma-build-log-<run_id>` as an artifact
-9. the final failure gate exits non-zero if the guarded build actually failed
+### Readiness flow
+1. `GET /health/ready` invokes Prisma database readiness.
+2. The same request invokes `browserSessionService.checkBrowserSessionStoreReadiness()`.
+3. The memory session store reports `{ mode: 'memory', status: 'memory' }` after local cleanup.
+4. The Redis session store reports `{ mode: 'redis', status: 'up' }` when `PING` succeeds and `{ mode: 'redis', status: 'down' }` when the connection fails.
+5. The route returns `200` only when the database is up and the browser-session dependency is acceptable for the active mode; in Redis mode, a down store makes readiness fail with `503`.
 
-### Evidence closeout flow
-1. real CI runs are recorded in `docs/prisma-windows-stability-evidence.md`
-2. the evidence document compares actual runs against the approved closeout criterion
-3. the repository verdict is currently `estabilizado con evidencia CI` because the documented criterion is now met
-4. README links the evidence document as the repository source of truth
+### Legacy-runtime preservation flow
+1. Legacy HTML/JS files remain versioned under `legacy-public-runtime/`.
+2. They are no longer inside `src/public/`.
+3. They are therefore not part of the supported HTTP runtime served by Express.
+4. Validators now treat them as preserved inventory, not active browser surface.
+5. The preserved tree remains transitional only until equivalent SPA coverage exists and has been validated.
 
 ## 7. Database and persistence
-Persistence remains Prisma + PostgreSQL.
-
-Scope-relevant observations for this cycle:
-- no Prisma schema change was made in this documentation refresh
-- no database migration change was made in this cycle summary
-- the affected `build` contract is about Prisma Client generation and CI evidence, not schema redesign
+- Prisma schema remains in `inventory-api/prisma/schema.prisma`.
+- Versioned migrations remain in `inventory-api/prisma/migrations/`.
+- Persistence remains repository + Prisma based.
+- Browser-session persistence remains externalized through the store abstraction.
+- `browser-session-store.factory.js` resolves `memory` for test mode by default and `redis` for non-test mode unless `BROWSER_SESSION_STORE_MODE` explicitly overrides it.
+- `BrowserSessionMemoryStore` keeps sessions in-process, eagerly drops expired entries, supports explicit invalidation, and exposes readiness as `memory`.
+- `BrowserSessionRedisStore` persists opaque sessions under the configured key prefix in Redis, uses a raw TCP Redis protocol client, and exposes readiness via `PING` without silently falling back to memory mode.
+- No database schema or migration changed in the inspected `p26` implementation refresh.
 
 ## 8. APIs and integrations
-No application API contract changed in this cycle.
+Current observable interfaces:
+- REST-style endpoints under `/api/*`
+- health endpoints under `/health/*`
+- static runtime served from `/`
+- GitHub Actions as repository-governance integration
+- canonical runtime-contract artifacts under `docs/**`, with `internal-docs/**` retained only as auxiliary repository material
 
-Repository-governance integrations relevant here:
-- GitHub Actions is the remote execution surface for the dedicated Windows Prisma workflow
-- local repository validation uses Node-based scripts and `node --test`
-- evidence currently depends on versioned Markdown plus previously captured GitHub Actions run metadata
+Relevant health and operational contracts now in effect:
+- `GET /health` returns `{ ok: true, service: 'inventory-api' }`;
+- `GET /health/ready` returns `{ ok, service, checks }` where `checks.database` and `checks.browserSessionStore` reflect current dependency status;
+- in Redis mode, `checks.browserSessionStore = down` forces readiness `503`;
+- in memory mode, `checks.browserSessionStore = memory` keeps readiness compatible without requiring Redis.
+
+Relevant public-surface behavior now in effect:
+- `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` remain supported and are explicitly outside the HTML deprecation scope;
+- `POST /api/auth/logout` is part of the governed runtime-contract inventory after the `p23` contract-alignment refresh;
+- legacy HTML paths are not redirected to new routes; they return `410 Gone` from the same URL;
+- `legacy-public-runtime/` is a repository artifact, not a served integration surface.
+- `legacy-public-runtime/` is transitional backup/reference inventory only and must not be reactivated as a compatibility shortcut.
 
 ## 9. Authentication and authorization
-No application auth/authorization contract changed in this cycle.
+Current observable behavior:
+- login remains public;
+- authenticated APIs use middleware-based authentication;
+- authorization remains middleware/policy based;
+- browser login can request a backend-owned browser session by sending `X-Inventory-Browser-Session: cookie` to `/api/auth/login`;
+- supported embedded browser flows use the cookie pair `inventory_browser_session` + `inventory_browser_state` instead of persisted bearer tokens in `localStorage`;
+- `shared/session.js` and `shared/auth.js` remain the active browser helper seam for the reduced supported public runtime;
+- `/api/auth/me` returns the browser-session user projection and refreshes cookies for cookie-authenticated browser requests;
+- `/api/auth/logout` invalidates the backend-owned browser session and clears both browser cookies;
+- mutating cookie-authenticated requests enforce same-origin `Origin` validation in `authenticate.js`.
 
-Repository-level observation:
-- initial implementation from this environment could not trigger GitHub Actions directly because `gh` was unavailable and `GITHUB_TOKEN` was absent
-- final closeout evidence was nevertheless obtained through successful remote GitHub Actions executions after push, including a documented rerun
+Current post-login behavior in code:
+- `src/public/login.js` now resolves retired-runtime-dependent authenticated users to `/migration.html?mode=post-login-transition`.
+- in that supported transition mode, the page explicitly confirms successful authentication, states that the destination module is not implemented yet, and preserves safe return-to-login/logout actions instead of pretending to be a functional dashboard.
+- direct requests to `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html` still do not open functional legacy screens; they continue to land on the deprecated-route migration response (`410 Gone`).
 
 ## 10. Events and background processing
-No event bus or background-processing architecture changed in this cycle.
+No application event bus or separate background worker was verified.
 
-The dedicated Windows workflow is CI orchestration, not an in-application event mechanism.
+GitHub Actions workflows remain repository automation, not application background processing.
 
 ## 11. Containers and deployment
-Container/runtime deployment architecture was not changed by this cycle.
+Observed deployment/runtime assets:
+- `inventory-api/Dockerfile`
+- `inventory-api/docker-compose.yml`
+- `inventory-api/docker-compose.dev.yml`
+- `inventory-api/docker-compose.prod.yml`
+- repository-root GitHub Actions workflows
 
-Relevant operational governance additions remain in GitHub Actions rather than Docker:
-- Windows Prisma build evidence workflow at repo root
-- mirrored workflow baseline under `inventory-api/.github/workflows/`
+Current platform baseline:
+- `inventory-api/package.json` declares `engines.node: ">=24 <25"`
+- `inventory-api/Dockerfile` uses `node:24-bullseye-slim`
+- the Docker image healthcheck probes `GET /health/ready`
+- compose files declare the Redis dependency and browser-session store environment expected by the current session baseline
+- root official workflows use Node 24 and execute in `inventory-api/`
 
 ## 12. Current testing strategy
-The repository has an active automated baseline using Node tests plus validation scripts.
+This refresh did not execute commands directly. Validation status is taken from the user-provided post-implementation evidence for the current repository-governance refresh.
 
-Cycle-relevant tests and validations:
-- `npm run validate:workflow-baseline` ✅ user-reported passed
-- `node --test tests/workflow-baseline-characterization.test.js` ✅ user-reported passed
-- `node --test tests/prisma-windows-build-stabilization.test.js` ✅ user-reported passed
+Current repository-wide testing posture now includes:
+- `scripts/run-tests.js` as the official aggregate test runner behind `npm run test`;
+- deterministic default test bootstrap via `NODE_ENV=test` and `BROWSER_SESSION_STORE_MODE=memory` unless explicitly overridden;
+- a dedicated non-default Redis-path validation command at `npm run test:redis-path`;
+- targeted governance and characterization suites for browser/runtime, contract coverage, authorization, audit instrumentation, integrations, and repository policies;
+- focused browser/runtime validation through `scripts/validate-public-runtime.js` and related tests;
+- workflow-governance validation through `scripts/validate-workflow-baseline.js` and `tests/workflow-baseline-characterization.test.js` against the root workflow tree;
+- optional environment-gated suites such as `tests/p2-hardening-constraints.test.js` when dedicated database configuration is supplied.
 
-Additional governance coverage visible in the repository:
-- `npm run build` uses the guarded Prisma wrapper
-- `npm run verify` includes `validate:workflow-baseline`
+The active browser/runtime governance still relies on:
+- `scripts/validate-public-runtime.js`
+- `tests/public-surface-characterization.test.js`
+- `tests/public-runtime-http-smoke.test.js`
+- `tests/browser-runtime-auth-convergence-inventory.test.js`
+- `tests/browser-auth-compatibility-inventory.test.js`
+- `tests/browser-e2e.e2e.js`
+- `docs/test-suite-catalog.md`
+- canonical runtime-contract artifacts under `docs/**`
+- optional auxiliary/internal artifacts under `internal-docs/**` when needed for non-canonical support material
 
-This document records those results as user-supplied implementation evidence. They were not re-executed during this documentation refresh.
+Additional post-implementation evidence supplied by the requester for the latest implemented refresh:
+- `node --test tests/browser-session-redis-store.test.js` ✅
+- `node --test tests/browser-session-service-characterization.test.js` ✅
+- `node --test tests/health-routes.test.js` ✅
+- `node --test tests/production-baseline-characterization.test.js` ✅
+- `node --test tests/browser-session-auth-boundary.test.js` ✅
+- `npm run test:redis-path` ✅
+- `npm run validate:operational-readiness` ✅
+- `npm run lint -- --quiet` ✅
+- `npm run typecheck` ✅
+- `npm run build` ✅ (after one transient Windows Prisma rename-lock retry)
+- `npm run test -- --silent` ✅
+- Additional requester-supplied validation evidence for `p26`:
+  - `node --test tests/browser-e2e.e2e.js` ✅
+  - `node --test tests/audit-instrumentation.test.js tests/audit-repository.test.js` ✅, with `tests/audit-repository.test.js` skipped when `P2_AUDIT_DATABASE_URL` is absent
+  - `npm run typecheck` ✅
+  - `npm run validate:public-runtime` ✅
+  - `npm run lint -- --quiet` ✅
+- baseline audit score: `8.8/10` acceptable, with no meaningful regression reported and the warning remaining only because the score is below `9.5`
+
+This evidence establishes a passing repository-wide baseline for the official aggregate suite, the explicit Redis-path lane, and the operational-readiness checks relevant to browser-session persistence.
 
 ## 13. Behavior to preserve
-- `npm run build` must continue using the guarded Prisma wrapper
-- the root workflow `.github/workflows/windows-prisma-build.yml` must remain the executable Windows evidence workflow
-- the mirrored workflow under `inventory-api/.github/workflows/windows-prisma-build.yml` must remain contract-aligned with the root workflow shape
-- workflow summary publication must remain in place
-- build-log artifact upload must remain in place
-- the explicit failure gate must continue preserving real build failure semantics
-- workflow failure classification taxonomy must remain documented and test-governed
-- `docs/prisma-windows-stability-evidence.md` must remain the primary repository source of truth for closeout evidence
+- Express must continue serving the reduced active browser runtime from `src/public/`.
+- `/`, `/index.html`, `/no-access.html`, and `/migration.html` must remain the only supported HTML documents in the embedded public runtime.
+- Requests to deprecated legacy HTML routes under `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html` must continue responding from the same URL with the common migration screen and HTTP `410 Gone`, without redirect.
+- `/migration.html?mode=post-login-transition` must remain a supported 200 post-login landing distinct from the deprecated-route `410 Gone` contract.
+- the supported post-login landing must remain explicitly transitional, not-yet-implemented, and safe-exit oriented until future SPA destinations per role are approved and implemented.
+- `legacy-public-runtime/` must remain outside the active runtime and outside implicit rollback behavior unless a later approved change explicitly redefines the supported surface.
+- `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` must remain supported.
+- `GET /health` must remain a backward-compatible liveness endpoint.
+- `GET /health/ready` must continue reflecting both database readiness and browser-session-store readiness, including `503` when Redis mode is configured but unavailable.
+- `shared/session.js`, `shared/auth.js`, and `login.js` must remain the bounded browser-runtime typecheck baseline.
+- Retired legacy pages and `legacy-public-runtime/` must not re-enter supported runtime, validator scope, or typecheck scope unless a later approved spec explicitly changes that contract.
+- Supported browser flows must not reintroduce persisted bearer tokens in `localStorage`.
 
 ## 14. Known defects
-- the Prisma/Windows closeout criterion is now satisfied and documented in `docs/prisma-windows-stability-evidence.md`
-- the remaining issues in this area are maintainability-oriented rather than an open closeout gap:
-  - workflow duplication between root executable workflow and app-local mirror
-  - future dependency on keeping evidence docs synchronized with CI reality
+- The supported post-login landing for retired-runtime-dependent roles remains transitional and informational (`/migration.html?mode=post-login-transition`), not a final functional destination.
+- The current supported wording intentionally tells the user that the destination module is not implemented yet and offers safe return-to-login/logout behavior rather than legacy fallback navigation.
+- The Redis session store implementation uses a small raw-socket protocol client rather than a mature Redis library, which keeps dependencies low but leaves protocol handling responsibility inside application code.
+- Some passing tests can still emit expected operational logs, but the previously known incidental audit-log noise for `tests/browser-e2e.e2e.js` no longer reaches Prisma because that suite now runs through an explicit DB-free audit seam.
+- The approved remediation strategy has now been implemented for the affected browser/runtime boundary through explicit DB-free vs DB-backed suite separation and a maintained suite catalog, rather than broad log suppression.
 
 ## 15. Architectural debt
-- workflow evidence depends on both a root executable workflow and a mirrored app-local baseline file, which introduces duplication that must stay synchronized
-- the governance path still includes manual evidence capture and documentation synchronization after real remote runs
-- future Windows/Prisma or runner changes could still require renewed evidence collection, even though the present closeout state is stabilized
+- The application remains layered without strict hexagonal separation.
+- Service-layer responsibilities remain broad in several modules.
+- API runtime, static public delivery, and governance concerns still coexist in the same deployable.
+- Operational assurance still depends on synchronization across docs, validators, tests, README, env examples, compose files, and workflows.
+- Runtime-contract governance now treats `docs/**` as the sole authoritative reviewed artifact location; `internal-docs/**` is auxiliary only and must not shadow canonical runtime-contract truth.
+- The repository-wide governance baseline remains acceptable but not fully closed by the latest audit score (`8.8/10`), so documentation and workflow/test contracts still require disciplined upkeep to avoid regressions below the desired threshold.
+- The preserved `legacy-public-runtime/` inventory is intentionally outside active support and remains in-repo only as transitional backup/reference debt until equivalent SPA functionality is implemented, validated, and a later approved slice removes it.
+- The interim supported post-login landing remains informational rather than operational for retired-runtime-dependent roles.
+- The reduced public-runtime contract depends on synchronized updates across `login.js`, `migration.html`, `migration.js`, validators, tests, and manifest/docs when transition behavior changes.
+- The aggregate test runner now defaults to memory-backed browser sessions for stability, which reduces default-suite coverage of the supported Redis-backed non-test path.
+- Focused browser/runtime suites should avoid real DB-backed audit dependencies when persistence is not part of the asserted behavior, while dedicated DB-backed tests must continue preserving audit/persistence coverage and unexpected-failure visibility.
+- `docs/test-suite-catalog.md` is now the maintained reference for the affected suite boundary, including DB-free, DB-backed, and Redis-backed classifications.
 
 ## 16. Security risks
-- No new application security defect was identified in this refresh scope
-- The hardened workflow reduces false-success risk by preserving the real build exit code
-- Residual risk is operational and audit/governance-oriented rather than a newly confirmed application security vulnerability
+Current architecture-facing security concerns still visible:
+- supported non-test browser-session persistence depends on Redis availability and correct environment configuration;
+- browser-session issuance and validation now fail explicitly with `503 service_unavailable` semantics when Redis mode is configured but the store is unreachable, which is safer than silent downgrade but increases operational dependence on Redis uptime;
+- universal `Secure` cookie enforcement still depends on HTTPS-capable deployment or trusted proxy signaling;
+- this HTTPS/cookie posture remains a documented residual risk and follow-up dependency tracked in `specs/p11-https-browser-session-migration/`, not an in-slice blocker for the current reduced public-runtime contract;
+- mutating cookie-authenticated requests rely on same-origin `Origin` validation rather than a separate CSRF token;
+- broader architectural boundaries are still layered rather than strongly isolated.
+
+The reduced public-runtime posture continues to limit public browser exposure by removing the functional legacy HTML runtime from the served surface.
 
 ## 17. Unknowns and assumptions
-- This refresh records the successful remote runs and rerun as the closeout evidence baseline for the hardened workflow version
-- The evidence document remains the source of truth and must be updated if future Windows behavior changes materially
-- The repository still treats workflow summary, artifact publication and explicit failure-gate behavior as compatibility-sensitive governance contracts
+- This refresh did not execute commands directly; validation status and audit scoring are taken from the user-provided command results.
+- No evidence in this refresh contradicts the implemented reduced public-runtime contract.
+- The preserved `legacy-public-runtime/` tree was verified as present in the repository, but it was not treated as supported runtime behavior because it is outside `src/public/`.
+- The approved interim replacement destination in `login.js` is `/migration.html?mode=post-login-transition` until a later approved slice defines final functional SPA destinations by role.
+- The requester-supplied passing suite evidence is treated as the current repository-wide baseline for `npm run test -- --silent` after the `p23` runner-bootstrap change.

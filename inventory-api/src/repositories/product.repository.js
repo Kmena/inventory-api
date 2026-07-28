@@ -99,8 +99,20 @@ function createProduct(data) {
   return prisma.product.create({ data, include: productInclude });
 }
 
-function updateProduct(id, data) {
-  return prisma.product.update({ where: { id }, data, include: productInclude });
+async function updateProduct(id, companyId, data, db = prisma) {
+  const result = await db.product.updateMany({
+    where: buildDefaultActiveProductWhere({ id, companyId }),
+    data,
+  });
+
+  if (result.count === 0) {
+    return null;
+  }
+
+  return db.product.findFirst({
+    where: buildDefaultActiveProductWhere({ id, companyId }),
+    include: productInclude,
+  });
 }
 
 function deactivateCompanyProduct(id, companyId) {

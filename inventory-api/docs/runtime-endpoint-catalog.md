@@ -11,6 +11,8 @@ Este documento formaliza el inventario actual de endpoints montados en runtime p
 - `docs/runtime-contract-manifest.json`
   - contiene toda operación montada en routers que queda intencionalmente fuera del OpenAPI parcial, con razón explícita;
   - también registra superficies runtime no enrutadas que siguen fuera de OpenAPI, como `express.static(src/public)`.
+- `docs/critical-contract-matrix.json`
+  - resume la superficie mínima crítica resuelta con la opción aprobada B.
 - Este catálogo
   - funciona como referencia humana consolidada del runtime montado y del criterio de clasificación contractual.
 
@@ -22,13 +24,14 @@ Toda operación montada en routers debe quedar clasificada por exactamente uno d
 No se aceptan rutas montadas sin clasificar.
 
 ### Current contract summary
+Option B satisfied for the minimum critical contract surface.
 - Operaciones montadas en routers descubiertas desde `src/app.js` + `src/routes/*.routes.js`: `95`
-- Operaciones cubiertas por OpenAPI parcial: `74`
-- Operaciones excluidas explícitamente del OpenAPI parcial: `21`
+- Operaciones cubiertas por OpenAPI parcial: `75`
+- Operaciones excluidas explícitamente del OpenAPI parcial: `20`
 - Superficie runtime adicional intencionalmente fuera de OpenAPI: `express.static(src/public)`
 
 ### Intentionally excluded OpenAPI operations
-Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Las categorías activas son:
+Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option B satisfied para la superficie mínima crítica documentada en `docs/critical-contract-matrix.json`. Las categorías activas son:
 - aliases o formas legacy compatibles preservadas;
 - superficies root/global fuera del recorte contractual actual;
 - mutaciones o subrecursos profundos de lifecycle aún no formalizados en OpenAPI parcial;
@@ -62,8 +65,9 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Las cat
 |---|---|---|---|---|---|
 | GET | `/health` | No | None | Liveness básica del servicio | `health.routes.js` |
 | GET | `/health/ready` | No | None | Readiness con chequeo de base de datos | Responde `503` si DB no está lista |
-| POST | `/api/auth/login` | No | None | Iniciar sesión y emitir contexto autenticado | Validado por `loginSchema` |
-| GET | `/api/auth/me` | Sí | `authenticate` | Obtener sesión/auth payload actual | Sin role middleware adicional |
+| POST | `/api/auth/login` | No | None | Iniciar sesión y emitir contexto autenticado | Validado por `loginSchema`; emite sesión browser por cookie cuando recibe `X-Inventory-Browser-Session: cookie` |
+| GET | `/api/auth/me` | Sí | `authenticate` | Obtener sesión/auth payload actual | Sin role middleware adicional; refresca cookies para requests browser autenticados por cookie |
+| POST | `/api/auth/logout` | Sí | `authenticate` | Cerrar sesión autenticada actual | Invalida la sesión browser backend-owned y limpia cookies |
 
 ## Gobierno organizacional y tenant
 | Method | Path | Authentication | Authorization observed | Purpose | Notes |

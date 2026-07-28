@@ -3,46 +3,15 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const publicRoot = path.join(__dirname, '..', 'src', 'public');
+const legacyRuntimeRoot = path.join(__dirname, '..', 'legacy-public-runtime');
 
-const HTML_WITHOUT_LOCAL_SCRIPT_ALLOWED = new Set(['no-access.html']);
-
-const CRITICAL_JAVASCRIPT_RULES = [
-  {
-    relativePath: 'root/index.js',
-    checks: [
-      { description: 'guards the root-only administrative screen', pattern: /if \(!session\?\.token \|\| session\?\.user\?\.role\?\.code !== 'root'\)/ },
-      { description: 'sends authenticated administrative requests', pattern: /Authorization: `Bearer \$\{session\.token\}`/ },
-      { description: 'clears local session on logout', pattern: /localStorage\.removeItem\(STORAGE_KEY\);/ },
-      { description: 'returns to the public login on logout', pattern: /window\.location\.href = '\/'/ },
-    ],
-  },
-  {
-    relativePath: 'root/clients.js',
-    checks: [
-      { description: 'reuses the shared root clients runtime helper', pattern: /const clientsShared = window\.RootClientsShared;/ },
-      { description: 'builds authenticated headers through the shared helper', pattern: /const authHeaders = \(\) => clientsShared\.authHeaders\(session\);/ },
-      { description: 'keeps protected document downloads behind the shared helper', pattern: /clientsShared\.downloadProtectedFile\(/ },
-      { description: 'clears local session on logout', pattern: /localStorage\.removeItem\(STORAGE_KEY\);/ },
-    ],
-  },
-  {
-    relativePath: 'agent/visit.js',
-    checks: [
-      { description: 'requires both authenticated session and store context', pattern: /if \(!session\?\.token \|\| !session\?\.user\?\.companyId \|\| !storeId\)/ },
-      { description: 'loads store detail through authenticated fetch', pattern: /fetch\(`\/api\/agent\/stores\/\$\{storeId\}`/, },
-      { description: 'posts visit updates through authenticated headers', pattern: /headers: authHeaders\(\),/ },
-      { description: 'keeps workspace back navigation', pattern: /window\.location\.href = `\/agent\/workspace\.html\?storeId=\$\{storeId\}`/ },
-    ],
-  },
-  {
-    relativePath: 'agent/order-entry.js',
-    checks: [
-      { description: 'requires both authenticated session and store context', pattern: /if \(!session\?\.token \|\| !session\?\.user\?\.companyId \|\| !storeId\)/ },
-      { description: 'loads order context through authenticated fetch', pattern: /fetch\(`\/api\/agent\/stores\/\$\{storeId\}\/order-context`/, },
-      { description: 'posts draft orders through authenticated headers', pattern: /headers: authHeaders\(\),/ },
-      { description: 'keeps workspace back navigation', pattern: /window\.location\.href = `\/agent\/workspace\.html\?storeId=\$\{storeId\}`/ },
-    ],
-  },
+const expectedHtmlFiles = ['index.html', 'migration.html', 'no-access.html'];
+const expectedJavaScriptFiles = [
+  'login.js',
+  'migration.js',
+  'no-access.js',
+  'shared/auth.js',
+  'shared/session.js',
 ];
 
 function toPosixPath(value) {
@@ -53,44 +22,30 @@ function readSource(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
-function listJavaScriptFiles(directory) {
+function listFilesWithExtension(directory, extension) {
   const collectedFiles = [];
 
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const absolutePath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      collectedFiles.push(...listJavaScriptFiles(absolutePath));
+      collectedFiles.push(...listFilesWithExtension(absolutePath, extension));
       continue;
     }
 
-    if (entry.isFile() && absolutePath.endsWith('.js')) {
+    if (entry.isFile() && absolutePath.endsWith(extension)) {
       collectedFiles.push(absolutePath);
     }
   }
 
   return collectedFiles.sort();
+}
+
+function listJavaScriptFiles(directory) {
+  return listFilesWithExtension(directory, '.js');
 }
 
 function listHtmlFiles(directory) {
-  const collectedFiles = [];
-
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    const absolutePath = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      collectedFiles.push(...listHtmlFiles(absolutePath));
-      continue;
-    }
-
-    if (entry.isFile() && absolutePath.endsWith('.html')) {
-      collectedFiles.push(absolutePath);
-    }
-  }
-
-  return collectedFiles.sort();
-}
-
-function validateJavaScriptSyntax(filePath) {
-  new vm.Script(readSource(filePath), { filename: filePath });
+  return listFilesWithExtension(directory, '.html');
 }
 
 function collectLocalAssetReferences(htmlSource) {
@@ -113,10 +68,13 @@ function collectLocalAssetReferences(htmlSource) {
   return assetReferences;
 }
 
+function validateJavaScriptSyntax(filePath) {
+  new vm.Script(readSource(filePath), { filename: filePath });
+}
+
 function validateHtmlAssets(filePath) {
   const source = readSource(filePath);
   const assetReferences = collectLocalAssetReferences(source);
-  const localScriptReferences = assetReferences.filter((assetPath) => assetPath.endsWith('.js'));
 
   for (const assetPath of assetReferences) {
     const absoluteAssetPath = path.join(publicRoot, assetPath.slice(1));
@@ -124,100 +82,126 @@ function validateHtmlAssets(filePath) {
       throw new Error(`Asset reference not found for ${toPosixPath(path.relative(publicRoot, filePath))}: ${assetPath}`);
     }
   }
+}
 
-  const relativePath = toPosixPath(path.relative(publicRoot, filePath));
-  if (localScriptReferences.length === 0 && !HTML_WITHOUT_LOCAL_SCRIPT_ALLOWED.has(relativePath)) {
-    throw new Error(`HTML runtime surface without local script reference: ${relativePath}`);
+function assertExactSupportedFileSet(relativePaths, expectedRelativePaths, label) {
+  const actual = [...relativePaths].sort();
+  const expected = [...expectedRelativePaths].sort();
+
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`${label} drift detected. Expected ${expected.join(', ')} but found ${actual.join(', ')}`);
   }
 }
 
-function validateLoginRuntimeContracts(failures) {
+function validatePublicRuntimeInventory() {
+  const htmlFiles = listHtmlFiles(publicRoot).map((filePath) => toPosixPath(path.relative(publicRoot, filePath)));
+  const javascriptFiles = listJavaScriptFiles(publicRoot).map((filePath) => toPosixPath(path.relative(publicRoot, filePath)));
+
+  assertExactSupportedFileSet(htmlFiles, expectedHtmlFiles, 'Public HTML inventory');
+  assertExactSupportedFileSet(javascriptFiles, expectedJavaScriptFiles, 'Public JavaScript inventory');
+
+  for (const retiredDirectory of ['root', 'warehouse', 'agent']) {
+    if (fs.existsSync(path.join(publicRoot, retiredDirectory))) {
+      throw new Error(`Retired public runtime directory is still exposed from src/public: ${retiredDirectory}`);
+    }
+  }
+
+  for (const relocatedDirectory of ['root', 'warehouse', 'agent']) {
+    if (!fs.existsSync(path.join(legacyRuntimeRoot, relocatedDirectory))) {
+      throw new Error(`Expected relocated legacy runtime directory not found: ${relocatedDirectory}`);
+    }
+  }
+
+  if (!fs.existsSync(path.join(legacyRuntimeRoot, 'shared', 'lot-dates.js'))) {
+    throw new Error('Expected relocated legacy shared helper not found: shared/lot-dates.js');
+  }
+}
+
+function validateLoginRuntimeContracts() {
+  const failures = [];
   const loginSource = readSource(path.join(publicRoot, 'login.js'));
   const loginHtmlSource = readSource(path.join(publicRoot, 'index.html'));
+  const sessionHelperSource = readSource(path.join(publicRoot, 'shared', 'session.js'));
+  const authHelperSource = readSource(path.join(publicRoot, 'shared', 'auth.js'));
 
   const loginSourceContracts = [
-    { description: 'declares the supported login storage key', snippet: 'inventory-api-auth' },
-    { description: 'declares the supported login endpoint', snippet: '/api/auth/login' },
-    { description: 'persists authenticated session in localStorage', snippet: 'localStorage.setItem(STORAGE_KEY, JSON.stringify(session));' },
-    { description: 'clears malformed stored session data defensively', snippet: 'localStorage.removeItem(STORAGE_KEY);' },
-    { description: 'keeps the approved landing resolver', snippet: 'getHomeForSession' },
-    { description: 'keeps the approved warehouse landing target', snippet: '/warehouse/products.html' },
-    { description: 'keeps the approved agent landing target', snippet: '/agent/workspace.html' },
-    { description: 'keeps the approved company-admin landing target', snippet: '/root/dashboard.html' },
+    { description: 'uses the shared browser session helper', snippets: ['const inventorySession = window.InventorySession;', 'const inventorySession = /** @type {any} */ (window).InventorySession;'] },
+    { description: 'uses the shared browser auth helper', snippets: ['const inventoryAuth = window.InventoryAuth;', 'const inventoryAuth = /** @type {any} */ (window).InventoryAuth;'] },
+    { description: 'declares the supported login endpoint', snippets: ['/api/auth/login'] },
+    { description: 'persists authenticated session through the shared session helper', snippets: ['inventorySession.write(session);'] },
+    { description: 'restores existing sessions through the shared session helper', snippets: ['inventorySession.read();'] },
+    { description: 'routes retired-runtime roles to the supported post-login transition landing', snippets: ["'/migration.html?mode=post-login-transition'", "const POST_LOGIN_TRANSITION_PATH = '/migration.html?mode=post-login-transition';"] },
   ];
 
   for (const contract of loginSourceContracts) {
-    if (!loginSource.includes(contract.snippet)) {
+    if (!contract.snippets.some((snippet) => loginSource.includes(snippet))) {
       failures.push(`login.js: missing contract -> ${contract.description}`);
     }
   }
 
-  if (loginHtmlSource.includes('Acceso inicial:')) {
-    failures.push('index.html: public login still exposes default bootstrap credentials');
+  if (!sessionHelperSource.includes('clearAndRedirectToLogin')) {
+    failures.push('shared/session.js: missing contract -> clearAndRedirectToLogin');
   }
-}
 
-function validateRuntimeSourceContracts(relativePath, contracts, failures) {
-  const source = readSource(path.join(publicRoot, relativePath));
-
-  for (const contract of contracts) {
-    if (!source.includes(contract.snippet)) {
-      failures.push(`${relativePath}: missing contract -> ${contract.description}`);
-    }
+  if (!authHelperSource.includes('async function fetchJson(session, url, options = {})')) {
+    failures.push('shared/auth.js: missing contract -> fetchJson');
   }
-}
 
-function validateRootDashboardRuntimeContracts(failures) {
-  validateRuntimeSourceContracts('root/dashboard.js', [
-    { description: 'guards the company-admin dashboard screen', snippet: "session?.user?.role?.code !== 'admin'" },
-    { description: 'uses the preferred company dashboard API', snippet: "/api/companies/company/dashboard" },
-    { description: 'sends authenticated dashboard requests', snippet: 'Authorization: `Bearer ${session.token}`' },
-    { description: 'clears local session on logout', snippet: 'localStorage.removeItem(STORAGE_KEY);' },
-  ], failures);
-}
-
-function validateWarehouseProductsRuntimeContracts(failures) {
-  validateRuntimeSourceContracts('warehouse/products.js', [
-    { description: 'guards the warehouse screen behind an authenticated warehouse-capable session', snippet: 'if (!session?.token || !canAccessWarehouse)' },
-    { description: 'centralizes authenticated API access', snippet: 'async function apiFetch(url, options = {}) {' },
-    { description: 'sends bearer authorization in warehouse API requests', snippet: 'Authorization: `Bearer ${session.token}`' },
-    { description: 'returns to login on unauthorized warehouse API responses', snippet: "if (response.status === 401) {" },
-    { description: 'clears local session when warehouse API returns unauthorized', snippet: 'localStorage.removeItem(STORAGE_KEY);' },
-    { description: 'returns to the public login after unauthorized warehouse API response', snippet: "window.location.href = '/';" },
-  ], failures);
-}
-
-function validateAgentWorkspaceRuntimeContracts(failures) {
-  validateRuntimeSourceContracts('agent/workspace.js', [
-    { description: 'guards the agent workspace behind an authenticated company session', snippet: 'if (!session?.token || !session?.user?.companyId)' },
-    { description: 'builds authenticated headers for agent requests', snippet: 'function authHeaders() {' },
-    { description: 'loads the agent dashboard through authenticated fetch', snippet: "fetch('/api/agent/dashboard', { headers: authHeaders() })" },
-    { description: 'clears local session on logout', snippet: 'localStorage.removeItem(STORAGE_KEY);' },
-    { description: 'returns to the public login on logout', snippet: "window.location.href = '/';" },
-  ], failures);
-}
-
-function validateCriticalJavaScriptContracts() {
-  const failures = [];
-
-  validateLoginRuntimeContracts(failures);
-  validateRootDashboardRuntimeContracts(failures);
-  validateWarehouseProductsRuntimeContracts(failures);
-  validateAgentWorkspaceRuntimeContracts(failures);
-
-  for (const rule of CRITICAL_JAVASCRIPT_RULES) {
-    const filePath = path.join(publicRoot, rule.relativePath);
-    const source = readSource(filePath);
-
-    for (const check of rule.checks) {
-      if (!check.pattern.test(source)) {
-        failures.push(`${rule.relativePath}: missing contract -> ${check.description}`);
-      }
-    }
+  if (!loginHtmlSource.includes('/shared/session.js') || !loginHtmlSource.includes('/shared/auth.js') || !loginHtmlSource.includes('/login.js')) {
+    failures.push('index.html: missing contract -> same-origin helper/script wiring');
   }
 
   if (failures.length > 0) {
-    throw new Error(`Critical public runtime contract drift detected:\n- ${failures.join('\n- ')}`);
+    throw new Error(`Critical login runtime contract drift detected:\n- ${failures.join('\n- ')}`);
+  }
+}
+
+function validateMigrationRuntimeContracts() {
+  const migrationHtmlSource = readSource(path.join(publicRoot, 'migration.html'));
+  const migrationSource = readSource(path.join(publicRoot, 'migration.js'));
+
+  if (!migrationHtmlSource.includes('Esta ruta ya no se encuentra disponible')) {
+    throw new Error('migration.html: missing contract -> deprecated-route title baseline');
+  }
+
+  if (!migrationHtmlSource.includes('Codigo de estado: 410')) {
+    throw new Error('migration.html: missing contract -> explicit 410 note baseline');
+  }
+
+  if (!migrationHtmlSource.includes('id="migration-primary-message"') || !migrationHtmlSource.includes('id="migration-secondary-message"') || !migrationHtmlSource.includes('id="migration-status-note"')) {
+    throw new Error('migration.html: missing contract -> multi-context content targets');
+  }
+
+  if (!migrationHtmlSource.includes('href="/"')) {
+    throw new Error('migration.html: missing contract -> return to login CTA');
+  }
+
+  if (!migrationHtmlSource.includes('/shared/session.js') || !migrationHtmlSource.includes('/migration.js')) {
+    throw new Error('migration.html: missing contract -> same-origin helper/script wiring');
+  }
+
+  if (!migrationSource.includes("const POST_LOGIN_TRANSITION_MODE = 'post-login-transition';")) {
+    throw new Error('migration.js: missing contract -> post-login transition mode constant');
+  }
+
+  if (!migrationSource.includes('new URLSearchParams(window.location.search)')) {
+    throw new Error('migration.js: missing contract -> query-param mode detection');
+  }
+
+  if (!migrationSource.includes('Iniciaste sesion correctamente')) {
+    throw new Error('migration.js: missing contract -> explicit post-login transition success title');
+  }
+
+  if (!migrationSource.includes('modulo de destino aun no esta implementado')) {
+    throw new Error('migration.js: missing contract -> explicit not-yet-implemented transition message');
+  }
+
+  if (!migrationSource.includes('migrationStatusNote.hidden = true;')) {
+    throw new Error('migration.js: missing contract -> hides 410 note in post-login mode');
+  }
+
+  if (!migrationSource.includes('inventorySession.clearAndRedirectToLogin()')) {
+    throw new Error('migration.js: missing contract -> logout redirect helper');
   }
 }
 
@@ -233,6 +217,8 @@ function main() {
     throw new Error('No se encontraron archivos HTML en src/public');
   }
 
+  validatePublicRuntimeInventory();
+
   for (const filePath of javascriptFiles) {
     validateJavaScriptSyntax(filePath);
   }
@@ -241,9 +227,10 @@ function main() {
     validateHtmlAssets(filePath);
   }
 
-  validateCriticalJavaScriptContracts();
+  validateLoginRuntimeContracts();
+  validateMigrationRuntimeContracts();
 
-  console.log(`Validated embedded public runtime syntax and critical browser contracts for ${javascriptFiles.length} JS files and ${htmlFiles.length} HTML files.`);
+  console.log(`Validated reduced public runtime syntax and contracts for ${javascriptFiles.length} JS files and ${htmlFiles.length} HTML files.`);
 }
 
 if (require.main === module) {
@@ -254,10 +241,7 @@ module.exports = {
   collectLocalAssetReferences,
   listHtmlFiles,
   listJavaScriptFiles,
-  validateCriticalJavaScriptContracts,
   validateLoginRuntimeContracts,
-  validateRootDashboardRuntimeContracts,
-  validateWarehouseProductsRuntimeContracts,
-  validateAgentWorkspaceRuntimeContracts,
-  validateRuntimeSourceContracts,
+  validateMigrationRuntimeContracts,
+  validatePublicRuntimeInventory,
 };

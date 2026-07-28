@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Rutas comerciales</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Inventori</p>
+          <h2>Empresa</h2>
+        </div>
+        <nav class="sidebar-nav" aria-label="Navegacion principal">
+          <a class="sidebar-link" href="/root/dashboard.html">Dashboard</a>
+          <a class="sidebar-link" href="/root/users.html">Usuarios</a>
+          <a class="sidebar-link" href="/root/roles.html">Roles</a>
+          <a class="sidebar-link" href="/root/warehouses.html">Bodegas</a>
+          <a class="sidebar-link" href="/root/products.html">Productos</a>
+          <a class="sidebar-link" href="/root/zones.html">Zonas</a>
+          <a class="sidebar-link active" href="/root/routes.html">Rutas</a>
+          <a class="sidebar-link" href="/root/clients.html">Clientes</a>
+          <a class="sidebar-link" href="/root/invoice-inconsistencies.html">Revision de facturas</a>
+        </nav>
+      </aside>
+
+      <section class="card app-content routes-page">
+        <header class="page-header clients-header">
+          <div>
+            <p class="eyebrow">Consola administrativa</p>
+            <h1>Rutas comerciales</h1>
+            <p id="routes-session" class="muted">Sesion activa</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="new-route-button" class="secondary-button" type="button">Nueva ruta</button>
+            <button id="refresh-routes-button" class="secondary-button" type="button">Actualizar</button>
+            <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+          </div>
+        </header>
+
+        <section class="clients-workspace routes-workspace">
+          <section class="client-metrics routes-summary" aria-label="Resumen de ruta">
+            <article class="dashboard-tile">
+              <span>Rutas activas</span>
+              <strong id="routes-count">0</strong>
+            </article>
+            <article class="dashboard-tile">
+              <span>Subzonas cubiertas</span>
+              <strong id="routes-subzones-count">0</strong>
+            </article>
+            <article class="dashboard-tile">
+              <span>Tiendas cubiertas</span>
+              <strong id="routes-stores-count">0</strong>
+            </article>
+            <article class="dashboard-tile">
+              <span>Agentes asignados</span>
+              <strong id="routes-agents-count">0</strong>
+            </article>
+          </section>
+
+          <section class="routes-layout">
+            <aside class="import-panel routes-agents-panel">
+              <div class="section-title-row">
+                <div>
+                  <h2>Rutas</h2>
+                  <p id="routes-list-caption" class="muted">0 rutas</p>
+                </div>
+              </div>
+
+              <label class="field">
+                <span>Buscar ruta</span>
+                <input id="route-search-input" type="search" placeholder="Codigo o nombre" />
+              </label>
+
+              <div id="routes-list" class="role-list routes-agents-list"></div>
+            </aside>
+
+            <section class="routes-main-panel">
+              <article class="import-panel">
+                <div class="section-title-row">
+                  <div>
+                    <h2>Definicion de ruta</h2>
+                    <p id="selected-route-label" class="muted">Seleccione o cree una ruta.</p>
+                  </div>
+                  <button id="save-route-button" class="secondary-button" type="button">Guardar ruta</button>
+                </div>
+                <section class="pricing-grid">
+                  <label class="field">
+                    <span>Codigo</span>
+                    <input id="route-code-input" type="text" maxlength="40" />
+                  </label>
+                  <label class="field">
+                    <span>Nombre</span>
+                    <input id="route-name-input" type="text" maxlength="120" />
+                  </label>
+                  <label class="field">
+                    <span>Frecuencia minima (dias)</span>
+                    <input id="route-frequency-input" type="number" min="1" max="365" value="15" />
+                  </label>
+                  <label class="field">
+                    <span>Alerta previa (dias)</span>
+                    <input id="route-near-limit-input" type="number" min="0" max="365" value="3" />
+                  </label>
+                </section>
+              </article>
+
+              <section class="routes-coverage-grid">
+                <article class="import-panel">
+                  <div class="section-title-row">
+                    <div>
+                      <h2>Subzonas de la ruta</h2>
+                      <p class="muted">Cada subzona debe pertenecer a una sola ruta.</p>
+                    </div>
+                    <button id="save-subzones-button" class="secondary-button" type="button">Guardar subzonas</button>
+                  </div>
+                  <div id="routes-subzones-panel" class="routes-subregions-panel"></div>
+                </article>
+
+                <article class="import-panel">
+                  <div class="section-title-row">
+                    <div>
+                      <h2>Agentes asignados</h2>
+                      <p class="muted">Asignacion formal de rutas a agentes comerciales.</p>
+                    </div>
+                    <button id="save-assignments-button" class="secondary-button" type="button">Guardar agentes</button>
+                  </div>
+                  <div id="routes-assignments-panel" class="routes-subregions-panel"></div>
+                </article>
+              </section>
+
+              <article class="import-panel">
+                <div class="section-title-row">
+                  <div>
+                    <h2>Metas comerciales</h2>
+                    <p class="muted">Administre las metas activas y el avance de cada agente.</p>
+                  </div>
+                  <div class="toolbar-actions">
+                    <button id="add-goal-button" class="secondary-button" type="button">Agregar meta</button>
+                    <button id="save-goals-button" class="secondary-button" type="button">Guardar metas</button>
+                  </div>
+                </div>
+
+                <label class="field">
+                  <span>Agente</span>
+                  <select id="goals-agent-select">
+                    <option value="">Seleccione un agente</option>
+                  </select>
+                </label>
+
+                <div class="table-wrapper routes-goals-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Meta</th>
+                        <th>Periodo</th>
+                        <th>Objetivo</th>
+                        <th>Avance</th>
+                        <th>Notas</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="routes-goals-body">
+                      <tr><td class="empty-state" colspan="6">Seleccione un agente para administrar sus metas.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+
+              <article class="import-panel">
+                <div class="section-title-row">
+                  <div>
+                    <h2>Cobertura y mapa</h2>
+                    <p id="routes-map-caption" class="muted">Tiendas cubiertas por la ruta seleccionada.</p>
+                  </div>
+                </div>
+
+                <div id="routes-map" class="routes-map"></div>
+
+                <div class="table-wrapper routes-stores-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Tienda</th>
+                        <th>Cliente</th>
+                        <th>Subzona</th>
+                        <th>Telefono</th>
+                        <th>Ubicacion</th>
+                      </tr>
+                    </thead>
+                    <tbody id="routes-stores-body">
+                      <tr>
+                        <td class="empty-state" colspan="5">Seleccione una ruta para ver su cobertura.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </section>
+          </section>
+
+          <p id="routes-message" class="message" aria-live="polite"></p>
+        </section>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/shared/session.js"></script>
+    <script src="/shared/auth.js"></script>
+    <script src="/root/root-sidebar.js"></script>
+    <script src="/root/routes.shared.js"></script>
+    <script src="/root/routes.js"></script>
+  </body>
+</html>

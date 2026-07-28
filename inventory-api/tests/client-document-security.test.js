@@ -135,9 +135,9 @@ test('createCompanyClientDocument removes the DB record when file persistence fa
         updateClientDocument: async () => {
           throw new Error('updateClientDocument should not be called after a file write failure');
         },
-        deleteClientDocument: async (documentId) => {
-          deleteDocumentId = documentId;
-          operations.push({ step: 'delete-db-record', documentId });
+        deleteClientDocument: async (documentId, clientId, companyId) => {
+          deleteDocumentId = { documentId, clientId, companyId };
+          operations.push({ step: 'delete-db-record', documentId, clientId, companyId });
         },
       }],
       [fs, {
@@ -160,11 +160,15 @@ test('createCompanyClientDocument removes the DB record when file persistence fa
     },
   );
 
-  assert.equal(deleteDocumentId, 13n);
+  assert.deepEqual(deleteDocumentId, {
+    documentId: 13n,
+    clientId: 5n,
+    companyId: 9n,
+  });
   assert.deepEqual(operations, [
     { step: 'create-db-record', fileUrl: '/api/clients/5/documents/13/download' },
     { step: 'write-file-failed' },
-    { step: 'delete-db-record', documentId: 13n },
+    { step: 'delete-db-record', documentId: 13n, clientId: 5n, companyId: 9n },
   ]);
 
   const privateFilePath = buildPrivateClientDocumentPath({

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Roles</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Inventori</p>
+          <h2>Empresa</h2>
+        </div>
+        <nav class="sidebar-nav" aria-label="Navegacion principal">
+          <a class="sidebar-link" href="/root/dashboard.html">Dashboard</a>
+          <a class="sidebar-link" href="/root/users.html">Usuarios</a>
+          <a class="sidebar-link active" href="/root/roles.html">Roles</a>
+          <a class="sidebar-link" href="/root/warehouses.html">Bodegas</a>
+          <a class="sidebar-link" href="/root/products.html">Productos</a>
+          <a class="sidebar-link" href="/root/zones.html">Zonas</a>
+          <a class="sidebar-link" href="/root/routes.html">Rutas</a>
+          <a class="sidebar-link" href="/root/clients.html">Clientes</a>
+          <a class="sidebar-link" href="/root/invoice-inconsistencies.html">Revision de facturas</a>
+        </nav>
+      </aside>
+
+      <section class="card app-content">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Configuracion</p>
+            <h1>Roles y permisos</h1>
+            <p id="roles-session" class="muted">Sesion activa</p>
+          </div>
+          <button id="logout-button" class="secondary-button" type="button">Cerrar sesion</button>
+        </header>
+
+        <section class="import-panel">
+          <div>
+            <h2>Crear variacion de rol</h2>
+            <p class="muted">Use los perfiles base de agente y supervisor comercial como punto de partida, o combine permisos manualmente.</p>
+          </div>
+
+          <section class="role-list" aria-label="Plantillas sugeridas de roles">
+            <article class="role-card">
+              <div>
+                <h3>Administrador</h3>
+                <p class="muted">Acceso administrativo amplio sobre empresa, usuarios, configuracion, clientes, inventario, compras y ventas.</p>
+              </div>
+              <div class="import-actions">
+                <button class="secondary-button role-template-button" type="button" data-role-template="admin">Usar plantilla</button>
+              </div>
+            </article>
+            <article class="role-card">
+              <div>
+                <h3>Agente comercial</h3>
+                <p class="muted">Ve clientes asignados, registra gestiones, consulta rutas y metas propias. El cobro es opcional por permiso.</p>
+              </div>
+              <div class="import-actions">
+                <button class="secondary-button role-template-button" type="button" data-role-template="sales_agent">Usar plantilla</button>
+              </div>
+            </article>
+            <article class="role-card">
+              <div>
+                <h3>Supervisor comercial</h3>
+                <p class="muted">Ve la operacion comercial completa y puede asignar rutas, metas y seguimiento del equipo.</p>
+              </div>
+              <div class="import-actions">
+                <button class="secondary-button role-template-button" type="button" data-role-template="sales_supervisor">Usar plantilla</button>
+              </div>
+            </article>
+            <article class="role-card">
+              <div>
+                <h3>Bodega</h3>
+                <p class="muted">Usuario operativo con acceso a inventario, bodega, productos y recepciones.</p>
+              </div>
+              <div class="import-actions">
+                <button class="secondary-button role-template-button" type="button" data-role-template="warehouse">Usar plantilla</button>
+              </div>
+            </article>
+            <article class="role-card">
+              <div>
+                <h3>Ventas legado</h3>
+                <p class="muted">Perfil simple historico para clientes y ventas generales, util mientras se migran perfiles comerciales.</p>
+              </div>
+              <div class="import-actions">
+                <button class="secondary-button role-template-button" type="button" data-role-template="sales">Usar plantilla</button>
+              </div>
+            </article>
+          </section>
+
+          <form id="role-form" class="stack-lg">
+            <label class="field">
+              <span>Nombre del rol</span>
+              <input name="name" type="text" placeholder="Bodega solo lectura" required />
+            </label>
+
+            <div id="role-template-message" class="message"></div>
+            <div id="permissions-list" class="permissions-grid"></div>
+          </form>
+
+          <div class="import-actions">
+            <button id="create-role-button" type="submit" form="role-form">Crear rol</button>
+            <p id="roles-message" class="message" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-title-row">
+            <h2>Roles disponibles</h2>
+          </div>
+
+          <div id="roles-list" class="role-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/shared/session.js"></script>
+    <script src="/shared/auth.js"></script>
+    <script src="/root/root-sidebar.js"></script>
+    <script src="/root/roles.js"></script>
+  </body>
+</html>

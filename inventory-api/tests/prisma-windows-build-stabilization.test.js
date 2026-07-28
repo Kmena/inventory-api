@@ -3,7 +3,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const workflowPath = path.join(__dirname, '..', '.github', 'workflows', 'windows-prisma-build.yml');
+const applicationRoot = path.join(__dirname, '..');
+const hostedRepositoryRoot = path.resolve(applicationRoot, '..');
+const workflowPath = path.join(hostedRepositoryRoot, '.github', 'workflows', 'windows-prisma-build.yml');
 const wrapperLibrary = require('../scripts/prisma-generate-safe-lib.js');
 
 function read(filePath) {
@@ -16,7 +18,7 @@ test('Windows Prisma workflow is dedicated, required and scoped to npm ci plus b
   assert.match(workflowSource, /^name:\s+windows-prisma-build$/m);
   assert.match(workflowSource, /^\s{2}windows-prisma-build:\s*$/m);
   assert.match(workflowSource, /runs-on:\s+windows-latest/);
-  assert.match(workflowSource, /node-version:\s+'20'/);
+  assert.match(workflowSource, /node-version:\s+'24'/);
   assert.match(workflowSource, /run:\s+npm ci/);
   assert.match(workflowSource, /npm run build/);
   assert.match(workflowSource, /id:\s+prisma_build/);

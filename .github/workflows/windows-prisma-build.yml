@@ -21,10 +21,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: inventory-api/package-lock.json
 
@@ -89,7 +89,7 @@ jobs:
           | Branch | ${{ github.ref_name }} |
           | Commit SHA | ${{ github.sha }} |
           | Runner OS | ${{ runner.os }} |
-          | Node version | 20 |
+          | Node version | 24 |
           | Build exit code | ${{ steps.prisma_build.outputs.build_exit_code }} |
           | Failure classification | ${{ steps.prisma_build_classification.outputs.failure_classification }} |
           | Build log artifact | `windows-prisma-build-log-${{ github.run_id }}` |

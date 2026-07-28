@@ -2,6 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const bcrypt = require('bcrypt');
 
+process.env.NODE_ENV = 'test';
+process.env.BROWSER_SESSION_STORE_MODE = 'memory';
+
 const audit = require('../src/lib/audit');
 const authService = require('../src/services/auth.service');
 const authorize = require('../src/middlewares/authorize');

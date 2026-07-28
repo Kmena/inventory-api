@@ -1,8 +1,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const repositoryRoot = path.join(__dirname, '..');
-const workflowsDirectory = path.join(repositoryRoot, '.github', 'workflows');
+const applicationRoot = path.join(__dirname, '..');
+const hostedRepositoryRoot = path.resolve(applicationRoot, '..');
+const workflowsDirectory = path.join(hostedRepositoryRoot, '.github', 'workflows');
 
 const workflowRules = [
   {
@@ -33,11 +34,24 @@ const workflowRules = [
     ],
   },
   {
+    relativePath: 'db-constraints-tests.yml',
+    checks: [
+      { description: 'defines a dedicated db-constraints-tests job', pattern: /^\s{2}db-constraints-tests:\s*$/m },
+      { description: 'provisions the P2 constraints database url', pattern: /P2_CONSTRAINTS_DATABASE_URL:\s+postgresql:\/\/postgres:postgres@127\.0\.0\.1:5432\/inventory_api_constraints\?schema=public/ },
+      { description: 'runs a postgres service for focused constraints evidence', pattern: /^\s{6}postgres:\s*$/m },
+      { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
+      { description: 'generates Prisma client before DB setup', pattern: /run:\s+npm run build/ },
+      { description: 'applies committed migrations', pattern: /run:\s+npm run prisma:apply-committed-migrations/ },
+      { description: 'seeds the constraints database with CI-only credentials', pattern: /run:\s+npm run prisma:seed/ },
+      { description: 'runs the focused p2 constraints test suite', pattern: /run:\s+node --test tests\/p2-hardening-constraints\.test\.js/ },
+    ],
+  },
+  {
     relativePath: 'windows-prisma-build.yml',
     checks: [
       { description: 'defines a dedicated Windows Prisma build job', pattern: /^\s{2}windows-prisma-build:\s*$/m },
       { description: 'runs on windows-latest', pattern: /runs-on:\s+windows-latest/ },
-      { description: 'pins Node.js 20', pattern: /node-version:\s+'20'/ },
+      { description: 'pins Node.js 24', pattern: /node-version:\s+'24'/ },
       { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
       { description: 'runs the guarded Prisma build on Windows', pattern: /npm run build/ },
       { description: 'captures the guarded build step with explicit id', pattern: /id:\s+prisma_build/ },
@@ -52,6 +66,15 @@ const workflowRules = [
       { description: 'defines a browser-e2e job', pattern: /^\s{2}browser-e2e:\s*$/m },
       { description: 'installs Chromium for browser E2E', pattern: /playwright install --with-deps chromium/ },
       { description: 'runs browser E2E critical flows', pattern: /run:\s+npm run test:e2e:browser/ },
+    ],
+  },
+  {
+    relativePath: 'redis-browser-session-tests.yml',
+    checks: [
+      { description: 'defines a dedicated redis-browser-session-tests job', pattern: /^\s{2}redis-browser-session-tests:\s*$/m },
+      { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
+      { description: 'generates Prisma client before Redis-path validation', pattern: /run:\s+npm run build/ },
+      { description: 'runs the dedicated Redis-path browser-session validation command', pattern: /run:\s+npm run test:redis-path/ },
     ],
   },
   {
@@ -71,9 +94,22 @@ const workflowRules = [
       { description: 'validates restore readiness evidence', pattern: /npm run validate:restore-readiness/ },
       { description: 'validates operational readiness evidence', pattern: /npm run validate:operational-readiness/ },
       { description: 'materializes a temporary production env file for compose smoke', pattern: /cat > \.env\.production <<EOF/ },
+      { description: 'provisions Redis URL for the production browser-session store baseline', pattern: /REDIS_URL:\s+redis:\/\/redis:6379\/0/ },
       { description: 'cleans temporary production env materialization', pattern: /rm -f \.env\.production/ },
       { description: 'validates compose syntax', pattern: /docker compose -f docker-compose\.prod\.yml config/ },
       { description: 'builds the production image without deploy', pattern: /docker build -t inventory-api:operational-smoke \./ },
+    ],
+  },
+  {
+    relativePath: 'p0-quality-gates.yml',
+    checks: [
+      { description: 'defines a quality-gates job', pattern: /^\s{2}quality-gates:\s*$/m },
+      { description: 'pins Node.js 24 for the legacy P0 gate', pattern: /node-version:\s+24/ },
+      { description: 'executes from inventory-api as the working directory', pattern: /working-directory:\s+inventory-api/ },
+      { description: 'runs lint in the legacy P0 gate', pattern: /run:\s+npm run lint/ },
+      { description: 'runs typecheck in the legacy P0 gate', pattern: /run:\s+npm run typecheck/ },
+      { description: 'runs build in the legacy P0 gate', pattern: /run:\s+npm run build/ },
+      { description: 'runs repository tests in the legacy P0 gate', pattern: /run:\s+npm run test/ },
     ],
   },
 ];
@@ -113,4 +149,5 @@ if (require.main === module) {
 
 module.exports = {
   workflowRules,
+  workflowsDirectory,
 };
