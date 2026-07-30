@@ -1,66 +1,85 @@
 # Architectural Action Plan
 
 ## 1. Objective
-Keep architecture-facing documentation synchronized with the real repository state after completion of the implemented browser-runtime governance slices, explicitly including the `p24-legacy-runtime-governance-closure` closeout of `TASK-018` and `TASK-019`, the `p25-post-login-transition-and-test-noise-closure` closeout of `TASK-023` and `TASK-024`, and the `p26-browser-runtime-db-free-suite-separation` implementation of the approved DB-free vs DB-backed suite boundary, while preserving the reduced supported public runtime plus the interim post-login transition landing, recording the Redis browser-session operational safeguards already implemented in code and tests, and planning only the remaining bounded follow-up work still visible after implementation.
+Keep architecture-facing documentation synchronized with the real repository state after `sidebar-rebrand-permissions` `TASK-004`, together with `TASK-001`, `TASK-002`, `TASK-003`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`, preserving the implemented reduced public-runtime baseline, the supported root shell at `/root/`, the bounded `window.RootShell` registry seam for internal shell dependencies, the actor split where global root keeps top navigation and company-admin receives the rebranded sidebar shell, the existing browser-session and auth contracts, the legacy-route `410 Gone` gate, the centralized permission-governance runtime foundation, the bounded actor-scope convergence seam in `src/security/access-policies.js` for company/company-role admin flows, the dedicated route policy `company.create-global`, the enforced company-role create deny for platform-scoped permissions, the route-level governance audit action `security.authorization.access_policy`, the dedicated service-level governance denial audit action `roles.company.create.governance_denied`, the current root-global shell routes `#home` and `#companies`, the company-admin sidebar routes `#admin_home`, `#products`, `#lots`, `#movements`, `#production`, `#agents`, `#routes`, `#zones`, `#clients`, `#purchases`, `#warehouses`, `#approvals`, `#reports`, `#users`, `#roles_permissions`, and `#settings`, the shared neutral `in_process` view used by the non-functional company-admin routes, and the remaining controlled transition behavior for non-wave-one browser profiles.
 
 ## 2. Scope
 In scope for the current plan:
-- preserve the reduced active public runtime under `src/public/`
-- preserve the `410 Gone` gate for deprecated legacy HTML routes under `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html`
+- preserve the supported root shell under `src/public/root/` and its `/root/` entrypoint
+- preserve the reduced public runtime and the legacy HTML `410 Gone` gate
 - preserve relocation of the retired functional legacy browser runtime to `legacy-public-runtime/` as transitional backup/reference inventory only
-- preserve the supported interim post-login landing at `/migration.html?mode=post-login-transition` as a default not-yet-implemented page with safe return-to-login/logout behavior
-- preserve the dual-mode migration screen behavior for deprecated-route `410` rendering and supported post-login transition rendering
-- preserve auth/session backend APIs and the current cookie-session browser model
-- preserve the official aggregate test-runner baseline in `scripts/run-tests.js`
-- preserve canonical runtime-contract ownership under `docs/**` with `internal-docs/**` retained only as auxiliary support material
-- preserve the dedicated Redis-path validation lane through `npm run test:redis-path` and `.github/workflows/redis-browser-session-tests.yml`
-- preserve `GET /health/ready` as a combined database + browser-session-store readiness contract
-- preserve explicit Redis-store unavailability behavior rather than silent downgrade
-- keep docs, validators, manifest metadata, runtime-contract artifacts, and tests aligned to the reduced supported contract
-- track remaining follow-up work such as eventual functional replacement of the interim post-login transition landing and any further suite-boundary cleanup beyond the already implemented `p26` separation
+- preserve the browser-session cookie model and reuse of `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout`
+- preserve explicit documentation that the remaining browser-session residual risk belongs to the HTTPS follow-up dependency in `specs/p11-https-browser-session-migration/` and is not an in-slice blocker for these bounded governance/documentation slices
+- preserve wave-one root-shell eligibility for `root` and `admin` with `companyId`
+- preserve actor-aware `/root/` shell navigation with root-global top navigation and the rebranded company-admin sidebar, keeping `#companies` for global root and `#roles_permissions` for company-admin users with `companyId`
+- preserve the current company-admin sidebar IA grouped into `Inicio`, `Operacion`, `Control`, and `Administracion`, while recognizing that most visible items still render the shared neutral `in_process` view
+- preserve the implemented visual hardening of the company-admin sidebar: fixed header/footer, central-only scrolling, defensive overflow rules, collapsed-only tooltip reveal, and thin styled scrollbar treatment on `.root-sidebar__scroll`
+- preserve the implemented Companies Admin shell flow over the existing root-company list/create/status endpoints
+- preserve the implemented Roles/Permissions Admin shell flow over the existing permission catalog and company-role list/create endpoints
+- preserve `/migration.html?mode=post-login-transition` for non-wave-one browser profiles
+- keep docs, validators, tests, and runtime contracts aligned to the implemented public runtime
+- keep the partial OpenAPI/typecheck coverage posture bounded to the selected governance-admin surfaces clarified by `p33`
+- keep `tests/governance-baseline-sync-guardrails.test.js` as the focused documentation-sync guardrail for the selected post-`p34` statements only, not as repository-wide documentation automation
+- reflect `docs/permission-governance-decisions.md` and the implemented `src/security/permission-governance*.js` foundation without overstating broader runtime enforcement
+- record only the bounded follow-up work still visible after the implemented root-shell slice
 
 ## 3. Out of scope
 - reactivating legacy HTML pages as supported runtime
-- implementing the SPA
-- redesigning backend auth APIs beyond the already implemented cookie-session model
-- changing database schema or migrations for this slice
-- production-code changes beyond already implemented `p21` + `p22` + `p23` + `p25` and the already-closed browser-session operational/readiness safeguards
+- migrating warehouse or agent browser areas into supported SPA surfaces
+- redesigning backend auth APIs beyond the current cookie-session model
+- changing database schema or migrations for this refresh
+- introducing a frontend framework, bundler, or separate SPA deployment
+- broadening root-shell eligibility or navigation beyond what is implemented today without a later approved slice
 
 ## 4. Requirements addressed
-This plan reflects the implemented reduced-runtime baseline plus the `p22` follow-through and `p23` repository-test-alignment requirements observable in code and tests:
-- only the reduced supported public pages remain in the active runtime
-- deprecated legacy HTML routes under `root/**`, `warehouse/**`, and `agent/**` continue to return the common migration screen from the same URL with HTTP `410 Gone` and no redirect
-- post-login browser landings for retired-runtime-dependent roles no longer point to `/root/*.html`, `/warehouse/*.html`, or `/agent/*.html`
-- the supported interim post-login landing is `/migration.html?mode=post-login-transition`
-- that landing is intentionally a temporary "not implemented yet" destination, not a functional dashboard replacement
-- `src/public/migration.html` and `src/public/migration.js` distinguish deprecated-route rendering from supported post-login transition rendering
-- validators, tests, manifest metadata, and docs govern the reduced contract and the transition landing explicitly
-- `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` remain outside the HTML deprecation scope
-- `tests/browser-auth-compatibility-inventory.test.js` now aligns to the reduced supported public runtime instead of retired browser files
-- `POST /api/auth/logout` is now explicitly classified in the runtime-contract governance baseline
-- reviewed runtime-contract artifacts under `docs/**` are now the canonical governance source, with `internal-docs/**` retained only as auxiliary support material
-- `npm run test` boots a stable default test environment through `scripts/run-tests.js` by defaulting to `NODE_ENV=test` and `BROWSER_SESSION_STORE_MODE=memory` unless explicitly overridden
-- the supported Redis-backed browser-session path has an explicit validation command and hosted CI lane via `npm run test:redis-path` and `.github/workflows/redis-browser-session-tests.yml`
-- `GET /health/ready` now reports browser-session-store status and fails readiness when Redis mode is configured but unavailable
-- browser-session create/validate flows now map Redis-store outages to explicit `503 service_unavailable` behavior instead of silently degrading
+This plan reflects the implemented `sidebar-rebrand-permissions` `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `p27`, `p28`, `p29`, `p30`, `p31`, `p32`, `p33`, `p34`, `p35`, `p36`, `p37`, and `p38` behavior now observable in code and tests:
+- a new supported root SPA shell exists at `/root/`
+- browser login routes wave-one root-eligible users to `/root/` instead of `/migration.html?mode=post-login-transition`
+- the root shell reuses the existing browser-session model and `GET /api/auth/me` for bootstrap
+- the root shell remains vanilla JS under `src/public/root/`
+- the root shell includes authenticated layout, actor-aware client routing, basic guards, manifest-driven navigation, logout, and an `in_process` fallback
+- global root sessions now keep top navigation, see `Empresas`, and can use bounded Companies Admin list/create/status flows from the shell
+- company-admin sessions with `companyId` now receive the rebranded sidebar, see grouped tenant-admin navigation, land on `#admin_home` when no hash is present, and can use bounded permission catalog + company-role list/create flows from the shell through `Roles y permisos`
+- the approved company-admin sidebar entries now have explicit route keys in `root/manifest.js`; only `Roles y permisos` is functionally implemented and all other current company-admin sidebar routes render the shared neutral `in_process` view
+- layout ownership is normalized so the shell owns actor-specific offsets and outer content placement while views own only their internal module layout
+- the company-admin sidebar now hardens latent overflow behavior by hiding tooltip boxes until collapsed hover/focus, applying defensive `box-sizing` and `min-width: 0` rules to nested wrappers, truncating long labels/footer text, and limiting the styled thin scrollbar to the central scroll region while header and footer remain fixed
+- no runtime role update/delete/reassignment UI was added
+- backend auth remains the source of truth; client guards are only UX gates
+- a local minimal navigation manifest exists under `src/public/root/manifest.js`
+- the first wave remains incremental and does not reactivate `/root/*.html` as supported runtime
+- `/root/*.html`, `/warehouse/*.html`, and `/agent/*.html` still return the same-URL `410 Gone` migration response
+- non-wave-one browser profiles still use the supported transition landing at `/migration.html?mode=post-login-transition`
+- validators and tests now explicitly recognize `/root/` as supported and keep legacy HTML routes retired
+- a centralized permission-governance policy foundation now exists under `src/security/`
+- only a global `root` actor can create companies under the current governance evaluation rule
+- company-role creation now rejects platform-scoped permissions such as `companies.manage` before persistence, while preserving warning-based audit metadata for non-approved deny candidates
+- denied company-role governance attempts now emit dedicated service-level audit attempts through action `roles.company.create.governance_denied` with structured denial metadata while preserving the same `403` response contract
+- company/company-role admin flows now expose a clearer route-policy/service-governance contract through explicit `global-root` and `company-admin` actor-scope checks in `src/security/access-policies.js`
+- `POST /api/companies/` now uses the dedicated route policy `company.create-global` while preserving the same endpoint and `403` semantics
+- bounded route-level actor-scope denials now emit safe audit attempts through action `security.authorization.access_policy`, remaining distinct from service-level governance denials
+- bounded governance evidence now also includes `src/security/access-policies.js` in typecheck plus partial OpenAPI / critical-contract coverage for company listing/creation, root-company listing/creation, assignable-role-permission listing, and company-role listing/creation
+- the in-scope legacy governance validator now reads canonical runtime-contract artifacts from `docs/**` rather than auxiliary `internal-docs/**` copies
+- a focused ownership regression test now guards that validator/documentation alignment without expanding into repository-wide `internal-docs/**` cleanup
 
 ## 5. Current problems addressed
-Problems already corrected by `p21` + `p22` + `p23` and the completed governance follow-up tasks:
-- active public runtime no longer exposes functional legacy HTML screens beyond the intended supported surface
-- `src/public/root/**`, `src/public/warehouse/**`, and `src/public/agent/**` no longer define authenticated post-login landings
-- public-runtime validators and tests now distinguish supported post-login transition behavior from deprecated-route `410` behavior
-- the browser-compatibility inventory test now matches the approved reduced public runtime
-- `POST /api/auth/logout` is no longer left unclassified in runtime-contract governance
-- the official aggregate suite no longer depends on callers manually setting test-safe browser-session environment variables
-- reviewed `docs/**` artifacts are now the canonical runtime-contract governance source instead of sharing that role with `internal-docs/**`
-- the supported Redis-backed browser-session path now has an explicit repeatable validation lane outside the stable memory-mode aggregate suite
+Problems already corrected by earlier browser-runtime slices plus `p27`:
+- the runtime no longer lacks a supported authenticated root destination for wave-one root users
+- `root` and company `admin` users no longer depend on the temporary transition landing as their primary supported post-login destination
+- the public-runtime validator and browser/runtime tests now distinguish the supported root shell from deprecated legacy HTML routes
+- the embedded browser runtime still avoids reactivating functional legacy HTML pages
+- the root shell reuses existing auth/session contracts instead of introducing a parallel browser auth model
+- the residual browser-session hardening risk remains an explicit follow-up dependency in `specs/p11-https-browser-session-migration/` and is not an in-slice blocker for the current bounded governance/documentation slices
 
-Problems still open after the implemented governance closeout (including the earlier browser-session operational/readiness safeguards, the later `p24` documentation-only closure, and the `p25` closure of `TASK-023` and `TASK-024`):
-- the supported post-login landing for retired-runtime-dependent roles remains informational and not yet a functional replacement UI
-- the default aggregate suite still exercises memory mode by default, so Redis-path confidence depends on keeping the explicit non-default lane healthy
-- docs/tests/validators/manifest metadata must continue staying synchronized so legacy runtime is not accidentally reintroduced as supported
-- the latest baseline governance audit is acceptable at `8.8/10`, but the warning below the `9.5` target shows residual governance hardening work remains
-- the approved remediation for browser/runtime test noise is now implemented for the addressed suites through explicit DB-free vs DB-backed boundaries, the shared DB-free audit seam helper, and `docs/test-suite-catalog.md`; only optional future extension to additional suites remains
+Problems still open after `sidebar-rebrand-permissions` `TASK-004` and `p38`:
+- non-wave-one browser roles still land on the transition page rather than a functional supported destination
+- root-shell navigation remains local-manifest based and not yet integrated with any broader approved navigation model
+- the company-admin sidebar still exposes many approved-but-not-yet-functional modules through the shared neutral `in_process` view; this is current supported behavior, but additional module implementation remains pending
+- browser-runtime `typecheck` now includes the approved `src/public/root/**` shell files through an explicit allowlist, while remaining intentionally bounded
+- docs/tests/validators must continue staying synchronized so the root shell and legacy-route policies do not drift
+- permission governance remains only partially implemented: the central policy foundation, the stable `company.create` deny, the first enforced company-role create deny, denial-path audit visibility for that deny, and the bounded company/company-role admin actor-scope convergence seam now exist, but broader backend role-governance hardening, root-shell UI consumption, and repository-wide access-policy convergence remain pending
+- metadata reconciliation for permission-governance sequencing is complete, and the former `p30-company-role-governance-hardening` plus `p32-governance-denial-audit-visibility` follow-up dependencies are now implemented for the current create-flow boundary
+- no runtime company-role update flow exists yet, so update hardening remains deferred until an actual update surface is approved
+- runtime-contract governance now converges on canonical `docs/**` artifacts for validator ownership, while `internal-docs/**` remains auxiliary support material only and other non-runtime-contract auxiliary consumers stay explicitly out of scope for this bounded slice
 
 ## 6. Domains affected
 - Embedded browser runtime
@@ -71,37 +90,44 @@ Problems still open after the implemented governance closeout (including the ear
 
 ## 7. Behavior to preserve
 - `src/public/` remains the only active public runtime directory
-- supported HTML remains limited to `/`, `/index.html`, `/no-access.html`, and `/migration.html`
+- `/root/` remains the supported root-shell entrypoint
+- root-shell bootstrap continues through the existing cookie-session model and `/api/auth/me`
+- root-shell logout continues through `/api/auth/logout`
+- global `root` keeps the current top-navigation shell variant
+- company-admin keeps the rebranded sidebar shell variant
+- the sidebar keeps header/footer fixed while only the middle navigation lane scrolls
+- hidden tooltip boxes stay display-gated until collapsed hover/focus instead of contributing to layout width
+- `root` and `admin` with `companyId` continue landing on `/root/`
+- company-admin continues defaulting to `#admin_home` when no hash is present
+- explicit company-admin sidebar route items remain declared in `src/public/root/manifest.js`
+- non-functional company-admin sidebar routes continue rendering the shared neutral `in_process` view
+- shell-owned global offsets remain separate from per-view internal layout
 - deprecated legacy HTML routes keep returning `410 Gone` and the migration screen from the same URL without redirect
-- `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` remain supported
+- `/migration.html?mode=post-login-transition` remains a supported 200 response for non-wave-one browser profiles
 - `legacy-public-runtime/` remains outside the served runtime and outside implicit rollback behavior
-- public-runtime governance stays intentionally bounded and does not resume treating `root/**`, `warehouse/**`, or `agent/**` as supported browser runtime
-- `npm run typecheck` remains bounded to the approved reduced public-runtime seam (`shared/session.js`, `shared/auth.js`, `login.js`)
-- retired legacy pages and `legacy-public-runtime/` must not re-enter supported runtime, validator scope, or typecheck scope unless a new approved spec explicitly changes the contract
-- the post-login transition landing remains a supported 200 response distinct from the deprecated-route `410 Gone` contract
+- `npm run validate:public-runtime` and the affected browser/runtime tests remain aligned to the implemented public surface
 
 ## 8. Defects to correct
 ### Medium
-- the interim post-login transition landing in `src/public/login.js` should eventually be replaced by real supported SPA destinations per role, but until then it should remain explicit about not-yet-implemented status and safe exit options
-- canonical `docs/**` ownership must stay explicit so auxiliary `internal-docs/**` material does not drift back into perceived source-of-truth status
-- Redis-backed browser-session coverage must remain explicit even though the aggregate test runner now defaults to memory mode for stability
+- non-wave-one browser roles still depend on the transition landing
 
 ### Low
-- the remaining noise profile is narrower now that incidental browser E2E audit persistence is isolated from Prisma
+- the root shell still relies on plain ordered static scripts even though internal registration/lookup is now centralized through `window.RootShell`
+
+### Low
 - preserved `legacy-public-runtime/` inventory may drift over time because it is no longer governed as active runtime
 
 ## 9. Future architectural changes
 Incremental future changes now visible:
-1. keep the reduced public-runtime baseline as the supported contract;
+1. preserve the implemented actor-aware `/root/` shell as the supported admin browser baseline, including root top-nav and company-admin sidebar variants;
 2. keep legacy HTML deprecation enforced at the HTTP boundary;
-3. preserve canonical runtime-contract artifact ownership under `docs/**` unless a later approved governance model explicitly changes it;
-4. preserve the aggregate test-runner bootstrap contract (`NODE_ENV=test`, `BROWSER_SESSION_STORE_MODE=memory` by default) unless a later approved slice deliberately changes the test baseline;
-5. keep the dedicated Redis-path validation lane explicit rather than folding Redis dependence back into the default aggregate suite;
-6. avoid re-expanding typecheck, validator, or runtime support back into retired legacy HTML surfaces unless a new approved spec explicitly changes the supported contract;
-7. replace the interim post-login transition landing only when approved final supported SPA destinations by role exist;
-8. preserve `legacy-public-runtime/` only as transitional backup/reference inventory until equivalent SPA sections are implemented and validated, then remove it in a later approved slice;
-9. preserve the implemented DB-free vs DB-backed suite separation and extend it only when additional affected suites justify the added maintenance cost;
-10. only narrow expected-noise handling when real failures remain fully visible and audit coverage stays preserved in dedicated DB-backed tests.
+3. extend the root shell only through later approved bounded slices, rather than expanding it through legacy-page restoration;
+4. extend the richer company-admin sidebar IA beyond the current shared neutral `in_process` placeholders through explicit module implementations;
+5. decide whether additional browser roles should later move from `/migration.html?mode=post-login-transition` into supported shell destinations;
+6. decide whether the bounded root-shell `typecheck` allowlist should later widen beyond the current approved file set;
+7. keep unsupported company edit/delete/detail and role update/delete/reassignment flows out of the shell until backed by approved slices and real runtime contracts;
+8. preserve the implemented bounded company/company-role admin convergence seam as the current baseline rather than reinterpreting it as pending work;
+9. preserve `legacy-public-runtime/` only as transitional backup/reference inventory until equivalent SPA sections are implemented and validated, then remove it in a later approved slice.
 
 ## 10. Database changes
 No database change is planned for this post-implementation refresh.
@@ -114,8 +140,8 @@ Current integration posture to preserve:
 - `POST /api/auth/logout` remains part of the governed runtime contract baseline;
 - `GET /health` remains a stable liveness response;
 - `GET /health/ready` remains the operational readiness boundary for database + browser-session-store dependencies;
-- the deprecated legacy HTML contract is now an HTTP `410` response contract, not a redirect contract;
-- `legacy-public-runtime/` is not an active integration surface.
+- the deprecated legacy HTML contract remains an HTTP `410` response contract, not a redirect contract;
+- `/root/` remains a supported browser entrypoint backed by static assets in the same Express runtime.
 
 ## 12. Container and deployment changes
 No new container or deployment change is currently required.
@@ -129,52 +155,102 @@ Container baseline to preserve:
 
 ## 13. Security changes
 Security posture to preserve:
-- reduced public browser exposure through removal of functional legacy HTML from the active runtime
 - same-origin cookie-session auth model for supported browser flows
+- no persisted bearer tokens in `localStorage`
 - same-origin `Origin` validation for mutating cookie-authenticated requests
-- strict CSP on the supported public documents and deprecated legacy HTML responses that serve the migration page
+- strict CSP on supported public documents and deprecated legacy HTML responses
+- backend auth as the final authority while root-shell guards remain UX-only
 
 Future security follow-up may include:
-- replacing the interim post-login transition landing with final supported routes
-- continuing broader HTTPS/cookie hardening and optional test-noise cleanup work
-- preserving the browser-session HTTPS migration tracked as a residual risk and follow-up dependency in `specs/p11-https-browser-session-migration/`
+- expanding supported shell destinations for additional browser roles only through approved slices
+- expanding static analysis coverage over root-shell files
+- extending governance-denial observability only if later approved operations add new enforced deny paths
+- continuing broader HTTPS/cookie hardening tracked in the existing browser-session follow-up work
 
 ## 14. Test strategy
 Continue validating the implemented repository baseline through:
 1. `npm run validate:public-runtime`
-2. `npm run test -- --silent`
-3. `npm run lint -- --quiet`
-4. `npm run typecheck`
-5. `npm run build`
-6. focused browser/runtime and contract suites when the slice touches those seams
+2. `node --test tests/public-surface-characterization.test.js`
+3. `node --test tests/public-runtime-http-smoke.test.js`
+4. `node --test tests/root-shell-route-governance.test.js`
+5. `node --test tests/browser-e2e.e2e.js`
+6. `npm run lint:public-runtime`
+7. `npm run lint`
+8. `npm run typecheck`
+9. `npm run build`
+
+Recorded post-implementation evidence supplied by the user for `sidebar-rebrand-permissions` `TASK-004`:
+- `npm run typecheck` passed
+- `npm run lint:public-runtime` passed
+- `npm run validate:public-runtime` passed
+- `node --test tests/public-surface-characterization.test.js` passed
+- `node --test tests/root-shell-route-governance.test.js` passed
+- `node --test tests/browser-e2e.e2e.js` passed
+- `npm run build` reported the same pre-existing Windows Prisma rename-lock issue during Prisma generate
+
+- focused permission-governance tests such as `tests/permission-governance-foundation.test.js` and `tests/permission-governance-backend-consumption.test.js`
+- focused audit instrumentation coverage such as `tests/audit-instrumentation.test.js`
+
+Recorded post-implementation evidence supplied by the user for `p30`:
+- `npm run lint` passed
+- `npm run typecheck` passed
+- `npm run build` passed
+- `node --test tests/permission-governance-foundation.test.js` passed
+- `node --test tests/permission-governance-backend-consumption.test.js tests/permission-governance-foundation.test.js` passed
+- `git diff --check` passed
+
+Recorded post-implementation evidence supplied by the user for `p36`:
+- `node --test tests/p36-doc-validator-ownership.test.js` passed
+- `node --test tests/runtime-contract-governance.test.js tests/critical-contract-governance.test.js tests/openapi-contract-consistency.test.js tests/governance-baseline-sync-guardrails.test.js` passed
+- `npm run typecheck` passed
+- `npm run lint -- --quiet` passed
+- `npm run build` passed
+
+Recorded post-implementation evidence supplied by the user for `p35`:
+- `node --test tests/governance-baseline-sync-guardrails.test.js` passed
+- `node --test tests/governance-baseline-sync-guardrails.test.js tests/typecheck-ci-hardening-governance.test.js tests/openapi-contract-consistency.test.js tests/critical-contract-governance.test.js` passed
+- `npm run lint` passed
+- `npm run build` passed
+
+Recorded post-implementation evidence supplied by the user for `p34`:
+- `npm run typecheck` passed
+- `node --test tests/typecheck-ci-hardening-governance.test.js` passed
+- `node --test tests/openapi-contract-consistency.test.js` passed
+- `node --test tests/critical-contract-governance.test.js` passed
+- `npm run build` passed
+
+Recorded post-implementation evidence supplied by the user for `p33`:
+- `set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/access-policies.test.js` passed
+- `set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/company-authorization-characterization.test.js` passed
+- `set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/authorization-convergence-characterization.test.js` passed
+- `set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/audit-instrumentation.test.js` passed
+- `node --test tests/permission-governance-backend-consumption.test.js` passed
+- `npm run lint` passed
+- `npm run typecheck` passed
+- `npm run build` passed
+- `git diff --check` passed
+
+Recorded post-implementation evidence supplied by the user for `p32`:
+- `node --test tests/permission-governance-backend-consumption.test.js` passed
+- `node --test tests/audit-instrumentation.test.js` passed
+- `npm run lint` passed
+- `npm run typecheck` passed
+- `npm run build` passed
+- `git diff --check` passed
 
 Recorded post-implementation evidence supplied by the user:
-- `node --test tests/browser-session-redis-store.test.js` passed
-- `node --test tests/browser-session-service-characterization.test.js` passed
-- `node --test tests/health-routes.test.js` passed
-- `node --test tests/production-baseline-characterization.test.js` passed
-- `node --test tests/browser-session-auth-boundary.test.js` passed
-- `npm run test:redis-path` passed
-- `npm run validate:operational-readiness` passed
-- `npm run lint -- --quiet` passed
-- `npm run typecheck` passed
-- `npm run build` passed after one transient Windows Prisma rename-lock retry
-- `npm run test -- --silent` passed
-- `node --test tests/browser-e2e.e2e.js` passed
-- `node --test tests/audit-instrumentation.test.js tests/audit-repository.test.js` passed, with `tests/audit-repository.test.js` skipped when `P2_AUDIT_DATABASE_URL` is absent
-- `npm run typecheck` passed
 - `npm run validate:public-runtime` passed
+- `npm run lint:public-runtime` passed
+- `npm run typecheck` passed
 - `npm run lint -- --quiet` passed
-- baseline governance audit score: `8.8/10` (acceptable, no meaningful regression found; warning remains below `9.5`)
+- `npm run build` passed
+- `node --test tests/browser-e2e.e2e.js` passed
+- `node --test tests/public-runtime-http-smoke.test.js tests/public-surface-characterization.test.js tests/browser-runtime-auth-convergence-inventory.test.js` passed
 
 Test-baseline notes to preserve:
-- `npm run test` now routes through `scripts/run-tests.js`
-- the runner defaults to `NODE_ENV=test` and `BROWSER_SESSION_STORE_MODE=memory` unless explicitly overridden
-- `npm run test:redis-path` and `.github/workflows/redis-browser-session-tests.yml` preserve explicit coverage for the supported Redis-backed non-default path
-- `tests/p2-hardening-constraints.test.js` remains environment-gated outside the plain aggregate path
-- some passing runs can still emit expected negative-path operational logs, but the previously known incidental browser E2E audit persistence noise no longer reaches Prisma
-- the approved improvement path was implemented first as suite-boundary separation (DB-free vs DB-backed), not broad log suppression
-- `docs/test-suite-catalog.md` now records the affected suite purpose and dependency boundaries
+- `npm run test` still routes through `scripts/run-tests.js`
+- the runner still defaults to `NODE_ENV=test` and `BROWSER_SESSION_STORE_MODE=memory` unless explicitly overridden
+- the new root shell is currently governed by an explicit bounded browser-runtime `typecheck` allowlist plus lint, validator, smoke, characterization, and browser E2E coverage
 
 ## 15. Migration stages
 ### Stage 1 — Completed
@@ -193,10 +269,10 @@ Test-baseline notes to preserve:
 - Refresh repository documentation to match the reduced runtime state
 
 ### Stage 6 — Completed
-- Replace historical post-login HTML aliases with the supported interim transition landing at `/migration.html?mode=post-login-transition` and distinguish that mode from deprecated-route `410` rendering
+- Replace historical post-login HTML aliases with the supported interim transition landing at `/migration.html?mode=post-login-transition`
 
 ### Stage 7 — Completed
-- Realign repository test and runtime-contract governance to the reduced supported runtime, classify `POST /api/auth/logout`, and stabilize the aggregate test runner bootstrap through `scripts/run-tests.js`
+- Realign repository test and runtime-contract governance to the reduced supported runtime and stable aggregate test runner
 
 ### Stage 8 — Completed
 - Converge canonical runtime-contract governance onto reviewed `docs/**` artifacts and keep `internal-docs/**` auxiliary only
@@ -205,45 +281,86 @@ Test-baseline notes to preserve:
 - Add the explicit Redis-path validation command and hosted workflow lane while preserving the stable memory-mode aggregate suite
 
 ### Stage 10 — Completed
-- Strengthen Redis operational safeguards by wiring browser-session-store readiness into `/health/ready`, preserving explicit failure semantics, and documenting diagnosis/recovery expectations
+- Strengthen Redis operational safeguards by wiring browser-session-store readiness into `/health/ready`
 
-### Stage 11 — Proposed
-- Replace the interim post-login transition landing with real supported destinations once the next approved browser shell or SPA entrypoints exist
+### Stage 11 — Completed
+- Introduce the supported wave-one root shell at `/root/`, including bootstrap, guards, minimal navigation, home view, `in_process` fallback, and logout
 
-### Stage 12 — Proposed
-- Extend the DB-free vs DB-backed suite classification to additional suites only if future evidence shows incidental infrastructure coupling beyond the currently addressed browser/runtime boundary
+### Stage 12 — Completed
+- Expand the supported `/root/` shell with actor-aware bounded admin routes:
+  - `#companies` for global root
+  - `#roles_permissions` for company admin with `companyId`
+
+### Stage 13 — Completed
+- Add bounded root-shell adapters and views for:
+  - root-company list/create/status flows
+  - company-role permission catalog, role list, and role creation flows
+
+### Stage 14 — Completed
+- Add the approved bounded browser-runtime typecheck allowlist for the supported `src/public/root/**` shell files without broadening to all `src/public/**`
+
+### Stage 15 — Completed
+- Apply the first rebranded company-admin sidebar shell over the supported `/root/` runtime while preserving root-global top navigation, the existing backend/API contracts, and the current actor split
+
+### Stage 16 — Completed
+- Reconcile sidebar manifest, router semantics, and `in_process` content so visible company-admin entries have explicit documented destination behavior
+- Normalize shell/view layout ownership so shell-level offsets are not duplicated inside admin views
+- Harden the implemented company-admin sidebar against latent horizontal overflow and lock the CSS contract in `tests/public-surface-characterization.test.js`
+
+### Stage 17 — Proposed
+- Add the next supported root-shell modules beyond the current bounded Companies and Roles/Permissions views through approved incremental slices
+
+### Stage 18 — Proposed
+- Replace transition-only landings for additional browser roles when approved supported destinations exist
+
+### Stage 19 — Proposed
+- Expand browser-runtime typecheck coverage only if a later approved slice widens the current bounded root-shell allowlist
+
+### Stage 20 — Completed
+- Introduce centralized permission-governance foundation, first stable `company.create` deny, and warning-based backend consumption for company-role creation
+
+### Stage 21 — Completed
+- Harden company-role creation so platform-scoped permissions such as `companies.manage` are denied before persistence while non-approved sensitive combinations remain warning-only
+
+### Stage 22 — Completed
+- Add dedicated denial-path audit visibility for the approved company-role create deny using the existing safe audit seam while preserving the same `403` response contract
+
+### Stage 23 — Completed
+- Introduce bounded actor-scope convergence in route policies for company/company-role admin flows while preserving service-level governance enforcement, dedicated `company.create-global`, and distinct route-level versus service-level denial auditing
+
+### Stage 24 — Completed
+- Align the in-scope legacy runtime-contract governance validator to canonical `docs/**` ownership and add bounded regression coverage so `internal-docs/**` remains auxiliary only for this seam
+
+### Stage 25 — Proposed
+- Consume the governance foundation in additional backend role-governance operations and approved UI slices, including any future update-flow hardening once an update surface exists
 
 ## 16. Risks and mitigations
 | Risk | Level | Mitigation |
 |---|---|---|
-| Legacy HTML runtime is accidentally reintroduced into `src/public/` or treated as supported again | High | Keep `validate-public-runtime`, browser/runtime characterization tests, and docs aligned to the reduced inventory |
-| Future work expands typecheck/runtime governance back into retired legacy pages | Medium | Preserve bounded allowlist and explicit task guidance against re-expansion |
-| Interim post-login transition landing can still frustrate users because it remains informational only | Medium | Keep the behavior documented now and replace the transition landing only when approved supported destinations exist |
-| Future changes accidentally collapse supported post-login transition mode back into deprecated-route semantics | Medium | Keep dual-mode migration rendering covered by validator, smoke tests, browser tests, and docs/manifest updates |
-| Auxiliary `internal-docs/**` material is mistakenly treated as canonical contract truth again | Medium | Keep authoritative runtime-contract governance under reviewed `docs/**` artifacts and limit `internal-docs/**` to non-canonical support material |
-| Memory-mode defaults hide regressions in the supported Redis-backed browser-session path | Medium | Preserve explicit Redis-path tests/CI and document that aggregate stability defaults do not replace non-default-path validation |
-| Acceptable-but-subtarget governance scoring (`8.8/10`) is misread as full closure | Medium | Keep the warning visible in architecture-facing docs and limit future claims to “acceptable with residual warning” until the score improves |
-| Residual incidental infrastructure coupling reappears in additional focused suites | Low | Extend the DB-free vs DB-backed boundary only where repeated evidence shows incidental coupling without weakening dedicated persistence coverage |
-| Preserved `legacy-public-runtime/` inventory drifts or is misread as active support | Low | Keep docs explicit that it is transitional backup/reference inventory outside the active runtime and not a rollback path |
+| Legacy HTML runtime is accidentally reintroduced into `src/public/` or treated as supported again | High | Keep `validate-public-runtime`, browser/runtime characterization tests, and docs aligned to the supported inventory |
+| Future work changes `/root/` behavior without updating validators and browser tests | High | Keep root-shell contract checks in validator, smoke tests, characterization tests, and browser E2E |
+| The richer company-admin sidebar IA is misread as fully implemented module coverage instead of mostly shared `in_process` placeholders | Medium | Keep docs explicit that only `Roles y permisos` is the functional tenant-admin destination today and add new functional modules only through approved slices |
+| Non-wave-one roles remain on an informational transition landing longer than expected | Medium | Keep the behavior explicit in docs and move those roles only through approved supported-destination slices |
+| Root shell now uses a bounded `window.RootShell` registry seam, but still depends on plain ordered static scripts and not on a broader module system | Low | Preserve current validator/test coverage, keep the allowlist explicit, and defer any framework/ES-module redesign to a later approved slice |
+| Permission-governance follow-up sequencing is misread because `p10` is analysis, `p28` is only a partial runtime implementation, and future contributors may reintroduce stale dependency metadata | Medium | Record the partial implementation explicitly, preserve the completed `p29` reconciliation plus the closed `p30` and `p32` follow-up slices in docs/spec metadata, and do not overstate current enforcement scope |
+| Preserved `legacy-public-runtime/` inventory drifts or is misread as active support | Low | Keep docs explicit that it is transitional backup/reference inventory outside the active runtime |
 
 ## 17. Rollback or recovery strategy
 - Do not reactivate legacy HTML runtime from `legacy-public-runtime/` as an implicit rollback.
-- If future follow-up work regresses the reduced runtime contract, revert only the affected documentation/governance or bounded landing-route slice.
-- Preserve the current `410 Gone` gate, reduced `src/public/` inventory, and supported post-login transition landing unless a new approved spec explicitly changes the supported browser contract.
+- If future follow-up work regresses the root shell, revert only the affected bounded browser-runtime slice.
+- Preserve the `410 Gone` gate, reduced `src/public/` inventory, and the supported `/root/` entrypoint unless a new approved spec explicitly changes the supported browser contract.
 
 ## 18. Manual validation
 For future follow-up work, manually confirm:
-- `src/public/` still contains only the reduced supported inventory
-- `legacy-public-runtime/` remains outside the served runtime
-- representative legacy HTML routes under `root`, `warehouse`, and `agent` still return the migration response with HTTP `410 Gone` and no redirect
-- `/`, `/index.html`, `/no-access.html`, and `/migration.html` still load successfully
-- `/migration.html?mode=post-login-transition` still behaves as the supported interim post-login landing and hides the 410 status note
-- `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` still behave as supported
-- `login.js` landing behavior is documented as the approved interim transition landing until a later slice defines final functional destinations
-- `npm run test -- --silent` still passes under the official runner baseline
-- `npm run test:redis-path` and `npm run validate:workflow-baseline` still pass when touching repository governance or browser-session storage seams
-- validators/tests/manifest metadata still govern the reduced public-runtime contract rather than retired legacy pages
-- canonical runtime-contract artifacts remain under `docs/**` and any auxiliary `internal-docs/**` material does not compete with them
+- `src/public/` still contains the supported root shell and does not re-expose warehouse or agent runtime directories
+- `/root/` still loads successfully
+- docs and specs distinguish clearly between `p10` analysis outputs and the implemented `p28` and `p30` runtime slices
+- permission-governance dependency metadata no longer treats `p30-company-role-governance-hardening` or `p32-governance-denial-audit-visibility` as pending for the current company-role create-flow boundary
+- root/admin browser sessions still land on `/root/`
+- invalid root-shell sessions still return to login
+- direct legacy HTML routes under `root`, `warehouse`, and `agent` still return the migration response with HTTP `410 Gone` and no redirect
+- `/migration.html?mode=post-login-transition` still behaves as the supported transition landing for non-wave-one profiles
+- `npm run validate:public-runtime` and the affected browser/runtime tests still pass when touching browser-runtime seams
 
 ## 19. Approval status
-**Status:** Documentation refresh now reflects the implemented reduced browser-runtime posture, the earlier Redis operational safeguards, the `p24` governance closeout, the completed `p25` closure of `TASK-023` and `TASK-024`, and the implemented `p26` suite-separation slice. The repository now documents the reduced supported public runtime, the `410 Gone` gate for deprecated legacy HTML routes, relocation of the functional legacy browser runtime to `legacy-public-runtime/`, the approved interim post-login transition landing at `/migration.html?mode=post-login-transition`, the explicit temporary wording that confirms successful authentication while stating that the destination module is not implemented yet, explicit runtime-contract coverage for `POST /api/auth/logout`, canonical runtime-contract ownership under `docs/**`, the auxiliary-only role of `internal-docs/**`, the stable aggregate test baseline behind `npm run test`, the explicit Redis-path validation lane, the readiness/runbook behavior that now treats browser-session persistence as an operational dependency, and the implemented test-governance direction that separates DB-free vs DB-backed suites for the addressed boundary instead of broadly suppressing logs. Remaining future work is limited to final functional replacement of the transition landing, eventual removal of the preserved legacy tree once SPA equivalence exists, optional extension of the suite-separation strategy to additional affected suites, and improving the governance score beyond the current acceptable `8.8/10`.
+**Status:** Documentation refresh now reflects the implemented `sidebar-rebrand-permissions` `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `p27-root-initial-spa-shell`, `p28-flexible-permission-governance-foundation`, `p29-permission-governance-metadata-reconciliation`, `p30-company-role-governance-hardening`, `p31-governance-architecture-documentation-alignment`, `p32-governance-denial-audit-visibility`, `p33-admin-authorization-governance-convergence`, `p34-bounded-governance-coverage-expansion`, `p35-governance-baseline-sync-guardrails`, `p36-bounded-doc-validator-ownership-alignment`, `p37-root-spa-companies-roles-admin`, `p38-root-shell-modularity-hardening`, and `root-shell-follow-up-alignment` state. The repository now documents the supported root shell at `/root/`, the wave-one post-login redirect for `root` and `admin` with `companyId`, continued use of shared browser-session/auth helpers and `/api/auth/me`, the split root-shell presentation where global root keeps top navigation and company-admin receives the rebranded grouped sidebar, the explicit company-admin sidebar route items with `#admin_home` as default landing, the current truth that only `Roles y permisos` is functionally implemented while the remaining sidebar routes render the shared neutral `in_process` view, the normalized shell/view layout ownership, the preserved `410 Gone` contract for deprecated legacy HTML routes, the centralized permission-governance foundation with its stable global-root company-creation rule, the bounded actor-scope route-policy convergence seam for company/company-role admin flows, the dedicated `company.create-global` route policy, the route-level audit action `security.authorization.access_policy`, the enforced company-role creation deny for platform-scoped permissions such as `companies.manage`, the dedicated denial audit action `roles.company.create.governance_denied` for that service-level create deny, the bounded root-shell typecheck allowlist, the focused sync/ownership guardrails from `p35` and `p36`, the canonical `docs/**` ownership used by the in-scope legacy runtime-contract validator, the auxiliary-only classification for `internal-docs/**`, the preserved warning-only posture for non-approved sensitive combinations, the still-open future module-expansion follow-up, and the current validator/test coverage that governs these surfaces.

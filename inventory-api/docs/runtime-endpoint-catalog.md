@@ -72,20 +72,20 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 ## Gobierno organizacional y tenant
 | Method | Path | Authentication | Authorization observed | Purpose | Notes |
 |---|---|---|---|---|---|
-| GET | `/api/companies/` | Sí | `authorize('root')` | Listar compañías globales | Superficie root |
-| GET | `/api/companies/root/companies` | Sí | `authorize('root')` | Listar compañías para gestión root | Consumido por UI root |
-| GET | `/api/companies/root/dashboard` | Sí | `authorize('admin')` | Dashboard ejecutivo de compañía | Ruta legacy preservada |
-| GET | `/api/companies/company/dashboard` | Sí | `authorize('admin')` | Dashboard ejecutivo de compañía | Alias semántico aprobado |
-| PATCH | `/api/companies/root/companies/:companyId/status` | Sí | `authorize('root')` | Activar/inactivar compañía | Validado por schema |
-| POST | `/api/companies/` | Sí | `authorize('root')` | Crear compañía | Flujo root |
-| POST | `/api/companies/root/companies` | Sí | `authorize('root')` | Crear compañía root-style | Compatibilidad explícita |
+| GET | `/api/companies/` | Sí | `authorizeAccessPolicy('company.list-global')` | Listar compañías globales | Superficie root con actor scope `global-root` |
+| GET | `/api/companies/root/companies` | Sí | `authorizeAccessPolicy('company.root-companies.list')` | Listar compañías para gestión root | Consumido por UI root; actor scope `global-root` |
+| GET | `/api/companies/root/dashboard` | Sí | `authorizeAccessPolicy('company.dashboard')` | Dashboard ejecutivo de compañía | Ruta legacy preservada; requiere actor `admin` con `companyId` |
+| GET | `/api/companies/company/dashboard` | Sí | `authorizeAccessPolicy('company.dashboard')` | Dashboard ejecutivo de compañía | Alias semántico aprobado; requiere actor `admin` con `companyId` |
+| PATCH | `/api/companies/root/companies/:companyId/status` | Sí | `authorizeAccessPolicy('company.root-companies.update-status')` | Activar/inactivar compañía | Validado por schema |
+| POST | `/api/companies/` | Sí | `authorizeAccessPolicy('company.create-global')` | Crear compañía | Flujo root; la policy declara actor scope `global-root` y el servicio revalida el límite global-root antes de persistir |
+| POST | `/api/companies/root/companies` | Sí | `authorizeAccessPolicy('company.root-companies.create')` | Crear compañía root-style | Compatibilidad explícita; actor scope `global-root` y revalidación sensible en servicio |
 | GET | `/api/users/` | Sí | `authorize('root')` | Listar usuarios globales | Scope root |
 | GET | `/api/users/company` | Sí | `authorize('admin')` | Listar usuarios de la compañía autenticada | Consumido por UI root/admin |
 | POST | `/api/users/company` | Sí | `authorize('admin')` | Crear usuario de compañía | Validado por schema |
 | POST | `/api/users/` | Sí | `authorize('root')` | Crear usuario global | Scope root |
-| GET | `/api/roles/permissions` | Sí | `authorize('admin')` | Listar permisos asignables | Base para roles personalizados |
-| GET | `/api/roles/company` | Sí | `authorize('admin')` | Listar roles asignables por compañía | Consumido por UI |
-| POST | `/api/roles/company` | Sí | `authorize('admin')` | Crear rol de compañía | Validado por schema |
+| GET | `/api/roles/permissions` | Sí | `authorizeAccessPolicy('role.permissions.list')` | Listar permisos asignables | Base para roles personalizados |
+| GET | `/api/roles/company` | Sí | `authorizeAccessPolicy('role.company.list')` | Listar roles asignables por compañía | Consumido por UI; actor scope `company-admin` |
+| POST | `/api/roles/company` | Sí | `authorizeAccessPolicy('role.company.create')` | Crear rol de compañía | Validado por schema; actor scope `company-admin`, y el servicio aplica gobernanza adicional, niega permisos de alcance plataforma como `companies.manage` antes de persistir y registra el deny path mediante auditoría fail-open cuando hay contexto de request |
 
 ## Clientes y crédito comercial
 | Method | Path | Authentication | Authorization observed | Purpose | Notes |

@@ -13,6 +13,29 @@ function mapPermissions(role) {
     .map((item) => item.permission.code) || [];
 }
 
+function buildSerializedUser(user) {
+  return {
+    id: user.id.toString(),
+    fullName: user.fullName,
+    username: user.username,
+    companyId: user.companyId ? user.companyId.toString() : null,
+    status: user.status,
+    role: user.role
+      ? {
+        ...user.role,
+        id: user.role.id ? user.role.id.toString() : undefined,
+      }
+      : null,
+    company: user.company
+      ? {
+        ...user.company,
+        id: user.company.id ? user.company.id.toString() : undefined,
+      }
+      : null,
+    permissions: mapPermissions(user.role),
+  };
+}
+
 async function login(payload, req = null, options = {}) {
   const loginMetadata = {
     username: payload.username,
@@ -85,7 +108,6 @@ async function login(payload, req = null, options = {}) {
   }
 
   const token = signAccessToken(user);
-  const { passwordHash: _passwordHash, ...safeUser } = user;
   if (req) {
     attachAuthenticatedActor(req, {
       sub: user.id.toString(),
@@ -111,10 +133,7 @@ async function login(payload, req = null, options = {}) {
     },
   });
 
-  const serializedUser = {
-    ...safeUser,
-    permissions: mapPermissions(user.role),
-  };
+  const serializedUser = buildSerializedUser(user);
 
   if (options.issueBrowserSession === true) {
     const browserSession = await browserSessionService.createBrowserSession(user.id, { req });

@@ -20,6 +20,12 @@ test('access policies centralize stable role and permission boundaries', () => {
   assert.equal(rootCompanyPolicy.mode, 'role');
   assert.deepEqual(rootCompanyPolicy.roles, ['root']);
   assert.equal(rootCompanyPolicy.boundary, 'platform-global');
+  assert.equal(rootCompanyPolicy.actorScope, 'global-root');
+
+  const createCompanyPolicy = getAccessPolicy('company.create-global');
+  assert.equal(createCompanyPolicy.mode, 'role');
+  assert.deepEqual(createCompanyPolicy.roles, ['root']);
+  assert.equal(createCompanyPolicy.actorScope, 'global-root');
 
   const paymentApprovePolicy = getAccessPolicy('payment.approve');
   assert.equal(paymentApprovePolicy.mode, 'permission');
@@ -50,15 +56,38 @@ test('access policies identify operational endpoints still in progressive role-t
   ]);
 });
 
-test('authorizeAccessPolicy preserves root-only company listing semantics', async () => {
+test('authorizeAccessPolicy preserves global-root company listing semantics', async () => {
   const guard = authorizeAccessPolicy('company.list-global');
 
-  const deniedError = await runGuard(guard, { role: 'admin', companyId: '7' });
-  assert.equal(deniedError?.statusCode, 403);
-  assert.equal(deniedError?.code, 'forbidden');
+  const deniedRoleError = await runGuard(guard, { role: 'admin', companyId: '7' });
+  assert.equal(deniedRoleError?.statusCode, 403);
+  assert.equal(deniedRoleError?.code, 'forbidden');
+
+  const deniedScopeError = await runGuard(guard, { role: 'root', companyId: '7' });
+  assert.equal(deniedScopeError?.statusCode, 403);
+  assert.equal(deniedScopeError?.code, 'forbidden');
 
   const allowedError = await runGuard(guard, { role: 'root', companyId: null });
   assert.equal(allowedError, undefined);
+});
+
+test('authorizeAccessPolicy preserves company-admin role administration semantics', async () => {
+  const listGuard = authorizeAccessPolicy('role.company.list');
+  const createGuard = authorizeAccessPolicy('role.company.create');
+
+  const deniedListScopeError = await runGuard(listGuard, { role: 'admin', companyId: null });
+  assert.equal(deniedListScopeError?.statusCode, 403);
+  assert.equal(deniedListScopeError?.code, 'forbidden');
+
+  const deniedCreateScopeError = await runGuard(createGuard, { role: 'admin', companyId: null });
+  assert.equal(deniedCreateScopeError?.statusCode, 403);
+  assert.equal(deniedCreateScopeError?.code, 'forbidden');
+
+  const allowedListError = await runGuard(listGuard, { role: 'admin', companyId: '7' });
+  assert.equal(allowedListError, undefined);
+
+  const allowedCreateError = await runGuard(createGuard, { role: 'admin', companyId: '7' });
+  assert.equal(allowedCreateError, undefined);
 });
 
 test('authorizeAccessPolicy preserves payment approval permission semantics', async () => {

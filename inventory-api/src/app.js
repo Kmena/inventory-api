@@ -63,7 +63,7 @@ function getFriendlyError(error) {
   };
 }
 
-const strictPublicDocumentPaths = new Set(['/', '/index.html', '/no-access.html', '/migration.html']);
+const strictPublicDocumentPaths = new Set(['/', '/index.html', '/no-access.html', '/migration.html', '/root/', '/root']);
 const deprecatedLegacyHtmlPathPattern = /^\/(?:root|warehouse|agent)\/[^/?]+\.html$/;
 
 function buildContentSecurityPolicy(directives) {

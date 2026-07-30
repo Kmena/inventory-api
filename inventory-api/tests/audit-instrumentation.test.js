@@ -9,6 +9,7 @@ const audit = require('../src/lib/audit');
 const authService = require('../src/services/auth.service');
 const authorize = require('../src/middlewares/authorize');
 const authorizePermission = require('../src/middlewares/authorizePermission');
+const { authorizeAccessPolicy } = require('../src/security/access-policies');
 const paymentService = require('../src/services/payment.service');
 const invoiceService = require('../src/services/invoice.service');
 const orderService = require('../src/services/order.service');
@@ -95,6 +96,11 @@ test('authService.login records a SUCCESS audit event without persisting the pas
       const result = await authService.login({ username: 'alice', password: 'secret123' }, createRequest());
       assert.equal(typeof result.token, 'string');
       assert.equal(result.user.username, 'alice');
+      assert.equal(result.user.id, '11');
+      assert.equal(result.user.companyId, '7');
+      assert.equal(result.user.role.code, 'admin');
+      assert.equal(typeof result.user.id, 'string');
+      assert.equal(typeof result.user.companyId, 'string');
     },
   );
 
@@ -188,6 +194,32 @@ test('authorizePermission records permission denials as audit events', async () 
   assert.equal(recordedEvents.length, 1);
   assert.equal(recordedEvents[0].action, 'security.authorization.permission');
   assert.equal(recordedEvents[0].reasonCode, 'permission_denied');
+});
+
+test('authorizeAccessPolicy records actor-scope denials as route-level audit events', async () => {
+  const recordedEvents = [];
+  const guard = authorizeAccessPolicy('company.list-global');
+  let nextError = null;
+
+  await withStubs(
+    [[audit, {
+      recordAuditEventSafelyIfAvailable: async (payload) => {
+        recordedEvents.push(payload);
+      },
+    }]],
+    async () => {
+      await guard({ auth: { role: 'root', companyId: '7' }, requestContext: { requestId: 'req-access-policy-1' } }, {}, (error) => {
+        nextError = error;
+      });
+    },
+  );
+
+  assert.equal(nextError?.code, 'forbidden');
+  assert.equal(recordedEvents.length, 1);
+  assert.equal(recordedEvents[0].action, 'security.authorization.access_policy');
+  assert.equal(recordedEvents[0].reasonCode, 'actor_scope_denied');
+  assert.equal(recordedEvents[0].metadata.policyId, 'company.list-global');
+  assert.equal(recordedEvents[0].metadata.actorScope, 'global-root');
 });
 
 test('paymentService.removePayment records a payment reversal audit event', async () => {
@@ -338,6 +370,35 @@ test('userService.registerCompanyUser records an administrative user audit event
 
   assert.equal(recordedEvents.length, 1);
   assert.equal(recordedEvents[0].action, 'users.company.create');
+});
+
+test('roleService.createCompanyRole records a governance denial audit event distinct from success auditing', async () => {
+  const recordedDenials = [];
+
+  await withStubs(
+    [
+      [roleRepository, {
+        findActivePermissions: async () => [{ code: 'companies.manage' }, { code: 'inventory.manage' }],
+      }],
+      [audit, {
+        recordAuditEventSafelyIfAvailable: async (payload) => {
+          recordedDenials.push(payload);
+        },
+      }],
+    ],
+    async () => {
+      await assert.rejects(
+        () => roleService.createCompanyRole({ name: 'Platform Role', permissionCodes: ['companies.manage'] }, { companyId: '1' }, createRequest()),
+        (error) => error.code === 'platform_permission_not_assignable',
+      );
+    },
+  );
+
+  assert.equal(recordedDenials.length, 1);
+  assert.equal(recordedDenials[0].action, 'roles.company.create.governance_denied');
+  assert.equal(recordedDenials[0].outcome, 'REJECTED');
+  assert.equal(recordedDenials[0].reasonCode, 'platform_permission_not_assignable');
+  assert.deepEqual(recordedDenials[0].metadata.affectedPermissions, ['companies.manage']);
 });
 
 test('roleService.createCompanyRole records an administrative role audit event', async () => {

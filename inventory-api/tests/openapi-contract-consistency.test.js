@@ -69,7 +69,11 @@ test('OpenAPI baseline covers expanded auth, client, agent, integration and phas
     ['/api/auth/me', 'get'],
     ['/api/companies', 'get'],
     ['/api/companies', 'post'],
+    ['/api/companies/root/companies', 'get'],
+    ['/api/companies/root/companies', 'post'],
+    ['/api/roles/permissions', 'get'],
     ['/api/roles/company', 'get'],
+    ['/api/roles/company', 'post'],
     ['/api/users/company', 'post'],
     ['/api/clients/company', 'get'],
     ['/api/clients/classifications/company', 'get'],
@@ -104,6 +108,12 @@ test('OpenAPI baseline covers expanded auth, client, agent, integration and phas
   }
   assert.equal(openApi.paths['/api/auth/login'].post.security, undefined);
   assert.equal(openApi.paths['/api/clients'].post['x-compatibility']?.status, 'legacy-alias');
+  assert.equal(openApi.paths['/api/companies'].get['x-governance']?.actorScope, 'global-root');
+  assert.equal(openApi.paths['/api/companies'].post['x-governance']?.routePolicy, 'company.create-global');
+  assert.equal(openApi.paths['/api/companies/root/companies'].post['x-governance']?.serviceRevalidation, 'company.service.js global-root governance check');
+  assert.equal(openApi.paths['/api/roles/permissions'].get['x-governance']?.routePolicy, 'role.permissions.list');
+  assert.equal(openApi.paths['/api/roles/company'].get['x-governance']?.actorScope, 'company-admin');
+  assert.equal(openApi.paths['/api/roles/company'].post['x-governance']?.serviceRevalidation, 'role.service.js company-role governance evaluation');
   assert.equal(openApi.paths['/api/payments/{id}'].delete['x-compatibility']?.status, 'compatibility-delete-reverse');
   assert.match(openApi.paths['/api/geocoding/search'].get.summary, /throttle/i);
   assert.match(openApi.paths['/api/taxpayers/lookup'].get.summary, /throttle/i);

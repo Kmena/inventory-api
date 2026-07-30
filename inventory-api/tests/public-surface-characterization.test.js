@@ -32,7 +32,7 @@ test('embedded UI keeps explicit browser-first quality gates for the reduced run
   assert.match(validateScriptSource, /validateMigrationRuntimeContracts/);
 });
 
-test('supported public runtime assets are now limited to login, no-access, migration and shared helpers', () => {
+test('supported public runtime assets now include the minimal root shell while legacy warehouse and agent runtimes remain retired', () => {
   const supportedFiles = [
     'index.html',
     'login.js',
@@ -40,20 +40,37 @@ test('supported public runtime assets are now limited to login, no-access, migra
     'migration.js',
     'no-access.html',
     'no-access.js',
+    'root/index.html',
+    'root/app.js',
+    'root/companies-api.js',
+    'root/guards.js',
+    'root/registry.js',
+    'root/manifest.js',
+    'root/roles-api.js',
+    'root/router.js',
+    'root/session-adapter.js',
+    'root/ui.js',
+    'root/views/companies-admin.js',
+    'root/views/home.js',
+    'root/views/in-process.js',
+    'root/views/roles-admin.js',
     'shared/auth.js',
     'shared/session.js',
     'styles.css',
   ];
 
   for (const relativePath of supportedFiles) {
-    assert.equal(fs.existsSync(path.join(publicRoot, relativePath)), true, `${relativePath} should remain in the reduced public runtime`);
+    assert.equal(fs.existsSync(path.join(publicRoot, relativePath)), true, `${relativePath} should remain in the supported public runtime`);
   }
 
-  for (const retiredDirectory of ['root', 'warehouse', 'agent']) {
+  assert.equal(fs.existsSync(path.join(publicRoot, 'root')), true, 'root shell should now exist under src/public');
+
+  for (const retiredDirectory of ['warehouse', 'agent']) {
     assert.equal(fs.existsSync(path.join(publicRoot, retiredDirectory)), false, `${retiredDirectory} should not remain exposed from src/public`);
     assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, retiredDirectory)), true, `${retiredDirectory} should be relocated for SPA transition reuse`);
   }
 
+  assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'root', 'dashboard.html')), true, 'legacy root inventory should remain preserved for future transition work');
   assert.equal(fs.existsSync(path.join(publicRoot, 'shared', 'lot-dates.js')), false, 'legacy warehouse helper should leave the reduced public runtime');
   assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'shared', 'lot-dates.js')), true, 'legacy warehouse helper should be preserved in the relocation baseline');
 });
@@ -67,9 +84,15 @@ test('public login, no-access and migration screens keep strict same-origin wiri
   const migrationSource = readPublicFile('migration.js');
   const sessionHelperSource = readPublicFile('shared/session.js');
   const authHelperSource = readPublicFile('shared/auth.js');
+  const stylesSource = readPublicFile('styles.css');
+
+  const rootShellHtmlSource = readPublicFile('root/index.html');
+  const rootShellAppSource = readPublicFile('root/app.js');
+  const rootShellManifestSource = readPublicFile('root/manifest.js');
 
   assert.match(loginSource, /inventorySession\.read\(\)/);
   assert.match(loginSource, /inventorySession\.write\(session\)/);
+  assert.match(loginSource, /const ROOT_SHELL_PATH = '\/root\/'/);
   assert.match(loginSource, /'\/migration\.html\?mode=post-login-transition'/);
   assert.doesNotMatch(loginSource, /'\/root\/dashboard\.html'/);
   assert.doesNotMatch(loginSource, /'\/warehouse\/products\.html'/);
@@ -82,6 +105,28 @@ test('public login, no-access and migration screens keep strict same-origin wiri
   assert.match(noAccessHtmlSource, /<script src="\/shared\/session\.js"><\/script>/);
   assert.match(noAccessHtmlSource, /<script src="\/no-access\.js"><\/script>/);
   assert.match(noAccessSource, /inventorySession\.clearAndRedirectToLogin\(\)/);
+  assert.match(rootShellHtmlSource, /Saltar al contenido principal/);
+  assert.match(rootShellHtmlSource, /Panel root/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/registry\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/companies-api\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/roles-api\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/ui\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/companies-admin\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/roles-admin\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/app\.js"><\/script>/);
+  assert.match(rootShellManifestSource, /routeKey: 'companies'/);
+  assert.match(rootShellManifestSource, /routeKey: 'roles_permissions'/);
+  assert.match(stylesSource, /\.root-sidebar,\s*\n\.root-sidebar \*/);
+  assert.match(stylesSource, /\.root-sidebar__scroll \{[\s\S]*overflow-y: auto;[\s\S]*scrollbar-width: thin;[\s\S]*scrollbar-color: rgba\(203, 213, 225, 0\.28\) transparent;/);
+  assert.match(stylesSource, /\.root-sidebar__nav,[\s\S]*\.root-sidebar__section-body,[\s\S]*\.root-sidebar__subnav \{[\s\S]*overflow-x: clip;/);
+  assert.match(stylesSource, /\.root-sidebar__label \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
+  assert.match(stylesSource, /\.root-sidebar__tooltip \{[\s\S]*display: none;/);
+  assert.match(rootShellAppSource, /rootShell\.require\('sessionAdapter'\)/);
+  assert.match(rootShellAppSource, /rootShell\.require\('router'\)/);
+  assert.match(rootShellAppSource, /function configureShellForActor\(session\)/);
+  assert.match(rootShellAppSource, /renderNavigation\(session\)/);
+  assert.match(rootShellAppSource, /rootShellSessionAdapter\.bootstrap\(\)/);
+  assert.match(rootShellAppSource, /inventoryAuth\.logout\(activeSession/);
   assert.match(migrationHtmlSource, /Actualizacion de acceso/);
   assert.match(migrationHtmlSource, /Esta ruta ya no se encuentra disponible/);
   assert.match(migrationHtmlSource, /Codigo de estado: 410/);

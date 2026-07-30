@@ -30,12 +30,30 @@ test('typecheck scope includes the approved schema, repository surfaces, and fir
   assert.equal(config.include.includes('src/repositories/company.repository.js'), true);
   assert.equal(config.include.includes('src/repositories/invoice.repository.js'), true);
   assert.equal(config.include.includes('src/repositories/inventory.repository.js'), true);
+  assert.equal(config.include.includes('src/security/access-policies.js'), true);
   assert.equal(config.include.includes('scripts/validate-workflow-baseline.js'), true);
   assert.equal(config.include.includes('scripts/validate-operational-readiness.js'), true);
   assert.equal(config.include.includes('scripts/validate-production-baseline.js'), true);
   assert.equal(config.include.includes('src/public/shared/session.js'), true);
   assert.equal(config.include.includes('src/public/shared/auth.js'), true);
   assert.equal(config.include.includes('src/public/login.js'), true);
+  for (const rootShellFile of [
+    'src/public/root/app.js',
+    'src/public/root/router.js',
+    'src/public/root/manifest.js',
+    'src/public/root/guards.js',
+    'src/public/root/registry.js',
+    'src/public/root/session-adapter.js',
+    'src/public/root/ui.js',
+    'src/public/root/companies-api.js',
+    'src/public/root/roles-api.js',
+    'src/public/root/views/home.js',
+    'src/public/root/views/in-process.js',
+    'src/public/root/views/companies-admin.js',
+    'src/public/root/views/roles-admin.js',
+  ]) {
+    assert.equal(config.include.includes(rootShellFile), true, `${rootShellFile} should be part of the approved root-shell typecheck allowlist`);
+  }
   assert.equal(config.include.includes('src/public/root/index.js'), false);
   assert.equal(config.include.includes('src/public/warehouse/products.js'), false);
   assert.equal(config.include.includes('src/public/agent/workspace.js'), false);

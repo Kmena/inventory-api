@@ -39,7 +39,7 @@ test('reduced public runtime serves supported HTML entrypoints with strict secur
   const server = app.listen(0);
   t.after(() => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))));
 
-  const supportedPaths = ['/', '/index.html', '/no-access.html', '/migration.html', '/migration.html?mode=post-login-transition'];
+  const supportedPaths = ['/', '/index.html', '/no-access.html', '/migration.html', '/migration.html?mode=post-login-transition', '/root/'];
 
   for (const pathName of supportedPaths) {
     const response = await request(server, pathName);
@@ -56,9 +56,14 @@ test('reduced public runtime serves supported HTML entrypoints with strict secur
   assert.match(postLoginTransitionResponse.body, /<script src="\/migration\.js"><\/script>/);
 });
 
-test('supported post-login transition mode stays on an active 200 URL while deprecated legacy routes still return 410', async (t) => {
+test('supported root shell and post-login transition URLs stay active while deprecated legacy routes still return 410', async (t) => {
   const server = app.listen(0);
   t.after(() => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))));
+
+  const supportedRootShellResponse = await request(server, '/root/');
+  assert.equal(supportedRootShellResponse.statusCode, 200);
+  assert.match(String(supportedRootShellResponse.headers['content-security-policy'] || ''), /default-src 'self'/);
+  assert.match(supportedRootShellResponse.body, /root-main/);
 
   const supportedTransitionResponse = await request(server, '/migration.html?mode=post-login-transition');
   assert.equal(supportedTransitionResponse.statusCode, 200);
@@ -95,7 +100,7 @@ test('reduced public runtime serves only the remaining supported JavaScript asse
   const server = app.listen(0);
   t.after(() => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))));
 
-  const supportedAssets = ['/login.js', '/migration.js', '/shared/auth.js', '/shared/session.js'];
+  const supportedAssets = ['/login.js', '/migration.js', '/shared/auth.js', '/shared/session.js', '/root/app.js', '/root/router.js', '/root/registry.js', '/root/companies-api.js', '/root/roles-api.js', '/root/ui.js', '/root/views/companies-admin.js', '/root/views/roles-admin.js'];
 
   for (const assetPath of supportedAssets) {
     const response = await request(server, assetPath);

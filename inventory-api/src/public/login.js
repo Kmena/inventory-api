@@ -1,3 +1,4 @@
+(() => {
 const inventorySession = /** @type {any} */ (window).InventorySession;
 const inventoryAuth = /** @type {any} */ (window).InventoryAuth;
 const form = /** @type {HTMLFormElement | null} */ (document.getElementById('login-form'));
@@ -7,6 +8,7 @@ const loginButton = /** @type {HTMLButtonElement | null} */ (document.getElement
 const LOGIN_ENDPOINT = '/api/auth/login';
 const DEFAULT_LOGIN_ERROR_MESSAGE = 'No se pudo iniciar sesion. Intente de nuevo.';
 const UNEXPECTED_LOGIN_ERROR_MESSAGE = 'Ocurrio un error inesperado.';
+const ROOT_SHELL_PATH = '/root/';
 const POST_LOGIN_TRANSITION_PATH = '/migration.html?mode=post-login-transition';
 
 let loginAttemptInProgress = false;
@@ -36,11 +38,11 @@ function getHomeForSession(session) {
   const permissions = session?.user?.permissions || [];
 
   if (roleCode === 'root') {
-    return POST_LOGIN_TRANSITION_PATH;
+    return ROOT_SHELL_PATH;
   }
 
   if (roleCode === 'admin' && session?.user?.companyId) {
-    return POST_LOGIN_TRANSITION_PATH;
+    return ROOT_SHELL_PATH;
   }
 
   if (roleCode === 'sales_supervisor') {
@@ -201,9 +203,12 @@ form.addEventListener('submit', async (event) => {
     sessionEstablished = true;
     redirectToSessionHome(session);
   } catch (error) {
-    loginAttemptInProgress = false;
     setMessage(error.message || UNEXPECTED_LOGIN_ERROR_MESSAGE, 'error');
   } finally {
+    if (!sessionEstablished) {
+      loginAttemptInProgress = false;
+    }
     setSubmittingState(false);
   }
 });
+})();
