@@ -403,6 +403,7 @@ code { background: #eef2ff; padding: 2px 6px; border-radius: 6px; }
   inset: 0 auto 0 0;
   z-index: 50;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   transform: translateX(-100%);
@@ -411,6 +412,13 @@ code { background: #eef2ff; padding: 2px 6px; border-radius: 6px; }
 
 .root-shell[data-shell-actor='company-admin'][data-drawer-open='true'] .root-sidebar {
   transform: translateX(0);
+}
+
+.root-sidebar__header,
+.root-sidebar__scroll,
+.root-sidebar__footer {
+  width: 100%;
+  min-width: 0;
 }
 
 .root-sidebar__header,
@@ -518,13 +526,22 @@ code { background: #eef2ff; padding: 2px 6px; border-radius: 6px; }
 .root-sidebar__group {
   display: grid;
   gap: 8px;
+  width: 100%;
   min-width: 0;
+  justify-items: stretch;
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .root-sidebar__nav,
 .root-sidebar__section-body,
 .root-sidebar__subnav {
   overflow-x: clip;
+}
+
+.root-sidebar__section {
+  width: 100%;
+  min-width: 0;
 }
 
 .root-sidebar__section + .root-sidebar__section {
@@ -803,17 +820,46 @@ code { background: #eef2ff; padding: 2px 6px; border-radius: 6px; }
 
   .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__header,
   .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__footer {
-    padding-left: 18px;
-    padding-right: 18px;
-  }
-
-  .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__scroll {
     padding-left: 12px;
     padding-right: 12px;
   }
 
+  .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__scroll {
+    padding-top: 24px;
+    padding-bottom: 24px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__section,
+  .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__section-body,
+  .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__section-body > .root-sidebar__link,
+  .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__section-body > .root-sidebar__group,
+  .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__group > .root-sidebar__link {
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+    align-self: stretch;
+  }
+
   .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__link {
-    justify-content: center;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+    align-self: stretch;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__icon {
+    justify-self: center;
+  }
+
+  .root-shell[data-shell-actor='company-admin'][data-sidebar-state='collapsed'] .root-sidebar__logout {
+    width: 100%;
+    min-width: 0;
     padding-left: 0;
     padding-right: 0;
   }
