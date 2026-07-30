@@ -5,11 +5,24 @@ const vm = require('node:vm');
 const publicRoot = path.join(__dirname, '..', 'src', 'public');
 const legacyRuntimeRoot = path.join(__dirname, '..', 'legacy-public-runtime');
 
-const expectedHtmlFiles = ['index.html', 'migration.html', 'no-access.html'];
+const expectedHtmlFiles = ['index.html', 'migration.html', 'no-access.html', 'root/index.html'];
 const expectedJavaScriptFiles = [
   'login.js',
   'migration.js',
   'no-access.js',
+  'root/app.js',
+  'root/companies-api.js',
+  'root/guards.js',
+  'root/manifest.js',
+  'root/registry.js',
+  'root/roles-api.js',
+  'root/router.js',
+  'root/session-adapter.js',
+  'root/ui.js',
+  'root/views/companies-admin.js',
+  'root/views/home.js',
+  'root/views/in-process.js',
+  'root/views/roles-admin.js',
   'shared/auth.js',
   'shared/session.js',
 ];
@@ -100,10 +113,14 @@ function validatePublicRuntimeInventory() {
   assertExactSupportedFileSet(htmlFiles, expectedHtmlFiles, 'Public HTML inventory');
   assertExactSupportedFileSet(javascriptFiles, expectedJavaScriptFiles, 'Public JavaScript inventory');
 
-  for (const retiredDirectory of ['root', 'warehouse', 'agent']) {
+  for (const retiredDirectory of ['warehouse', 'agent']) {
     if (fs.existsSync(path.join(publicRoot, retiredDirectory))) {
       throw new Error(`Retired public runtime directory is still exposed from src/public: ${retiredDirectory}`);
     }
+  }
+
+  if (!fs.existsSync(path.join(publicRoot, 'root', 'index.html'))) {
+    throw new Error('Expected supported root shell entrypoint not found: root/index.html');
   }
 
   for (const relocatedDirectory of ['root', 'warehouse', 'agent']) {
@@ -130,7 +147,8 @@ function validateLoginRuntimeContracts() {
     { description: 'declares the supported login endpoint', snippets: ['/api/auth/login'] },
     { description: 'persists authenticated session through the shared session helper', snippets: ['inventorySession.write(session);'] },
     { description: 'restores existing sessions through the shared session helper', snippets: ['inventorySession.read();'] },
-    { description: 'routes retired-runtime roles to the supported post-login transition landing', snippets: ["'/migration.html?mode=post-login-transition'", "const POST_LOGIN_TRANSITION_PATH = '/migration.html?mode=post-login-transition';"] },
+    { description: 'routes root-eligible roles to the supported root shell entrypoint', snippets: ["const ROOT_SHELL_PATH = '/root/';", 'return ROOT_SHELL_PATH;'] },
+    { description: 'keeps the supported transition landing for non-wave-one profiles', snippets: ["'/migration.html?mode=post-login-transition'", "const POST_LOGIN_TRANSITION_PATH = '/migration.html?mode=post-login-transition';"] },
   ];
 
   for (const contract of loginSourceContracts) {
@@ -153,6 +171,61 @@ function validateLoginRuntimeContracts() {
 
   if (failures.length > 0) {
     throw new Error(`Critical login runtime contract drift detected:\n- ${failures.join('\n- ')}`);
+  }
+}
+
+function validateRootShellRuntimeContracts() {
+  const rootHtmlSource = readSource(path.join(publicRoot, 'root', 'index.html'));
+  const rootAppSource = readSource(path.join(publicRoot, 'root', 'app.js'));
+  const rootRouterSource = readSource(path.join(publicRoot, 'root', 'router.js'));
+  const rootManifestSource = readSource(path.join(publicRoot, 'root', 'manifest.js'));
+  const rootGuardsSource = readSource(path.join(publicRoot, 'root', 'guards.js'));
+  const rootSessionAdapterSource = readSource(path.join(publicRoot, 'root', 'session-adapter.js'));
+
+  if (!rootHtmlSource.includes('id="root-main"') || !rootHtmlSource.includes('id="root-view"')) {
+    throw new Error('root/index.html: missing contract -> shell landmarks and view outlet');
+  }
+
+  if (!rootHtmlSource.includes('/shared/session.js')
+    || !rootHtmlSource.includes('/shared/auth.js')
+    || !rootHtmlSource.includes('/root/registry.js')
+    || !rootHtmlSource.includes('/root/companies-api.js')
+    || !rootHtmlSource.includes('/root/roles-api.js')
+    || !rootHtmlSource.includes('/root/ui.js')
+    || !rootHtmlSource.includes('/root/views/companies-admin.js')
+    || !rootHtmlSource.includes('/root/views/roles-admin.js')
+    || !rootHtmlSource.includes('/root/app.js')) {
+    throw new Error('root/index.html: missing contract -> shared helper and shell script wiring');
+  }
+
+  if (!rootAppSource.includes('rootShellSessionAdapter.bootstrap()')) {
+    throw new Error('root/app.js: missing contract -> /api/auth/me bootstrap through shared auth helper');
+  }
+
+  if (!rootAppSource.includes('inventoryAuth.logout(activeSession')) {
+    throw new Error('root/app.js: missing contract -> shared logout');
+  }
+
+  if (!rootRouterSource.includes("'in_process'")) {
+    throw new Error('root/router.js: missing contract -> in_process fallback route');
+  }
+
+  if (!rootManifestSource.includes("label: 'Inicio'")
+    || !rootManifestSource.includes("label: 'Empresas'")
+    || !rootManifestSource.includes("label: 'Roles y permisos'")
+    || !rootManifestSource.includes("label: 'Pendientes'")) {
+    throw new Error('root/manifest.js: missing contract -> bounded admin navigation items');
+  }
+
+  if (!rootGuardsSource.includes("roleCode === 'root'")
+    || !rootGuardsSource.includes("roleCode === 'admin'")
+    || !rootGuardsSource.includes('function isRootUser(session)')
+    || !rootGuardsSource.includes('function isCompanyAdmin(session)')) {
+    throw new Error('root/guards.js: missing contract -> wave-one eligibility guard');
+  }
+
+  if (!rootSessionAdapterSource.includes('bootstrapSession({')) {
+    throw new Error('root/session-adapter.js: missing contract -> shared auth bootstrap reuse');
   }
 }
 
@@ -228,6 +301,7 @@ function main() {
   }
 
   validateLoginRuntimeContracts();
+  validateRootShellRuntimeContracts();
   validateMigrationRuntimeContracts();
 
   console.log(`Validated reduced public runtime syntax and contracts for ${javascriptFiles.length} JS files and ${htmlFiles.length} HTML files.`);
@@ -244,4 +318,5 @@ module.exports = {
   validateLoginRuntimeContracts,
   validateMigrationRuntimeContracts,
   validatePublicRuntimeInventory,
+  validateRootShellRuntimeContracts,
 };

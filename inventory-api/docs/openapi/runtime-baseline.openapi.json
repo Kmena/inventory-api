@@ -149,6 +149,11 @@
         "description": "Ruta preservada por compatibilidad. Aunque contiene `/root/`, en runtime resuelve el mismo dashboard ejecutivo de compañía que `/api/companies/company/dashboard` y no un dashboard root global.",
         "tags": ["companies"],
         "security": [{ "bearerAuth": [] }],
+        "x-governance": {
+          "routePolicy": "company.dashboard",
+          "boundary": "tenant-admin-legacy",
+          "coveragePosture": "legacy-dashboard-alias"
+        },
         "x-compatibility": {
           "status": "legacy-alias",
           "preferredPath": "/api/companies/company/dashboard",
@@ -172,6 +177,11 @@
         "description": "Ruta recomendada para administradores de empresa sobre su propio tenant.",
         "tags": ["companies"],
         "security": [{ "bearerAuth": [] }],
+        "x-governance": {
+          "routePolicy": "company.dashboard",
+          "boundary": "tenant-admin-legacy",
+          "coveragePosture": "legacy-dashboard-alias"
+        },
         "x-runtime-source": {
           "mountPath": "/api/companies",
           "routeFile": "src/routes/company.routes.js",
@@ -190,6 +200,12 @@
         "description": "Superficie histórica preservada. Mantiene semántica root/global y no debe reinterpretarse como listado tenant-admin.",
         "tags": ["companies"],
         "security": [{ "bearerAuth": [] }],
+        "x-governance": {
+          "routePolicy": "company.list-global",
+          "actorScope": "global-root",
+          "boundary": "platform-global",
+          "coveragePosture": "bounded-p33-admin-convergence"
+        },
         "x-compatibility": {
           "status": "legacy-global-shape",
           "preferredPath": "/api/companies/root/companies",
@@ -211,6 +227,13 @@
         "description": "Superficie histórica preservada. Mantiene semántica root/global y no debe reinterpretarse como alta tenant-admin.",
         "tags": ["companies"],
         "security": [{ "bearerAuth": [] }],
+        "x-governance": {
+          "routePolicy": "company.create-global",
+          "actorScope": "global-root",
+          "boundary": "platform-global",
+          "serviceRevalidation": "company.service.js global-root governance check",
+          "coveragePosture": "bounded-p33-admin-convergence"
+        },
         "x-compatibility": {
           "status": "legacy-global-shape",
           "preferredPath": "/api/companies/root/companies",
@@ -233,6 +256,12 @@
         "summary": "Listar empresas para root global",
         "tags": ["companies"],
         "security": [{ "bearerAuth": [] }],
+        "x-governance": {
+          "routePolicy": "company.root-companies.list",
+          "actorScope": "global-root",
+          "boundary": "platform-global",
+          "coveragePosture": "bounded-p33-admin-convergence"
+        },
         "x-runtime-source": {
           "mountPath": "/api/companies",
           "routeFile": "src/routes/company.routes.js",
@@ -248,6 +277,13 @@
         "summary": "Registrar empresa desde flujo root",
         "tags": ["companies"],
         "security": [{ "bearerAuth": [] }],
+        "x-governance": {
+          "routePolicy": "company.root-companies.create",
+          "actorScope": "global-root",
+          "boundary": "platform-global",
+          "serviceRevalidation": "company.service.js global-root governance check",
+          "coveragePosture": "bounded-p33-admin-convergence"
+        },
         "x-runtime-source": {
           "mountPath": "/api/companies",
           "routeFile": "src/routes/company.routes.js",
@@ -283,6 +319,11 @@
         "summary": "Listar permisos asignables para roles de compañía",
         "tags": ["roles"],
         "security": [{ "bearerAuth": [] }],
+        "x-governance": {
+          "routePolicy": "role.permissions.list",
+          "boundary": "tenant-admin-legacy",
+          "coveragePosture": "bounded-p33-admin-convergence-supporting"
+        },
         "x-runtime-source": {
           "mountPath": "/api/roles",
           "routeFile": "src/routes/role.routes.js",
@@ -300,6 +341,12 @@
         "summary": "Listar roles asignables de compañía",
         "tags": ["roles"],
         "security": [{ "bearerAuth": [] }],
+        "x-governance": {
+          "routePolicy": "role.company.list",
+          "actorScope": "company-admin",
+          "boundary": "tenant-admin-legacy",
+          "coveragePosture": "bounded-p33-admin-convergence"
+        },
         "x-runtime-source": {
           "mountPath": "/api/roles",
           "routeFile": "src/routes/role.routes.js",
@@ -315,6 +362,20 @@
         "summary": "Crear rol personalizado de compañía",
         "tags": ["roles"],
         "security": [{ "bearerAuth": [] }],
+        "x-governance": {
+          "routePolicy": "role.company.create",
+          "actorScope": "company-admin",
+          "boundary": "tenant-admin-legacy",
+          "serviceRevalidation": "role.service.js company-role governance evaluation",
+          "coveragePosture": "bounded-p33-admin-convergence"
+        },
+        "x-runtime-source": {
+          "routePolicy": "role.company.create",
+          "actorScope": "company-admin",
+          "boundary": "tenant-admin-legacy",
+          "serviceRevalidation": "role.service.js company-role governance evaluation",
+          "coveragePosture": "bounded-p33-admin-convergence"
+        },
         "x-runtime-source": {
           "mountPath": "/api/roles",
           "routeFile": "src/routes/role.routes.js",

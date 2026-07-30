@@ -4,6 +4,10 @@ const { bcryptRounds } = require('../config');
 const { createHttpError } = require('../lib/errors');
 const companyRepository = require('../repositories/company.repository');
 const audit = require('../lib/audit');
+const {
+  evaluateGovernanceOperation,
+  isGlobalRootActor,
+} = require('../security/permission-governance.service');
 
 async function listCompanies(auth) {
   assertRootCreator(auth);
@@ -11,8 +15,15 @@ async function listCompanies(auth) {
 }
 
 function assertRootCreator(auth) {
-  if (auth.companyId) {
-    throw createHttpError(403, 'Solo el root principal puede crear o listar empresas', 'forbidden');
+  if (!isGlobalRootActor(auth)) {
+    throw createHttpError(403, 'Solo el root global puede crear o listar empresas', 'forbidden');
+  }
+}
+
+function assertCompanyCreationAllowed(auth) {
+  const governanceDecision = evaluateGovernanceOperation('company.create', { auth });
+  if (governanceDecision.decision === 'deny') {
+    throw createHttpError(403, governanceDecision.denial.message, governanceDecision.denial.code);
   }
 }
 
@@ -23,6 +34,7 @@ async function listCompaniesForRoot(auth) {
 
 async function registerCompany(payload, auth, req = null) {
   assertRootCreator(auth);
+  assertCompanyCreationAllowed(auth);
 
   const company = await companyRepository.createCompany(payload);
   await audit.recordAuditEventIfAvailable({
@@ -116,6 +128,7 @@ async function getExecutiveDashboard(auth) {
 
 async function registerRootCompany(payload, auth, req = null) {
   assertRootCreator(auth);
+  assertCompanyCreationAllowed(auth);
 
   const existingUser = await companyRepository.findUserByUsername(payload.rootUser.username);
   if (existingUser) {

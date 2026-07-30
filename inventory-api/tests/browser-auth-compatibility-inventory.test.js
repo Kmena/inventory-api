@@ -27,7 +27,9 @@ test('browser auth token-bridge removal is enforced across the reduced supported
   assert.match(noAccessSource, /inventorySession\.clearAndRedirectToLogin\(\)/);
   assert.doesNotMatch(authenticateSource, /token === BROWSER_SESSION_COMPATIBILITY_TOKEN && browserSessionId/);
 
-  for (const retiredDirectory of ['src/public/root', 'src/public/warehouse', 'src/public/agent']) {
+  assert.equal(require('node:fs').existsSync(path.join(__dirname, '..', 'src/public/root')), true, 'src/public/root should remain part of the supported public runtime');
+
+  for (const retiredDirectory of ['src/public/warehouse', 'src/public/agent']) {
     assert.equal(require('node:fs').existsSync(path.join(__dirname, '..', retiredDirectory)), false, `${retiredDirectory} should remain retired from the active public runtime`);
   }
 });

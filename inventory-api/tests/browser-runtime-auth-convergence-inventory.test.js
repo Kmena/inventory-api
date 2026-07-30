@@ -23,8 +23,11 @@ test('shared browser helpers remain the supported convergence seam for the reduc
   assert.match(migrationSource, /inventorySession\.clearAndRedirectToLogin\(\)/);
 });
 
-test('legacy public runtime has been retired from src/public and preserved under the SPA transition inventory', () => {
-  for (const retiredDirectory of ['root', 'warehouse', 'agent']) {
+test('legacy warehouse and agent runtimes remain retired while the supported root shell coexists with preserved legacy inventory', () => {
+  assert.equal(fs.existsSync(path.join(publicRoot, 'root')), true, 'supported root shell should exist under src/public');
+  assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'root')), true, 'legacy root inventory should remain preserved for transition work');
+
+  for (const retiredDirectory of ['warehouse', 'agent']) {
     assert.equal(fs.existsSync(path.join(publicRoot, retiredDirectory)), false, `${retiredDirectory} should not remain under src/public`);
     assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, retiredDirectory)), true, `${retiredDirectory} should remain preserved for SPA transition work`);
   }
@@ -32,10 +35,11 @@ test('legacy public runtime has been retired from src/public and preserved under
   assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'shared', 'lot-dates.js')), true);
 });
 
-test('login now routes retired-runtime roles to the supported transition page while app.js keeps deprecated html routes on 410 responses', () => {
+test('login now routes wave-one root roles to the supported root shell while app.js keeps deprecated legacy html routes on 410 responses', () => {
   const loginSource = readPublicFile('login.js');
   const appSource = fs.readFileSync(appPath, 'utf8');
 
+  assert.match(loginSource, /const ROOT_SHELL_PATH = '\/root\/'/);
   assert.match(loginSource, /'\/migration\.html\?mode=post-login-transition'/);
   assert.doesNotMatch(loginSource, /'\/root\/dashboard\.html'/);
   assert.doesNotMatch(loginSource, /'\/warehouse\/products\.html'/);

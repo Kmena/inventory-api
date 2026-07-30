@@ -31,12 +31,16 @@ test('legacy GET /api/companies keeps global listing unavailable to company admi
   assert.equal(allowedError, undefined);
 });
 
-test('legacy POST /api/companies keeps global creation unavailable to company admins', async () => {
+test('legacy POST /api/companies keeps global creation unavailable to company admins and tenant-scoped roots', async () => {
   const guard = getRouteGuard(companyRoutes, '/', 'post');
 
-  const deniedError = await runGuard(guard, { role: 'admin', companyId: '7' });
-  assert.equal(deniedError?.statusCode, 403);
-  assert.equal(deniedError?.code, 'forbidden');
+  const deniedCompanyAdminError = await runGuard(guard, { role: 'admin', companyId: '7' });
+  assert.equal(deniedCompanyAdminError?.statusCode, 403);
+  assert.equal(deniedCompanyAdminError?.code, 'forbidden');
+
+  const deniedTenantRootError = await runGuard(guard, { role: 'root', companyId: '7' });
+  assert.equal(deniedTenantRootError?.statusCode, 403);
+  assert.equal(deniedTenantRootError?.code, 'forbidden');
 
   const allowedError = await runGuard(guard, { role: 'root', companyId: null });
   assert.equal(allowedError, undefined);

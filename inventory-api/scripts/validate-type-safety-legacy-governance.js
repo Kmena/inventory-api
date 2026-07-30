@@ -2,11 +2,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const repositoryRoot = path.join(__dirname, '..');
-const { internalDocsExist, writeSkip } = require('./internal-docs-optional');
+const { writeSkip } = require('./internal-docs-optional');
 const typeSafetyPath = path.join(repositoryRoot, 'docs', 'type-safety-debt-register.json');
 const legacyInventoryPath = path.join(repositoryRoot, 'docs', 'legacy-governance-inventory.json');
-const runtimeManifestPath = path.join(repositoryRoot, 'internal-docs', 'runtime-contract-manifest.json');
-const openApiPath = path.join(repositoryRoot, 'internal-docs', 'openapi', 'runtime-baseline.openapi.json');
+const runtimeManifestPath = path.join(repositoryRoot, 'docs', 'runtime-contract-manifest.json');
+const openApiPath = path.join(repositoryRoot, 'docs', 'openapi', 'runtime-baseline.openapi.json');
 const tsconfigPath = path.join(repositoryRoot, 'tsconfig.typecheck.json');
 const rootDashboardSourcePath = path.join(repositoryRoot, 'src', 'public', 'root', 'dashboard.js');
 const rootCompaniesSourcePath = path.join(repositoryRoot, 'src', 'public', 'root', 'index.js');
@@ -138,10 +138,10 @@ function validateLegacyInventory(failures) {
 }
 
 function main() {
-  if (!internalDocsExist([
-    'internal-docs/runtime-contract-manifest.json',
-    'internal-docs/openapi/runtime-baseline.openapi.json',
-  ]) || !fs.existsSync(typeSafetyPath) || !fs.existsSync(legacyInventoryPath)) {
+  if (!fs.existsSync(runtimeManifestPath)
+    || !fs.existsSync(openApiPath)
+    || !fs.existsSync(typeSafetyPath)
+    || !fs.existsSync(legacyInventoryPath)) {
     writeSkip('Type-safety and legacy governance validation skipped: governed artifacts are not fully present.');
     return;
   }

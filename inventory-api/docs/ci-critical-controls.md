@@ -38,7 +38,7 @@ Current examples:
 ## 3. Critical controls matrix
 | Critical control | Domain | Evidence class required for closure | Required GitHub Actions job | Notes |
 |---|---|---|---|---|
-| Expanded typecheck over approved contracts and persistence surfaces | quality / architecture | Strong | `static-checks` | Covers `src/schemas/**`, `sales-route.repository.js`, `order.repository.js`, `payment.repository.js`, `company.repository.js`, `invoice.repository.js`, `inventory.repository.js`, the versioned baseline validators in the current approved slice, and the first approved public-runtime allowlist (`src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`). |
+| Expanded typecheck over approved contracts and persistence surfaces | quality / architecture | Strong | `static-checks` | Covers `src/schemas/**`, `sales-route.repository.js`, `order.repository.js`, `payment.repository.js`, `company.repository.js`, `invoice.repository.js`, `inventory.repository.js`, `src/security/access-policies.js`, the versioned baseline validators in the current approved slice, and the approved bounded public-runtime allowlist (`src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`, plus the explicit `src/public/root/**` shell file set). |
 | Tenant, document, and payment security regressions | security | Strong | `repository-tests` | Strong runtime regressions remain inside the aggregate mandatory suite. |
 | Authorization and route-guard characterization | security / business logic | Partial characterization only | Supportive, not sufficient alone | Useful context, not closure by itself. |
 | Runtime, workflow, and operational contract validation | governance / business logic | Strong | `contract-validations` and `operational-smoke` | Explicit validator-based governance evidence. |
@@ -47,7 +47,7 @@ Current examples:
 | Windows Prisma build stability | platform | Strong | `windows-prisma-build` | Dedicated operational evidence, not replaced by aggregate verify. |
 | Database constraints on payments, orders, products, and warehouse stocks | data quality / business logic | Strong | `db-constraints-tests` | Focused PostgreSQL-backed gate using committed migrations and seed fixtures. |
 | Release aggregate quality | release governance | Strong for release flow only | `build-and-publish` | Release gate; not a replacement for PR-time mandatory controls. |
-| Optional OpenAPI partial baseline consistency | documentation | Optional / skipped | No critical-control closure claim | Useful when artifacts exist, but not a mandatory critical-control gate. |
+| Optional OpenAPI partial baseline consistency | documentation | Optional / skipped | No critical-control closure claim | Useful when artifacts exist, but not a mandatory critical-control gate; current bounded coverage includes the selected company/company-role admin governance surfaces clarified by `p33`. |
 
 ## 4. Policy consequences
 - A green `repository-tests` result does not mean every critical control has strong evidence.
@@ -79,6 +79,6 @@ The following final closeout evidence still requires manual verification in GitH
 ## 7. Current status
 Current P11 status after the implemented Node 24, workflow-governance, and closeout hardening slices:
 - Node 24 is the active supported baseline across package metadata, Docker, and the official root-hosted workflows;
-- typecheck scope is incrementally expanded over the approved high-value surfaces, including the scoped repository and baseline-validator additions from `p11-hardening-closeout-95` plus the first public-runtime allowlist from `p19-public-runtime-typecheck-expansion` (`src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`);
+- typecheck scope is incrementally expanded over the approved high-value surfaces, including the scoped repository and baseline-validator additions from `p11-hardening-closeout-95`, the bounded governance seam file `src/security/access-policies.js`, the first public-runtime allowlist from `p19-public-runtime-typecheck-expansion` (`src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`), and the approved bounded root-shell follow-up allowlist for `src/public/root/**` shell files;
 - the constraints gap is no longer implicit because `db-constraints-tests` is now the dedicated required workflow for `tests/p2-hardening-constraints.test.js`;
 - hosted branch-protection / required-status-check enforcement still requires separate manual verification because it is not provable from versioned repository contents alone.

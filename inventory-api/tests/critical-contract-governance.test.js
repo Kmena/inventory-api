@@ -100,4 +100,6 @@ test('critical contract matrix resolves the minimum critical surface with approv
     supportingExcluded.map((route) => `${route.method} ${route.path}`),
     ['GET /api/clients'],
   );
+  assert.deepEqual(matrix.requiredCriticalSurfaces, ['auth', 'governance-admin']);
+  assert.equal(criticalRoutes.filter((route) => route.surface === 'governance-admin').length, 7);
 });

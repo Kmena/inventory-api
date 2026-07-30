@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventori | Panel root</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="root-page">
+    <a class="skip-link" href="#root-main">Saltar al contenido principal</a>
+
+    <div class="root-shell">
+      <header class="root-header" aria-label="Contexto del panel root">
+        <div class="root-header__brand" aria-label="Inventori">
+          <span class="brand-mark" aria-hidden="true">I</span>
+          <div class="root-header__context">
+            <p class="root-header__eyebrow">Inventori</p>
+            <h1 class="root-header__title">Panel root</h1>
+          </div>
+        </div>
+
+        <div class="root-header__identity" aria-live="polite">
+          <p id="root-user-name" class="root-header__user">Validando sesion...</p>
+          <p id="root-user-role" class="root-header__role">Acceso autenticado</p>
+        </div>
+      </header>
+
+      <nav class="root-nav" aria-label="Navegacion principal del panel root">
+        <div id="root-nav-links" class="root-nav__links"></div>
+        <button id="root-logout-button" class="secondary-button root-nav__logout" type="button" aria-label="Cerrar sesion y volver al inicio de sesion">Cerrar sesion</button>
+      </nav>
+
+      <main id="root-main" class="root-main" tabindex="-1">
+        <p id="root-shell-status" class="root-status" role="status" aria-live="polite">Validando sesion...</p>
+        <section id="root-view" class="root-view" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <script src="/shared/session.js"></script>
+    <script src="/shared/auth.js"></script>
+    <script src="/root/registry.js"></script>
+    <script src="/root/session-adapter.js"></script>
+    <script src="/root/guards.js"></script>
+    <script src="/root/manifest.js"></script>
+    <script src="/root/ui.js"></script>
+    <script src="/root/companies-api.js"></script>
+    <script src="/root/roles-api.js"></script>
+    <script src="/root/views/home.js"></script>
+    <script src="/root/views/in-process.js"></script>
+    <script src="/root/views/companies-admin.js"></script>
+    <script src="/root/views/roles-admin.js"></script>
+    <script src="/root/router.js"></script>
+    <script src="/root/app.js"></script>
+  </body>
+</html>

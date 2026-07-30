@@ -2,6 +2,7 @@ const { createHttpError } = require('../lib/errors');
 const { buildPaginatedResponse } = require('../lib/pagination');
 const roleRepository = require('../repositories/role.repository');
 const audit = require('../lib/audit');
+const { evaluateGovernanceOperation } = require('../security/permission-governance.service');
 
 function assertCompanyAdmin(auth) {
   if (!auth.companyId) {
@@ -48,6 +49,35 @@ async function listAssignableRoles(auth, pagination = null) {
   return buildPaginatedResponse(paginatedRoles.items.map(serializeRole), pagination, paginatedRoles.totalItems);
 }
 
+async function recordCompanyRoleGovernanceDenialAudit(governanceDecision, auth, requestedPermissionCodes, req) {
+  if (governanceDecision.decision !== 'deny') {
+    return;
+  }
+
+  await audit.recordAuditEventSafelyIfAvailable({
+    req,
+    action: 'roles.company.create.governance_denied',
+    resourceType: 'role',
+    outcome: 'REJECTED',
+    reasonCode: governanceDecision.denial.code,
+    metadata: {
+      governanceDecision: governanceDecision.decision,
+      denialCode: governanceDecision.denial.code,
+      ruleId: governanceDecision.denial.ruleId,
+      affectedPermissions: governanceDecision.denial.affectedPermissions || [],
+      requestedPermissionCodes,
+      companyId: auth.companyId,
+    },
+  });
+}
+
+async function assertCompanyRoleCreationAllowed(governanceDecision, auth, requestedPermissionCodes, req) {
+  if (governanceDecision.decision === 'deny') {
+    await recordCompanyRoleGovernanceDenialAudit(governanceDecision, auth, requestedPermissionCodes, req);
+    throw createHttpError(403, governanceDecision.denial.message, governanceDecision.denial.code);
+  }
+}
+
 async function createCompanyRole(payload, auth, req = null) {
   assertCompanyAdmin(auth);
 
@@ -59,6 +89,12 @@ async function createCompanyRole(payload, auth, req = null) {
   if (invalidPermission) {
     throw createHttpError(400, `Permiso no disponible: ${invalidPermission}`, 'validation_error');
   }
+
+  const governanceDecision = evaluateGovernanceOperation('role.company.create', {
+    auth,
+    permissionCodes: uniquePermissionCodes,
+  });
+  await assertCompanyRoleCreationAllowed(governanceDecision, auth, uniquePermissionCodes, req);
 
   const code = `company_${auth.companyId}_${slugify(payload.name)}_${Date.now()}`;
   const role = await roleRepository.createCompanyRole({
@@ -81,6 +117,10 @@ async function createCompanyRole(payload, auth, req = null) {
       name: serializedRole.name,
       companyId: serializedRole.companyId,
       permissionsCount: serializedRole.permissions.length,
+    },
+    metadata: {
+      governanceDecision: governanceDecision.decision,
+      governanceWarnings: governanceDecision.warnings,
     },
   });
   return serializedRole;

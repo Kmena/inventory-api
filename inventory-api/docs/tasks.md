@@ -1,5 +1,23 @@
 # Tasks
 
+## TASK-038: Harden root-shell internal modularity with a bounded registry seam
+**Status:** Completed
+**Priority:** Low
+**Domain:** Embedded browser runtime / Architecture documentation
+**Requirement:** `p38-root-shell-modularity-hardening`
+**Reason:** The supported `/root/` shell kept behavior-preserving runtime coverage but still depended on many independent top-level globals for internal wiring.
+**Implemented change:** Added `src/public/root/registry.js`, migrated shell modules to publish/consume through `window.RootShell` (`register`, `require`, `has`), preserved runtime behavior, and refreshed validation/docs/traceability.
+**Affected files:** `src/public/root/**`, `tests/root-shell-modularity-governance.test.js`, `tests/public-surface-characterization.test.js`, `tests/public-runtime-http-smoke.test.js`, `scripts/validate-public-runtime.js`, docs/spec traceability files
+**Dependencies:** `root-shell-follow-up-alignment` completed baseline
+**Database impact:** None
+**API impact:** None; `/root/` and related APIs remain compatible
+**Container impact:** None
+**Security impact:** Low direct impact; medium maintainability and regression-prevention impact
+**Acceptance criteria:** Focused registry-contract test exists; root-shell modules use `window.RootShell`; `/root/` behavior and legacy `410 Gone` routes remain unchanged.
+**Validation evidence:** `node --test tests/root-shell-modularity-governance.test.js`; `node --test tests/root-shell-route-governance.test.js`; `node --test tests/public-surface-characterization.test.js`; `node --test tests/public-runtime-http-smoke.test.js`; `node --test tests/browser-runtime-auth-convergence-inventory.test.js`; `node --test tests/browser-e2e.e2e.js`; `npm run validate:public-runtime`; `npm run lint:public-runtime`; `npm run typecheck`; `npm run build`
+**Rollback or mitigation:** Revert the registry seam and all migrated root-shell modules together to avoid mixed global/registry wiring.
+**Risk:** Low
+
 ## TASK-001: Implement confirmed tenant-isolation fixes from P11 inventory
 **Status:** Completed
 **Priority:** Critical
@@ -39,6 +57,125 @@
 **Migration considerations:** Preserve root-global exception behavior while moving persistence responsibilities.
 **Rollback or mitigation:** Revert repository extraction slice if bootstrap semantics drift.
 **Risk:** Medium
+
+## TASK-029: Reconcile stale permission-governance planning metadata after `p28` foundation
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Repository/platform governance / Permission governance planning
+**Requirement:** `p10-permission-governance` implementation report; `p28-flexible-permission-governance-foundation`; sidebar/navigation planning dependency accuracy
+**Reason:** The repository now has completed `p10` analysis artifacts plus the first runtime implementation slice from `p28`, but some planning metadata may still imply an outdated dependency/readiness state.
+**Current problem:** Older spec metadata blurred the distinction between analysis completion, partial runtime implementation, and remaining follow-up work for role-governance/UI slices; the stale `p10` readiness blocker and related sidebar dependency wording had to be reconciled to reflect actual repository state.
+**Proposed change:** Reconcile spec metadata and dependency markers so future planning distinguishes clearly between analysis completion, partial implementation now in runtime, and still-pending follow-up work.
+**Implementation status:** Completed documentation-only reconciliation through `p29-permission-governance-metadata-reconciliation`; `p10` readiness metadata no longer points to stale `p11`, repository docs now describe that blocker as already resolved, and `sidebar-rebrand-permissions` now points to `p30-company-role-governance-hardening` as the practical follow-up dependency.
+**Affected files:** `specs/p10-permission-governance/**`, related sidebar/navigation spec metadata files, `docs/action-plan.md`, `docs/architecture.md`, future governance notes if needed
+**Dependencies:** None
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance/sequencing integrity impact
+**Acceptance criteria:**
+- `p10` metadata no longer reports stale readiness blockers that are already materially satisfied.
+- Related sidebar/navigation specs reference the correct dependency state for permission-governance planning.
+- Repository docs distinguish analysis completion from runtime implementation completion.
+**Required tests:** Documentary review; repository validation already recorded by the implementation agent with `npm run lint`, `npm run typecheck`, `npm run build`, and `git diff --check` all passing
+**Migration considerations:** Do not rewrite planning history; only clarify current readiness/dependency truth.
+**Completion evidence:** `specs/p29-permission-governance-metadata-reconciliation/**`, `specs/p10-permission-governance/metadata.yaml`, `specs/sidebar-rebrand-permissions/metadata.yaml`, and this architecture-facing documentation now reflect the reconciled state.
+**Rollback or mitigation:** Revert metadata-only changes if they accidentally obscure approved-but-unimplemented follow-up work.
+**Risk:** Low
+
+## TASK-031: Align architecture-facing governance documentation after `p30`
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Repository/platform governance / Architecture documentation
+**Requirement:** `p31-governance-architecture-documentation-alignment`
+**Reason:** After `p30`, the primary governance docs were mostly refreshed, but a few architecture-facing references still under-described the new company-role deny boundary or pointed to outdated future-work framing.
+**Current problem resolved:** The repository now describes the post-`p30` baseline consistently across current-state, architecture, action-plan/task inventory, and endpoint-catalog surfaces without inventing a company-role update flow or denied-governance audit persistence.
+**Implemented change:** Documentation-only alignment completed through `p31-governance-architecture-documentation-alignment`; architecture-facing docs now describe the hybrid route/service split, the implemented company-role platform-scope deny, the absence of a company-role update flow, and the still-separate denial-audit follow-up.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/runtime-endpoint-catalog.md`, `docs/tasks.md`, `specs/p31-governance-architecture-documentation-alignment/**`
+**Dependencies:** TASK-030 (completed)
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance/traceability impact
+**Acceptance criteria:**
+- Current architecture-facing docs describe the post-`p30` runtime truth without overstating convergence.
+- Company-role update hardening remains documented as deferred because no runtime update surface exists.
+- Denied-governance audit persistence remains documented as a separate follow-up concern rather than active behavior.
+**Validation evidence:** `npm run lint`; `npm run typecheck`; `npm run build`; `git diff --check`
+**Rollback or mitigation:** Revert documentation-only changes if any wording overstates runtime behavior.
+**Risk:** Low
+
+## TASK-032: Add denied governance audit visibility for company-role creation
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Identity and access / Audit observability
+**Requirement:** `p32-governance-denial-audit-visibility`
+**Reason:** The approved `p30` deny boundary for company-role creation blocked platform-scoped permission assignment, but denied attempts were still invisible in persisted audit history.
+**Current problem resolved:** Denied `role.company.create` attempts now emit a dedicated fail-open audit attempt from the service-level governance denial path while preserving the same `403` response contract and without broadening governance scope.
+**Implemented change:** `p32-governance-denial-audit-visibility` added action `roles.company.create.governance_denied` with structured denial metadata (`governanceDecision`, `denialCode`, `ruleId`, `affectedPermissions`, `requestedPermissionCodes`, `companyId`) using the existing safe audit seam.
+**Affected files:** `src/services/role.service.js`, `tests/permission-governance-backend-consumption.test.js`, `tests/audit-instrumentation.test.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/runtime-endpoint-catalog.md`, `specs/p32-governance-denial-audit-visibility/**`
+**Dependencies:** TASK-031 (completed)
+**Database impact:** None
+**API impact:** None; denied response remains backward-compatible
+**Container impact:** None
+**Security impact:** Medium positive impact through stronger governance-denial observability
+**Acceptance criteria:**
+- Denied company-role governance attempts trigger safe audit recording when request context exists.
+- Audit persistence failure does not change the denial response.
+- Success-path role creation audit behavior remains intact.
+- No new governance deny rule is introduced.
+**Validation evidence:** `node --test tests/permission-governance-backend-consumption.test.js`; `node --test tests/audit-instrumentation.test.js`; `npm run lint`; `npm run typecheck`; `npm run build`; `git diff --check`
+**Rollback or mitigation:** Revert deny-path audit instrumentation if it alters response semantics or produces incorrect payloads; keep the existing `p30` deny rule intact.
+**Risk:** Medium
+
+## TASK-033: Converge admin authorization/governance contract for company and company-role flows
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Identity and access / Architecture governance
+**Requirement:** `p33-admin-authorization-governance-convergence` FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, BR-001, BR-002, BR-003, BR-004, AC-001, AC-002, AC-003, AC-004
+**Reason:** The highest-signal company/company-role admin flows still had a hard-to-read split between route intent and service governance.
+**Current problem resolved:** A bounded convergence seam now exists for the affected company/company-role admin routes without redesigning unrelated route families.
+**Implemented change:** `src/security/access-policies.js` now declares explicit actor-scope checks for company list/create and company-role list/create flows, `POST /api/companies/` uses dedicated policy `company.create-global`, route-level actor-scope denials audit through action `security.authorization.access_policy`, and sensitive service-level governance remains in `company.service.js` and `role.service.js`.
+**Affected files:** `src/security/access-policies.js`, `src/routes/company.routes.js`, `tests/access-policies.test.js`, `tests/company-authorization-characterization.test.js`, `tests/audit-instrumentation.test.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/runtime-endpoint-catalog.md`, `specs/p33-admin-authorization-governance-convergence/**`
+**Dependencies:** TASK-032 (completed)
+**Database impact:** None
+**API impact:** None; endpoint paths, payloads, and `403` semantics remain compatible
+**Container impact:** None
+**Security impact:** Medium positive impact through clearer authorization boundaries and preserved distinct denial semantics
+**Acceptance criteria:**
+- Company/company-role admin flows have a clearer route-policy/service-governance contract.
+- Existing compatibility and `403` semantics remain intact.
+- Route-level and service-level denial auditing remain distinct.
+- No unrelated route families were migrated.
+**Validation evidence:** `set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/access-policies.test.js`; `set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/company-authorization-characterization.test.js`; `set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/authorization-convergence-characterization.test.js`; `set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/audit-instrumentation.test.js`; `node --test tests/permission-governance-backend-consumption.test.js`; `npm run lint`; `npm run typecheck`; `npm run build`; `git diff --check`
+**Rollback or mitigation:** Revert only the bounded actor-scope seam if it changes compatibility or weakens the distinct service-level governance checks.
+**Risk:** Medium
+
+## TASK-030: Harden company-role governance beyond warning-only audit metadata
+**Status:** Completed
+**Priority:** High
+**Domain:** Identity and access / Role governance
+**Requirement:** `p10-permission-governance`; `p28-flexible-permission-governance-foundation`
+**Reason:** `p28` introduced a centralized governance foundation and warning contract, but tenant role creation still allows any active permission combination accepted by the current backend.
+**Current problem:** `src/services/role.service.js` previously evaluated governance for `role.company.create` only as audit metadata; the first approved hardening slice needed to enforce the platform-vs-tenant boundary without broadening deny scope beyond repository evidence.
+**Proposed change:** Extend backend company-role governance to use the centralized foundation for explicit allow/warn/deny handling on company-role creation, preserving compatibility until each new deny rule is explicitly approved. Update-flow hardening remains deferred because no runtime update surface exists.
+**Affected files:** `src/services/role.service.js`, `src/security/permission-governance*.js`, related role routes/tests, `docs/current-state.md`, `docs/architecture.md`, future spec artifacts if approved
+**Dependencies:** TASK-029 (completed)
+**Database impact:** None expected
+**API impact:** Possible error/warning contract expansion for role-governance responses; must remain backward-compatible unless separately approved
+**Container impact:** None
+**Security impact:** High positive impact through tighter tenant-role governance and clearer platform-vs-tenant separation
+**Acceptance criteria:**
+- Approved deny rules for company-role governance are enforced in backend services.
+- Warning-only rules remain structured and documented when not yet approved for denial.
+- Tests cover allowed, warned, and denied company-role combinations.
+- Docs distinguish current runtime behavior from future policy ambitions.
+**Implementation status:** Completed through `p30-company-role-governance-hardening`; `companies.manage` is now denied in company-role creation before persistence, warning-only combinations remain allowed, and update hardening remains deferred because no update flow exists.
+**Required tests:** Completed with focused governance unit tests and role-service characterization coverage: `tests/permission-governance-foundation.test.js` and `tests/permission-governance-backend-consumption.test.js`
+**Validation evidence:** `npm run lint`; `npm run typecheck`; `npm run build`; `node --test tests/permission-governance-foundation.test.js`; `node --test tests/permission-governance-backend-consumption.test.js tests/permission-governance-foundation.test.js`; `git diff --check`
+**Migration considerations:** Introduce deny rules incrementally and only for approved combinations to avoid breaking legitimate tenant flows.
+**Rollback or mitigation:** Revert new deny decisions to warning-only posture if production behavior or approval scope proves incorrect.
+**Risk:** High
 
 ## TASK-009: Document browser-session HTTPS dependency and prepare partial hardening slice
 **Status:** Completed
@@ -343,6 +480,29 @@
 **Rollback or mitigation:** Revert only the public-runtime allowlist and helper typing slice if the browser baseline regresses; keep the governance inventory to separate pre-existing debt from new regressions.
 **Risk:** Medium
 
+## TASK-017A: Align bounded root-shell governance and typecheck baseline
+**Status:** Completed
+**Completed at:** 2025-08-14
+**Implemented files:** `tests/browser-auth-compatibility-inventory.test.js`, `tests/typecheck-ci-hardening-governance.test.js`, `tsconfig.typecheck.json`, `src/public/login.js`, `src/public/root/app.js`, `src/public/root/views/roles-admin.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/ci-critical-controls.md`, `specs/root-shell-follow-up-alignment/*`
+**Validation evidence:** `node --test tests/browser-auth-compatibility-inventory.test.js tests/typecheck-ci-hardening-governance.test.js`; `npm run typecheck`; `npm run lint:public-runtime`; `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js tests/browser-runtime-auth-convergence-inventory.test.js tests/root-shell-route-governance.test.js`; `node --test tests/public-runtime-http-smoke.test.js`; `npm run build`; `git diff --check`
+**Priority:** Medium
+**Domain:** Frontend/runtime quality governance / Embedded browser runtime
+**Requirement:** post-`p37` bounded governance alignment for the supported `/root/` shell
+**Reason:** The repository supported `/root/` at runtime, but one governance test still modeled `src/public/root/**` as retired and the browser-runtime `typecheck` baseline still excluded the approved root-shell files.
+**Current problem resolved:** Governance tests, `tsconfig.typecheck.json`, and architecture-facing docs now agree that the bounded `/root/` shell is supported runtime and part of the approved explicit browser-runtime `typecheck` allowlist, while `warehouse` and `agent` remain retired and legacy HTML still returns `410 Gone`.
+**Implemented change:** Updated stale browser-runtime governance tests, added an explicit root-shell allowlist to `tsconfig.typecheck.json`, applied only the minimal `checkJs` compatibility fixes required in `src/public/login.js`, `src/public/root/app.js`, and `src/public/root/views/roles-admin.js`, aligned baseline docs, and explicitly deferred broader root-shell modularity refactor.
+**Affected files:** `tests/browser-auth-compatibility-inventory.test.js`, `tests/typecheck-ci-hardening-governance.test.js`, `tsconfig.typecheck.json`, `src/public/login.js`, `src/public/root/app.js`, `src/public/root/views/roles-admin.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/ci-critical-controls.md`, `specs/root-shell-follow-up-alignment/*`
+**Dependencies:** TASK-017
+**Database impact:** None
+**API impact:** None; `/root/`, `/api/auth/*`, company admin endpoints, and legacy `410 Gone` routes remain unchanged
+**Container impact:** None
+**Security impact:** Medium positive impact through stronger compile-time and governance coverage for the approved root-shell surface without broadening to all `src/public/**`
+**Acceptance criteria:** Completed. `/root/` remains supported runtime, root-shell files are inside the approved bounded `typecheck` baseline, docs/tests/tsconfig are aligned, and broader shell modularity work remains explicitly deferred.
+**Required tests:** Passed `node --test tests/browser-auth-compatibility-inventory.test.js tests/typecheck-ci-hardening-governance.test.js`; passed `npm run typecheck`; passed `npm run lint:public-runtime`; passed `npm run validate:public-runtime`; passed `node --test tests/public-surface-characterization.test.js tests/browser-runtime-auth-convergence-inventory.test.js tests/root-shell-route-governance.test.js`; passed `node --test tests/public-runtime-http-smoke.test.js`; passed `npm run build`; passed `git diff --check`
+**Migration considerations:** Keep the allowlist explicit and preserve the current static shell composition unless a later approved spec widens scope.
+**Rollback or mitigation:** Revert the allowlist and its minimal `checkJs` compatibility adjustments together with the aligned docs/tests if the bounded baseline needs to be withdrawn.
+**Risk:** Medium
+
 ## TASK-018: Define the long-term disposition of `legacy-public-runtime/`
 **Status:** Completed
 **Completed at:** 2026-07-28
@@ -561,4 +721,25 @@
 **Required tests:** existing browser-session boundary/store tests under Redis mode; repository or CI validation command added by the approved slice
 **Migration considerations:** Keep Redis validation explicit and additive rather than folding it back into the default aggregate suite.
 **Rollback or mitigation:** Revert only the dedicated Redis-path validation slice if it proves too unstable, while preserving the stable default suite.
+**Risk:** Medium
+
+## TASK-028: Introduce the initial supported root SPA shell
+**Status:** Completed
+**Completed at:** 2025-08-14
+**Priority:** High
+**Domain:** Embedded browser runtime / Identity and access
+**Requirement:** `p27-root-initial-spa-shell` FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007, FR-008, FR-009, FR-010, FR-012; AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007
+**Reason:** The reduced browser runtime still lacked a supported authenticated destination for wave-one root users after login.
+**Current problem resolved:** The repository now exposes a supported root shell at `/root/`, routes wave-one eligible root users there after login, reuses the existing cookie-session plus `/api/auth/me` bootstrap, keeps legacy `/root/*.html` pages retired on the `410 Gone` contract, and preserves the transition landing only for non-wave-one profiles.
+**Proposed change:** Preserve the initial root shell as the supported wave-one root browser surface and continue expanding it only through later approved incremental slices.
+**Affected files:** `src/public/root/index.html`, `src/public/root/app.js`, `src/public/root/router.js`, `src/public/root/guards.js`, `src/public/root/manifest.js`, `src/public/root/session-adapter.js`, `src/public/root/views/home.js`, `src/public/root/views/in-process.js`, `src/public/login.js`, `src/public/styles.css`, `src/app.js`, `scripts/validate-public-runtime.js`, `tests/public-runtime-http-smoke.test.js`, `tests/public-surface-characterization.test.js`, `tests/browser-runtime-auth-convergence-inventory.test.js`, `tests/browser-e2e.e2e.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
+**Dependencies:** TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027
+**Database impact:** None
+**API impact:** No new backend API endpoints; browser post-login routing now sends `root` and `admin` with `companyId` to `/root/`
+**Container impact:** None
+**Security impact:** Medium positive impact through a supported authenticated destination that still relies on backend-owned browser-session contracts rather than reviving legacy runtime pages
+**Acceptance criteria:** `/root/` is a supported browser entrypoint; eligible `root` and `admin` sessions land there after login; the shell bootstraps through `/api/auth/me`; invalid or ineligible sessions exit to login or no-access; legacy `/root/*.html` URLs remain `410 Gone`; validators/tests/docs reflect the implemented state.
+**Required tests:** `npm run validate:public-runtime`; `npm run lint:public-runtime`; `npm run typecheck`; `npm run lint -- --quiet`; `npm run build`; `node --test tests/browser-e2e.e2e.js`; `node --test tests/public-runtime-http-smoke.test.js tests/public-surface-characterization.test.js tests/browser-runtime-auth-convergence-inventory.test.js`
+**Migration considerations:** Preserve the reduced supported runtime contract, keep non-wave-one roles on the transition landing until later approved destinations exist, and do not reactivate legacy HTML pages as a shortcut.
+**Rollback or mitigation:** Revert only the bounded root-shell slice if the supported authenticated browser flow regresses; keep legacy HTML routes retired.
 **Risk:** Medium

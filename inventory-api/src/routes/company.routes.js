@@ -59,7 +59,7 @@ router.patch(
   }
 );
 
-router.post('/', authorizeAccessPolicy('company.list-global'), validate(createCompanySchema), async (req, res, next) => {
+router.post('/', authorizeAccessPolicy('company.create-global'), validate(createCompanySchema), async (req, res, next) => {
   try {
     const company = await companyService.registerCompany(req.body, req.auth, req);
     return res.status(201).json(company);

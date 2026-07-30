@@ -5,13 +5,14 @@
     "approvedOption": "B"
   },
   "requiredCriticalSurfaces": [
-    "auth"
+    "auth",
+    "governance-admin"
   ],
   "summary": {
     "optionSatisfied": "B",
-    "totalRoutes": 2,
-    "criticalRoutes": 1,
-    "criticalCoveredByOpenApi": 1,
+    "totalRoutes": 9,
+    "criticalRoutes": 8,
+    "criticalCoveredByOpenApi": 8,
     "criticalExplicitlyExcluded": 0,
     "supportingRoutes": 1,
     "supportingExplicitlyExcluded": 1,
@@ -27,6 +28,83 @@
       "justification": "Login forma parte de la superficie mínima crítica observable del runtime.",
       "evidence": {
         "openApiPath": "/api/auth/login"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/companies",
+      "surface": "governance-admin",
+      "criticality": "critical",
+      "contractStatus": "covered-by-openapi",
+      "justification": "El listado global legacy de empresas sigue siendo una superficie admin sensible y ahora documenta explícitamente la policy `company.list-global` con actor scope `global-root`.",
+      "evidence": {
+        "openApiPath": "/api/companies"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/companies",
+      "surface": "governance-admin",
+      "criticality": "critical",
+      "contractStatus": "covered-by-openapi",
+      "justification": "La creación global legacy de empresas sigue siendo una superficie admin sensible y ahora documenta la policy `company.create-global` más la revalidación sensible en servicio.",
+      "evidence": {
+        "openApiPath": "/api/companies"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/companies/root/companies",
+      "surface": "governance-admin",
+      "criticality": "critical",
+      "contractStatus": "covered-by-openapi",
+      "justification": "El listado root de empresas forma parte del seam convergido acotado y necesita evidencia contractual explícita de actor scope `global-root`.",
+      "evidence": {
+        "openApiPath": "/api/companies/root/companies"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/companies/root/companies",
+      "surface": "governance-admin",
+      "criticality": "critical",
+      "contractStatus": "covered-by-openapi",
+      "justification": "La creación root-style de empresas forma parte del seam convergido acotado y mantiene revalidación sensible en servicio.",
+      "evidence": {
+        "openApiPath": "/api/companies/root/companies"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/roles/permissions",
+      "surface": "governance-admin",
+      "criticality": "critical",
+      "contractStatus": "covered-by-openapi",
+      "justification": "El listado de permisos asignables soporta la administración de roles de compañía y requiere evidencia contractual explícita de su boundary admin vigente.",
+      "evidence": {
+        "openApiPath": "/api/roles/permissions"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/roles/company",
+      "surface": "governance-admin",
+      "criticality": "critical",
+      "contractStatus": "covered-by-openapi",
+      "justification": "El listado de roles de compañía forma parte del seam convergido acotado con actor scope `company-admin`.",
+      "evidence": {
+        "openApiPath": "/api/roles/company"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/roles/company",
+      "surface": "governance-admin",
+      "criticality": "critical",
+      "contractStatus": "covered-by-openapi",
+      "justification": "La creación de roles de compañía forma parte del seam convergido acotado y preserva la gobernanza sensible en `role.service.js`.",
+      "evidence": {
+        "openApiPath": "/api/roles/company"
       }
     },
     {

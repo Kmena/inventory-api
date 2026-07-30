@@ -1,3 +1,5 @@
+const { createHttpError } = require('../lib/errors');
+const audit = require('../lib/audit');
 const authorize = require('../middlewares/authorize');
 const authorizePermission = require('../middlewares/authorizePermission');
 
@@ -7,18 +9,28 @@ const ACCESS_POLICIES = Object.freeze({
     roles: ['root'],
     boundary: 'platform-global',
     transition: 'stable-role',
+    actorScope: 'global-root',
+  },
+  'company.create-global': {
+    mode: 'role',
+    roles: ['root'],
+    boundary: 'platform-global',
+    transition: 'stable-role',
+    actorScope: 'global-root',
   },
   'company.root-companies.list': {
     mode: 'role',
     roles: ['root'],
     boundary: 'platform-global',
     transition: 'stable-role',
+    actorScope: 'global-root',
   },
   'company.root-companies.create': {
     mode: 'role',
     roles: ['root'],
     boundary: 'platform-global',
     transition: 'stable-role',
+    actorScope: 'global-root',
   },
   'company.root-companies.update-status': {
     mode: 'role',
@@ -67,12 +79,14 @@ const ACCESS_POLICIES = Object.freeze({
     roles: ['admin'],
     boundary: 'tenant-admin-legacy',
     transition: 'documented-legacy-role',
+    actorScope: 'company-admin',
   },
   'role.company.create': {
     mode: 'role',
     roles: ['admin'],
     boundary: 'tenant-admin-legacy',
     transition: 'documented-legacy-role',
+    actorScope: 'company-admin',
   },
   'region.company.list': {
     mode: 'role',
@@ -454,9 +468,7 @@ function listAccessPolicies() {
   return { ...ACCESS_POLICIES };
 }
 
-function authorizeAccessPolicy(policyId) {
-  const policy = getAccessPolicy(policyId);
-
+function createBaseAccessGuard(policyId, policy) {
   if (policy.mode === 'role') {
     return authorize(...policy.roles);
   }
@@ -466,6 +478,78 @@ function authorizeAccessPolicy(policyId) {
   }
 
   throw new Error(`Unsupported access policy mode for ${policyId}: ${policy.mode}`);
+}
+
+function buildActorScopeDeniedError(policy) {
+  if (policy.actorScope === 'global-root') {
+    return createHttpError(403, 'Solo el root global puede ejecutar esta acción', 'forbidden');
+  }
+
+  if (policy.actorScope === 'company-admin') {
+    return createHttpError(403, 'El administrador debe pertenecer a una empresa', 'forbidden');
+  }
+
+  return null;
+}
+
+function isActorScopeAllowed(policy, auth) {
+  if (!policy.actorScope) {
+    return true;
+  }
+
+  if (policy.actorScope === 'global-root') {
+    return Boolean(auth?.role === 'root' && !auth?.companyId);
+  }
+
+  if (policy.actorScope === 'company-admin') {
+    return Boolean(auth?.role === 'admin' && auth?.companyId);
+  }
+
+  return true;
+}
+
+async function recordAccessPolicyActorScopeDenial(policyId, policy, req) {
+  await audit.recordAuditEventSafelyIfAvailable({
+    req,
+    action: 'security.authorization.access_policy',
+    resourceType: 'request',
+    outcome: 'REJECTED',
+    reasonCode: 'actor_scope_denied',
+    metadata: {
+      policyId,
+      boundary: policy.boundary,
+      actorScope: policy.actorScope,
+      role: req.auth?.role || null,
+      companyId: req.auth?.companyId || null,
+    },
+  });
+}
+
+async function runAccessGuard(guard, req, res) {
+  return new Promise((resolve) => {
+    guard(req, res, (error) => {
+      resolve(error || null);
+    });
+  });
+}
+
+function authorizeAccessPolicy(policyId) {
+  const policy = getAccessPolicy(policyId);
+  const baseGuard = createBaseAccessGuard(policyId, policy);
+
+  return async (req, res, next) => {
+    const baseError = await runAccessGuard(baseGuard, req, res);
+    if (baseError) {
+      return next(baseError);
+    }
+
+    if (isActorScopeAllowed(policy, req.auth)) {
+      return next();
+    }
+
+    await recordAccessPolicyActorScopeDenial(policyId, policy, req);
+    return next(buildActorScopeDeniedError(policy));
+  };
 }
 
 module.exports = {
