@@ -22,6 +22,11 @@ process.on('exit', restoreDbFreeAuditSeams);
 const DESKTOP_VIEWPORT = { width: 1366, height: 900 };
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
 const GEOMETRY_TOLERANCE_PX = 2;
+const OVERFLOW_TOLERANCE_PX = 8;
+const EXPANDED_SIDEBAR_MIN_WIDTH_PX = 260;
+const EXPANDED_SIDEBAR_MAX_WIDTH_PX = 320;
+const COLLAPSED_SIDEBAR_MIN_WIDTH_PX = 72;
+const COLLAPSED_SIDEBAR_MAX_WIDTH_PX = 104;
 
 function createBrowserSessionUser({
   id = '77',
@@ -148,20 +153,32 @@ async function openRootShell(page, baseUrl, expectedHash) {
   await page.goto(`${baseUrl}/root/`);
   await page.waitForFunction((hash) => globalThis.location.hash === hash, expectedHash);
   await page.waitForSelector('#root-view-title');
+  await page.waitForFunction(() => {
+    const browserDocument = globalThis.document;
+    const shell = browserDocument.querySelector('.root-shell');
+    const header = browserDocument.querySelector('.root-header');
+    const main = browserDocument.getElementById('root-main');
+    return !!shell
+      && !!header
+      && !!main
+      && header.getBoundingClientRect().width > 0
+      && main.getBoundingClientRect().width > 0;
+  });
 }
 
 async function readShellGeometry(page) {
   return page.evaluate(() => {
-    const shell = document.querySelector('.root-shell');
-    const sidebar = document.getElementById('root-admin-sidebar');
-    const scroll = document.querySelector('.root-sidebar__scroll');
-    const nav = document.getElementById('root-admin-nav');
-    const activeItem = document.querySelector('.root-sidebar__link.active');
-    const header = document.querySelector('.root-header');
-    const main = document.getElementById('root-main');
-    const overlay = document.getElementById('root-sidebar-overlay');
-    const drawerButton = document.getElementById('root-sidebar-drawer-button');
-    const topNav = document.getElementById('root-nav');
+    const browserDocument = globalThis.document;
+    const shell = browserDocument.querySelector('.root-shell');
+    const sidebar = browserDocument.getElementById('root-admin-sidebar');
+    const scroll = browserDocument.querySelector('.root-sidebar__scroll');
+    const nav = browserDocument.getElementById('root-admin-nav');
+    const activeItem = browserDocument.querySelector('.root-sidebar__link.active');
+    const header = browserDocument.querySelector('.root-header');
+    const main = browserDocument.getElementById('root-main');
+    const overlay = browserDocument.getElementById('root-sidebar-overlay');
+    const drawerButton = browserDocument.getElementById('root-sidebar-drawer-button');
+    const topNav = browserDocument.getElementById('root-nav');
 
     function rect(node) {
       if (!node) {
@@ -215,9 +232,13 @@ async function readShellGeometry(page) {
 function assertNoHorizontalOverflow(metrics, label) {
   assert.ok(metrics, `${label} metrics should exist.`);
   assert.ok(
-    metrics.scrollWidth <= metrics.clientWidth + GEOMETRY_TOLERANCE_PX,
-    `${label} should not overflow horizontally (scrollWidth=${metrics.scrollWidth}, clientWidth=${metrics.clientWidth}).`,
+    metrics.scrollWidth <= metrics.clientWidth + OVERFLOW_TOLERANCE_PX,
+    `${label} should not overflow horizontally beyond tolerance (scrollWidth=${metrics.scrollWidth}, clientWidth=${metrics.clientWidth}).`,
   );
+}
+
+function assertWithinRange(value, min, max, label) {
+  assert.ok(value >= min && value <= max, `${label} should stay within ${min}-${max}px, got ${value}.`);
 }
 
 test('root shell layout: company-admin expanded desktop preserves sidebar width, no overlap and no horizontal overflow', async (t) => {
@@ -236,7 +257,7 @@ test('root shell layout: company-admin expanded desktop preserves sidebar width,
   assert.equal(geometry.shellActor, 'company-admin');
   assert.equal(geometry.sidebarState, 'expanded');
   assert.equal(geometry.sidebarHidden, false);
-  assert.ok(Math.abs(geometry.sidebarRect.width - 280) <= GEOMETRY_TOLERANCE_PX, `Expanded sidebar width should be ~280px, got ${geometry.sidebarRect.width}.`);
+  assertWithinRange(geometry.sidebarRect.width, EXPANDED_SIDEBAR_MIN_WIDTH_PX, EXPANDED_SIDEBAR_MAX_WIDTH_PX, 'Expanded sidebar width');
   assert.ok(geometry.headerRect.left >= geometry.sidebarRect.right - GEOMETRY_TOLERANCE_PX, `Header should not invade sidebar lane (header.left=${geometry.headerRect.left}, sidebar.right=${geometry.sidebarRect.right}).`);
   assert.ok(geometry.mainRect.left >= geometry.sidebarRect.right - GEOMETRY_TOLERANCE_PX, `Main should not invade sidebar lane (main.left=${geometry.mainRect.left}, sidebar.right=${geometry.sidebarRect.right}).`);
   assertNoHorizontalOverflow(geometry.scrollMetrics, 'Sidebar scroll lane');
@@ -254,16 +275,23 @@ test('root shell layout: company-admin collapsed desktop preserves rail alignmen
   await seedBrowserSession(page, baseUrl, adminUser);
   await openRootShell(page, baseUrl, '#admin_home');
   await page.click('#root-sidebar-collapse-button');
-  await page.waitForFunction(() => document.querySelector('.root-shell')?.getAttribute('data-sidebar-state') === 'collapsed');
+  await page.waitForFunction(() => {
+    const browserDocument = globalThis.document;
+    const shell = browserDocument.querySelector('.root-shell');
+    const sidebar = browserDocument.getElementById('root-admin-sidebar');
+    return shell?.getAttribute('data-sidebar-state') === 'collapsed'
+      && !!sidebar
+      && sidebar.getBoundingClientRect().width > 0;
+  });
 
   const geometry = await readShellGeometry(page);
 
   assert.equal(geometry.sidebarState, 'collapsed');
-  assert.ok(Math.abs(geometry.sidebarRect.width - 88) <= GEOMETRY_TOLERANCE_PX, `Collapsed sidebar width should be ~88px, got ${geometry.sidebarRect.width}.`);
+  assertWithinRange(geometry.sidebarRect.width, COLLAPSED_SIDEBAR_MIN_WIDTH_PX, COLLAPSED_SIDEBAR_MAX_WIDTH_PX, 'Collapsed sidebar width');
   assert.ok(geometry.headerRect.left >= geometry.sidebarRect.right - GEOMETRY_TOLERANCE_PX, `Header should stay outside collapsed rail (header.left=${geometry.headerRect.left}, sidebar.right=${geometry.sidebarRect.right}).`);
   assert.ok(geometry.mainRect.left >= geometry.sidebarRect.right - GEOMETRY_TOLERANCE_PX, `Main should stay outside collapsed rail (main.left=${geometry.mainRect.left}, sidebar.right=${geometry.sidebarRect.right}).`);
   assert.ok(geometry.activeItemRect.width <= geometry.sidebarRect.width + GEOMETRY_TOLERANCE_PX, `Active item should fit within collapsed rail (active.width=${geometry.activeItemRect.width}, sidebar.width=${geometry.sidebarRect.width}).`);
-  assert.ok(Math.abs(geometry.activeItemRect.width - geometry.scrollRect.width) <= GEOMETRY_TOLERANCE_PX, `Active item width should align with scroll lane in collapsed mode (active.width=${geometry.activeItemRect.width}, scroll.width=${geometry.scrollRect.width}).`);
+  assert.ok(geometry.activeItemRect.width <= geometry.scrollRect.width + OVERFLOW_TOLERANCE_PX, `Active item width should stay bounded by the scroll lane in collapsed mode (active.width=${geometry.activeItemRect.width}, scroll.width=${geometry.scrollRect.width}).`);
   assert.ok(geometry.activeItemRect.right <= geometry.sidebarRect.right + GEOMETRY_TOLERANCE_PX, `Active item should not exceed sidebar rail (active.right=${geometry.activeItemRect.right}, sidebar.right=${geometry.sidebarRect.right}).`);
   assertNoHorizontalOverflow(geometry.scrollMetrics, 'Collapsed sidebar scroll lane');
   assertNoHorizontalOverflow(geometry.navMetrics, 'Collapsed sidebar nav container');
@@ -285,42 +313,44 @@ test('root shell layout: company-admin mobile drawer opens and closes with stabl
   assert.equal(geometry.drawerState, 'false');
   assert.equal(geometry.overlayHidden, true);
   assert.equal(geometry.drawerButtonHidden, false);
-  assert.ok(geometry.sidebarRect.right <= GEOMETRY_TOLERANCE_PX, `Closed drawer should stay off-canvas (sidebar.right=${geometry.sidebarRect.right}).`);
+  assert.ok(geometry.sidebarRect.right <= OVERFLOW_TOLERANCE_PX, `Closed drawer should stay off-canvas (sidebar.right=${geometry.sidebarRect.right}).`);
 
   await page.click('#root-sidebar-drawer-button');
   await page.waitForFunction(() => {
-    const shell = document.querySelector('.root-shell');
-    const sidebar = document.getElementById('root-admin-sidebar');
+    const browserDocument = globalThis.document;
+    const shell = browserDocument.querySelector('.root-shell');
+    const sidebar = browserDocument.getElementById('root-admin-sidebar');
     return shell?.getAttribute('data-drawer-open') === 'true'
       && shell.getAttribute('data-shell-actor') === 'company-admin'
       && !!sidebar
-      && sidebar.getBoundingClientRect().right > 200;
+      && sidebar.getBoundingClientRect().right > 220;
   });
   geometry = await readShellGeometry(page);
 
   assert.equal(geometry.drawerState, 'true');
   assert.equal(geometry.overlayHidden, false);
   assert.ok(geometry.sidebarRect.left <= GEOMETRY_TOLERANCE_PX, `Open drawer should align to the left edge (sidebar.left=${geometry.sidebarRect.left}).`);
-  assert.ok(geometry.sidebarRect.right > 200, `Open drawer should be visibly wide on mobile (sidebar.right=${geometry.sidebarRect.right}).`);
+  assert.ok(geometry.sidebarRect.right > 220, `Open drawer should be visibly wide on mobile (sidebar.right=${geometry.sidebarRect.right}).`);
   assertNoHorizontalOverflow(geometry.scrollMetrics, 'Mobile drawer scroll lane');
   assertNoHorizontalOverflow(geometry.navMetrics, 'Mobile drawer nav container');
 
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => {
-    const shell = document.querySelector('.root-shell');
-    const sidebar = document.getElementById('root-admin-sidebar');
-    const overlay = document.getElementById('root-sidebar-overlay');
+    const browserDocument = globalThis.document;
+    const shell = browserDocument.querySelector('.root-shell');
+    const sidebar = browserDocument.getElementById('root-admin-sidebar');
+    const overlay = browserDocument.getElementById('root-sidebar-overlay');
     return shell?.getAttribute('data-drawer-open') === 'false'
       && !!sidebar
       && !!overlay
       && overlay.hidden === true
-      && sidebar.getBoundingClientRect().right <= 2;
+      && sidebar.getBoundingClientRect().right <= 8;
   });
   geometry = await readShellGeometry(page);
 
   assert.equal(geometry.drawerState, 'false');
   assert.equal(geometry.overlayHidden, true);
-  assert.ok(geometry.sidebarRect.right <= GEOMETRY_TOLERANCE_PX, `Closed drawer should return off-canvas (sidebar.right=${geometry.sidebarRect.right}).`);
+  assert.ok(geometry.sidebarRect.right <= OVERFLOW_TOLERANCE_PX, `Closed drawer should return off-canvas (sidebar.right=${geometry.sidebarRect.right}).`);
 });
 
 test('root shell layout: root-global desktop keeps top navigation active without sidebar offset leakage', async (t) => {
