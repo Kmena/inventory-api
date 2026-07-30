@@ -9,32 +9,70 @@
   <body class="root-page">
     <a class="skip-link" href="#root-main">Saltar al contenido principal</a>
 
-    <div class="root-shell">
-      <header class="root-header" aria-label="Contexto del panel root">
-        <div class="root-header__brand" aria-label="Inventori">
-          <span class="brand-mark" aria-hidden="true">I</span>
-          <div class="root-header__context">
-            <p class="root-header__eyebrow">Inventori</p>
-            <h1 class="root-header__title">Panel root</h1>
+    <div class="root-shell" data-shell-actor="unknown" data-sidebar-state="expanded" data-drawer-open="false">
+      <div id="root-sidebar-overlay" class="root-sidebar-overlay" hidden></div>
+
+      <aside id="root-admin-sidebar" class="root-sidebar" aria-label="Navegacion principal de administracion" hidden>
+        <div class="root-sidebar__header">
+          <a class="root-sidebar__brand" href="/root/#home" aria-label="Inventori">
+            <span class="brand-mark" aria-hidden="true">I</span>
+            <span class="root-sidebar__brand-copy">
+              <strong>Inventori</strong>
+              <span>Organiza mas.</span>
+            </span>
+          </a>
+          <button id="root-sidebar-collapse-button" class="root-sidebar__collapse" type="button" aria-controls="root-admin-sidebar" aria-expanded="true" aria-label="Colapsar navegacion lateral">
+            <span aria-hidden="true">◀</span>
+          </button>
+        </div>
+
+        <div class="root-sidebar__scroll">
+          <nav id="root-admin-nav" class="root-sidebar__nav" aria-label="Modulos administrativos"></nav>
+        </div>
+
+        <footer class="root-sidebar__footer">
+          <div class="root-sidebar__assistant">
+            <p class="root-sidebar__assistant-title">Tori organiza todo</p>
           </div>
-        </div>
+          <div id="root-identity-slot-sidebar"></div>
+          <div id="root-logout-slot-sidebar"></div>
+        </footer>
+      </aside>
 
-        <div class="root-header__identity" aria-live="polite">
-          <p id="root-user-name" class="root-header__user">Validando sesion...</p>
-          <p id="root-user-role" class="root-header__role">Acceso autenticado</p>
-        </div>
-      </header>
+      <div class="root-shell__main">
+        <header class="root-header" aria-label="Contexto del panel root">
+          <div class="root-header__brand" aria-label="Inventori">
+            <button id="root-sidebar-drawer-button" class="root-header__menu-button" type="button" aria-controls="root-admin-sidebar" aria-expanded="false" aria-label="Abrir navegacion">
+              ☰
+            </button>
+            <span class="brand-mark" aria-hidden="true">I</span>
+            <div class="root-header__context">
+              <p class="root-header__eyebrow">Inventori</p>
+              <h1 class="root-header__title">Panel root</h1>
+            </div>
+          </div>
 
-      <nav class="root-nav" aria-label="Navegacion principal del panel root">
-        <div id="root-nav-links" class="root-nav__links"></div>
-        <button id="root-logout-button" class="secondary-button root-nav__logout" type="button" aria-label="Cerrar sesion y volver al inicio de sesion">Cerrar sesion</button>
-      </nav>
+          <div id="root-identity-slot-header"></div>
+        </header>
 
-      <main id="root-main" class="root-main" tabindex="-1">
-        <p id="root-shell-status" class="root-status" role="status" aria-live="polite">Validando sesion...</p>
-        <section id="root-view" class="root-view" aria-live="polite"></section>
-      </main>
+        <nav id="root-nav" class="root-nav" aria-label="Navegacion principal del panel root">
+          <div id="root-nav-links" class="root-nav__links"></div>
+          <div id="root-logout-slot-root"></div>
+        </nav>
+
+        <main id="root-main" class="root-main" tabindex="-1">
+          <p id="root-shell-status" class="root-status" role="status" aria-live="polite">Validando sesion...</p>
+          <section id="root-view" class="root-view" aria-live="polite"></section>
+        </main>
+      </div>
     </div>
+
+    <div id="root-identity-block" class="root-identity-block" hidden>
+      <p id="root-user-name" class="root-header__user">Validando sesion...</p>
+      <p id="root-user-role" class="root-header__role">Acceso autenticado</p>
+    </div>
+
+    <button id="root-logout-button" class="secondary-button root-logout-button" type="button" aria-label="Cerrar sesion y volver al inicio de sesion" hidden>Cerrar sesion</button>
 
     <script src="/shared/session.js"></script>
     <script src="/shared/auth.js"></script>

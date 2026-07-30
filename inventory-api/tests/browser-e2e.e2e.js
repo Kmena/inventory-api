@@ -315,12 +315,14 @@ test('browser E2E: a company-admin browser session sees Roles y permisos only an
 
   const response = await page.goto(`${baseUrl}/`);
   assert.equal(response.status(), 200);
-  await page.waitForFunction(() => globalThis.location.pathname === '/root/' && globalThis.location.hash === '#home');
+  await page.waitForFunction(() => globalThis.location.pathname === '/root/' && globalThis.location.hash === '#admin_home');
   await page.waitForSelector('#root-view-title');
 
   assert.match(await page.locator('#root-user-name').textContent(), /Admin Demo/);
   assert.equal(await page.getByRole('link', { name: 'Roles y permisos', exact: true }).count(), 1);
   assert.equal(await page.getByRole('link', { name: 'Empresas', exact: true }).count(), 0);
+  await page.waitForFunction(() => globalThis.document.getElementById('root-view-title')?.textContent === 'Modulo en progreso');
+  assert.equal(await page.getByRole('link', { name: 'Volver a Inicio' }).count(), 0);
 
   await page.getByRole('link', { name: 'Roles y permisos', exact: true }).click();
   await page.waitForFunction(() => globalThis.document.getElementById('root-view-title')?.textContent === 'Roles y permisos');

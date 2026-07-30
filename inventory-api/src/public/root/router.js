@@ -8,12 +8,7 @@
   const rolesAdminView = rootShell.require('views.rolesAdmin');
 
   function normalizeHashRoute(hashValue) {
-    const normalizedHash = String(hashValue || '').replace(/^#/, '').trim();
-    if (!normalizedHash) {
-      return 'home';
-    }
-
-    return normalizedHash;
+    return String(hashValue || '').replace(/^#/, '').trim();
   }
 
   function findNavigationItem(routeKey) {
@@ -21,25 +16,36 @@
   }
 
   function getFirstAccessibleRoute(session) {
-    const firstVisibleItem = manifest.items.find((item) => guards.canAccessRoute(session, item));
-    return firstVisibleItem?.routeKey || 'home';
+    const firstVisibleItem = manifest.items.find((item) => {
+      if (item.includeInLanding === false) {
+        return false;
+      }
+
+      return guards.canAccessRoute(session, item);
+    });
+
+    return firstVisibleItem?.routeKey || 'in_process';
   }
 
-  function getRouteView(routeKey) {
-    if (routeKey === 'home') {
+  function getRouteView(item) {
+    if (!item) {
+      return inProcessView;
+    }
+
+    if (!item.implemented) {
+      return inProcessView;
+    }
+
+    if (item.routeKey === 'home') {
       return homeView;
     }
 
-    if (routeKey === 'companies') {
+    if (item.routeKey === 'companies') {
       return companiesAdminView;
     }
 
-    if (routeKey === 'roles_permissions') {
+    if (item.routeKey === 'roles_permissions') {
       return rolesAdminView;
-    }
-
-    if (routeKey === 'in_process') {
-      return inProcessView;
     }
 
     return inProcessView;
@@ -47,41 +53,43 @@
 
   function resolveRoute(hashValue, session) {
     const requestedRouteKey = normalizeHashRoute(hashValue);
-    const item = findNavigationItem(requestedRouteKey);
+    const requestedItem = requestedRouteKey ? findNavigationItem(requestedRouteKey) : null;
 
-    if (!item) {
+    if (!requestedItem) {
       const fallbackRouteKey = getFirstAccessibleRoute(session);
+      const fallbackItem = findNavigationItem(fallbackRouteKey);
       return {
         allowed: true,
         requestedRouteKey,
         routeKey: fallbackRouteKey,
-        item: findNavigationItem(fallbackRouteKey),
-        view: getRouteView(fallbackRouteKey),
+        item: fallbackItem,
+        view: getRouteView(fallbackItem),
       };
     }
 
-    if (!guards.canAccessRoute(session, item)) {
+    if (!guards.canAccessRoute(session, requestedItem)) {
       const fallbackRouteKey = getFirstAccessibleRoute(session);
+      const fallbackItem = findNavigationItem(fallbackRouteKey);
       return {
         allowed: false,
         requestedRouteKey,
         routeKey: fallbackRouteKey,
-        item: findNavigationItem(fallbackRouteKey),
-        view: getRouteView(fallbackRouteKey),
+        item: fallbackItem,
+        view: getRouteView(fallbackItem),
       };
     }
 
     return {
       allowed: true,
       requestedRouteKey,
-      routeKey: item.routeKey,
-      item,
-      view: getRouteView(item.routeKey),
+      routeKey: requestedItem.routeKey,
+      item: requestedItem,
+      view: getRouteView(requestedItem),
     };
   }
 
   function renderRoute(routeResolution, session) {
-    return routeResolution.view.render(session);
+    return routeResolution.view.render(session, routeResolution.item);
   }
 
   rootShell.register('router', {

@@ -1,5 +1,47 @@
 # Tasks
 
+## TASK-040: Harden company-admin sidebar overflow behavior and regression coverage
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Embedded browser runtime / Frontend shell hardening
+**Requirement:** `sidebar-rebrand-permissions` `TASK-004`; FR-021; FR-022; NFR-003; NFR-005; AC-011; AC-012; AC-014
+**Reason:** The implemented company-admin sidebar already matched the approved IA, but hidden tooltip boxes and long nested content still needed stronger defensive styling so latent horizontal overflow would not survive inside the supported `/root/` shell.
+**Current problem resolved:** `src/public/styles.css` now keeps sidebar tooltips out of layout until collapsed hover/focus, applies defensive `box-sizing` and `min-width: 0` rules across nested sidebar wrappers, truncates long labels and footer identity text, and limits the styled thin scrollbar to the middle `.root-sidebar__scroll` region while header/footer stay fixed.
+**Implemented change:** Completed through `sidebar-rebrand-permissions` `TASK-004`; hardened the existing sidebar CSS contract and updated `tests/public-surface-characterization.test.js` to assert scrollbar, truncation, overflow, tooltip-display, and current root-shell wiring expectations.
+**Affected files:** `src/public/styles.css`, `tests/public-surface-characterization.test.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
+**Dependencies:** `sidebar-rebrand-permissions` `TASK-003` completed baseline
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium resilience and UX integrity impact
+**Acceptance criteria:** The company-admin sidebar no longer keeps hidden tooltip boxes contributing to width; only the center navigation lane scrolls; labels/footer text truncate safely; focused characterization coverage reflects the supported CSS/runtime contract.
+**Validation evidence:** `npm run typecheck`; `npm run lint:public-runtime`; `npm run validate:public-runtime`; `node --test tests/public-surface-characterization.test.js`; `node --test tests/root-shell-route-governance.test.js`; `node --test tests/browser-e2e.e2e.js`; `npm run build` ⚠️ pre-existing local Windows Prisma rename-lock `EPERM`
+**Required tests:** Preserve `tests/public-surface-characterization.test.js`, `tests/root-shell-route-governance.test.js`, and `tests/browser-e2e.e2e.js` coverage for the supported root shell.
+**Migration considerations:** Preserve the current actor split, shell route semantics, and backend-owned auth/session contracts; do not reintroduce width-bearing hidden tooltip elements.
+**Rollback or mitigation:** Revert only the sidebar hardening slice if a visual regression is detected, while preserving the manifest/router semantics and current supported `/root/` runtime contract.
+**Risk:** Medium
+
+## TASK-039: Reconcile company-admin sidebar route semantics with current shell truth
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Embedded browser runtime / Architecture documentation
+**Requirement:** `sidebar-rebrand-permissions` follow-up after implemented `TASK-001`
+**Reason:** The company-admin sidebar was already implemented and visible in `/root/`, but its richer IA needed explicit current-state route semantics, a neutral shared placeholder view, and aligned layout ownership so docs/tests would match the real shell.
+**Current problem resolved:** `src/public/root/manifest.js` now declares explicit company-admin sidebar route items, `src/public/root/router.js` resolves actor-aware fallback to the first accessible route, company-admin sessions default to `#admin_home` when no hash is present, `src/public/root/views/in-process.js` now uses the neutral approved copy, and shell-owned offsets are no longer duplicated inside view layouts.
+**Implemented change:** Completed through `sidebar-rebrand-permissions` `TASK-002` and `TASK-003`; enriched the manifest and router for explicit company-admin route semantics, kept only `#roles_permissions` functional, routed the remaining approved company-admin entries to the shared neutral `in_process` view, normalized shell/view layout ownership, and refreshed browser/runtime tests plus architecture-facing documentation.
+**Affected files:** `src/public/root/manifest.js`, `src/public/root/router.js`, `src/public/root/app.js`, `src/public/root/views/in-process.js`, `src/public/root/views/roles-admin.js`, `src/public/styles.css`, `tests/root-shell-route-governance.test.js`, `tests/browser-e2e.e2e.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, feature spec follow-up files
+**Dependencies:** `sidebar-rebrand-permissions` `TASK-001` completed baseline
+**Database impact:** None
+**API impact:** None; existing backend endpoints remain authoritative
+**Container impact:** None
+**Security impact:** Low direct impact; medium UX/traceability integrity impact
+**Acceptance criteria:** Company-admin visible entries have explicit current-state route semantics; `in_process` content matches the documented supported baseline; company-admin sessions land on `#admin_home` when no hash is present; docs/tests no longer imply that placeholder entries are separate functional modules.
+**Validation evidence:** `npm run typecheck`; `npm run lint:public-runtime`; `npm run validate:public-runtime`; `node --test tests/root-shell-route-governance.test.js`; `node --test tests/browser-e2e.e2e.js`; `npm run build` ⚠️ pre-existing local Windows Prisma rename-lock `EPERM`
+**Required tests:** Focused browser/runtime characterization coverage for admin sidebar route semantics and current `in_process` content, preserving `tests/root-shell-route-governance.test.js` and `tests/browser-e2e.e2e.js` coverage.
+**Migration considerations:** Preserve root-global top navigation, the current actor split, existing `/root/` route authority, and the `410 Gone` legacy HTML contract.
+**Rollback or mitigation:** Revert only the sidebar-semantics slice if route or copy changes create confusion; keep current actor-aware shell behavior intact.
+**Risk:** Medium
+
 ## TASK-038: Harden root-shell internal modularity with a bounded registry seam
 **Status:** Completed
 **Priority:** Low

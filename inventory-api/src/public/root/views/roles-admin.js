@@ -33,7 +33,7 @@
             <fieldset class="root-form__section">
               <legend>Seleccion de permisos</legend>
               <label class="root-form-grid__full"><span>Buscar permiso</span><input id="roles-permission-search" type="search" placeholder="Filtrar por codigo, modulo o accion" /></label>
-              <p id="roles-selection-count" class="muted">0 permisos seleccionados</p>
+              <p id="roles-selection-count" class="muted" aria-live="polite">0 permisos seleccionados</p>
               <div id="roles-permissions-region" class="root-permission-groups"></div>
             </fieldset>
 

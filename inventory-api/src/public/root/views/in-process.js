@@ -1,25 +1,17 @@
 (function attachRootShellInProcessView(globalScope) {
   const rootShell = /** @type {any} */ (globalScope).RootShell;
+
   function renderInProcessView() {
     return `
       <section class="root-hero" aria-labelledby="root-view-title">
         <p class="eyebrow">Panel root</p>
-        <h2 id="root-view-title">Pendientes</h2>
-        <p class="muted">Algunos modulos administrativos todavia estan en proceso de incorporacion al nuevo shell.</p>
+        <h2 id="root-view-title">Modulo en progreso</h2>
+        <p class="muted">Proximamente podras gestionar este modulo desde aqui.</p>
       </section>
 
-      <article class="card root-card root-card--wide">
+      <article class="card root-card root-card--wide root-card--placeholder">
         <p class="root-badge">En proceso</p>
-        <p class="muted">Esta primera ola incluye el acceso autenticado, navegacion minima y cierre seguro. Los modulos del panel root se integraran gradualmente.</p>
-        <h3>Proximas incorporaciones</h3>
-        <ul class="root-list">
-          <li>Navegacion ampliada del panel root.</li>
-          <li>Modulos root migrados desde el inventario legacy preservado.</li>
-          <li>Ajustes de visibilidad por permisos en specs posteriores aprobados.</li>
-        </ul>
-        <div class="action-row">
-          <a class="button-link" href="/root/#home">Volver a Inicio</a>
-        </div>
+        <p class="muted">Esta seccion ya forma parte de la navegacion aprobada del shell administrativo, pero su flujo funcional aun no esta disponible en esta primera ola.</p>
       </article>
     `;
   }

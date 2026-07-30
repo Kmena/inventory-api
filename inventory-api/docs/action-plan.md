@@ -1,7 +1,7 @@
 # Architectural Action Plan
 
 ## 1. Objective
-Keep architecture-facing documentation synchronized with the real repository state after `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`, preserving the implemented reduced public-runtime baseline, the supported root shell at `/root/`, the bounded `window.RootShell` registry seam for internal shell dependencies, the existing browser-session and auth contracts, the legacy-route `410 Gone` gate, the centralized permission-governance runtime foundation, the bounded actor-scope convergence seam in `src/security/access-policies.js` for company/company-role admin flows, the dedicated route policy `company.create-global`, the enforced company-role create deny for platform-scoped permissions, the route-level governance audit action `security.authorization.access_policy`, the dedicated service-level governance denial audit action `roles.company.create.governance_denied`, the new actor-aware shell routes `#companies` and `#roles_permissions`, and the remaining controlled transition behavior for non-wave-one browser profiles.
+Keep architecture-facing documentation synchronized with the real repository state after `sidebar-rebrand-permissions` `TASK-004`, together with `TASK-001`, `TASK-002`, `TASK-003`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`, preserving the implemented reduced public-runtime baseline, the supported root shell at `/root/`, the bounded `window.RootShell` registry seam for internal shell dependencies, the actor split where global root keeps top navigation and company-admin receives the rebranded sidebar shell, the existing browser-session and auth contracts, the legacy-route `410 Gone` gate, the centralized permission-governance runtime foundation, the bounded actor-scope convergence seam in `src/security/access-policies.js` for company/company-role admin flows, the dedicated route policy `company.create-global`, the enforced company-role create deny for platform-scoped permissions, the route-level governance audit action `security.authorization.access_policy`, the dedicated service-level governance denial audit action `roles.company.create.governance_denied`, the current root-global shell routes `#home` and `#companies`, the company-admin sidebar routes `#admin_home`, `#products`, `#lots`, `#movements`, `#production`, `#agents`, `#routes`, `#zones`, `#clients`, `#purchases`, `#warehouses`, `#approvals`, `#reports`, `#users`, `#roles_permissions`, and `#settings`, the shared neutral `in_process` view used by the non-functional company-admin routes, and the remaining controlled transition behavior for non-wave-one browser profiles.
 
 ## 2. Scope
 In scope for the current plan:
@@ -11,7 +11,9 @@ In scope for the current plan:
 - preserve the browser-session cookie model and reuse of `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout`
 - preserve explicit documentation that the remaining browser-session residual risk belongs to the HTTPS follow-up dependency in `specs/p11-https-browser-session-migration/` and is not an in-slice blocker for these bounded governance/documentation slices
 - preserve wave-one root-shell eligibility for `root` and `admin` with `companyId`
-- preserve actor-aware `/root/` shell navigation with `#companies` for global root and `#roles_permissions` for company-admin users with `companyId`
+- preserve actor-aware `/root/` shell navigation with root-global top navigation and the rebranded company-admin sidebar, keeping `#companies` for global root and `#roles_permissions` for company-admin users with `companyId`
+- preserve the current company-admin sidebar IA grouped into `Inicio`, `Operacion`, `Control`, and `Administracion`, while recognizing that most visible items still render the shared neutral `in_process` view
+- preserve the implemented visual hardening of the company-admin sidebar: fixed header/footer, central-only scrolling, defensive overflow rules, collapsed-only tooltip reveal, and thin styled scrollbar treatment on `.root-sidebar__scroll`
 - preserve the implemented Companies Admin shell flow over the existing root-company list/create/status endpoints
 - preserve the implemented Roles/Permissions Admin shell flow over the existing permission catalog and company-role list/create endpoints
 - preserve `/migration.html?mode=post-login-transition` for non-wave-one browser profiles
@@ -30,14 +32,17 @@ In scope for the current plan:
 - broadening root-shell eligibility or navigation beyond what is implemented today without a later approved slice
 
 ## 4. Requirements addressed
-This plan reflects the implemented `p27`, `p28`, `p29`, `p30`, `p31`, `p32`, `p33`, `p34`, `p35`, `p36`, and `p37` behavior now observable in code and tests:
+This plan reflects the implemented `sidebar-rebrand-permissions` `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `p27`, `p28`, `p29`, `p30`, `p31`, `p32`, `p33`, `p34`, `p35`, `p36`, `p37`, and `p38` behavior now observable in code and tests:
 - a new supported root SPA shell exists at `/root/`
 - browser login routes wave-one root-eligible users to `/root/` instead of `/migration.html?mode=post-login-transition`
 - the root shell reuses the existing browser-session model and `GET /api/auth/me` for bootstrap
 - the root shell remains vanilla JS under `src/public/root/`
 - the root shell includes authenticated layout, actor-aware client routing, basic guards, manifest-driven navigation, logout, and an `in_process` fallback
-- global root sessions now see `Empresas` and can use bounded Companies Admin list/create/status flows from the shell
-- company-admin sessions with `companyId` now see `Roles y permisos` and can use bounded permission catalog + company-role list/create flows from the shell
+- global root sessions now keep top navigation, see `Empresas`, and can use bounded Companies Admin list/create/status flows from the shell
+- company-admin sessions with `companyId` now receive the rebranded sidebar, see grouped tenant-admin navigation, land on `#admin_home` when no hash is present, and can use bounded permission catalog + company-role list/create flows from the shell through `Roles y permisos`
+- the approved company-admin sidebar entries now have explicit route keys in `root/manifest.js`; only `Roles y permisos` is functionally implemented and all other current company-admin sidebar routes render the shared neutral `in_process` view
+- layout ownership is normalized so the shell owns actor-specific offsets and outer content placement while views own only their internal module layout
+- the company-admin sidebar now hardens latent overflow behavior by hiding tooltip boxes until collapsed hover/focus, applying defensive `box-sizing` and `min-width: 0` rules to nested wrappers, truncating long labels/footer text, and limiting the styled thin scrollbar to the central scroll region while header and footer remain fixed
 - no runtime role update/delete/reassignment UI was added
 - backend auth remains the source of truth; client guards are only UX gates
 - a local minimal navigation manifest exists under `src/public/root/manifest.js`
@@ -65,10 +70,10 @@ Problems already corrected by earlier browser-runtime slices plus `p27`:
 - the root shell reuses existing auth/session contracts instead of introducing a parallel browser auth model
 - the residual browser-session hardening risk remains an explicit follow-up dependency in `specs/p11-https-browser-session-migration/` and is not an in-slice blocker for the current bounded governance/documentation slices
 
-Problems still open after `p38`:
-- `Pendientes` remains a placeholder route even though the shell now includes bounded real admin views
+Problems still open after `sidebar-rebrand-permissions` `TASK-004` and `p38`:
 - non-wave-one browser roles still land on the transition page rather than a functional supported destination
 - root-shell navigation remains local-manifest based and not yet integrated with any broader approved navigation model
+- the company-admin sidebar still exposes many approved-but-not-yet-functional modules through the shared neutral `in_process` view; this is current supported behavior, but additional module implementation remains pending
 - browser-runtime `typecheck` now includes the approved `src/public/root/**` shell files through an explicit allowlist, while remaining intentionally bounded
 - docs/tests/validators must continue staying synchronized so the root shell and legacy-route policies do not drift
 - permission governance remains only partially implemented: the central policy foundation, the stable `company.create` deny, the first enforced company-role create deny, denial-path audit visibility for that deny, and the bounded company/company-role admin actor-scope convergence seam now exist, but broader backend role-governance hardening, root-shell UI consumption, and repository-wide access-policy convergence remain pending
@@ -88,7 +93,15 @@ Problems still open after `p38`:
 - `/root/` remains the supported root-shell entrypoint
 - root-shell bootstrap continues through the existing cookie-session model and `/api/auth/me`
 - root-shell logout continues through `/api/auth/logout`
+- global `root` keeps the current top-navigation shell variant
+- company-admin keeps the rebranded sidebar shell variant
+- the sidebar keeps header/footer fixed while only the middle navigation lane scrolls
+- hidden tooltip boxes stay display-gated until collapsed hover/focus instead of contributing to layout width
 - `root` and `admin` with `companyId` continue landing on `/root/`
+- company-admin continues defaulting to `#admin_home` when no hash is present
+- explicit company-admin sidebar route items remain declared in `src/public/root/manifest.js`
+- non-functional company-admin sidebar routes continue rendering the shared neutral `in_process` view
+- shell-owned global offsets remain separate from per-view internal layout
 - deprecated legacy HTML routes keep returning `410 Gone` and the migration screen from the same URL without redirect
 - `/migration.html?mode=post-login-transition` remains a supported 200 response for non-wave-one browser profiles
 - `legacy-public-runtime/` remains outside the served runtime and outside implicit rollback behavior
@@ -106,14 +119,15 @@ Problems still open after `p38`:
 
 ## 9. Future architectural changes
 Incremental future changes now visible:
-1. preserve the implemented actor-aware `/root/` shell as the supported admin browser baseline;
+1. preserve the implemented actor-aware `/root/` shell as the supported admin browser baseline, including root top-nav and company-admin sidebar variants;
 2. keep legacy HTML deprecation enforced at the HTTP boundary;
 3. extend the root shell only through later approved bounded slices, rather than expanding it through legacy-page restoration;
-4. decide whether additional browser roles should later move from `/migration.html?mode=post-login-transition` into supported shell destinations;
-5. decide whether the bounded root-shell `typecheck` allowlist should later widen beyond the current approved file set;
-6. keep unsupported company edit/delete/detail and role update/delete/reassignment flows out of the shell until backed by approved slices and real runtime contracts;
-7. preserve the implemented bounded company/company-role admin convergence seam as the current baseline rather than reinterpreting it as pending work;
-8. preserve `legacy-public-runtime/` only as transitional backup/reference inventory until equivalent SPA sections are implemented and validated, then remove it in a later approved slice.
+4. extend the richer company-admin sidebar IA beyond the current shared neutral `in_process` placeholders through explicit module implementations;
+5. decide whether additional browser roles should later move from `/migration.html?mode=post-login-transition` into supported shell destinations;
+6. decide whether the bounded root-shell `typecheck` allowlist should later widen beyond the current approved file set;
+7. keep unsupported company edit/delete/detail and role update/delete/reassignment flows out of the shell until backed by approved slices and real runtime contracts;
+8. preserve the implemented bounded company/company-role admin convergence seam as the current baseline rather than reinterpreting it as pending work;
+9. preserve `legacy-public-runtime/` only as transitional backup/reference inventory until equivalent SPA sections are implemented and validated, then remove it in a later approved slice.
 
 ## 10. Database changes
 No database change is planned for this post-implementation refresh.
@@ -164,8 +178,18 @@ Continue validating the implemented repository baseline through:
 7. `npm run lint`
 8. `npm run typecheck`
 9. `npm run build`
-10. focused permission-governance tests such as `tests/permission-governance-foundation.test.js` and `tests/permission-governance-backend-consumption.test.js`
-11. focused audit instrumentation coverage such as `tests/audit-instrumentation.test.js`
+
+Recorded post-implementation evidence supplied by the user for `sidebar-rebrand-permissions` `TASK-004`:
+- `npm run typecheck` passed
+- `npm run lint:public-runtime` passed
+- `npm run validate:public-runtime` passed
+- `node --test tests/public-surface-characterization.test.js` passed
+- `node --test tests/root-shell-route-governance.test.js` passed
+- `node --test tests/browser-e2e.e2e.js` passed
+- `npm run build` reported the same pre-existing Windows Prisma rename-lock issue during Prisma generate
+
+- focused permission-governance tests such as `tests/permission-governance-foundation.test.js` and `tests/permission-governance-backend-consumption.test.js`
+- focused audit instrumentation coverage such as `tests/audit-instrumentation.test.js`
 
 Recorded post-implementation evidence supplied by the user for `p30`:
 - `npm run lint` passed
@@ -275,32 +299,39 @@ Test-baseline notes to preserve:
 ### Stage 14 — Completed
 - Add the approved bounded browser-runtime typecheck allowlist for the supported `src/public/root/**` shell files without broadening to all `src/public/**`
 
-### Stage 15 — Proposed
-- Evaluate later shell destinations for non-wave-one browser roles without reactivating legacy HTML
-- Add the next supported root-shell modules beyond `Inicio` and `Pendientes` through approved incremental slices
+### Stage 15 — Completed
+- Apply the first rebranded company-admin sidebar shell over the supported `/root/` runtime while preserving root-global top navigation, the existing backend/API contracts, and the current actor split
 
-### Stage 16 — Proposed
-- Replace transition-only landings for additional browser roles when approved supported destinations exist
+### Stage 16 — Completed
+- Reconcile sidebar manifest, router semantics, and `in_process` content so visible company-admin entries have explicit documented destination behavior
+- Normalize shell/view layout ownership so shell-level offsets are not duplicated inside admin views
+- Harden the implemented company-admin sidebar against latent horizontal overflow and lock the CSS contract in `tests/public-surface-characterization.test.js`
 
 ### Stage 17 — Proposed
+- Add the next supported root-shell modules beyond the current bounded Companies and Roles/Permissions views through approved incremental slices
+
+### Stage 18 — Proposed
+- Replace transition-only landings for additional browser roles when approved supported destinations exist
+
+### Stage 19 — Proposed
 - Expand browser-runtime typecheck coverage only if a later approved slice widens the current bounded root-shell allowlist
 
-### Stage 18 — Completed
+### Stage 20 — Completed
 - Introduce centralized permission-governance foundation, first stable `company.create` deny, and warning-based backend consumption for company-role creation
 
-### Stage 19 — Completed
+### Stage 21 — Completed
 - Harden company-role creation so platform-scoped permissions such as `companies.manage` are denied before persistence while non-approved sensitive combinations remain warning-only
 
-### Stage 20 — Completed
+### Stage 22 — Completed
 - Add dedicated denial-path audit visibility for the approved company-role create deny using the existing safe audit seam while preserving the same `403` response contract
 
-### Stage 21 — Completed
+### Stage 23 — Completed
 - Introduce bounded actor-scope convergence in route policies for company/company-role admin flows while preserving service-level governance enforcement, dedicated `company.create-global`, and distinct route-level versus service-level denial auditing
 
-### Stage 22 — Completed
+### Stage 24 — Completed
 - Align the in-scope legacy runtime-contract governance validator to canonical `docs/**` ownership and add bounded regression coverage so `internal-docs/**` remains auxiliary only for this seam
 
-### Stage 23 — Proposed
+### Stage 25 — Proposed
 - Consume the governance foundation in additional backend role-governance operations and approved UI slices, including any future update-flow hardening once an update surface exists
 
 ## 16. Risks and mitigations
@@ -308,6 +339,7 @@ Test-baseline notes to preserve:
 |---|---|---|
 | Legacy HTML runtime is accidentally reintroduced into `src/public/` or treated as supported again | High | Keep `validate-public-runtime`, browser/runtime characterization tests, and docs aligned to the supported inventory |
 | Future work changes `/root/` behavior without updating validators and browser tests | High | Keep root-shell contract checks in validator, smoke tests, characterization tests, and browser E2E |
+| The richer company-admin sidebar IA is misread as fully implemented module coverage instead of mostly shared `in_process` placeholders | Medium | Keep docs explicit that only `Roles y permisos` is the functional tenant-admin destination today and add new functional modules only through approved slices |
 | Non-wave-one roles remain on an informational transition landing longer than expected | Medium | Keep the behavior explicit in docs and move those roles only through approved supported-destination slices |
 | Root shell now uses a bounded `window.RootShell` registry seam, but still depends on plain ordered static scripts and not on a broader module system | Low | Preserve current validator/test coverage, keep the allowlist explicit, and defer any framework/ES-module redesign to a later approved slice |
 | Permission-governance follow-up sequencing is misread because `p10` is analysis, `p28` is only a partial runtime implementation, and future contributors may reintroduce stale dependency metadata | Medium | Record the partial implementation explicitly, preserve the completed `p29` reconciliation plus the closed `p30` and `p32` follow-up slices in docs/spec metadata, and do not overstate current enforcement scope |
@@ -331,4 +363,4 @@ For future follow-up work, manually confirm:
 - `npm run validate:public-runtime` and the affected browser/runtime tests still pass when touching browser-runtime seams
 
 ## 19. Approval status
-**Status:** Documentation refresh now reflects the implemented `p27-root-initial-spa-shell`, `p28-flexible-permission-governance-foundation`, `p29-permission-governance-metadata-reconciliation`, `p30-company-role-governance-hardening`, `p31-governance-architecture-documentation-alignment`, `p32-governance-denial-audit-visibility`, `p33-admin-authorization-governance-convergence`, `p34-bounded-governance-coverage-expansion`, `p35-governance-baseline-sync-guardrails`, `p36-bounded-doc-validator-ownership-alignment`, `p37-root-spa-companies-roles-admin`, and `root-shell-follow-up-alignment` state. The repository now documents the supported root shell at `/root/`, the wave-one post-login redirect for `root` and `admin` with `companyId`, continued use of shared browser-session/auth helpers and `/api/auth/me`, the preserved `410 Gone` contract for deprecated legacy HTML routes, the centralized permission-governance foundation with its stable global-root company-creation rule, the bounded actor-scope route-policy convergence seam for company/company-role admin flows, the dedicated `company.create-global` route policy, the route-level audit action `security.authorization.access_policy`, the enforced company-role creation deny for platform-scoped permissions such as `companies.manage`, the dedicated denial audit action `roles.company.create.governance_denied` for that service-level create deny, the bounded root-shell typecheck allowlist, the focused sync/ownership guardrails from `p35` and `p36`, the canonical `docs/**` ownership used by the in-scope legacy runtime-contract validator, the auxiliary-only classification for `internal-docs/**`, the preserved warning-only posture for non-approved sensitive combinations, the explicit deferral of broader shell modularity refactor, and the current validator/test coverage that governs these surfaces.
+**Status:** Documentation refresh now reflects the implemented `sidebar-rebrand-permissions` `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `p27-root-initial-spa-shell`, `p28-flexible-permission-governance-foundation`, `p29-permission-governance-metadata-reconciliation`, `p30-company-role-governance-hardening`, `p31-governance-architecture-documentation-alignment`, `p32-governance-denial-audit-visibility`, `p33-admin-authorization-governance-convergence`, `p34-bounded-governance-coverage-expansion`, `p35-governance-baseline-sync-guardrails`, `p36-bounded-doc-validator-ownership-alignment`, `p37-root-spa-companies-roles-admin`, `p38-root-shell-modularity-hardening`, and `root-shell-follow-up-alignment` state. The repository now documents the supported root shell at `/root/`, the wave-one post-login redirect for `root` and `admin` with `companyId`, continued use of shared browser-session/auth helpers and `/api/auth/me`, the split root-shell presentation where global root keeps top navigation and company-admin receives the rebranded grouped sidebar, the explicit company-admin sidebar route items with `#admin_home` as default landing, the current truth that only `Roles y permisos` is functionally implemented while the remaining sidebar routes render the shared neutral `in_process` view, the normalized shell/view layout ownership, the preserved `410 Gone` contract for deprecated legacy HTML routes, the centralized permission-governance foundation with its stable global-root company-creation rule, the bounded actor-scope route-policy convergence seam for company/company-role admin flows, the dedicated `company.create-global` route policy, the route-level audit action `security.authorization.access_policy`, the enforced company-role creation deny for platform-scoped permissions such as `companies.manage`, the dedicated denial audit action `roles.company.create.governance_denied` for that service-level create deny, the bounded root-shell typecheck allowlist, the focused sync/ownership guardrails from `p35` and `p36`, the canonical `docs/**` ownership used by the in-scope legacy runtime-contract validator, the auxiliary-only classification for `internal-docs/**`, the preserved warning-only posture for non-approved sensitive combinations, the still-open future module-expansion follow-up, and the current validator/test coverage that governs these surfaces.

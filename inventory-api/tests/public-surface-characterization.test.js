@@ -84,6 +84,7 @@ test('public login, no-access and migration screens keep strict same-origin wiri
   const migrationSource = readPublicFile('migration.js');
   const sessionHelperSource = readPublicFile('shared/session.js');
   const authHelperSource = readPublicFile('shared/auth.js');
+  const stylesSource = readPublicFile('styles.css');
 
   const rootShellHtmlSource = readPublicFile('root/index.html');
   const rootShellAppSource = readPublicFile('root/app.js');
@@ -115,9 +116,15 @@ test('public login, no-access and migration screens keep strict same-origin wiri
   assert.match(rootShellHtmlSource, /<script src="\/root\/app\.js"><\/script>/);
   assert.match(rootShellManifestSource, /routeKey: 'companies'/);
   assert.match(rootShellManifestSource, /routeKey: 'roles_permissions'/);
+  assert.match(stylesSource, /\.root-sidebar,\s*\n\.root-sidebar \*/);
+  assert.match(stylesSource, /\.root-sidebar__scroll \{[\s\S]*overflow-y: auto;[\s\S]*scrollbar-width: thin;[\s\S]*scrollbar-color: rgba\(203, 213, 225, 0\.28\) transparent;/);
+  assert.match(stylesSource, /\.root-sidebar__nav,[\s\S]*\.root-sidebar__section-body,[\s\S]*\.root-sidebar__subnav \{[\s\S]*overflow-x: clip;/);
+  assert.match(stylesSource, /\.root-sidebar__label \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
+  assert.match(stylesSource, /\.root-sidebar__tooltip \{[\s\S]*display: none;/);
   assert.match(rootShellAppSource, /rootShell\.require\('sessionAdapter'\)/);
   assert.match(rootShellAppSource, /rootShell\.require\('router'\)/);
-  assert.match(rootShellAppSource, /renderNavigation\(effectiveSession\)/);
+  assert.match(rootShellAppSource, /function configureShellForActor\(session\)/);
+  assert.match(rootShellAppSource, /renderNavigation\(session\)/);
   assert.match(rootShellAppSource, /rootShellSessionAdapter\.bootstrap\(\)/);
   assert.match(rootShellAppSource, /inventoryAuth\.logout\(activeSession/);
   assert.match(migrationHtmlSource, /Actualizacion de acceso/);
