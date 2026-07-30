@@ -96,6 +96,11 @@ test('authService.login records a SUCCESS audit event without persisting the pas
       const result = await authService.login({ username: 'alice', password: 'secret123' }, createRequest());
       assert.equal(typeof result.token, 'string');
       assert.equal(result.user.username, 'alice');
+      assert.equal(result.user.id, '11');
+      assert.equal(result.user.companyId, '7');
+      assert.equal(result.user.role.code, 'admin');
+      assert.equal(typeof result.user.id, 'string');
+      assert.equal(typeof result.user.companyId, 'string');
     },
   );
 
