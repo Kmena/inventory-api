@@ -3,7 +3,7 @@
 ## 1. System overview
 `inventory-api/` is a single-deployable Node.js 24 Express + Prisma application with REST APIs and an embedded browser runtime served by the same Express process.
 
-Current browser/runtime and access-governance state verified from repository contents after `zones-view`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-009`, together with `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `TASK-005`, `TASK-006`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, and `root-shell-follow-up-alignment`, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`:
+Current browser/runtime and access-governance state verified from repository contents after `zones-view`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-009`, together with `hotspot-seams-doc-ownership` `TASK-001` through `TASK-008`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, and `root-shell-follow-up-alignment`, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`:
 - the active public browser runtime under `src/public/` is intentionally small and now includes a supported root SPA shell entrypoint;
 - supported public HTML documents are `/`, `/index.html`, `/no-access.html`, `/migration.html`, and the root shell entrypoint at `/root/` backed by `src/public/root/index.html`;
 - the supported `/root/` shell now has two observable actor variants: global `root` users keep the existing top navigation, while `admin` users with `companyId` receive a rebranded administrative sidebar shell with explicit hash routes for visible menu items;
@@ -22,6 +22,12 @@ Repository-governance state verified in this refresh:
 - `tests/governance-baseline-sync-guardrails.test.js` now acts as the focused documentation-sync guardrail for the selected post-`p34` governance statements only; it does not imply repository-wide documentation convergence;
 - `docs/permission-governance-decisions.md` now exists as an explainer for the completed `p10-permission-governance` analysis outputs, while the active runtime foundation lives in `src/security/permission-governance.config.js`, `src/security/role-bundles.config.js`, and `src/security/permission-governance.service.js`; `p30-company-role-governance-hardening` extended that foundation so company-role creation now rejects platform-scoped permissions such as `companies.manage` before persistence, and `p32-governance-denial-audit-visibility` added a dedicated service-level denial audit action for that denied path;
 - `internal-docs/**` remains auxiliary repository material only, while the in-scope runtime-contract governance validators now consume canonical `docs/**` artifacts and do not rely on auxiliary `internal-docs/**` runtime-contract copies for authority;
+- `docs/documentation-ownership-map.md` is the compact classification reference for canonical, auxiliary, historical/compatibility, and auto-validated repository artifacts, including the current workflow source-of-truth and seam ownership examples;
+- `hotspot-seams-doc-ownership` tasks 1-8 are now reflected in the implemented structure: `src/security/access-policies.js` remains the stable facade while policy registry, actor-scope checks, and denial-audit behavior now live in `src/security/access-policy-registry.js`, `src/security/access-policy-actor-scope.js`, and `src/security/access-policy-audit.js`;
+- agent workspace routes now also use the centralized access-policy facade explicitly at the route boundary through the `agent.workspace.access` policy, preserving the existing commercial-agent token contract while making the protection convergent with other guarded modules; `/api/agent/**` now enforces a `permission-plus-actor-scope` boundary that allows `sales_agent` or equivalent commercial-agent tokens with `companyId`, `sub`, `sales.orders.create`, `sales.routes.view.own`, and `customer.activities.manage`, while still denying supervisor/global variants such as `sales_supervisor`, `sales.routes.view.all`, and `sales.routes.assign`;
+- `docs/prisma-windows-stability-evidence.md` now distinguishes the hosted Windows closeout verdict (`estabilizado con evidencia CI`) from the developer-local Windows operating baseline (`residual gobernado` when `windows_rename_lock` still reproduces locally), so CI closure is no longer treated as equivalent to universal local stability;
+- the same hardening slice also introduced focused service seams at `src/services/inventory-alerts.service.js`, `src/services/agent-workspace-store-state.service.js`, `src/services/product-permission-shaping.service.js`, and `src/services/product-pricing.service.js` without changing the public API surface;
+- the validation/documentation closure for that slice is also now reflected: the governance baseline sync guardrail passed, coding-standard path alignment passed, lint passed, typecheck passed, and the aggregate suite passed in the intended memory browser-session mode (`BROWSER_SESSION_STORE_MODE=memory`);
 - the repository keeps an explicit Redis-path validation lane through `npm run test:redis-path` and the parent-root hosted workflow `../.github/workflows/redis-browser-session-tests.yml` relative to `inventory-api/`;
 - `/health/ready` depends on both database readiness and browser-session-store readiness.
 
@@ -31,6 +37,7 @@ High-signal paths verified in this refresh:
 - authoritative hosted workflow location for local validators/tests: `../.github/workflows/` relative to `inventory-api/`; `inventory-api/.github/workflows/` is not the current authoritative workflow source
 - application root: `inventory-api/package.json`, `inventory-api/Dockerfile`, `inventory-api/src/`, `inventory-api/prisma/`, `inventory-api/scripts/`, `inventory-api/tests/`, `inventory-api/docs/`, `inventory-api/internal-docs/`, `inventory-api/README.md`
 - canonical coding-standards document: `inventory-api/docs/coding_standard.md`
+- canonical documentation ownership map: `inventory-api/docs/documentation-ownership-map.md`
 - compatibility bridge for older coding-standards references: legacy hyphenated coding-standards alias
 - active public runtime: `inventory-api/src/public/`
 - preserved but inactive legacy browser inventory: `inventory-api/legacy-public-runtime/`
@@ -106,7 +113,8 @@ The legacy browser HTML pages are not an active runtime module even though their
 ## 4. Existing domains and modules
 Observable current runtime and governance areas:
 - Authentication and authorization
-  - legacy hybrid access-policy runtime in `src/security/access-policies.js`
+  - stable access-policy facade in `src/security/access-policies.js`
+  - extracted access-policy registry, actor-scope, and denial-audit seams in `src/security/access-policy-*.js`
   - centralized permission-governance foundation in `src/security/permission-governance*.js`
 - Company, role, and user administration
 - Client management and client documents
@@ -206,6 +214,7 @@ Current observable interfaces:
 - static runtime served from `/`
 - GitHub Actions as repository-governance integration
 - canonical runtime-contract artifacts under `docs/**`, including the runtime-contract manifest and reviewed OpenAPI baseline consumed by the bounded legacy governance validator
+- canonical workflow authority under `../.github/workflows/**` relative to `inventory-api/`, with ownership expectations summarized in `docs/documentation-ownership-map.md`
 
 Relevant public-surface behavior now in effect:
 - `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` remain supported and are outside the HTML deprecation scope;
@@ -221,8 +230,8 @@ Current observable behavior:
 - login remains public;
 - authenticated APIs use middleware-based authentication;
 - authorization remains middleware/policy based;
-- role/permission governance remains hybrid in runtime code: `src/security/access-policies.js` still mixes role-based and permission-based policies, but the repository now also contains a centralized permission-governance foundation used by services for governed-operation evaluation;
-- a bounded route-policy convergence seam now exists for the highest-signal company/company-role admin flows only: company list/create and root-company list/create policies declare explicit `global-root` actor scope, while company-role list/create policies declare explicit `company-admin` actor scope before the sensitive service-level governance rules run;
+- role/permission governance remains hybrid in runtime code: `src/security/access-policies.js` is still the stable authorization facade and central policy entrypoint, but declarative policy data, actor-scope checks, and route-level denial-audit behavior are now split into focused helper modules under `src/security/access-policy-*.js`; the repository also contains a centralized permission-governance foundation used by services for governed-operation evaluation;
+- a bounded route-policy convergence seam now exists for the highest-signal company/company-role admin flows and the agent workspace routes: company list/create and root-company list/create policies declare explicit `global-root` actor scope, company-role list/create policies declare explicit `company-admin` actor scope, and agent workspace routes now declare explicit `agent-workspace-user` actor scope before the downstream service-layer checks run;
 - the planning/governance analysis package for this area is documented in `specs/p10-permission-governance/`, `docs/permission-governance-decisions.md` summarizes the recommended governance model, `p28` implemented the first runtime slice with a central policy model, reusable warning contract, and stable `company.create` deny rule for non-global-root actors, `p30` added enforced company-role creation denial for platform-scoped permissions, and `p32` added dedicated service-level denial audit visibility for that approved deny path;
 - `tests/access-policies.test.js` and `tests/authorization-convergence-characterization.test.js` now freeze current access-policy behavior for strict policy lookup, actor-scope inventories, actor-scope denial audit metadata, and selected route-policy mappings without changing runtime authorization semantics;
 - browser login can request a backend-owned browser session by sending `X-Inventory-Browser-Session: cookie` to `/api/auth/login`;
@@ -291,6 +300,7 @@ The active browser/runtime governance now relies on:
 The active permission-governance foundation now also relies on:
 - `tests/permission-governance-foundation.test.js`
 - `tests/permission-governance-backend-consumption.test.js`
+- `tests/documentation-ownership-governance.test.js` for the documentation ownership map and canonical workflow/documentation references introduced by `hotspot-seams-doc-ownership`
 
 The current inventory hotspot characterization baseline now also relies on:
 - `tests/inventory-service-hotspot-characterization.test.js`
@@ -316,7 +326,7 @@ The current access-policy hotspot characterization baseline now also relies on:
 - `tests/access-policies.test.js`
 - `tests/authorization-convergence-characterization.test.js`
 - characterization of unknown-policy failure behavior
-- characterization of `global-root` and `company-admin` actor-scope inventories
+- characterization of `global-root`, `company-admin`, and `agent-workspace-user` actor-scope inventories
 - characterization of route-level actor-scope denial audit metadata
 - characterization of current route-policy mappings across selected administrative, product, inventory, warehouse, and sales-route guards
 
@@ -382,6 +392,17 @@ Additional requester-supplied validation evidence for `repository-baseline-score
 - `npm run lint` ✅
 - `npm run typecheck` ✅
 - `npm run build` ✅
+
+Additional requester-supplied validation evidence for `hotspot-seams-doc-ownership` tasks 1-8:
+- `node --test tests/governance-baseline-sync-guardrails.test.js` ✅
+- `node --test tests/coding-standard-path-alignment.test.js` ✅
+- `npm run lint` ✅
+- `npm run typecheck` ✅
+- targeted access-policy / inventory / agent-workspace / product / documentation suites passed ✅
+- `npm run validate:workflow-baseline` ✅
+- `set BROWSER_SESSION_STORE_MODE=memory && npm run test -- --silent` ✅
+- baseline audit rerun: `7.4/10`, verdict `Acceptable`, no regressions observed ✅
+- `npm run build` remains intermittently unstable on Windows because Prisma generate can hit a rename-lock `EPERM` ⚠️
 
 Additional requester-supplied validation evidence for `quality-baseline-recovery` `TASK-006`:
 - `node --test tests/root-shell-modularity-governance.test.js` ✅
@@ -510,20 +531,23 @@ Note on current static analysis scope:
 - Supported browser flows must not reintroduce persisted bearer tokens in `localStorage`.
 
 ## 14. Known defects
-- `npm run build` can still fail locally on Windows with the pre-existing Prisma rename-lock `EPERM` issue during Prisma generate; however, `docs/prisma-windows-stability-evidence.md` now records the repository closeout verdict as `estabilizado con evidencia CI`, so the local failure remains documented as complementary diagnostic evidence rather than the active CI closeout verdict.
+- `npm run build` can still fail locally on Windows with the pre-existing Prisma rename-lock `EPERM` issue during Prisma generate; however, `docs/prisma-windows-stability-evidence.md` now records the hosted repository closeout verdict as `estabilizado con evidencia CI` while explicitly classifying the developer-local Windows operating baseline as `residual gobernado` when `windows_rename_lock` still reproduces.
+- The current Windows wrapper/workflow baseline still has open diagnostic gaps: it classifies retryable rename-lock failures, preserves the real exit code, and now writes a minimal latest-run diagnostics report under `logs/prisma-generate-last-run.json`, but it does not yet identify the locking local process or capture richer process-attribution evidence.
+- The full `hotspot-seams-doc-ownership` validation matrix closes only for the documented memory-session aggregate lane; the Windows Prisma rename-lock remains an external environment/platform defect rather than a feature regression.
 - Permission-governance hardening identified in `specs/p10-permission-governance/` remains only partially implemented, but the enforced scope has advanced: the centralized policy foundation, the stable `company.create` deny rule, and a first company-role deny rule now exist; company-role creation rejects platform-scoped permissions such as `companies.manage` before persistence, denied attempts can now emit dedicated service-level audit events through action `roles.company.create.governance_denied`, and other sensitive combinations still remain warning-only in success-path audit metadata.
 - Denied company-role governance attempts are now recorded through the existing safe audit seam from the service-level denial path when request audit context is available; the dedicated action is `roles.company.create.governance_denied`, the recorded outcome is `REJECTED`, and metadata includes `governanceDecision`, `denialCode`, `ruleId`, `affectedPermissions`, `requestedPermissionCodes`, and `companyId`. This remains distinct from route-level authorization denial auditing and preserves the same `403` response contract.
-- `src/services/agent-workspace.service.js` and `src/services/product.service.js` remain large orchestration hotspots with mixed coordination, filtering/serialization, and cross-service transaction responsibilities; `TASK-008` added characterization coverage for selected high-risk seams but did not reduce the underlying complexity.
-- `src/security/access-policies.js` remains a centralized authorization hotspot that still mixes policy registry data, actor-scope rules, denial-audit behavior, and guard composition; `TASK-009` added characterization coverage for selected high-risk seams but did not restructure the boundary.
+- `src/services/agent-workspace.service.js` and `src/services/product.service.js` remain large orchestration hotspots with mixed coordination, filtering/serialization, and cross-service transaction responsibilities, although focused seams now exist in `agent-workspace-store-state.service.js`, `product-permission-shaping.service.js`, and `product-pricing.service.js`.
+- `src/security/access-policies.js` remains a centralized authorization facade and policy entrypoint, but the registry, actor-scope, and denial-audit responsibilities are now split into dedicated modules; agent workspace routes now consume that same facade explicitly, while order routes still intentionally preserve a mixed baseline of permission-governed draft mutations and role-governed legacy operations.
 - The supported post-login landing for non-wave-one roles remains transitional and informational (`/migration.html?mode=post-login-transition`), not a final functional destination.
 - The Redis session store implementation uses a small raw-socket protocol client rather than a mature Redis library.
 - Some passing tests can still emit expected operational logs, though the previously known incidental browser E2E audit-DB noise for the addressed suites has already been isolated through DB-free seams.
+- Authorization characterization tests can still pass while emitting expected `audit_record_failed` console noise when denied-path audit persistence cannot reach `db:5432`; this is currently diagnostic noise, not by itself a guard regression.
 - `tests/public-surface-characterization.test.js` uses regex-based stylesheet characterization rather than screenshot diffs, so subtle per-browser pixel drift can still escape despite the stronger contract coverage.
 
 ## 15. Architectural debt
 - The application remains layered without strict hexagonal separation.
 - Service-layer responsibilities remain broad in several modules.
-- `src/services/inventory.service.js`, `src/services/agent-workspace.service.js`, and `src/services/product.service.js` remain characterization-protected hotspots rather than decomposed modules; the current tests freeze selected behavior but do not change the production design.
+- `src/services/inventory.service.js`, `src/services/agent-workspace.service.js`, and `src/services/product.service.js` remain characterization-protected hotspots, but they now delegate some cohesive behavior to `inventory-alerts.service.js`, `agent-workspace-store-state.service.js`, `product-permission-shaping.service.js`, and `product-pricing.service.js`.
 - API runtime, static public delivery, and governance concerns still coexist in the same deployable.
 - Operational assurance still depends on synchronization across docs, validators, tests, README, env examples, compose files, and workflows.
 - The root shell uses global browser objects and file-level script composition rather than module bundling or stronger client-side encapsulation, although the current `window.RootShell` registry plus modularity governance tests now provide a bounded containment seam.

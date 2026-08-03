@@ -1,7 +1,7 @@
 # Architectural Action Plan
 
 ## 1. Objective
-Keep architecture-facing documentation synchronized with the real repository state after `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-008`, together with `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `TASK-005`, `TASK-006`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`, preserving the implemented reduced public-runtime baseline, the supported root shell at `/root/`, the bounded `window.RootShell` registry seam for internal shell dependencies, the actor split where global root keeps top navigation and company-admin receives the rebranded sidebar shell, the existing browser-session and auth contracts, the legacy-route `410 Gone` gate, the centralized permission-governance runtime foundation, the bounded actor-scope convergence seam in `src/security/access-policies.js` for company/company-role admin flows, the dedicated route policy `company.create-global`, the enforced company-role create deny for platform-scoped permissions, the route-level governance audit action `security.authorization.access_policy`, the dedicated service-level governance denial audit action `roles.company.create.governance_denied`, the current root-global shell routes `#home` and `#companies`, the company-admin sidebar routes `#admin_home`, `#products`, `#lots`, `#movements`, `#production`, `#agents`, `#routes`, `#zones`, `#clients`, `#purchases`, `#warehouses`, `#approvals`, `#reports`, `#users`, `#roles_permissions`, and `#settings`, the shared neutral `in_process` view used by the still-non-functional company-admin routes, the canonical coding-standards path at `docs/coding_standard.md`, the legacy hyphenated compatibility bridge, and the remaining controlled transition behavior for non-wave-one browser profiles.
+Keep architecture-facing documentation synchronized with the real repository state after `hotspot-seams-doc-ownership` tasks 1-8 closure, in addition to the previously documented `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-008`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, and the related governance slices built on `p34-bounded-governance-coverage-expansion`, `p35-governance-baseline-sync-guardrails`, and `p36-bounded-doc-validator-ownership-alignment`. This refresh now also captures the implemented hotspot seam reductions that preserve the layered monolith while splitting `src/security/access-policies.js` into facade + registry + actor-scope + denial-audit ownership, extracting focused service seams in inventory, agent workspace, and product flows, and recording that the minimum and expanded validation matrix passed for the intended memory-session aggregate lane.
 
 ## 2. Scope
 In scope for the current plan:
@@ -18,6 +18,7 @@ In scope for the current plan:
 - preserve the implemented Roles/Permissions Admin shell flow over the existing permission catalog and company-role list/create endpoints
 - preserve the implemented Zones shell flow over the existing company regions list/create and subregion-create endpoints
 - preserve `/migration.html?mode=post-login-transition` for non-wave-one browser profiles
+- preserve the extracted hotspot seams now in effect: `src/security/access-policy-registry.js`, `src/security/access-policy-actor-scope.js`, `src/security/access-policy-audit.js`, `src/services/inventory-alerts.service.js`, `src/services/agent-workspace-store-state.service.js`, `src/services/product-permission-shaping.service.js`, and `src/services/product-pricing.service.js`
 - keep docs, validators, tests, and runtime contracts aligned to the implemented public runtime
 - keep workflow-ownership wording aligned with the implemented validator/test baseline that reads hosted workflow truth from `../.github/workflows/` relative to `inventory-api/`
 - preserve `docs/coding_standard.md` as the canonical coding-standards document while allowing the legacy hyphenated alias to remain only as a compatibility bridge
@@ -66,6 +67,11 @@ This plan reflects the implemented `zones-view`, `sidebar-rebrand-permissions` `
 - a focused ownership regression test now guards that validator/documentation alignment without expanding into repository-wide `internal-docs/**` cleanup
 - the coding standards document path is now converged on `docs/coding_standard.md`, with the legacy hyphenated alias retained only as a compatibility bridge and protected by dedicated drift tests
 - the coding standards path is now aligned so `docs/coding_standard.md` is authoritative, the legacy hyphenated alias is compatibility-only, and a dedicated repository test guards against stale hyphenated references in repo-owned docs/tests/scripts
+- the access-policy hotspot is now split so declarative policy data, actor-scope checks, and route-level denial-audit behavior are separated while `authorizeAccessPolicy(...)` remains the stable facade contract
+- inventory-alert behavior is now isolated in `src/services/inventory-alerts.service.js` while inventory stock and lot orchestration remain in `inventory.service.js`
+- agent store-state, debt visibility, purchase-history shaping, and sorting are now isolated in `src/services/agent-workspace-store-state.service.js` while actor scoping and order delegation remain in `agent-workspace.service.js`
+- permission-aware product shaping and general-price synchronization are now isolated in `src/services/product-permission-shaping.service.js` and `src/services/product-pricing.service.js` while `product.service.js` keeps higher-level CRUD/import orchestration
+- `docs/documentation-ownership-map.md` now classifies `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, canonical workflow ownership, and the extracted auth/service/repository seam examples
 
 ## 5. Current problems addressed
 Problems already corrected by earlier browser-runtime slices plus `p27`:
@@ -86,8 +92,8 @@ Problems still open after `quality-baseline-recovery` `TASK-007`, `repository-ba
 - the new modularity guardrail is intentionally narrow and only freezes the currently approved containment baseline for `router.js` and `zones-admin.js`; broader root-shell decomposition is still pending if future slices grow `app.js` or introduce new sensitive modules
 - the temporary coding-standards compatibility bridge should not be expanded back into a second independently maintained standards body
 - permission governance remains only partially implemented: the central policy foundation, the stable `company.create` deny, the first enforced company-role create deny, denial-path audit visibility for that deny, and the bounded company/company-role admin actor-scope convergence seam now exist, but broader backend role-governance hardening, root-shell UI consumption, and repository-wide access-policy convergence remain pending
-- `TASK-009` added characterization coverage for the access-policy hotspot in `src/security/access-policies.js`, making strict lookup behavior, actor-scope denial auditing, and selected route-policy mappings explicit without changing production authorization behavior
-- `src/services/agent-workspace.service.js` and `src/services/product.service.js` remain large service hotspots; the new characterization suites freeze selected tenant-scope, serialization, transaction, and coupling assumptions, but the production orchestration boundaries are unchanged
+- the feature validation matrix is closed for the intended memory-session aggregate lane, but local Windows Prisma generate instability remains a separate documented platform issue during `npm run build`
+- `src/services/agent-workspace.service.js` and `src/services/product.service.js` remain large service hotspots; the extracted seams reduce mixed responsibilities, but the production orchestration boundaries are still concentrated in those facade services
 - metadata reconciliation for permission-governance sequencing is complete, and the former `p30-company-role-governance-hardening` plus `p32-governance-denial-audit-visibility` follow-up dependencies are now implemented for the current create-flow boundary
 - no runtime company-role update flow exists yet, so update hardening remains deferred until an actual update surface is approved
 - runtime-contract governance now converges on canonical `docs/**` artifacts for validator ownership, while `internal-docs/**` remains auxiliary support material only and other non-runtime-contract auxiliary consumers stay explicitly out of scope for this bounded slice
@@ -96,6 +102,9 @@ Problems still open after `quality-baseline-recovery` `TASK-007`, `repository-ba
 ## 6. Domains affected
 - Embedded browser runtime
 - Identity and access
+- Inventory
+- Sales routing / agent workspace
+- Product catalog
 - Repository/platform governance
 - CI/workflow governance
 - Cross-cutting architecture documentation
@@ -142,7 +151,9 @@ Incremental future changes now visible:
 8. preserve the implemented bounded company/company-role admin convergence seam as the current baseline rather than reinterpreting it as pending work;
 9. preserve `legacy-public-runtime/` only as transitional backup/reference inventory until equivalent SPA sections are implemented and validated, then remove it in a later approved slice;
 10. retire the legacy hyphenated coding-standards compatibility bridge only after repository and external consumers no longer depend on that alias path;
-11. preserve and extend the newly implemented `quality-baseline-recovery` growth guardrails for sensitive root-shell modules as future slices touch `router.js`, `zones-admin.js`, `app.js`, or new high-risk shell files.
+11. preserve and extend the newly implemented `quality-baseline-recovery` growth guardrails for sensitive root-shell modules as future slices touch `router.js`, `zones-admin.js`, `app.js`, or new high-risk shell files;
+12. keep the new hotspot seam split as the implemented baseline and, if future hardening is approved, continue reducing central services only through additive extractions behind the current facades rather than through a broad folder redesign;
+13. preserve the completed `hotspot-seams-doc-ownership` `TASK-008` validation baseline, including the passing memory-session aggregate lane and the separate tracking of the Windows Prisma generate rename-lock issue.
 
 ## 10. Database changes
 No database change is planned for this post-implementation refresh.
@@ -200,12 +211,27 @@ Continue validating the implemented repository baseline through:
 14. `npm run typecheck`
 15. `npm run build`
 16. `set NODE_ENV=test&& set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/access-policies.test.js tests/administrative-authorization-characterization.test.js tests/authorization-convergence-characterization.test.js`
+17. `node --test tests/documentation-ownership-governance.test.js tests/p36-doc-validator-ownership.test.js tests/workflow-baseline-characterization.test.js`
+18. `node --test tests/agent-workspace-hotspot-characterization.test.js tests/agent-workspace-tenant-scope.test.js tests/agent-workspace-contract-characterization.test.js`
+19. `node --test tests/product-service-hotspot-characterization.test.js tests/product-delete-semantics.test.js tests/pagination.test.js`
 
 Hotspot characterization notes to preserve:
 - characterization coverage now exists for the current `inventory.service` seam and should remain in place before any future refactor of pagination logic, alert transitions, transaction propagation, or the boundary with `inventory-transaction-support.service.js`
 - characterization coverage now exists for selected `agent-workspace.service` seams and should remain in place before any future refactor of tenant-scoped store filtering/serialization or order delegation behavior
 - characterization coverage now exists for selected `product.service` seams and should remain in place before any future refactor of repository transaction ownership, derived lot decoration, or import-time inventory coupling
-- characterization coverage now exists for the current `src/security/access-policies.js` seam and should remain in place before any future cleanup of strict policy lookup, actor-scope enforcement, denial-audit behavior, or route-policy mappings
+- characterization coverage now exists for the current access-policy split and should remain in place before any future cleanup of strict policy lookup, actor-scope enforcement, denial-audit behavior, or route-policy mappings
+- documentation ownership governance coverage now exists for canonical vs auxiliary/historical artifact boundaries and should remain in place before any future workflow/doc authority cleanup
+
+Recorded post-implementation evidence supplied by the user for `hotspot-seams-doc-ownership` tasks 1-8:
+- `node --test tests/governance-baseline-sync-guardrails.test.js` passed
+- `node --test tests/coding-standard-path-alignment.test.js` passed
+- `npm run lint` passed
+- `npm run typecheck` passed
+- targeted access-policy / inventory / agent-workspace / product / documentation suites passed
+- `npm run validate:workflow-baseline` passed
+- `set BROWSER_SESSION_STORE_MODE=memory && npm run test -- --silent` passed
+- baseline audit rerun scored `7.4/10` with verdict `Acceptable` and no regressions observed
+- `npm run build` remains intermittently unstable on Windows because Prisma generate can hit a rename-lock `EPERM`
 
 Recorded post-implementation evidence supplied by the user for `zones-view`:
 - `npm run lint:public-runtime` passed
@@ -424,6 +450,9 @@ Test-baseline notes to preserve:
 ### Stage 28 — Proposed
 - Consume the governance foundation in additional backend role-governance operations and approved UI slices, including any future update-flow hardening once an update surface exists
 
+### Stage 29 — Completed
+- Reduce the `hotspot-seams-doc-ownership` hotspots incrementally by preserving the access-policy facade, extracting registry / actor-scope / denial-audit seams, extracting focused inventory / agent-workspace / product service seams, consolidating the canonical documentation ownership map, and closing the intended memory-session validation matrix
+
 ## 16. Risks and mitigations
 | Risk | Level | Mitigation |
 |---|---|---|
@@ -456,4 +485,4 @@ For future follow-up work, manually confirm:
 - `npm run validate:public-runtime` and the affected browser/runtime tests still pass when touching browser-runtime seams
 
 ## 19. Approval status
-**Status:** Documentation refresh now reflects the implemented `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-009`, `p27-root-initial-spa-shell`, `p28-flexible-permission-governance-foundation`, `p29-permission-governance-metadata-reconciliation`, `p30-company-role-governance-hardening`, `p31-governance-architecture-documentation-alignment`, `p32-governance-denial-audit-visibility`, `p33-admin-authorization-governance-convergence`, `p34-bounded-governance-coverage-expansion`, `p35-governance-baseline-sync-guardrails`, `p36-bounded-doc-validator-ownership-alignment`, `p37-root-spa-companies-roles-admin`, `p38-root-shell-modularity-hardening`, and `root-shell-follow-up-alignment` state. `TASK-009` did not require additional production runtime, database, or API changes; it extended characterization/test/documentation synchronization around the centralized access-policy seam and related authorization route mappings without redesigning the runtime architecture. The repository now documents the supported root shell at `/root/`, the wave-one post-login redirect for `root` and `admin` with `companyId`, continued use of shared browser-session/auth helpers and `/api/auth/me`, the split root-shell presentation where global root keeps top navigation and company-admin receives the rebranded grouped sidebar, the explicit company-admin sidebar route items with `#admin_home` as default landing, the current truth that `Roles y permisos` and `Zonas` are functionally implemented while the remaining sidebar routes render the shared neutral `in_process` view, the normalized shell/view layout ownership, the preserved `410 Gone` contract for deprecated legacy HTML routes, the centralized permission-governance foundation with its stable global-root company-creation rule, the bounded actor-scope route-policy convergence seam for company/company-role admin flows, the dedicated `company.create-global` route policy, the route-level audit action `security.authorization.access_policy`, the enforced company-role creation deny for platform-scoped permissions such as `companies.manage`, the dedicated denial audit action `roles.company.create.governance_denied` for that service-level create deny, the bounded root-shell typecheck allowlist, the focused sync/ownership guardrails from `p35` and `p36`, the canonical `docs/**` ownership used by the in-scope legacy runtime-contract validator, the canonical coding-standards ownership at `docs/coding_standard.md` with the legacy hyphenated alias retained only as a compatibility notice, the auxiliary-only classification for `internal-docs/**`, the preserved warning-only posture for non-approved sensitive combinations, the official Prisma/Windows closeout verdict recorded in `docs/prisma-windows-stability-evidence.md` as `estabilizado con evidencia CI`, the still-open future module-expansion follow-up, the still-large `agent-workspace.service.js`, `product.service.js`, and centralized `access-policies.js` hotspots now protected by characterization coverage, and the current validator/test coverage that governs these surfaces.
+**Status:** Documentation refresh now reflects the implemented state after `hotspot-seams-doc-ownership` tasks 1-8 in addition to the previously completed browser/runtime and governance slices. The repository now documents the active access-policy split (`access-policies.js` facade plus registry / actor-scope / denial-audit helpers), the extracted inventory/agent-workspace/product service seams, the canonical documentation ownership map including `docs/tasks.md`, and the focused documentation-governance test coverage. No additional production API or database redesign is documented here. Remaining follow-up is limited to future additive seam work and the separately documented local Windows Prisma rename-lock instability during build generation.
