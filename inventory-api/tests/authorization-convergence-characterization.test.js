@@ -6,6 +6,8 @@ const regionRoutes = require('../src/routes/region.routes');
 const warehouseRoutes = require('../src/routes/warehouse.routes');
 const salesRouteRoutes = require('../src/routes/sales-route.routes');
 const economicActivityRoutes = require('../src/routes/economic-activity.routes');
+const productRoutes = require('../src/routes/product.routes');
+const inventoryRoutes = require('../src/routes/inventory.routes');
 
 function getRouteGuard(router, path, method) {
   const layer = router.stack.find((entry) => entry.route && entry.route.path === path && entry.route.methods[method]);
@@ -102,6 +104,54 @@ test('sales-route administration routes stay limited to admin and sales_supervis
 
   const allowedAdminGoals = await runGuard(goalsGuard, { role: 'admin', companyId: '7' });
   assert.equal(allowedAdminGoals, undefined);
+});
+
+test('product routes stay permission-governed through centralized access policies', async () => {
+  const listGuard = getRouteGuard(productRoutes, '/', 'get');
+  const createGuard = getRouteGuard(productRoutes, '/', 'post');
+  const deleteGuard = getRouteGuard(productRoutes, '/:id', 'delete');
+
+  const deniedList = await runGuard(listGuard, { role: 'sales', companyId: '7', permissions: ['inventory.view'] });
+  assert.equal(deniedList?.statusCode, 403);
+
+  const allowedList = await runGuard(listGuard, { role: 'catalog-viewer', companyId: '7', permissions: ['products.view'] });
+  assert.equal(allowedList, undefined);
+
+  const deniedCreate = await runGuard(createGuard, { role: 'catalog-viewer', companyId: '7', permissions: ['products.view'] });
+  assert.equal(deniedCreate?.statusCode, 403);
+
+  const allowedCreate = await runGuard(createGuard, { role: 'catalog-manager', companyId: '7', permissions: ['products.manage'] });
+  assert.equal(allowedCreate, undefined);
+
+  const deniedDelete = await runGuard(deleteGuard, { role: 'catalog-import', companyId: '7', permissions: ['products.import'] });
+  assert.equal(deniedDelete?.statusCode, 403);
+
+  const allowedDelete = await runGuard(deleteGuard, { role: 'catalog-manager', companyId: '7', permissions: ['products.manage'] });
+  assert.equal(allowedDelete, undefined);
+});
+
+test('inventory routes keep explicit permission boundaries for view, status update, and QA actions', async () => {
+  const alertsGuard = getRouteGuard(inventoryRoutes, '/alerts', 'get');
+  const alertStatusGuard = getRouteGuard(inventoryRoutes, '/alerts/:id/status', 'patch');
+  const lotQaGuard = getRouteGuard(inventoryRoutes, '/lots/:id/qa', 'patch');
+
+  const deniedAlerts = await runGuard(alertsGuard, { role: 'warehouse', companyId: '7', permissions: ['sales.manage'] });
+  assert.equal(deniedAlerts?.statusCode, 403);
+
+  const allowedAlerts = await runGuard(alertsGuard, { role: 'warehouse', companyId: '7', permissions: ['inventory.view'] });
+  assert.equal(allowedAlerts, undefined);
+
+  const deniedAlertStatus = await runGuard(alertStatusGuard, { role: 'warehouse', companyId: '7', permissions: ['inventory.view'] });
+  assert.equal(deniedAlertStatus?.statusCode, 403);
+
+  const allowedAlertStatus = await runGuard(alertStatusGuard, { role: 'warehouse', companyId: '7', permissions: ['inventory.manage'] });
+  assert.equal(allowedAlertStatus, undefined);
+
+  const deniedLotQa = await runGuard(lotQaGuard, { role: 'warehouse', companyId: '7', permissions: ['inventory.manage'] });
+  assert.equal(deniedLotQa?.statusCode, 403);
+
+  const allowedLotQa = await runGuard(lotQaGuard, { role: 'quality', companyId: '7', permissions: ['inventory.qa.manage'] });
+  assert.equal(allowedLotQa, undefined);
 });
 
 test('economic activity lookup keeps admin and sales restrictions through centralized access policies', async () => {

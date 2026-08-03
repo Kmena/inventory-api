@@ -3,7 +3,7 @@
 ## 1. Purpose and scope
 This document describes only the architecture currently implemented and the active decisions currently governing the repository.
 
-This refresh reflects the repository state after `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, together with `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `TASK-005`, `TASK-006`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, and the implemented `root-shell-follow-up-alignment` slice, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`, in addition to the already-implemented browser-runtime reduction, runtime-contract governance convergence, Redis browser-session operational safeguards, DB-free versus DB-backed suite separation for the affected browser/runtime boundary, and the currently implemented permission-governance runtime slices.
+This refresh reflects the repository state after `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-009`, together with `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `TASK-005`, `TASK-006`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, and the implemented `root-shell-follow-up-alignment` slice, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`, in addition to the already-implemented browser-runtime reduction, runtime-contract governance convergence, Redis browser-session operational safeguards, DB-free versus DB-backed suite separation for the affected browser/runtime boundary, and the currently implemented permission-governance runtime slices.
 
 ## 2. Current active architecture summary
 The repository remains a single-deployable Node.js 24 Express + Prisma modular monolith.
@@ -88,7 +88,7 @@ Observable current runtime/governance areas:
 - **Root Roles API adapter (`src/public/root/roles-api.js`)**: same-origin browser adapter for permission catalog and company-role list/create operations against `/api/roles/permissions` and `/api/roles/company`
 - **Migration / no-access surfaces**: supported fallback pages for deprecated-route rendering and non-wave-one transition behavior
 - **Legacy runtime archive (`legacy-public-runtime/`)**: preserved transition backup/reference inventory, not part of the served runtime
-- **Access-policy seam (`src/security/access-policies.js`)**: owns centralized route policy definitions, the bounded actor-scope convergence seam for company/company-role admin flows, and route-level actor-scope denial auditing through action `security.authorization.access_policy`
+- **Access-policy seam (`src/security/access-policies.js`)**: owns centralized route policy definitions, the bounded actor-scope convergence seam for company/company-role admin flows, route-level actor-scope denial auditing through action `security.authorization.access_policy`, and the currently characterized strict policy lookup plus selected route-policy mapping behavior
 - **Permission-governance foundation (`src/security/permission-governance*.js`)**: owns centralized role-bundle definitions, permission metadata, governed-operation inventory, approved combination rules, global-root detection, reusable warning contract, and operation evaluation (`allow` / `warn` / `deny`)
 - **Company service**: still owns company orchestration and now rechecks `company.create` through the governance foundation before persistence
 - **Role service**: owns company-role creation flow, rejects platform-scoped permission assignment such as `companies.manage` before persistence, records governance warnings in audit metadata for successful allow/warn flows, and emits dedicated fail-open denial audit attempts with action `roles.company.create.governance_denied` for the enforced deny path
@@ -196,6 +196,10 @@ Current implemented testing posture includes:
 - browser E2E coverage
 - bounded browser-runtime typecheck coverage over `src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`, and the approved `src/public/root/**` shell files
 - focused route/modularity/browser coverage through `tests/root-shell-route-governance.test.js`, `tests/root-shell-modularity-governance.test.js`, `tests/public-surface-characterization.test.js`, `tests/zones-view-selection-filters-characterization.test.js`, `tests/zones-view-dialog-feedback-characterization.test.js`, and `tests/zones-view.e2e.js`
+- inventory hotspot characterization coverage through `tests/inventory-service-hotspot-characterization.test.js`, freezing paginated inventory movement/alert seams, alert disappearance conflict handling, and transaction propagation around `updateLotQa` and `registerStockEntry`
+- agent-workspace hotspot characterization coverage through `tests/agent-workspace-hotspot-characterization.test.js`, freezing tenant-scoped store filtering/sorting, store summary serialization, and current order-payload coercion/delegation behavior
+- product hotspot characterization coverage through `tests/product-service-hotspot-characterization.test.js`, freezing repository-transaction ownership for `createProduct`, derived lot-usability decoration, category-cache reuse during import, and import-time inventory registration coupling
+- access-policy hotspot characterization coverage through `tests/access-policies.test.js` and `tests/authorization-convergence-characterization.test.js`, freezing strict registry lookup behavior, actor-scope inventories, denial-audit metadata, and selected route-policy mappings without changing runtime semantics
 - `docs/test-suite-catalog.md` as the maintained reference for the affected DB-free vs DB-backed suite boundary
 - `tests/coding-standard-path-alignment.test.js` as the focused governance check for canonical versus compatibility coding-standards paths
 
@@ -246,6 +250,26 @@ Recorded post-implementation evidence supplied by the user for `quality-baseline
 - `node --test tests/root-shell-route-governance.test.js` passed
 - `npm run typecheck` passed
 - `npm run lint:public-runtime` passed
+
+Recorded post-implementation evidence supplied by the user for `repository-baseline-score-recovery` `TASK-007`:
+- `node --test tests/inventory-service-hotspot-characterization.test.js tests/inventory-alerts-tenant-scope.test.js tests/approval-baseline-compatibility.test.js` passed
+- `npm run test -- --silent` passed with only the expected environment-gated skips remaining
+- `npm run lint` passed
+- `npm run typecheck` passed
+
+Recorded post-implementation evidence supplied by the user for `repository-baseline-score-recovery` `TASK-008`:
+- `node --test tests/agent-workspace-hotspot-characterization.test.js tests/product-service-hotspot-characterization.test.js` passed
+- `npm run test -- --silent` passed
+- `npm run lint` passed
+- `npm run typecheck` passed
+- `npm run build` passed
+
+Recorded post-implementation evidence supplied by the user for `repository-baseline-score-recovery` `TASK-009`:
+- `set NODE_ENV=test&& set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/access-policies.test.js tests/administrative-authorization-characterization.test.js tests/authorization-convergence-characterization.test.js` passed
+- `npm run test -- --silent` passed with only the expected environment-gated skips remaining
+- `npm run lint` passed
+- `npm run typecheck` passed
+- `npm run build` passed
 
 Recorded post-implementation evidence supplied by the user for `p37`:
 - `npm run validate:public-runtime` passed
@@ -382,6 +406,10 @@ Currently implemented or actively governing decisions:
 - the browser-runtime `typecheck` baseline now covers the approved root-shell files through an explicit allowlist, while avoiding a broad `src/public/**` expansion
 - the preserved `legacy-public-runtime/` tree is transition inventory, not active runtime
 - the default aggregate test baseline prioritizes deterministic memory-backed browser sessions, so Redis-backed session persistence is not exercised on every plain `npm run test` run
+- inventory transaction ownership and orchestration responsibilities remain distributed between `src/services/inventory.service.js`, `src/services/inventory-transaction-support.service.js`, and repository-owned transaction callbacks; the current seam is now characterized but was not refactored in this cycle
+- `src/services/agent-workspace.service.js` remains a large coordination hotspot that mixes tenant scoping, route/store filtering, serialization, and delegation to `order.service.js`; `TASK-008` froze selected behavior but did not restructure the boundary
+- `src/services/product.service.js` remains a large coordination hotspot that mixes product CRUD/import orchestration with inventory-side effects through repository transaction callbacks and `inventory.service.js`; `TASK-008` froze selected behavior but did not restructure the boundary
+- `src/security/access-policies.js` remains a large centralized authorization hotspot that combines policy registry data, actor-scope rules, denial-audit behavior, and guard composition in one file; `TASK-009` added characterization coverage only and did not restructure this boundary
 - the Redis store is implemented with a bespoke low-level TCP client
 - requester-supplied validation evidence is current, but this refresh did not independently re-execute commands
 - Prisma/Windows closeout is now governed by `docs/prisma-windows-stability-evidence.md`, which records the official repository verdict as `estabilizado con evidencia CI`; local rename-lock failures remain relevant diagnostics but are not the active hosted-workflow closeout verdict on their own
