@@ -2,6 +2,7 @@ const path = require('node:path');
 
 const {
   classifyPrismaGenerateFailure,
+  defaultMaxWindowsRetries,
   executePrismaGenerateWithWindowsStabilization,
   getWindowsRetryDelayMs,
   listWindowsEngineTempFiles,
@@ -29,6 +30,7 @@ if (require.main === module) {
 
 module.exports = {
   classifyPrismaGenerateFailure,
+  defaultMaxWindowsRetries,
   getWindowsRetryDelayMs,
   listWindowsEngineTempFiles: () => listWindowsEngineTempFiles(prismaClientDirectory),
   removeWindowsEngineTempFiles: () => removeWindowsEngineTempFiles(prismaClientDirectory),

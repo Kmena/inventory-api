@@ -52,6 +52,9 @@ test('governed baseline docs preserve canonical ownership and no-update-flow tru
 
   assert.match(currentState, /canonical runtime-contract governance lives under `docs\/\*\*`/);
   assert.match(architecture, /canonical reviewed artifacts under `docs\/\*\*`/);
+  assert.match(currentState, /authoritative hosted workflow location for local validators\/tests: `\.\.\/\.github\/workflows\//);
+  assert.match(architecture, /The workflow-baseline validators and characterization tests intentionally read hosted workflow truth from that parent-root workflow tree\./);
+  assert.match(actionPlan, /reads hosted workflow truth from `\.\.\/\.github\/workflows\//);
 
   if (audit) {
     assert.match(audit, /canonical `docs\/\*\*` artifacts|canonical `docs\/\*\*` source of truth|canonical `docs\/\*\*` artifacts used by the new governance tests/i);

@@ -36,9 +36,19 @@ function fail(message) {
   process.stderr.write(`${message}\n`);
 }
 
+function describeEnvSource() {
+  if (fs.existsSync(envFilePath)) {
+    return `${envFileName} (loaded from file)`;
+  }
+
+  return `${envFileName} (not found; relying on process environment)`;
+}
+
 const missingVariables = requiredVariables.filter((name) => !String(process.env[name] || '').trim());
 if (missingVariables.length) {
   fail(`Missing required production variables: ${missingVariables.join(', ')}`);
+  fail(`Validation source: ${describeEnvSource()}`);
+  fail('Provide values through a local env file selected with ENV_FILE or export the variables directly in the shell.');
   process.exit(1);
 }
 
@@ -71,4 +81,4 @@ if (missingFiles.length) {
   process.exit(1);
 }
 
-process.stdout.write('Production baseline validation passed.\n');
+process.stdout.write(`Production baseline validation passed using ${describeEnvSource()}.\n`);

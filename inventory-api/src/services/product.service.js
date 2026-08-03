@@ -2,6 +2,8 @@ const productRepository = require('../repositories/product.repository');
 const inventoryService = require('./inventory.service');
 const { createHttpError } = require('../lib/errors');
 const { buildPaginatedResponse } = require('../lib/pagination');
+const { hasPermission, serializeProductForPermissions } = require('./product-permission-shaping.service');
+const { syncGeneralPrice } = require('./product-pricing.service');
 
 function authScope(auth) {
   if (!auth?.companyId || !auth?.sub) {
@@ -9,44 +11,6 @@ function authScope(auth) {
   }
   return { companyId: BigInt(auth.companyId), userId: BigInt(auth.sub) };
 }
-function hasPermission(auth, ...allowedPermissions) {
-  const permissions = auth?.permissions || [];
-  return allowedPermissions.some((permission) => permissions.includes(permission));
-}
-
-function decorateWarehouseLotStock(stock) {
-  if (!stock?.lot) return stock;
-  return {
-    ...stock,
-    lot: {
-      ...stock.lot,
-      derivedUsability: inventoryService.deriveLotUsability(stock.lot),
-    },
-  };
-}
-
-function serializeProductForPermissions(product, auth) {
-  if (!product) return product;
-  const enrichedProduct = Array.isArray(product.warehouseLotStocks)
-    ? {
-        ...product,
-        warehouseLotStocks: product.warehouseLotStocks.map(decorateWarehouseLotStock),
-      }
-    : product;
-  if (hasPermission(auth, 'inventory.view', 'inventory.manage')) return enrichedProduct;
-  const {
-    quantity: _quantity,
-    reservedQuantity: _reservedQuantity,
-    minStock: _minStock,
-    maxStock: _maxStock,
-    standbyStock: _standbyStock,
-    warehouseStocks: _warehouseStocks,
-    warehouseLotStocks: _warehouseLotStocks,
-    ...catalogProduct
-  } = enrichedProduct;
-  return catalogProduct;
-}
-
 function normalizeOptionalString(value) {
   if (value === undefined || value === null) return null;
   const normalized = String(value).trim();
@@ -151,32 +115,6 @@ function buildProductWriteData(payload, auth, existingProduct) {
       ?? existingProduct?.conversionFactor
       ?? 1,
   };
-}
-
-async function syncGeneralPrice(tx, productId, amount, currency) {
-  if (amount === undefined || amount === null) return;
-
-  await tx.productPrice.updateMany({
-    where: {
-      productId,
-      priceType: 'GENERAL',
-      isActive: true,
-    },
-    data: {
-      isActive: false,
-      validTo: new Date(),
-    },
-  });
-
-  await tx.productPrice.create({
-    data: {
-      productId,
-      priceType: 'GENERAL',
-      amount,
-      currency: currency || 'CRC',
-      isActive: true,
-    },
-  });
 }
 
 async function listProducts(auth, pagination = null) {

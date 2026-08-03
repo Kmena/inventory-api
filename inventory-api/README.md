@@ -151,15 +151,19 @@ Ese artefacto resume:
 
 ## Quality gates versionados
 
-El repositorio versiona los siguientes workflows de baseline y gobernanza en GitHub Actions:
+Los workflows oficiales de baseline y gobernanza viven hoy en el **repository root hospedado**, un nivel por encima de `inventory-api/`, bajo `../.github/workflows/`.
 
-- `.github/workflows/static-checks.yml`
-- `.github/workflows/contract-validations.yml`
-- `.github/workflows/repository-tests.yml`
-- `.github/workflows/windows-prisma-build.yml`
-- `.github/workflows/browser-e2e.yml`
-- `.github/workflows/operational-smoke.yml`
-- `.github/workflows/build-and-publish.yml`
+Dentro de `inventory-api/`, el directorio `.github/workflows/` no es la fuente autoritativa actual; los validadores locales leen los workflows versionados desde el root hospedado padre.
+
+El baseline vigente depende de estos workflows del root hospedado:
+
+- `../.github/workflows/static-checks.yml`
+- `../.github/workflows/contract-validations.yml`
+- `../.github/workflows/repository-tests.yml`
+- `../.github/workflows/windows-prisma-build.yml`
+- `../.github/workflows/browser-e2e.yml`
+- `../.github/workflows/operational-smoke.yml`
+- `../.github/workflows/build-and-publish.yml`
 
 En conjunto cubren instalación, generación de Prisma, validaciones de contratos, test suite, browser E2E, smoke operativo y el gate dedicado de Prisma/Windows en `push`, `pull_request` y `workflow_dispatch` según corresponda.
 
@@ -171,15 +175,15 @@ Para el estado auditable del riesgo Prisma/Windows y la evidencia CI consolidada
 
 ## CD parcial versionado sin deploy
 
-El repositorio incluye además un workflow controlado de build/publicación en:
+El repositorio incluye además un workflow controlado de build/publicación en el root hospedado:
 
-- `.github/workflows/build-and-publish.yml`
+- `../.github/workflows/build-and-publish.yml`
 
 Características del flujo:
 
 - se activa solo por tag `v*` o por `workflow_dispatch`
 - ejecuta `npm ci`, `npm run build` y `npm run verify` antes de empaquetar
-- el riesgo Prisma/Windows queda gobernado además por `windows-prisma-build.yml`, que ejecuta `npm ci` + `npm run build` en `windows-latest`
+- el riesgo Prisma/Windows queda gobernado además por `../.github/workflows/windows-prisma-build.yml`, que ejecuta `npm ci` + `npm run build` en `windows-latest`
 - construye una imagen Docker versionada
 - publica artefactos reproducibles en GitHub Actions mediante `upload-artifact`
 - no realiza despliegue automático a ningún ambiente
@@ -256,9 +260,10 @@ Flujo resumido:
 
 El archivo `.env.production.example` es parte explícita del baseline versionado y `npm run validate:production-baseline` falla si deja de estar presente.
 El baseline productivo versionado también exige `REDIS_URL` porque las browser sessions soportadas fuera de test usan Redis como store persistente.
+El validador puede cargar variables desde `.env.production`, desde otro archivo local indicado con `ENV_FILE`, o desde variables ya exportadas en el shell.
 
-1. copiar `.env.production.example` a `.env.production`
-2. ejecutar `npm run validate:production-baseline`
+1. copiar `.env.production.example` a `.env.production` y reemplazar placeholders, o crear un archivo local alterno como `.env.production.local`
+2. ejecutar `npm run validate:production-baseline` o `ENV_FILE=.env.production.local npm run validate:production-baseline`
 3. ejecutar `docker compose -f docker-compose.prod.yml build`
 4. ejecutar `docker compose -f docker-compose.prod.yml up -d db redis`
 5. ejecutar `docker compose -f docker-compose.prod.yml run --rm migrate`
@@ -324,7 +329,15 @@ npm.cmd run prisma:generate
 npx.cmd prisma migrate dev --name init
 ```
 
-Si Prisma falla de forma intermitente en Windows con errores tipo `EPERM`, locks sobre `query_engine-windows.dll.node` o problemas al regenerar el client, use el wrapper soportado del repositorio y esta mitigación local:
+Si Prisma falla de forma intermitente en Windows con errores tipo `EPERM`, locks sobre `query_engine-windows.dll.node` o problemas al regenerar el client, use el wrapper soportado del repositorio y esta mitigación local.
+
+Contrato actual del wrapper soportado:
+
+- `npm run build` y `npm run prisma:generate` usan `node scripts/prisma-generate-safe.js`
+- el wrapper soportado elimina archivos temporales stale `query_engine-windows.dll.node.tmp*` antes del generate y despues de un generate exitoso
+- ante clasificacion `windows_rename_lock`, el wrapper intenta hasta 2 reintentos acotados con demoras de `750ms` y `1500ms`
+- cada corrida deja un reporte local minimo en `logs/prisma-generate-last-run.json` con estado, clasificacion, intentos y demoras de retry para diagnostico reproducible
+- una pasada local exitosa mejora el diagnostico, pero la evidencia CI de Windows sigue siendo la evidencia primaria para cierre del baseline
 
 Resumen corto de mitigación local:
 
@@ -336,14 +349,17 @@ Resumen corto de mitigación local:
 npm.cmd run prisma:generate
 ```
 
-4. si persiste el lock, elimine el contenido temporal de `node_modules/.prisma/client` y vuelva a ejecutar `npm.cmd run prisma:generate`
-5. revise antivirus/Windows Defender/exclusiones si el DLL vuelve a quedar bloqueado
-6. solo despues reintente `npm run build`, migraciones o tests dependientes de Prisma
+4. inspeccione `logs/prisma-generate-last-run.json` para confirmar si la clasificacion fue `windows_rename_lock`, cuántos intentos ocurrieron y si quedaron archivos temporales reportados
+5. si el wrapper no logra resolver el lock por si mismo, elimine el contenido temporal de `node_modules/.prisma/client` y vuelva a ejecutar `npm.cmd run prisma:generate`
+6. revise antivirus/Windows Defender/exclusiones si el DLL vuelve a quedar bloqueado
+7. solo despues reintente `npm run build`, migraciones o tests dependientes de Prisma
 
 Importante:
 
 - esta guia reduce friccion local, pero no garantiza eliminar todas las causas ambientales del file-lock
-- el repositorio ahora versiona un gate dedicado en GitHub Actions: `.github/workflows/windows-prisma-build.yml`, enfocado en `npm ci` + `npm run build` sobre `windows-latest`
+- el baseline actual distingue entre cierre hospedado del workflow (`estabilizado con evidencia CI`) y baseline operativo local Windows (`residual gobernado` cuando el rename-lock reaparece)
+- el root hospedado del repositorio ahora versiona un gate dedicado en GitHub Actions: `../.github/workflows/windows-prisma-build.yml`, enfocado en `npm ci` + `npm run build` sobre `windows-latest`
+- una ejecucion local exitosa sigue siendo evidencia complementaria; para cierre del baseline, la jerarquia vigente sigue priorizando la evidencia CI de Windows
 - si el problema reaparece durante validaciones, documentelo como falla ambiental y no lo atribuya automaticamente al cambio funcional en curso
 
 ## Quality gates
@@ -454,6 +470,22 @@ Suites obligatorias actuales:
 - `tests/invoice-tenant-scope.test.js`
 - `tests/payment-tenant-scope.test.js`
 - `tests/client-document-security.test.js`
+
+Prerequisitos reproducibles del runner agregado:
+
+- `npm run test` usa `scripts/run-tests.js`
+- si no define overrides, el runner fuerza `NODE_ENV=test`
+- si no define overrides, el runner fuerza `BROWSER_SESSION_STORE_MODE=memory`
+- el lane Redis **no** vive dentro del agregado por defecto; ejecútelo aparte con `npm run test:redis-path`
+- las suites DB-backed environment-gated siguen separadas y requieren variables dedicadas como `P2_AUDIT_DATABASE_URL` o `P2_CONSTRAINTS_DATABASE_URL`
+- si fuerza `BROWSER_SESSION_STORE_MODE=redis` sin `REDIS_URL`, el runner ahora falla con guía accionable en vez de dejar un fallo opaco más tarde
+
+Comandos especiales por superficie:
+
+- lane agregado por defecto: `npm run test`
+- lane Redis browser-session: `npm run test:redis-path`
+- suite audit DB-backed: `node --test tests/audit-repository.test.js`
+- suite constraints DB-backed: `node --test tests/p2-hardening-constraints.test.js`
 
 Validación diagnóstica opcional separada del cierre P0 actual:
 

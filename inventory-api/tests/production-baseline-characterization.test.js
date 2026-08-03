@@ -35,6 +35,8 @@ test('production baseline documentation covers validation, migrations, health ch
   assert.match(docSource, /\.env\.production\.example/);
   assert.match(docSource, /REDIS_URL/);
   assert.match(docSource, /npm run validate:production-baseline/);
+  assert.match(docSource, /ENV_FILE=\.env\.production\.local npm run validate:production-baseline/);
+  assert.match(docSource, /cat > \.env\.production\.local/);
   assert.match(docSource, /npm run validate:restore-readiness/);
   assert.match(docSource, /npm run validate:operational-readiness/);
   assert.match(docSource, /docker compose -f docker-compose.prod.yml run --rm migrate/);
@@ -46,6 +48,7 @@ test('production baseline documentation covers validation, migrations, health ch
   assert.match(readmeSource, /production-baseline\.md/);
   assert.match(readmeSource, /REDIS_URL/);
   assert.match(readmeSource, /\.env\.production\.example/);
+  assert.match(readmeSource, /ENV_FILE=\.env\.production\.local npm run validate:production-baseline/);
 });
 
 test('validate-production-baseline passes with explicit production environment values', () => {
@@ -69,7 +72,7 @@ test('validate-production-baseline passes with explicit production environment v
   });
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /Production baseline validation passed/);
+  assert.match(result.stdout, /Production baseline validation passed using missing\.env\.production \(not found; relying on process environment\)\./);
 });
 
 test('validate-restore-readiness passes when restore contract evidence stays versioned', () => {

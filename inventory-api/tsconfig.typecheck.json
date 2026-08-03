@@ -51,10 +51,13 @@
     "src/public/root/ui.js",
     "src/public/root/companies-api.js",
     "src/public/root/roles-api.js",
+    "src/public/root/zones-api.js",
     "src/public/root/views/home.js",
     "src/public/root/views/in-process.js",
     "src/public/root/views/companies-admin.js",
-    "src/public/root/views/roles-admin.js"
+    "src/public/root/views/roles-admin.js",
+    "src/public/root/views/zones-admin.helpers.js",
+    "src/public/root/views/zones-admin.js"
   ],
   "exclude": [
     "node_modules",

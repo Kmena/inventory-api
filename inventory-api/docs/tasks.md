@@ -1,5 +1,236 @@
 # Tasks
 
+## TASK-051: Refresh architecture-facing docs after hotspot validation closure
+**Status:** Completed
+**Priority:** Low
+**Domain:** Repository/platform governance / Architecture documentation
+**Requirement:** `hotspot-seams-doc-ownership` TASK-008; FR-006; FR-007; FR-008
+**Reason:** After the validation matrix closed, the architecture-facing docs still needed to stop describing `TASK-008` as pending and reflect the current accepted baseline accurately.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, and `docs/audit/current-code-audit.md` now reflect that the governance baseline sync guardrails passed, coding-standard path alignment passed, lint/typecheck passed, and the aggregate suite passed with `BROWSER_SESSION_STORE_MODE=memory`, while keeping the pre-existing Windows Prisma `EPERM` rename-lock documented as a separate platform issue.
+**Implemented change:** Synchronized architecture-facing documentation to the post-`TASK-008` repository truth, updated the audit verdict and score, and removed stale wording that still treated the hotspot validation lane as open.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `docs/audit/current-code-audit.md`
+**Dependencies:** `TASK-050`
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance accuracy impact
+**Acceptance criteria:** Architecture-facing docs reflect the completed hotspot validation closure without redesigning the current layered monolith; the Windows Prisma instability remains documented as pre-existing platform debt rather than a feature regression.
+**Validation evidence:** user-supplied post-implementation results for `tests/governance-baseline-sync-guardrails.test.js`, `tests/coding-standard-path-alignment.test.js`, `npm run lint`, `npm run typecheck`, `set BROWSER_SESSION_STORE_MODE=memory && npm run test -- --silent`, and the rerun baseline audit (`7.4/10`, `Acceptable`, no regressions observed)
+**Required tests:** Preserve governance baseline sync, coding-standard path alignment, aggregate memory-session suite, and audit baseline refresh evidence.
+**Migration considerations:** Keep the docs aligned to the current memory-session aggregate baseline and do not reinterpret the Windows Prisma `EPERM` issue as application behavior.
+**Rollback or mitigation:** Revert documentation-only wording if a later verified validation run changes the accepted baseline.
+**Risk:** Low
+
+## TASK-050: Document auth/service/repository ownership for hotspot seams
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Repository/platform governance / Architecture documentation
+**Requirement:** `hotspot-seams-doc-ownership` TASK-007; FR-004; FR-005; FR-006
+**Reason:** After the seam extractions, the repository needed explicit architecture-facing documentation of what responsibility still belongs to auth, service, and repository layers.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/documentation-ownership-map.md` now describe concrete ownership examples for access-policy, inventory, agent-workspace, and product seams without redesigning the layered monolith.
+**Implemented change:** Documented the stable access-policy facade vs registry/actor-scope/audit seams, the focused service seams extracted from inventory, agent workspace, and product services, and the continued repository ownership of Prisma persistence boundaries; synchronized the feature spec architecture/domain analysis accordingly.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/documentation-ownership-map.md`, `specs/hotspot-seams-doc-ownership/architecture.md`, `specs/hotspot-seams-doc-ownership/domain-analysis.md`
+**Dependencies:** `TASK-049`, `TASK-048`, `TASK-047`, `TASK-046`, `TASK-045`
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium reviewability and governance impact
+**Acceptance criteria:** Auth, service, and repository ownership is explicit in architecture-facing docs using real repository examples; the documentation does not invent new layers or target-state redesign.
+**Validation evidence:** `node --test tests/documentation-ownership-governance.test.js tests/p36-doc-validator-ownership.test.js tests/workflow-baseline-characterization.test.js`; `npm run lint`; `npm run typecheck`
+**Required tests:** Preserve `tests/documentation-ownership-governance.test.js`, `tests/p36-doc-validator-ownership.test.js`, and workflow/doc governance coverage.
+**Migration considerations:** Keep the existing layered monolith description accurate; do not overstate seam extraction as a module rewrite.
+**Rollback or mitigation:** Revert documentation-only ownership wording if a statement overreaches the implemented code.
+**Risk:** Low
+
+## TASK-049: Consolidate canonical documentation ownership map
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Repository/platform governance / Documentation ownership
+**Requirement:** `hotspot-seams-doc-ownership` TASK-006; FR-003; FR-007
+**Reason:** The repository needed one explicit map for canonical, auxiliary, historical, and auto-validated artifacts across docs and workflows.
+**Current problem resolved:** `docs/documentation-ownership-map.md` now classifies documentation and workflow artifacts, including canonical architecture-facing docs, auxiliary `internal-docs/**`, compatibility bridges, and the current workflow source of truth under `../.github/workflows/**`.
+**Implemented change:** Added the ownership map, aligned architecture/current-state references to it, and introduced `tests/documentation-ownership-governance.test.js` as the focused guardrail for canonical workflow/documentation references.
+**Affected files:** `docs/documentation-ownership-map.md`, `docs/current-state.md`, `docs/architecture.md`, `tests/documentation-ownership-governance.test.js`
+**Dependencies:** `TASK-044`
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance drift-prevention impact
+**Acceptance criteria:** Canonical vs auxiliary vs historical vs auto-validated ownership is explicit; workflow authority does not contradict the implemented validator baseline.
+**Validation evidence:** `node --test tests/documentation-ownership-governance.test.js tests/p36-doc-validator-ownership.test.js tests/workflow-baseline-characterization.test.js`; `npm run validate:workflow-baseline`; `npm run lint`; `npm run typecheck`
+**Required tests:** Preserve documentation/workflow governance suites.
+**Migration considerations:** Keep `internal-docs/**` support-only unless a later approved change promotes an artifact.
+**Rollback or mitigation:** Revert the ownership map and doc references together if governance wording drifts from repository truth.
+**Risk:** Low
+
+## TASK-048: Extract focused product seams for permission shaping and pricing
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Product catalog
+**Requirement:** `hotspot-seams-doc-ownership` TASK-005; FR-002; FR-004; FR-007
+**Reason:** `src/services/product.service.js` mixed product CRUD/import orchestration with permission shaping and general-price synchronization concerns.
+**Current problem resolved:** Permission-aware shaping now lives in `src/services/product-permission-shaping.service.js` and general-price synchronization now lives in `src/services/product-pricing.service.js`, while `product.service.js` keeps the higher-level product/import workflow.
+**Implemented change:** Extracted permission-shaping and pricing seams, rewired `product.service.js` to consume them, and preserved inventory-linked initial-stock coordination behavior.
+**Affected files:** `src/services/product.service.js`, `src/services/product-permission-shaping.service.js`, `src/services/product-pricing.service.js`, related architecture-facing docs/spec files
+**Dependencies:** `TASK-044`
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium maintainability impact
+**Acceptance criteria:** Product permission shaping and price synchronization responsibilities are isolated without changing observable product API behavior.
+**Validation evidence:** `node --test tests/product-service-hotspot-characterization.test.js tests/product-delete-semantics.test.js tests/pagination.test.js`; `npm run lint`; `npm run typecheck`
+**Required tests:** Preserve product hotspot characterization and related product regression suites.
+**Migration considerations:** Keep `product.service.js` as the service facade; do not reinterpret this slice as a new module boundary.
+**Rollback or mitigation:** Revert extracted seams together with the service call-site wiring if regressions appear.
+**Risk:** Medium
+
+## TASK-047: Extract focused agent-workspace store-state and debt shaping seam
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Sales routing / agent workspace
+**Requirement:** `hotspot-seams-doc-ownership` TASK-004; FR-002; FR-004; FR-005; FR-007
+**Reason:** `src/services/agent-workspace.service.js` mixed actor scoping, route/store filtering, visit-state derivation, debt visibility rules, serialization, and order delegation.
+**Current problem resolved:** Store-state, visit-state, debt visibility, purchase-history shaping, and sorting now live in `src/services/agent-workspace-store-state.service.js`, while the main service keeps actor scoping and higher-level orchestration.
+**Implemented change:** Extracted the focused store-state seam, rewired the service to consume it, and preserved tenant-scope behavior and delegation to `order.service.js` / `inventory.service.js`.
+**Affected files:** `src/services/agent-workspace.service.js`, `src/services/agent-workspace-store-state.service.js`, related architecture-facing docs/spec files
+**Dependencies:** `TASK-044`
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium maintainability and reviewability impact
+**Acceptance criteria:** Tenant scope and agent eligibility remain unchanged while store-state and debt-shaping responsibilities are isolated into the extracted seam.
+**Validation evidence:** `node --test tests/agent-workspace-hotspot-characterization.test.js tests/agent-workspace-tenant-scope.test.js tests/agent-workspace-contract-characterization.test.js`; `npm run lint`; `npm run typecheck`
+**Required tests:** Preserve agent-workspace hotspot, tenant-scope, and contract characterization suites.
+**Migration considerations:** Keep the existing service facade and route contracts stable.
+**Rollback or mitigation:** Revert the extracted seam and service call-site wiring together if behavior drifts.
+**Risk:** Medium
+
+## TASK-046: Extract focused inventory-alert seam from inventory service
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Inventory
+**Requirement:** `hotspot-seams-doc-ownership` TASK-003; FR-002; FR-004; FR-007
+**Reason:** `src/services/inventory.service.js` mixed inventory-alert behavior with broader stock, lot, and transaction orchestration.
+**Current problem resolved:** Inventory-alert permission checks, serialization, transition validation, metadata merge behavior, and alert-focused audit coordination now live in `src/services/inventory-alerts.service.js`.
+**Implemented change:** Extracted the inventory-alert seam, rewired `inventory.service.js` to delegate alert behavior to it, and preserved existing transactional stock and lot behavior.
+**Affected files:** `src/services/inventory.service.js`, `src/services/inventory-alerts.service.js`, related architecture-facing docs/spec files
+**Dependencies:** `TASK-044`
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium maintainability impact
+**Acceptance criteria:** Alert behavior is isolated into a focused seam without changing current inventory API contracts or transaction semantics.
+**Validation evidence:** `node --test tests/inventory-service-hotspot-characterization.test.js tests/inventory-alerts-tenant-scope.test.js tests/audit-instrumentation.test.js`; `npm run lint`; `npm run typecheck`
+**Required tests:** Preserve inventory hotspot characterization, inventory-alert scope, and audit instrumentation coverage.
+**Migration considerations:** Keep transaction-sensitive stock and lot orchestration in `inventory.service.js` until a later approved slice.
+**Rollback or mitigation:** Revert the extracted seam and its call-site wiring together if inventory alert behavior changes unexpectedly.
+**Risk:** Medium
+
+## TASK-045: Split access-policy hotspot into facade, registry, actor-scope, and denial-audit seams
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Identity and access
+**Requirement:** `hotspot-seams-doc-ownership` TASK-002; FR-001; FR-005; FR-006; FR-007
+**Reason:** `src/security/access-policies.js` concentrated declarative policy data, actor-scope checks, denial-audit side effects, and guard composition in one file.
+**Current problem resolved:** Declarative registry data now lives in `src/security/access-policy-registry.js`, actor-scope logic in `src/security/access-policy-actor-scope.js`, and denial-audit behavior in `src/security/access-policy-audit.js`, while `src/security/access-policies.js` remains the stable facade.
+**Implemented change:** Extracted the new security seam files, preserved `authorizeAccessPolicy(...)`, `getAccessPolicy(...)`, and `listAccessPolicies(...)`, and kept current authorization behavior compatible.
+**Affected files:** `src/security/access-policies.js`, `src/security/access-policy-registry.js`, `src/security/access-policy-actor-scope.js`, `src/security/access-policy-audit.js`, related architecture-facing docs/spec files
+**Dependencies:** `TASK-044`
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Medium positive impact through clearer reviewability of authorization behavior
+**Acceptance criteria:** Route consumers keep the same access-policy facade contract while registry, actor-scope, and denial-audit responsibilities are isolated.
+**Validation evidence:** `node --test tests/access-policies.test.js tests/authorization-convergence-characterization.test.js`; `node --test tests/audit-instrumentation.test.js`; `npm run lint`; `npm run typecheck`
+**Required tests:** Preserve access-policy characterization and audit instrumentation suites.
+**Migration considerations:** Keep the facade path stable for route consumers.
+**Rollback or mitigation:** Revert facade and extracted seam files together if authorization compatibility regresses.
+**Risk:** Medium
+
+## TASK-044: Revalidate hotspot responsibilities and reusable seams before extraction
+**Status:** Completed
+**Priority:** Low
+**Domain:** Cross-cutting architecture hardening
+**Requirement:** `hotspot-seams-doc-ownership` TASK-001; FR-001; FR-002; FR-004
+**Reason:** Seam extraction needed to be grounded in real current responsibilities rather than speculative architecture.
+**Current problem resolved:** The feature now has an implementation record that ties each hotspot extraction to the actual mixed responsibilities observed in `access-policies.js`, `inventory.service.js`, `agent-workspace.service.js`, and `product.service.js`.
+**Implemented change:** Revalidated hotspot responsibilities and existing helper seams in the feature spec/report artifacts before and during implementation.
+**Affected files:** `specs/hotspot-seams-doc-ownership/implementation-report.md`, `specs/hotspot-seams-doc-ownership/tasks.md`, `specs/hotspot-seams-doc-ownership/traceability.md`, `specs/hotspot-seams-doc-ownership/changelog.md`
+**Dependencies:** None
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium planning integrity impact
+**Acceptance criteria:** Each hotspot has its current responsibilities enumerated and each extraction is tied to a real reusable seam.
+**Validation evidence:** `npm run lint`; `npm run typecheck`; `npm run validate:workflow-baseline`; manual hotspot responsibility review
+**Required tests:** Manual/spec review plus reuse of existing hotspot baselines.
+**Migration considerations:** Keep seam extraction incremental and evidence-based.
+**Rollback or mitigation:** Revert only spec/report changes if responsibility wording is found inaccurate.
+**Risk:** Low
+
+## TASK-042: Implement company-admin zones view in the supported root shell
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Embedded browser runtime / Geography administration
+**Requirement:** `zones-view`; company-admin root-shell module delivery over the existing regions contract
+**Reason:** The approved company-admin sidebar already exposed `Zonas`, but the route still resolved to the shared neutral `in_process` view and did not provide an implemented geography-management surface.
+**Current problem resolved:** `#zones` is now a functional company-admin route in the supported `/root/` shell, backed by `GET /api/regions/company`, `POST /api/regions/company`, and `POST /api/regions/company/:regionId/subregions`, with local in-memory search, create-zone/create-subzone modal flows, toast feedback, temporary subzone highlight, and mobile consecutive list/detail behavior.
+**Implemented change:** Added the root-shell zones API adapter and zones view modules, wired the route through the manifest/router/runtime validator, expanded the bounded browser-runtime typecheck allowlist to include the new files, refreshed root-shell characterization/governance coverage, and synchronized architecture-facing documentation to the implemented state. Later follow-up work under `quality-baseline-recovery` added small helper seams in `src/public/root/views/zones-admin.helpers.js` for selection/filter and dialog/form behavior, plus isolated characterization coverage in `tests/zones-view-selection-filters-characterization.test.js` and `tests/zones-view-dialog-feedback-characterization.test.js`, without changing the supported API or shell contract.
+**Affected files:** `scripts/validate-public-runtime.js`, `src/public/root/index.html`, `src/public/root/manifest.js`, `src/public/root/router.js`, `src/public/root/zones-api.js`, `src/public/root/views/zones-admin.helpers.js`, `src/public/root/views/zones-admin.js`, `src/public/styles.css`, `tests/public-surface-characterization.test.js`, `tests/root-shell-route-governance.test.js`, `tests/zones-view.e2e.js`, `tsconfig.typecheck.json`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `TASK-039` and `TASK-040` completed baseline
+**Database impact:** None
+**API impact:** None; reused existing region company endpoints and did not change backend contracts
+**Container impact:** None
+**Security impact:** Low direct impact; medium UX/traceability impact through a supported authenticated geography-management surface
+**Acceptance criteria:** `#zones` is reachable for company-admin users; the page loads data from the existing regions endpoints; zone/subzone search remains local in memory; create-zone and create-subzone flows succeed with inline error handling; mobile uses consecutive list/detail behavior; public-runtime validators and bounded tests reflect the new route.
+**Validation evidence:** `npm run lint:public-runtime`; `npm run typecheck`; `npm run validate:public-runtime`; `npm run lint`; `node --test tests/root-shell-route-governance.test.js tests/public-surface-characterization.test.js tests/zones-view.e2e.js`; `npm run build` ⚠️ pre-existing local Windows Prisma rename-lock `EPERM`; `node --test tests/zones-view-selection-filters-characterization.test.js`; `node --test tests/zones-view-dialog-feedback-characterization.test.js`; `node --test tests/zones-view.e2e.js`; `node --test tests/root-shell-route-governance.test.js`; `npm run validate:public-runtime`; `npm run typecheck`; `npm run lint:public-runtime`
+**Required tests:** Preserve `tests/root-shell-route-governance.test.js`, `tests/public-surface-characterization.test.js`, `tests/zones-view-selection-filters-characterization.test.js`, `tests/zones-view-dialog-feedback-characterization.test.js`, and `tests/zones-view.e2e.js` coverage for the supported `#zones` route.
+**Migration considerations:** Preserve the existing company-regions API contract and the current root-shell actor split; do not reinterpret the implemented view as a new backend geography module boundary.
+**Rollback or mitigation:** Revert the zones route wiring and view modules together if a supported-shell regression is detected, while preserving validator/test updates for diagnosis.
+**Risk:** Medium
+
+## TASK-043: Add isolated characterization for zones dialogs and feedback flows
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Embedded browser runtime / Root shell maintainability
+**Requirement:** `quality-baseline-recovery` TASK-005
+**Reason:** Selection/filter behavior had isolated coverage, but dialog lifecycle, inline errors, and toast feedback remained concentrated in `zones-admin.js`.
+**Current problem resolved:** `#zones` no longer depends only on integrated behavior for dialog open/close/reset, submit feedback, and inline error rendering; those behaviors now have focused characterization coverage.
+**Implemented change:** Added isolated characterization coverage for zone/subzone dialogs, success toast behavior, inline error rendering, and field-error handling without changing the supported UI contract. The implementation kept the existing DOM/API contract and extracted only small helper seams in `zones-admin.helpers.js` for `resetFormState`, `renderFormError`, and `setSubmitButtonState`.
+**Affected files:** `src/public/root/views/zones-admin.js`, `src/public/root/views/zones-admin.helpers.js`, `tests/zones-view-dialog-feedback-characterization.test.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `TASK-042` completed baseline
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium regression-prevention impact
+**Acceptance criteria:** Dialog open/close/reset, success feedback, inline error messaging, and field-error behavior are covered by isolated tests while `tests/zones-view.e2e.js` remains green.
+**Validation evidence:** `node --test tests/zones-view-dialog-feedback-characterization.test.js`; `node --test tests/zones-view.e2e.js`; `node --test tests/zones-view-selection-filters-characterization.test.js`; `node --test tests/root-shell-route-governance.test.js`; `npm run validate:public-runtime`; `npm run typecheck`; `npm run lint:public-runtime`
+**Required tests:** Preserve `tests/zones-view-dialog-feedback-characterization.test.js`, `tests/zones-view-selection-filters-characterization.test.js`, `tests/zones-view.e2e.js`, and `tests/root-shell-route-governance.test.js` coverage.
+**Migration considerations:** Preserve current DOM contract and API usage.
+**Rollback or mitigation:** Revert only the added seam/tests if they unintentionally alter supported UI behavior.
+**Risk:** Medium
+
+## TASK-041: Align coding-standards canonical path and compatibility governance
+**Status:** Completed
+**Priority:** Low
+**Domain:** Repository/platform governance / Documentation ownership
+**Requirement:** `coding-standard-doc-path-alignment`; FR-001; FR-002; FR-003; FR-004; FR-005; AC-001; AC-002; AC-003
+**Reason:** The repository needed one authoritative coding-standards path without leaving two independently maintained standards bodies.
+**Current problem resolved:** `docs/coding_standard.md` now holds the full standards body, the legacy hyphenated alias is only a compatibility notice, and repo-owned docs/tests/scripts are guarded against stale hyphenated-path references.
+**Implemented change:** Completed through `coding-standard-doc-path-alignment`; established `docs/coding_standard.md` as canonical, reduced the legacy hyphenated alias to a compatibility bridge, added `tests/coding-standard-path-alignment.test.js`, and refreshed spec evidence for the final path policy.
+**Affected files:** `docs/coding_standard.md`, legacy hyphenated coding-standards compatibility bridge, `tests/coding-standard-path-alignment.test.js`, `specs/coding-standard-doc-path-alignment/**`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
+**Dependencies:** None
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance and drift-prevention impact
+**Acceptance criteria:** `docs/coding_standard.md` remains the single authoritative standards body; the legacy hyphenated alias remains compatibility-only; a focused repository test fails if stale repo-owned hyphenated references or duplicate authoritative content reappear.
+**Validation evidence:** `node --test tests/coding-standard-path-alignment.test.js`; `node --test tests/workflow-baseline-characterization.test.js`; `npm run typecheck`; `npm run build` ⚠️ pre-existing local Windows Prisma rename-lock `EPERM`
+**Required tests:** Preserve `tests/coding-standard-path-alignment.test.js` and `tests/workflow-baseline-characterization.test.js` coverage for documentation-path governance.
+**Migration considerations:** Keep the compatibility bridge until remaining consumers no longer depend on the hyphenated path; do not restore a second full copy of the standards body.
+**Rollback or mitigation:** Revert only the documentation-path alignment slice if an external dependency unexpectedly requires temporary rollback, while keeping the path-governance evidence for diagnosis.
+**Risk:** Low
+
 ## TASK-040: Harden company-admin sidebar overflow behavior and regression coverage
 **Status:** Completed
 **Priority:** Medium
