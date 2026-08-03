@@ -18,9 +18,12 @@ Este documento define el baseline productivo **mínimo y verificable** soportado
 - `.github/workflows/operational-smoke.yml`
 
 ## Variables y secretos requeridos
-Copie `.env.production.example` a `.env.production` y reemplace todos los placeholders.
+Copie `.env.production.example` a `.env.production` y reemplace todos los placeholders, **o** genere un archivo local alterno y seleccione ese archivo con `ENV_FILE` al validar.
 
 `.env.production.example` es un artefacto versionado del baseline productivo y `npm run validate:production-baseline` confirma que siga presente en el repositorio.
+El validador acepta dos modos reproducibles para una corrida local desde clean checkout:
+- cargar variables desde un archivo local como `.env.production` o `.env.production.local` usando `ENV_FILE`;
+- exportar las variables requeridas directamente en el shell cuando no quiera materializar un archivo local persistente.
 
 Variables obligatorias del baseline:
 - `NODE_ENV=production`
@@ -44,10 +47,30 @@ Notas:
 Desde `inventory-api/`:
 
 ### 1. Validar configuración
+Opción A, usando `.env.production`:
 ```bash
 cp .env.production.example .env.production
 # editar .env.production
 npm run validate:production-baseline
+npm run validate:restore-readiness
+npm run validate:operational-readiness
+```
+
+Opción B, usando un archivo local reproducible sin tocar `.env.production`:
+```bash
+cat > .env.production.local <<'EOF'
+NODE_ENV=production
+PORT=2500
+POSTGRES_DB=tracksys
+POSTGRES_USER=tracksys
+POSTGRES_PASSWORD=local_validation_password_123
+DATABASE_URL=postgresql://tracksys:local_validation_password_123@db:5432/tracksys?schema=public
+CORS_ORIGIN=https://inventory.example.com
+APP_BASE_URL=https://inventory.example.com
+JWT_SECRET=local_validation_secret_1234567890abcd
+REDIS_URL=redis://redis:6379/0
+EOF
+ENV_FILE=.env.production.local npm run validate:production-baseline
 npm run validate:restore-readiness
 npm run validate:operational-readiness
 ```
@@ -118,6 +141,25 @@ npm run validate:restore-readiness
 npm run validate:operational-readiness
 docker compose -f docker-compose.prod.yml config
 docker build -t inventory-api:operational-smoke .
+```
+
+Si prefiere no mantener `.env.production` durante la validación documental local, puede usar la variante reproducible:
+
+```bash
+cat > .env.production.local <<'EOF'
+NODE_ENV=production
+PORT=2500
+POSTGRES_DB=tracksys
+POSTGRES_USER=tracksys
+POSTGRES_PASSWORD=local_validation_password_123
+DATABASE_URL=postgresql://tracksys:local_validation_password_123@db:5432/tracksys?schema=public
+CORS_ORIGIN=https://inventory.example.com
+APP_BASE_URL=https://inventory.example.com
+JWT_SECRET=local_validation_secret_1234567890abcd
+REDIS_URL=redis://redis:6379/0
+EOF
+ENV_FILE=.env.production.local npm run validate:production-baseline
+rm -f .env.production.local
 ```
 
 ## Cobertura operativa mínima del baseline

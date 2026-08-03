@@ -10,7 +10,9 @@ The repository remains a single-deployable Node.js 24 Express + Prisma modular m
 
 Current architecture has two important roots:
 - **application root:** `inventory-api/` contains runtime code, package scripts, Prisma assets, tests, specs, and docs;
-- **repository root:** `/.github/workflows/` contains the official hosted GitHub Actions automation entry point.
+- **repository root:** the parent-root `../.github/workflows/` directory relative to `inventory-api/` contains the official hosted GitHub Actions automation entry point.
+
+For governance tooling, `inventory-api/.github/workflows/` is not the current authoritative workflow source. The workflow-baseline validators and characterization tests intentionally read hosted workflow truth from that parent-root workflow tree.
 
 Within the browser runtime, the active public surface is intentionally constrained but now includes a supported actor-aware root SPA shell under `src/public/root/` served at `/root/`.
 
@@ -47,8 +49,8 @@ Current implemented style is layered, not hexagonal:
 - governance layer: scripts, tests, docs, specs, and GitHub Actions workflows
 
 A governance boundary also exists between:
-- root official workflows used by hosted GitHub Actions as the operational source of truth;
-- local validators and characterization tests that read the same root workflow tree directly.
+- parent-root official workflows used by hosted GitHub Actions as the operational source of truth;
+- local validators and characterization tests that read the same parent-root workflow tree directly from `../.github/workflows/` relative to `inventory-api/`.
 - the authoritative coding-standards body at `docs/coding_standard.md` and a legacy hyphenated compatibility notice kept only for lagging references.
 
 ## 4. Current domain map

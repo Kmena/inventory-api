@@ -3,6 +3,14 @@
 ## 1. Purpose
 This document defines the current repository policy for translating test evidence quality into mandatory GitHub Actions gates.
 
+## 1.1 Workflow ownership boundary
+For the current repository layout, the authoritative hosted workflow definitions live in the parent repository root under `../.github/workflows/` relative to `inventory-api/`.
+
+This means:
+- `inventory-api/.github/workflows/` is not the current authoritative workflow source;
+- local validators and characterization tests intentionally read workflow truth from the parent-root hosted repository; and
+- docs in `inventory-api/` must describe that parent-root ownership explicitly instead of implying that the app root owns the workflow files.
+
 It exists to close the P11 governance gap where a green aggregate suite could still mix:
 - strong evidence,
 - partial characterization,
@@ -56,7 +64,7 @@ Current examples:
 - Every critical control must map to a required workflow or to an explicit approved exception.
 
 ## 5. Repo-verifiable required-job baseline
-The current repository can prove the following expected required-job baseline from versioned root workflows and validators:
+The current repository can prove the following expected required-job baseline from versioned parent-root workflows and local validators:
 - `static-checks`
 - `contract-validations`
 - `repository-tests`

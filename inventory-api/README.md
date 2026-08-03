@@ -151,15 +151,19 @@ Ese artefacto resume:
 
 ## Quality gates versionados
 
-El repositorio versiona los siguientes workflows de baseline y gobernanza en GitHub Actions:
+Los workflows oficiales de baseline y gobernanza viven hoy en el **repository root hospedado**, un nivel por encima de `inventory-api/`, bajo `../.github/workflows/`.
 
-- `.github/workflows/static-checks.yml`
-- `.github/workflows/contract-validations.yml`
-- `.github/workflows/repository-tests.yml`
-- `.github/workflows/windows-prisma-build.yml`
-- `.github/workflows/browser-e2e.yml`
-- `.github/workflows/operational-smoke.yml`
-- `.github/workflows/build-and-publish.yml`
+Dentro de `inventory-api/`, el directorio `.github/workflows/` no es la fuente autoritativa actual; los validadores locales leen los workflows versionados desde el root hospedado padre.
+
+El baseline vigente depende de estos workflows del root hospedado:
+
+- `../.github/workflows/static-checks.yml`
+- `../.github/workflows/contract-validations.yml`
+- `../.github/workflows/repository-tests.yml`
+- `../.github/workflows/windows-prisma-build.yml`
+- `../.github/workflows/browser-e2e.yml`
+- `../.github/workflows/operational-smoke.yml`
+- `../.github/workflows/build-and-publish.yml`
 
 En conjunto cubren instalación, generación de Prisma, validaciones de contratos, test suite, browser E2E, smoke operativo y el gate dedicado de Prisma/Windows en `push`, `pull_request` y `workflow_dispatch` según corresponda.
 
@@ -171,9 +175,9 @@ Para el estado auditable del riesgo Prisma/Windows y la evidencia CI consolidada
 
 ## CD parcial versionado sin deploy
 
-El repositorio incluye además un workflow controlado de build/publicación en:
+El repositorio incluye además un workflow controlado de build/publicación en el root hospedado:
 
-- `.github/workflows/build-and-publish.yml`
+- `../.github/workflows/build-and-publish.yml`
 
 Características del flujo:
 
@@ -256,9 +260,10 @@ Flujo resumido:
 
 El archivo `.env.production.example` es parte explícita del baseline versionado y `npm run validate:production-baseline` falla si deja de estar presente.
 El baseline productivo versionado también exige `REDIS_URL` porque las browser sessions soportadas fuera de test usan Redis como store persistente.
+El validador puede cargar variables desde `.env.production`, desde otro archivo local indicado con `ENV_FILE`, o desde variables ya exportadas en el shell.
 
-1. copiar `.env.production.example` a `.env.production`
-2. ejecutar `npm run validate:production-baseline`
+1. copiar `.env.production.example` a `.env.production` y reemplazar placeholders, o crear un archivo local alterno como `.env.production.local`
+2. ejecutar `npm run validate:production-baseline` o `ENV_FILE=.env.production.local npm run validate:production-baseline`
 3. ejecutar `docker compose -f docker-compose.prod.yml build`
 4. ejecutar `docker compose -f docker-compose.prod.yml up -d db redis`
 5. ejecutar `docker compose -f docker-compose.prod.yml run --rm migrate`
@@ -343,7 +348,7 @@ npm.cmd run prisma:generate
 Importante:
 
 - esta guia reduce friccion local, pero no garantiza eliminar todas las causas ambientales del file-lock
-- el repositorio ahora versiona un gate dedicado en GitHub Actions: `.github/workflows/windows-prisma-build.yml`, enfocado en `npm ci` + `npm run build` sobre `windows-latest`
+- el root hospedado del repositorio ahora versiona un gate dedicado en GitHub Actions: `../.github/workflows/windows-prisma-build.yml`, enfocado en `npm ci` + `npm run build` sobre `windows-latest`
 - si el problema reaparece durante validaciones, documentelo como falla ambiental y no lo atribuya automaticamente al cambio funcional en curso
 
 ## Quality gates

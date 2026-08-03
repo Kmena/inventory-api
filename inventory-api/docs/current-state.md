@@ -22,12 +22,13 @@ Repository-governance state verified in this refresh:
 - `tests/governance-baseline-sync-guardrails.test.js` now acts as the focused documentation-sync guardrail for the selected post-`p34` governance statements only; it does not imply repository-wide documentation convergence;
 - `docs/permission-governance-decisions.md` now exists as an explainer for the completed `p10-permission-governance` analysis outputs, while the active runtime foundation lives in `src/security/permission-governance.config.js`, `src/security/role-bundles.config.js`, and `src/security/permission-governance.service.js`; `p30-company-role-governance-hardening` extended that foundation so company-role creation now rejects platform-scoped permissions such as `companies.manage` before persistence, and `p32-governance-denial-audit-visibility` added a dedicated service-level denial audit action for that denied path;
 - `internal-docs/**` remains auxiliary repository material only, while the in-scope runtime-contract governance validators now consume canonical `docs/**` artifacts and do not rely on auxiliary `internal-docs/**` runtime-contract copies for authority;
-- the repository keeps an explicit Redis-path validation lane through `npm run test:redis-path` and `.github/workflows/redis-browser-session-tests.yml`;
+- the repository keeps an explicit Redis-path validation lane through `npm run test:redis-path` and the parent-root hosted workflow `../.github/workflows/redis-browser-session-tests.yml` relative to `inventory-api/`;
 - `/health/ready` depends on both database readiness and browser-session-store readiness.
 
 ## 2. Repository structure
 High-signal paths verified in this refresh:
-- repository root: `.github/workflows/`, `inventory-api/`
+- repository root: parent-root `.github/workflows/` plus the `inventory-api/` application directory
+- authoritative hosted workflow location for local validators/tests: `../.github/workflows/` relative to `inventory-api/`; `inventory-api/.github/workflows/` is not the current authoritative workflow source
 - application root: `inventory-api/package.json`, `inventory-api/Dockerfile`, `inventory-api/src/`, `inventory-api/prisma/`, `inventory-api/scripts/`, `inventory-api/tests/`, `inventory-api/docs/`, `inventory-api/internal-docs/`, `inventory-api/README.md`
 - canonical coding-standards document: `inventory-api/docs/coding_standard.md`
 - compatibility bridge for older coding-standards references: legacy hyphenated coding-standards alias

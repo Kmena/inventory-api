@@ -19,6 +19,7 @@ In scope for the current plan:
 - preserve the implemented Zones shell flow over the existing company regions list/create and subregion-create endpoints
 - preserve `/migration.html?mode=post-login-transition` for non-wave-one browser profiles
 - keep docs, validators, tests, and runtime contracts aligned to the implemented public runtime
+- keep workflow-ownership wording aligned with the implemented validator/test baseline that reads hosted workflow truth from `../.github/workflows/` relative to `inventory-api/`
 - preserve `docs/coding_standard.md` as the canonical coding-standards document while allowing the legacy hyphenated alias to remain only as a compatibility bridge
 - keep the partial OpenAPI/typecheck coverage posture bounded to the selected governance-admin surfaces clarified by `p33`
 - keep `tests/governance-baseline-sync-guardrails.test.js` as the focused documentation-sync guardrail for the selected post-`p34` statements only, not as repository-wide documentation automation
@@ -88,6 +89,7 @@ Problems still open after `quality-baseline-recovery` `TASK-007` and `p38`:
 - metadata reconciliation for permission-governance sequencing is complete, and the former `p30-company-role-governance-hardening` plus `p32-governance-denial-audit-visibility` follow-up dependencies are now implemented for the current create-flow boundary
 - no runtime company-role update flow exists yet, so update hardening remains deferred until an actual update surface is approved
 - runtime-contract governance now converges on canonical `docs/**` artifacts for validator ownership, while `internal-docs/**` remains auxiliary support material only and other non-runtime-contract auxiliary consumers stay explicitly out of scope for this bounded slice
+- workflow governance wording must continue to reflect the actual repository boundary where hosted workflow truth lives in the parent-root `../.github/workflows/` tree relative to `inventory-api/`, not in an app-root-local workflow directory
 
 ## 6. Domains affected
 - Embedded browser runtime
