@@ -49,7 +49,7 @@ Current implemented style is layered, not hexagonal:
 A governance boundary also exists between:
 - root official workflows used by hosted GitHub Actions as the operational source of truth;
 - local validators and characterization tests that read the same root workflow tree directly.
-- the authoritative coding-standards body at `docs/coding_standard.md` and the compatibility notice kept at `docs/coding-standards.md` for lagging references.
+- the authoritative coding-standards body at `docs/coding_standard.md` and a legacy hyphenated compatibility notice kept only for lagging references.
 
 ## 4. Current domain map
 Observable current runtime/governance areas:
@@ -95,7 +95,7 @@ Observable current runtime/governance areas:
 - **Aggregate test runner**: `scripts/run-tests.js` discovers `.test.js` files, applies preferred ordering, forwards Node test arguments, and injects the default test-safe environment
 - **Public-runtime validator**: `scripts/validate-public-runtime.js` governs the supported public inventory, validates legacy relocation, and asserts login, migration, and root-shell contracts
 - **Runtime-contract artifacts**: canonical reviewed artifacts under `docs/**`, including the partial OpenAPI baseline and critical-contract matrix that now cover the selected governance-admin surfaces from `p34` (company listing/creation, root-company listing/creation, assignable-role-permission listing, and company-role listing/creation) clarified by `p33`; after `p36`, the in-scope legacy governance validator also consumes those canonical `docs/**` artifacts directly, while `internal-docs/**` remains auxiliary support material only
-- **Coding-standards documentation seam**: `docs/coding_standard.md` is the authoritative standards document, `docs/coding-standards.md` is a compatibility-only bridge, and `tests/coding-standard-path-alignment.test.js` guards that no second authoritative copy reappears in repo-owned docs/tests/scripts
+- **Coding-standards documentation seam**: `docs/coding_standard.md` is the authoritative standards document, the legacy hyphenated alias is compatibility-only, and `tests/coding-standard-path-alignment.test.js` guards that no second authoritative copy reappears in repo-owned docs/tests/scripts
 - **Workflow-baseline validator**: `scripts/validate-workflow-baseline.js` verifies the root hosted workflow contracts, including the dedicated Redis browser-session lane
 
 ## 6. Current dependency rules
@@ -150,6 +150,7 @@ Current public HTML/browser contract:
 - `#zones` is a company-admin shell surface backed by `/api/regions/company` and `/api/regions/company/:regionId/subregions`, with local in-memory search and server round-trips limited to load, refresh, and successful create actions
 - the remaining current company-admin sidebar routes render the shared neutral `in_process` view, with `#admin_home` as the default landing when no hash is present
 - no supported root-shell contract exists today for company edit/delete/detail, role update/delete, permission mutation, or user-role reassignment
+- no runtime company-role update flow currently exists, so update hardening remains deferred until an approved update surface is implemented
 - deprecated public HTML: `/root/*.html`, `/warehouse/*.html`, `/agent/*.html` -> same URL, no redirect, shared migration screen, HTTP `410 Gone`
 - preserved legacy files under `legacy-public-runtime/` are not an integration contract
 - login currently routes wave-one root-eligible users to `/root/` and keeps other retired-runtime-dependent profiles on `/migration.html?mode=post-login-transition`
@@ -353,7 +354,7 @@ Currently implemented or actively governing decisions:
 - intercept deprecated legacy HTML routes at the HTTP boundary and return `410 Gone` with the shared migration screen from the same URL
 - preserve the removed functional legacy runtime outside the active runtime in `legacy-public-runtime/`
 - keep reviewed canonical runtime-contract ownership under `docs/**` and treat `internal-docs/**` as auxiliary only
-- keep `docs/coding_standard.md` as the single authoritative coding-standards body and keep `docs/coding-standards.md` as a compatibility notice only
+- keep `docs/coding_standard.md` as the single authoritative coding-standards body and keep the legacy hyphenated alias as a compatibility notice only
 - keep the first stable permission-governance enforcement slice for `company.create` limited to global-root actors only
 - keep company-role governance incremental: deny platform-scoped permission assignment in company-role creation now, record that enforced deny through the dedicated service-level audit action, and leave broader sensitive combinations in `warn` posture until later approval
 - keep the bounded actor-scope convergence seam limited to company/company-role admin flows rather than broadening it into a repository-wide authorization redesign
@@ -367,7 +368,7 @@ Currently implemented or actively governing decisions:
 - layered architecture without strict hexagonal separation
 - broad service responsibilities
 - operational/readiness/browser governance still depends on synchronized docs, scripts, tests, manifest metadata, and workflows
-- the repository still carries a temporary compatibility bridge at `docs/coding-standards.md`; governance relies on maintainers not restoring a second full standards body there, with `tests/coding-standard-path-alignment.test.js` acting as the preventive guardrail
+- the repository still carries a temporary compatibility bridge at the legacy hyphenated coding-standards path; governance relies on maintainers not restoring a second full standards body there, with `tests/coding-standard-path-alignment.test.js` acting as the preventive guardrail
 - the root shell is still a bounded first wave implemented through ordered global scripts rather than a stronger module-loading boundary, even though its internal dependency contract is now contained through `window.RootShell` and guarded by dedicated modularity tests
 - root-shell navigation is local-manifest based and not yet centralized with any broader cross-role navigation model
 - the company-admin sidebar IA is richer than the currently implemented module set, because many visible entries still converge on the shared neutral `in_process` view

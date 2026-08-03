@@ -3,7 +3,7 @@
 ## 1. System overview
 `inventory-api/` is a single-deployable Node.js 24 Express + Prisma application with REST APIs and an embedded browser runtime served by the same Express process.
 
-Current browser/runtime and access-governance state verified from repository contents after `zones-view`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, together with `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `TASK-005`, `TASK-006`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, and `root-shell-follow-up-alignment`, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, and `p33-admin-authorization-governance-convergence`:
+Current browser/runtime and access-governance state verified from repository contents after `zones-view`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, together with `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `TASK-005`, `TASK-006`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, and `root-shell-follow-up-alignment`, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`:
 - the active public browser runtime under `src/public/` is intentionally small and now includes a supported root SPA shell entrypoint;
 - supported public HTML documents are `/`, `/index.html`, `/no-access.html`, `/migration.html`, and the root shell entrypoint at `/root/` backed by `src/public/root/index.html`;
 - the supported `/root/` shell now has two observable actor variants: global `root` users keep the existing top navigation, while `admin` users with `companyId` receive a rebranded administrative sidebar shell with explicit hash routes for visible menu items;
@@ -17,7 +17,7 @@ The backend JSON API, Prisma persistence, browser-session cookie model, health/r
 Repository-governance state verified in this refresh:
 - `scripts/run-tests.js` is the official aggregate test runner behind `npm run test`;
 - canonical runtime-contract governance lives under `docs/**`;
-- `docs/coding_standard.md` is now the canonical coding-standards body, while `docs/coding-standards.md` remains only as a compatibility bridge for older references;
+- `docs/coding_standard.md` is now the canonical coding-standards body, while the legacy hyphenated alias remains only as a compatibility bridge for older references;
 - bounded evidence for the `p33` admin-governance seam now also covers `src/security/access-policies.js` in typecheck and keeps the reviewed partial OpenAPI/matrix focused on the selected governance-admin endpoints only;
 - `tests/governance-baseline-sync-guardrails.test.js` now acts as the focused documentation-sync guardrail for the selected post-`p34` governance statements only; it does not imply repository-wide documentation convergence;
 - `docs/permission-governance-decisions.md` now exists as an explainer for the completed `p10-permission-governance` analysis outputs, while the active runtime foundation lives in `src/security/permission-governance.config.js`, `src/security/role-bundles.config.js`, and `src/security/permission-governance.service.js`; `p30-company-role-governance-hardening` extended that foundation so company-role creation now rejects platform-scoped permissions such as `companies.manage` before persistence, and `p32-governance-denial-audit-visibility` added a dedicated service-level denial audit action for that denied path;
@@ -30,7 +30,7 @@ High-signal paths verified in this refresh:
 - repository root: `.github/workflows/`, `inventory-api/`
 - application root: `inventory-api/package.json`, `inventory-api/Dockerfile`, `inventory-api/src/`, `inventory-api/prisma/`, `inventory-api/scripts/`, `inventory-api/tests/`, `inventory-api/docs/`, `inventory-api/internal-docs/`, `inventory-api/README.md`
 - canonical coding-standards document: `inventory-api/docs/coding_standard.md`
-- compatibility bridge for older coding-standards references: `inventory-api/docs/coding-standards.md`
+- compatibility bridge for older coding-standards references: legacy hyphenated coding-standards alias
 - active public runtime: `inventory-api/src/public/`
 - preserved but inactive legacy browser inventory: `inventory-api/legacy-public-runtime/`
 
@@ -292,7 +292,7 @@ The active permission-governance foundation now also relies on:
 
 The current documentation-path governance for coding standards now also relies on:
 - `docs/coding_standard.md` as the authoritative standards body
-- `docs/coding-standards.md` as a compatibility notice only
+- the legacy hyphenated coding-standards alias as a compatibility notice only
 - `tests/coding-standard-path-alignment.test.js`
 
 Additional requester-supplied validation evidence for `coding-standard-doc-path-alignment`:
@@ -477,7 +477,7 @@ Note on current static analysis scope:
 - Company-admin sidebar behavior in `src/public/root/app.js` currently includes hardcoded group identifiers and UI-state assumptions (`inventory-group`, `sales-group`, route-specific checks), which is workable but brittle for future menu expansion even after layout ownership was normalized.
 - The zones screen is still implemented as plain-script DOM orchestration in `src/public/root/views/zones-admin.js` and `zones-admin.helpers.js`; behavior is now covered by E2E plus isolated selection/filter and dialog/feedback characterization tests, but the view remains large and UI-stateful rather than decomposed into smaller modules.
 - The browser-runtime `typecheck` baseline now includes the approved root-shell files through an explicit allowlist rather than a broad `src/public/**` expansion.
-- A temporary compatibility bridge still exists at `docs/coding-standards.md`; the authoritative coding-standards content now lives only at `docs/coding_standard.md` and drift is guarded by `tests/coding-standard-path-alignment.test.js`.
+- A temporary compatibility bridge still exists at the legacy hyphenated coding-standards path; the authoritative coding-standards content now lives only at `docs/coding_standard.md` and drift is guarded by `tests/coding-standard-path-alignment.test.js`.
 - `legacy-public-runtime/` remains in-repo as transitional backup/reference debt until equivalent SPA functionality is implemented and validated.
 
 ## 16. Security risks

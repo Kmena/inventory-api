@@ -48,15 +48,15 @@
 **Domain:** Repository/platform governance / Documentation ownership
 **Requirement:** `coding-standard-doc-path-alignment`; FR-001; FR-002; FR-003; FR-004; FR-005; AC-001; AC-002; AC-003
 **Reason:** The repository needed one authoritative coding-standards path without leaving two independently maintained standards bodies.
-**Current problem resolved:** `docs/coding_standard.md` now holds the full standards body, `docs/coding-standards.md` is only a compatibility notice, and repo-owned docs/tests/scripts are guarded against stale hyphenated-path references.
-**Implemented change:** Completed through `coding-standard-doc-path-alignment`; established `docs/coding_standard.md` as canonical, reduced `docs/coding-standards.md` to a compatibility bridge, added `tests/coding-standard-path-alignment.test.js`, and refreshed spec evidence for the final path policy.
-**Affected files:** `docs/coding_standard.md`, `docs/coding-standards.md`, `tests/coding-standard-path-alignment.test.js`, `specs/coding-standard-doc-path-alignment/**`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
+**Current problem resolved:** `docs/coding_standard.md` now holds the full standards body, the legacy hyphenated alias is only a compatibility notice, and repo-owned docs/tests/scripts are guarded against stale hyphenated-path references.
+**Implemented change:** Completed through `coding-standard-doc-path-alignment`; established `docs/coding_standard.md` as canonical, reduced the legacy hyphenated alias to a compatibility bridge, added `tests/coding-standard-path-alignment.test.js`, and refreshed spec evidence for the final path policy.
+**Affected files:** `docs/coding_standard.md`, legacy hyphenated coding-standards compatibility bridge, `tests/coding-standard-path-alignment.test.js`, `specs/coding-standard-doc-path-alignment/**`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
 **Dependencies:** None
 **Database impact:** None
 **API impact:** None
 **Container impact:** None
 **Security impact:** Low direct impact; medium governance and drift-prevention impact
-**Acceptance criteria:** `docs/coding_standard.md` remains the single authoritative standards body; `docs/coding-standards.md` remains compatibility-only; a focused repository test fails if stale repo-owned hyphenated references or duplicate authoritative content reappear.
+**Acceptance criteria:** `docs/coding_standard.md` remains the single authoritative standards body; the legacy hyphenated alias remains compatibility-only; a focused repository test fails if stale repo-owned hyphenated references or duplicate authoritative content reappear.
 **Validation evidence:** `node --test tests/coding-standard-path-alignment.test.js`; `node --test tests/workflow-baseline-characterization.test.js`; `npm run typecheck`; `npm run build` ⚠️ pre-existing local Windows Prisma rename-lock `EPERM`
 **Required tests:** Preserve `tests/coding-standard-path-alignment.test.js` and `tests/workflow-baseline-characterization.test.js` coverage for documentation-path governance.
 **Migration considerations:** Keep the compatibility bridge until remaining consumers no longer depend on the hyphenated path; do not restore a second full copy of the standards body.
