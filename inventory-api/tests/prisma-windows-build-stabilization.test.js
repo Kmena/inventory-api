@@ -79,6 +79,7 @@ test('wrapper performs bounded cleanup and retry before succeeding on a retryabl
   const warnings = [];
   const sleepCalls = [];
   const cleanupStages = [];
+  const diagnosticsReports = [];
   const runResults = [
     { status: 1, stdout: '', stderr: 'EPERM rename query_engine-windows.dll.node.tmp1234' },
     { status: 0, stdout: '', stderr: '' },
@@ -112,6 +113,10 @@ test('wrapper performs bounded cleanup and retry before succeeding on a retryabl
       failWithActionableGuidance: () => {
         throw new Error('failWithActionableGuidance should not be reached in retry success path');
       },
+      writePrismaGenerateDiagnostics: (outputPath, diagnostics) => {
+        diagnosticsReports.push({ outputPath, diagnostics });
+        return outputPath;
+      },
     },
   });
 
@@ -124,6 +129,49 @@ test('wrapper performs bounded cleanup and retry before succeeding on a retryabl
   ]);
   assert.match(warnings[0], /Removed 1 stale Prisma Windows engine temp file\(s\) before generate/);
   assert.match(warnings[1], /Cleaning and retrying \(attempt 1 of 2\) after 750ms/);
+  assert.equal(diagnosticsReports.length, 1);
+  assert.equal(diagnosticsReports[0].diagnostics.status, 'success');
+  assert.deepEqual(diagnosticsReports[0].diagnostics.retryDelayMs, [750]);
+  assert.equal(diagnosticsReports[0].diagnostics.attemptNumber, 2);
+});
+
+test('wrapper writes a local diagnostics report for failing Windows runs before preserving the real exit path', () => {
+  const diagnosticsReports = [];
+  const failCalls = [];
+
+  wrapperLibrary.executePrismaGenerateWithWindowsStabilization({
+    platform: 'win32',
+    projectRoot: applicationRoot,
+    prismaCliEntrypoint: 'prisma/build/index.js',
+    prismaClientDirectory: path.join(applicationRoot, 'node_modules', '.prisma', 'client'),
+    env: {},
+    hooks: {
+      cleanupTempFiles: () => 0,
+      warn: () => {},
+      sleep: () => {},
+      runPrismaGenerate: () => ({ status: 1, stdout: '', stderr: 'EPERM rename query_engine-windows.dll.node.tmp1234' }),
+      classifyPrismaGenerateFailure: () => ({
+        kind: 'windows_rename_lock',
+        retryable: false,
+        tempFilesAfterFailure: ['query_engine-windows.dll.node.tmp1234'],
+        combinedOutput: 'EPERM',
+      }),
+      writePrismaGenerateDiagnostics: (outputPath, diagnostics) => {
+        diagnosticsReports.push({ outputPath, diagnostics });
+        return outputPath;
+      },
+      failWithActionableGuidance: (_result, attemptNumber, failure, reportPath) => {
+        failCalls.push({ attemptNumber, failure, reportPath });
+      },
+    },
+  });
+
+  assert.equal(diagnosticsReports.length, 1);
+  assert.equal(diagnosticsReports[0].diagnostics.status, 'failure');
+  assert.equal(diagnosticsReports[0].diagnostics.classification, 'windows_rename_lock');
+  assert.equal(failCalls.length, 1);
+  assert.equal(failCalls[0].attemptNumber, 1);
+  assert.equal(failCalls[0].reportPath, diagnosticsReports[0].outputPath);
 });
 
 test('Prisma Windows stability evidence distinguishes primary CI closure evidence from complementary local diagnostics', () => {
@@ -137,8 +185,11 @@ test('Prisma Windows stability evidence distinguishes primary CI closure evidenc
   assert.match(evidenceSource, /Complementary evidence/);
   assert.match(evidenceSource, /local developer runs/);
   assert.match(evidenceSource, /do not on their own overturn a CI-based closeout verdict/);
+  assert.match(evidenceSource, /Local Windows operating status:\*\*?\s*`residual gobernado`/i);
+  assert.match(evidenceSource, /does not identify which local process is actually holding the Prisma engine file lock/i);
   assert.match(evidenceSource, /up to 2 bounded retries/i);
   assert.match(readmeSource, /wrapper soportado elimina archivos temporales stale/i);
   assert.match(readmeSource, /hasta 2 reintentos acotados/i);
+  assert.match(readmeSource, /logs\/prisma-generate-last-run\.json/i);
   assert.match(readmeSource, /evidencia CI de Windows sigue siendo la evidencia primaria/i);
 });

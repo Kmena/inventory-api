@@ -56,6 +56,14 @@ The current local wrapper baseline is intentionally bounded:
 - retryable `windows_rename_lock` handling is limited to **up to 2 bounded retries**;
 - the current bounded retry delays are `750ms` and `1500ms`;
 - if the bounded retries do not recover the build, the wrapper must still preserve the real failure exit and emit actionable local guidance.
+- each guarded local run may persist a minimal diagnostics report at `logs/prisma-generate-last-run.json` so developers can inspect the latest local classification, attempt count, retry delays, and temp-file evidence without re-parsing the console manually.
+
+## 5.2 Diagnostic gaps still open
+Even with the bounded wrapper and the hosted workflow evidence, the repository still treats the following Windows/Prisma gaps as active residual diagnostic debt:
+- the wrapper can classify `windows_rename_lock`, but it does not identify which local process is actually holding the Prisma engine file lock;
+- the wrapper now persists a minimal local diagnostics report, but it still does not capture richer process-attribution evidence beyond the latest structured run summary and emitted console/log output;
+- the hosted Windows workflow proves the guarded CI lane is stable, but it does not prove that every developer-local Windows environment is equally stable under antivirus, shell, or background-process variation;
+- a local `windows_rename_lock` failure therefore remains a governed residual operating risk until a later slice either isolates the root cause further or reduces recurrence with stronger reproducible evidence.
 
 ## 6. Real CI evidence gathered
 
@@ -76,6 +84,13 @@ The current local wrapper baseline is intentionally bounded:
 
 ### Baseline interpretation during local remediation
 A local Windows `npm run build` failure classified as `windows_rename_lock` remains important diagnostic input for remediation work and must be recorded in implementation reports when it occurs. A local success after stale-temp cleanup or bounded retries is also useful diagnostic evidence. However, by policy both remain complementary evidence only and do not on their own overturn a CI-based closeout verdict unless the same closeout cycle also records new primary CI Windows failure evidence.
+
+### Dual-status interpretation now in force
+The repository now treats Windows/Prisma stability as two related but distinct status lines:
+- **Hosted closeout status:** `estabilizado con evidencia CI` when the approved workflow criterion remains satisfied.
+- **Local Windows operating status:** `residual gobernado` whenever developer-local runs can still reproduce `windows_rename_lock`, even if CI remains green.
+
+This dual-status interpretation is intentional. It prevents the repository from overstating universal Windows stability while still preserving the value of the hosted CI closeout evidence.
 
 ### Why the criterion is now considered satisfied
 The repository now has:

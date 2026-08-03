@@ -336,6 +336,7 @@ Contrato actual del wrapper soportado:
 - `npm run build` y `npm run prisma:generate` usan `node scripts/prisma-generate-safe.js`
 - el wrapper soportado elimina archivos temporales stale `query_engine-windows.dll.node.tmp*` antes del generate y despues de un generate exitoso
 - ante clasificacion `windows_rename_lock`, el wrapper intenta hasta 2 reintentos acotados con demoras de `750ms` y `1500ms`
+- cada corrida deja un reporte local minimo en `logs/prisma-generate-last-run.json` con estado, clasificacion, intentos y demoras de retry para diagnostico reproducible
 - una pasada local exitosa mejora el diagnostico, pero la evidencia CI de Windows sigue siendo la evidencia primaria para cierre del baseline
 
 Resumen corto de mitigación local:
@@ -348,13 +349,15 @@ Resumen corto de mitigación local:
 npm.cmd run prisma:generate
 ```
 
-4. si el wrapper no logra resolver el lock por si mismo, elimine el contenido temporal de `node_modules/.prisma/client` y vuelva a ejecutar `npm.cmd run prisma:generate`
-5. revise antivirus/Windows Defender/exclusiones si el DLL vuelve a quedar bloqueado
-6. solo despues reintente `npm run build`, migraciones o tests dependientes de Prisma
+4. inspeccione `logs/prisma-generate-last-run.json` para confirmar si la clasificacion fue `windows_rename_lock`, cuántos intentos ocurrieron y si quedaron archivos temporales reportados
+5. si el wrapper no logra resolver el lock por si mismo, elimine el contenido temporal de `node_modules/.prisma/client` y vuelva a ejecutar `npm.cmd run prisma:generate`
+6. revise antivirus/Windows Defender/exclusiones si el DLL vuelve a quedar bloqueado
+7. solo despues reintente `npm run build`, migraciones o tests dependientes de Prisma
 
 Importante:
 
 - esta guia reduce friccion local, pero no garantiza eliminar todas las causas ambientales del file-lock
+- el baseline actual distingue entre cierre hospedado del workflow (`estabilizado con evidencia CI`) y baseline operativo local Windows (`residual gobernado` cuando el rename-lock reaparece)
 - el root hospedado del repositorio ahora versiona un gate dedicado en GitHub Actions: `../.github/workflows/windows-prisma-build.yml`, enfocado en `npm ci` + `npm run build` sobre `windows-latest`
 - una ejecucion local exitosa sigue siendo evidencia complementaria; para cierre del baseline, la jerarquia vigente sigue priorizando la evidencia CI de Windows
 - si el problema reaparece durante validaciones, documentelo como falla ambiental y no lo atribuya automaticamente al cambio funcional en curso
