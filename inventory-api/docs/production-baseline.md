@@ -4,6 +4,8 @@
 Este documento define el baseline productivo **mínimo y verificable** soportado por el repositorio. No afirma una plataforma cloud completa ni una postura final de hardening; documenta el flujo realmente versionado.
 
 ## Artefactos versionados
+Los artefactos viven entre `inventory-api/` y el root hospedado padre. Para este baseline, el workflow oficial no vive dentro de `inventory-api/.github/workflows/`.
+
 - `Dockerfile`
 - `docker-compose.prod.yml`
 - `.env.production.example`
@@ -15,7 +17,7 @@ Este documento define el baseline productivo **mínimo y verificable** soportado
 - `docs/restore-readiness-baseline.md`
 - `src/routes/health.routes.js`
 - `prisma/schema.prisma`
-- `.github/workflows/operational-smoke.yml`
+- `../.github/workflows/operational-smoke.yml`
 
 ## Variables y secretos requeridos
 Copie `.env.production.example` a `.env.production` y reemplace todos los placeholders, **o** genere un archivo local alterno y seleccione ese archivo con `ENV_FILE` al validar.
@@ -107,9 +109,9 @@ curl http://localhost:${PORT:-2500}/health/ready
 ```
 
 ## Workflow operativo versionado
-El repositorio ahora incluye además un smoke workflow explícito en:
+El repositorio ahora incluye además un smoke workflow explícito en el root hospedado padre relativo a `inventory-api/`:
 
-- `.github/workflows/operational-smoke.yml`
+- `../.github/workflows/operational-smoke.yml`
 
 Alcance del workflow:
 - `npm ci`
@@ -196,9 +198,9 @@ rm -f .env.production.local
 
 ## Build/publicación controlada sin deploy
 
-El repositorio también versiona un flujo parcial de release en:
+El repositorio también versiona un flujo parcial de release en el root hospedado padre relativo a `inventory-api/`:
 
-- `.github/workflows/build-and-publish.yml`
+- `../.github/workflows/build-and-publish.yml`
 
 Alcance explícito del workflow:
 - trigger por tag `v*` o `workflow_dispatch`

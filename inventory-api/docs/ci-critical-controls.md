@@ -11,6 +11,9 @@ This means:
 - local validators and characterization tests intentionally read workflow truth from the parent-root hosted repository; and
 - docs in `inventory-api/` must describe that parent-root ownership explicitly instead of implying that the app root owns the workflow files.
 
+Operational rule:
+- when parent-root workflow files are absent from a local checkout, validator failures must point maintainers back to `../.github/workflows/` ownership instead of implying that app-root workflow YAML is missing by mistake.
+
 It exists to close the P11 governance gap where a green aggregate suite could still mix:
 - strong evidence,
 - partial characterization,

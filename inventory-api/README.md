@@ -183,7 +183,7 @@ Características del flujo:
 
 - se activa solo por tag `v*` o por `workflow_dispatch`
 - ejecuta `npm ci`, `npm run build` y `npm run verify` antes de empaquetar
-- el riesgo Prisma/Windows queda gobernado además por `windows-prisma-build.yml`, que ejecuta `npm ci` + `npm run build` en `windows-latest`
+- el riesgo Prisma/Windows queda gobernado además por `../.github/workflows/windows-prisma-build.yml`, que ejecuta `npm ci` + `npm run build` en `windows-latest`
 - construye una imagen Docker versionada
 - publica artefactos reproducibles en GitHub Actions mediante `upload-artifact`
 - no realiza despliegue automático a ningún ambiente
@@ -329,7 +329,14 @@ npm.cmd run prisma:generate
 npx.cmd prisma migrate dev --name init
 ```
 
-Si Prisma falla de forma intermitente en Windows con errores tipo `EPERM`, locks sobre `query_engine-windows.dll.node` o problemas al regenerar el client, use el wrapper soportado del repositorio y esta mitigación local:
+Si Prisma falla de forma intermitente en Windows con errores tipo `EPERM`, locks sobre `query_engine-windows.dll.node` o problemas al regenerar el client, use el wrapper soportado del repositorio y esta mitigación local.
+
+Contrato actual del wrapper soportado:
+
+- `npm run build` y `npm run prisma:generate` usan `node scripts/prisma-generate-safe.js`
+- el wrapper soportado elimina archivos temporales stale `query_engine-windows.dll.node.tmp*` antes del generate y despues de un generate exitoso
+- ante clasificacion `windows_rename_lock`, el wrapper intenta hasta 2 reintentos acotados con demoras de `750ms` y `1500ms`
+- una pasada local exitosa mejora el diagnostico, pero la evidencia CI de Windows sigue siendo la evidencia primaria para cierre del baseline
 
 Resumen corto de mitigación local:
 
@@ -341,7 +348,7 @@ Resumen corto de mitigación local:
 npm.cmd run prisma:generate
 ```
 
-4. si persiste el lock, elimine el contenido temporal de `node_modules/.prisma/client` y vuelva a ejecutar `npm.cmd run prisma:generate`
+4. si el wrapper no logra resolver el lock por si mismo, elimine el contenido temporal de `node_modules/.prisma/client` y vuelva a ejecutar `npm.cmd run prisma:generate`
 5. revise antivirus/Windows Defender/exclusiones si el DLL vuelve a quedar bloqueado
 6. solo despues reintente `npm run build`, migraciones o tests dependientes de Prisma
 
@@ -349,6 +356,7 @@ Importante:
 
 - esta guia reduce friccion local, pero no garantiza eliminar todas las causas ambientales del file-lock
 - el root hospedado del repositorio ahora versiona un gate dedicado en GitHub Actions: `../.github/workflows/windows-prisma-build.yml`, enfocado en `npm ci` + `npm run build` sobre `windows-latest`
+- una ejecucion local exitosa sigue siendo evidencia complementaria; para cierre del baseline, la jerarquia vigente sigue priorizando la evidencia CI de Windows
 - si el problema reaparece durante validaciones, documentelo como falla ambiental y no lo atribuya automaticamente al cambio funcional en curso
 
 ## Quality gates
@@ -459,6 +467,22 @@ Suites obligatorias actuales:
 - `tests/invoice-tenant-scope.test.js`
 - `tests/payment-tenant-scope.test.js`
 - `tests/client-document-security.test.js`
+
+Prerequisitos reproducibles del runner agregado:
+
+- `npm run test` usa `scripts/run-tests.js`
+- si no define overrides, el runner fuerza `NODE_ENV=test`
+- si no define overrides, el runner fuerza `BROWSER_SESSION_STORE_MODE=memory`
+- el lane Redis **no** vive dentro del agregado por defecto; ejecútelo aparte con `npm run test:redis-path`
+- las suites DB-backed environment-gated siguen separadas y requieren variables dedicadas como `P2_AUDIT_DATABASE_URL` o `P2_CONSTRAINTS_DATABASE_URL`
+- si fuerza `BROWSER_SESSION_STORE_MODE=redis` sin `REDIS_URL`, el runner ahora falla con guía accionable en vez de dejar un fallo opaco más tarde
+
+Comandos especiales por superficie:
+
+- lane agregado por defecto: `npm run test`
+- lane Redis browser-session: `npm run test:redis-path`
+- suite audit DB-backed: `node --test tests/audit-repository.test.js`
+- suite constraints DB-backed: `node --test tests/p2-hardening-constraints.test.js`
 
 Validación diagnóstica opcional separada del cierre P0 actual:
 

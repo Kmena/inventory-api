@@ -5,6 +5,7 @@ const repositoryRoot = path.join(__dirname, '..');
 const runbookPath = path.join(repositoryRoot, 'docs', 'production-operations-runbook.md');
 const productionBaselinePath = path.join(repositoryRoot, 'docs', 'production-baseline.md');
 const workflowPath = path.join(repositoryRoot, '..', '.github', 'workflows', 'operational-smoke.yml');
+const localWorkflowDirectory = path.join(repositoryRoot, '.github', 'workflows');
 const loggingPath = path.join(repositoryRoot, 'src', 'lib', 'logging.js');
 const requestContextPath = path.join(repositoryRoot, 'src', 'lib', 'request-context.js');
 
@@ -18,12 +19,25 @@ function assertPattern(source, pattern, message, failures) {
   }
 }
 
+function formatWorkflowOwnershipGuidance() {
+  return [
+    `Authoritative operational workflow is expected at: ${path.relative(repositoryRoot, workflowPath)}`,
+    `Application-local workflow directory is not authoritative today: ${path.relative(repositoryRoot, localWorkflowDirectory)}`,
+    'If the parent-root operational workflow is absent, run this validator from the hosted repository checkout that contains ../.github/workflows/ or restore the approved parent-root workflow baseline before treating the result as repository drift.',
+  ].join('\n');
+}
+
 function main() {
   const failures = [];
 
   for (const requiredPath of [runbookPath, productionBaselinePath, workflowPath, loggingPath, requestContextPath]) {
     if (!fs.existsSync(requiredPath)) {
-      failures.push(`Missing required operational readiness file: ${path.relative(repositoryRoot, requiredPath)}`);
+      const missingPathMessage = `Missing required operational readiness file: ${path.relative(repositoryRoot, requiredPath)}`;
+      if (requiredPath === workflowPath) {
+        failures.push(`${missingPathMessage}\n${formatWorkflowOwnershipGuidance()}`);
+      } else {
+        failures.push(missingPathMessage);
+      }
     }
   }
 
@@ -72,4 +86,7 @@ if (require.main === module) {
 
 module.exports = {
   main,
+  formatWorkflowOwnershipGuidance,
+  localWorkflowDirectory,
+  workflowPath,
 };

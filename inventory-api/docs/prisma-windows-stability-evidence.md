@@ -49,6 +49,14 @@ When the guarded build fails, the repository uses the following diagnostic state
 
 The wrapper remains responsible for explicit retryable vs non-retryable Prisma classification. The workflow closeout layer is responsible for preserving the real build exit code while publishing auditable evidence.
 
+## 5.1 Local wrapper contract under governance
+The current local wrapper baseline is intentionally bounded:
+- `inventory-api/scripts/prisma-generate-safe.js` remains the only supported Prisma generate wrapper for `npm run build` and `npm run prisma:generate`;
+- stale `query_engine-windows.dll.node.tmp*` files are removed before the initial generate attempt and after a successful generate;
+- retryable `windows_rename_lock` handling is limited to **up to 2 bounded retries**;
+- the current bounded retry delays are `750ms` and `1500ms`;
+- if the bounded retries do not recover the build, the wrapper must still preserve the real failure exit and emit actionable local guidance.
+
 ## 6. Real CI evidence gathered
 
 | Run ID | Job ID | Event | Run attempt | Branch | Commit SHA | Created at (UTC) | Result | Notes |
@@ -67,7 +75,7 @@ The wrapper remains responsible for explicit retryable vs non-retryable Prisma c
 **`estabilizado con evidencia CI`**
 
 ### Baseline interpretation during local remediation
-A local Windows `npm run build` failure classified as `windows_rename_lock` remains important diagnostic input for remediation work and must be recorded in implementation reports when it occurs. However, by policy it is complementary evidence only and does not on its own overturn a CI-based closeout verdict unless the same closeout cycle also records new primary CI Windows failure evidence.
+A local Windows `npm run build` failure classified as `windows_rename_lock` remains important diagnostic input for remediation work and must be recorded in implementation reports when it occurs. A local success after stale-temp cleanup or bounded retries is also useful diagnostic evidence. However, by policy both remain complementary evidence only and do not on their own overturn a CI-based closeout verdict unless the same closeout cycle also records new primary CI Windows failure evidence.
 
 ### Why the criterion is now considered satisfied
 The repository now has:

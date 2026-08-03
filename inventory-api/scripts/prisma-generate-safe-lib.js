@@ -4,6 +4,7 @@ const { spawnSync } = require('node:child_process');
 
 const windowsEngineTempFilePattern = /^query_engine-windows\.dll\.node\.tmp\d+$/;
 const windowsRetryDelayByAttempt = [750, 1500];
+const defaultMaxWindowsRetries = 2;
 
 function listWindowsEngineTempFiles(prismaClientDirectory) {
   if (!fs.existsSync(prismaClientDirectory)) {
@@ -15,16 +16,21 @@ function listWindowsEngineTempFiles(prismaClientDirectory) {
     .map((entry) => path.join(prismaClientDirectory, entry));
 }
 
-function removeWindowsEngineTempFiles(prismaClientDirectory) {
+function removeWindowsEngineTempFiles(prismaClientDirectory, options = {}) {
   const tempFiles = listWindowsEngineTempFiles(prismaClientDirectory);
+  const onCleanupError = typeof options.onCleanupError === 'function'
+    ? options.onCleanupError
+    : null;
   let removedCount = 0;
 
   for (const tempFile of tempFiles) {
     try {
       fs.rmSync(tempFile, { force: true });
       removedCount += 1;
-    } catch (_error) {
-      // keep cleanup best-effort; real build status still comes from prisma generate.
+    } catch (error) {
+      if (onCleanupError) {
+        onCleanupError({ tempFile, error });
+      }
     }
   }
 
@@ -130,45 +136,60 @@ function executePrismaGenerateWithWindowsStabilization({
   prismaCliEntrypoint,
   prismaClientDirectory,
   env,
-  maxWindowsRetries = 2,
+  maxWindowsRetries = defaultMaxWindowsRetries,
+  hooks = {},
 }) {
-  const removedBeforeGenerate = removeWindowsEngineTempFiles(prismaClientDirectory);
+  const cleanupTempFiles = hooks.cleanupTempFiles || ((stageLabel) => removeWindowsEngineTempFiles(prismaClientDirectory, {
+    onCleanupError: ({ tempFile, error }) => {
+      console.warn(`Could not remove stale Prisma Windows engine temp file during ${stageLabel}: ${tempFile} (${error.message})`);
+    },
+  }));
+  const warn = hooks.warn || ((message) => console.warn(message));
+  const sleepFn = hooks.sleep || sleep;
+  const runGenerate = hooks.runPrismaGenerate || (() => runPrismaGenerate({ projectRoot, prismaCliEntrypoint, env }));
+  const classifyFailure = hooks.classifyPrismaGenerateFailure
+    || ((result) => classifyPrismaGenerateFailure({ platform, result, prismaClientDirectory }));
+  const fail = hooks.failWithActionableGuidance
+    || ((result, attemptNumber, failure) => failWithActionableGuidance({ result, platform, attemptNumber, failure }));
+
+  const removedBeforeGenerate = cleanupTempFiles('pre-generate cleanup');
   if (removedBeforeGenerate > 0) {
-    console.warn(`Removed ${removedBeforeGenerate} stale Prisma Windows engine temp file(s) before generate.`);
+    warn(`Removed ${removedBeforeGenerate} stale Prisma Windows engine temp file(s) before generate.`);
   }
 
   let attemptNumber = 1;
-  let result = runPrismaGenerate({ projectRoot, prismaCliEntrypoint, env });
+  let result = runGenerate();
   if (result.status === 0) {
-    removeWindowsEngineTempFiles(prismaClientDirectory);
+    cleanupTempFiles('post-success cleanup');
     return;
   }
 
-  let failure = classifyPrismaGenerateFailure({ platform, result, prismaClientDirectory });
+  let failure = classifyFailure(result);
   while (platform === 'win32' && failure.retryable && attemptNumber <= maxWindowsRetries) {
     const delayMs = getWindowsRetryDelayMs(attemptNumber);
-    console.warn(`Detected Windows Prisma engine rename lock or stale temp files. Cleaning and retrying (attempt ${attemptNumber} of ${maxWindowsRetries}) after ${delayMs}ms...`);
-    const removedBeforeRetry = removeWindowsEngineTempFiles(prismaClientDirectory);
+    warn(`Detected Windows Prisma engine rename lock or stale temp files. Cleaning and retrying (attempt ${attemptNumber} of ${maxWindowsRetries}) after ${delayMs}ms...`);
+    const removedBeforeRetry = cleanupTempFiles(`retry cleanup before attempt ${attemptNumber + 1}`);
     if (removedBeforeRetry > 0) {
-      console.warn(`Removed ${removedBeforeRetry} stale Prisma Windows engine temp file(s) before retry.`);
+      warn(`Removed ${removedBeforeRetry} stale Prisma Windows engine temp file(s) before retry.`);
     }
 
-    sleep(delayMs);
+    sleepFn(delayMs);
     attemptNumber += 1;
-    result = runPrismaGenerate({ projectRoot, prismaCliEntrypoint, env });
+    result = runGenerate();
     if (result.status === 0) {
-      removeWindowsEngineTempFiles(prismaClientDirectory);
+      cleanupTempFiles('post-success cleanup');
       return;
     }
 
-    failure = classifyPrismaGenerateFailure({ platform, result, prismaClientDirectory });
+    failure = classifyFailure(result);
   }
 
-  failWithActionableGuidance({ result, platform, attemptNumber, failure });
+  fail(result, attemptNumber, failure);
 }
 
 module.exports = {
   classifyPrismaGenerateFailure,
+  defaultMaxWindowsRetries,
   executePrismaGenerateWithWindowsStabilization,
   getWindowsRetryDelayMs,
   listWindowsEngineTempFiles,

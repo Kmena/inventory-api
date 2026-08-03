@@ -26,9 +26,32 @@ This document explains the current purpose, dependency boundary, and execution e
 - The aggregate runner defaults to:
   - `NODE_ENV=test`
   - `BROWSER_SESSION_STORE_MODE=memory`
+- `scripts/run-tests.js` now rejects unsupported `BROWSER_SESSION_STORE_MODE` values and fails fast with actionable guidance when `BROWSER_SESSION_STORE_MODE=redis` is requested without `REDIS_URL`.
 - Explicit non-default infrastructure validation remains separate, for example:
   - `npm run test:redis-path`
   - `tests/audit-repository.test.js` with `P2_AUDIT_DATABASE_URL`
+  - `tests/p2-hardening-constraints.test.js` with `P2_CONSTRAINTS_DATABASE_URL`
+
+## Prerequisite summary by lane
+- **Default aggregate lane (`npm run test`)**
+  - intended for the broad repository suite
+  - defaults to memory browser-session mode
+  - should not require `REDIS_URL`, `P2_AUDIT_DATABASE_URL`, or `P2_CONSTRAINTS_DATABASE_URL`
+- **Redis lane (`npm run test:redis-path`)**
+  - validates the supported non-default Redis-backed browser-session path
+  - uses the fake/local Redis server embedded in `tests/browser-session-redis-store.test.js`
+  - does not require the default application database
+- **DB-backed audit lane**
+  - run `node --test tests/audit-repository.test.js`
+  - requires `P2_AUDIT_DATABASE_URL`
+- **DB-backed constraints lane**
+  - run `node --test tests/p2-hardening-constraints.test.js`
+  - requires `P2_CONSTRAINTS_DATABASE_URL`
+
+## Failure guidance expectations
+- Missing DB-only variables should remain explicit and environment-gated rather than silently assumed.
+- Non-default Redis validation should stay outside the aggregate default suite.
+- Aggregate test failures caused by invalid browser-session mode configuration should point maintainers back to the default memory lane or the dedicated Redis lane.
 
 ## Maintenance rule
 When a test suite changes category or starts depending on different infrastructure, update this catalog in the same slice so the documented boundary stays accurate.

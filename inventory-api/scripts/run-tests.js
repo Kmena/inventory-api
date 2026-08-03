@@ -39,6 +39,7 @@ const preferredTestOrder = [
   'tests/production-baseline-characterization.test.js',
 ];
 const preferredOrderIndex = new Map(preferredTestOrder.map((filePath, index) => [filePath, index]));
+const supportedBrowserSessionStoreModes = new Set(['memory', 'redis']);
 
 function toPosixPath(value) {
   return value.split(path.sep).join('/');
@@ -84,6 +85,44 @@ function listTestFiles(directory) {
     .sort(compareDiscoveredTestFiles);
 }
 
+function getAggregateTestEnvironment(baseEnv = process.env) {
+  return {
+    ...baseEnv,
+    NODE_ENV: baseEnv.NODE_ENV || 'test',
+    BROWSER_SESSION_STORE_MODE: baseEnv.BROWSER_SESSION_STORE_MODE || 'memory',
+  };
+}
+
+function validateAggregateTestEnvironment(environment) {
+  const failures = [];
+  const sessionStoreMode = String(environment.BROWSER_SESSION_STORE_MODE || '').trim();
+
+  if (!supportedBrowserSessionStoreModes.has(sessionStoreMode)) {
+    failures.push(
+      `Unsupported BROWSER_SESSION_STORE_MODE \`${sessionStoreMode}\` for aggregate test execution. Supported values: memory, redis.`,
+    );
+  }
+
+  if (sessionStoreMode === 'redis' && !String(environment.REDIS_URL || '').trim()) {
+    failures.push(
+      'BROWSER_SESSION_STORE_MODE=redis requires REDIS_URL for aggregate test execution.',
+    );
+  }
+
+  return failures;
+}
+
+function formatAggregateTestEnvironmentGuidance(environment) {
+  const sessionStoreMode = String(environment.BROWSER_SESSION_STORE_MODE || '').trim();
+
+  return [
+    `Aggregate runner defaults: NODE_ENV=${environment.NODE_ENV}, BROWSER_SESSION_STORE_MODE=${sessionStoreMode}.`,
+    'Use `npm run test` for the default broad suite in memory mode.',
+    'Use `npm run test:redis-path` for the dedicated Redis-backed browser-session lane.',
+    'Database-backed optional suites remain environment-gated and require dedicated variables such as P2_AUDIT_DATABASE_URL or P2_CONSTRAINTS_DATABASE_URL.',
+  ].join('\n');
+}
+
 function run() {
   const testFiles = listTestFiles(testsRoot);
 
@@ -92,14 +131,17 @@ function run() {
   }
 
   const forwardedArguments = process.argv.slice(2).filter((argument) => argument !== '--silent');
+  const environment = getAggregateTestEnvironment(process.env);
+  const environmentFailures = validateAggregateTestEnvironment(environment);
+
+  if (environmentFailures.length > 0) {
+    throw new Error(`${environmentFailures.join('\n')}\n${formatAggregateTestEnvironmentGuidance(environment)}`);
+  }
+
   const child = spawn(process.execPath, ['--test', ...forwardedArguments, ...testFiles], {
     stdio: 'inherit',
     cwd: process.cwd(),
-    env: {
-      ...process.env,
-      NODE_ENV: process.env.NODE_ENV || 'test',
-      BROWSER_SESSION_STORE_MODE: process.env.BROWSER_SESSION_STORE_MODE || 'memory',
-    },
+    env: environment,
   });
 
   child.on('exit', (code, signal) => {
@@ -112,4 +154,17 @@ function run() {
   });
 }
 
-run();
+if (require.main === module) {
+  run();
+}
+
+module.exports = {
+  compareDiscoveredTestFiles,
+  formatAggregateTestEnvironmentGuidance,
+  getAggregateTestEnvironment,
+  listTestFiles,
+  run,
+  supportedBrowserSessionStoreModes,
+  toPosixPath,
+  validateAggregateTestEnvironment,
+};

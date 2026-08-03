@@ -9,6 +9,8 @@ const hostedRepositoryRoot = path.resolve(repositoryRoot, '..');
 const workflowsRoot = path.join(hostedRepositoryRoot, '.github', 'workflows');
 const productionDocPath = path.join(repositoryRoot, 'docs', 'production-baseline.md');
 const criticalControlsDocPath = path.join(repositoryRoot, 'docs', 'ci-critical-controls.md');
+const workflowValidator = require('../scripts/validate-workflow-baseline.js');
+const operationalReadinessValidator = require('../scripts/validate-operational-readiness.js');
 
 function readWorkflow(name) {
   return fs.readFileSync(path.join(workflowsRoot, name), 'utf8');
@@ -32,7 +34,7 @@ test('operational smoke workflow validates production baseline inputs, compose s
 test('production baseline documentation includes the operational smoke workflow and local smoke checklist', () => {
   const docSource = fs.readFileSync(productionDocPath, 'utf8');
 
-  assert.match(docSource, /operational-smoke\.yml/);
+  assert.match(docSource, /\.\.\/\.github\/workflows\/operational-smoke\.yml/);
   assert.match(docSource, /(limpieza explícita posterior del `\.env\.production` temporal|materialización temporal de `\.env\.production`)/i);
   assert.match(docSource, /docker compose -f docker-compose\.prod\.yml config/);
   assert.match(docSource, /docker build -t inventory-api:operational-smoke \./);
@@ -105,6 +107,21 @@ test('critical controls documentation keeps the repo-verifiable required-job bas
   assert.match(source, /Manual hosted verification checklist/i);
   assert.match(source, /branch protection/i);
   assert.match(source, /required status checks/i);
+});
+
+test('workflow validators expose actionable parent-root ownership guidance when workflow files are absent', () => {
+  const workflowGuidance = workflowValidator.formatWorkflowOwnershipGuidance();
+  const missingWorkflowMessage = workflowValidator.describeMissingWorkflow('static-checks.yml');
+  const operationalGuidance = operationalReadinessValidator.formatWorkflowOwnershipGuidance();
+
+  assert.match(workflowGuidance, /Authoritative hosted workflows are expected in:/);
+  assert.match(workflowGuidance, /\.\.\\?\/\.github\\?\/workflows|\.\.\/\.github\/workflows/);
+  assert.match(workflowGuidance, /Application-local workflow directory is not authoritative today/);
+  assert.match(missingWorkflowMessage, /static-checks\.yml: workflow file is missing/);
+  assert.match(missingWorkflowMessage, /run this validator from the hosted repository checkout/i);
+  assert.match(operationalGuidance, /Authoritative operational workflow is expected at:/);
+  assert.match(operationalGuidance, /Application-local workflow directory is not authoritative today/);
+  assert.match(operationalGuidance, /restore the approved parent-root workflow baseline/i);
 });
 
 test('validate-workflow-baseline passes when the versioned workflows preserve their contracts', () => {

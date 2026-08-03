@@ -138,6 +138,13 @@ function withEnvironment(overrides, run) {
     });
 }
 
+test('Redis-path suite provisions its own fake Redis server and does not require a preconfigured REDIS_URL', async () => {
+  await withFakeRedisServer(async ({ redisUrl }) => {
+    assert.match(redisUrl, /^redis:\/\/127\.0\.0\.1:\d+\/0$/);
+    assert.equal(String(process.env.REDIS_URL || '').trim(), '');
+  });
+});
+
 test('browser session service persists browser sessions through Redis and survives service reloading', async () => {
   await withFakeRedisServer(({ redisUrl }) => withEnvironment({
     NODE_ENV: 'development',

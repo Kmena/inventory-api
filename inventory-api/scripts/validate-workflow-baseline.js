@@ -4,6 +4,7 @@ const path = require('node:path');
 const applicationRoot = path.join(__dirname, '..');
 const hostedRepositoryRoot = path.resolve(applicationRoot, '..');
 const workflowsDirectory = path.join(hostedRepositoryRoot, '.github', 'workflows');
+const localWorkflowDirectory = path.join(applicationRoot, '.github', 'workflows');
 
 const workflowRules = [
   {
@@ -118,13 +119,25 @@ function read(relativePath) {
   return fs.readFileSync(path.join(workflowsDirectory, relativePath), 'utf8');
 }
 
+function formatWorkflowOwnershipGuidance() {
+  return [
+    `Authoritative hosted workflows are expected in: ${path.relative(applicationRoot, workflowsDirectory)}`,
+    `Application-local workflow directory is not authoritative today: ${path.relative(applicationRoot, localWorkflowDirectory)}`,
+    'If parent-root workflow files are missing, run this validator from the hosted repository checkout that contains ../.github/workflows/ or restore the approved parent-root workflow baseline before treating the result as repository drift.',
+  ].join('\n');
+}
+
+function describeMissingWorkflow(relativePath) {
+  return `${relativePath}: workflow file is missing\n${formatWorkflowOwnershipGuidance()}`;
+}
+
 function main() {
   const failures = [];
 
   for (const rule of workflowRules) {
     const absolutePath = path.join(workflowsDirectory, rule.relativePath);
     if (!fs.existsSync(absolutePath)) {
-      failures.push(`${rule.relativePath}: workflow file is missing`);
+      failures.push(describeMissingWorkflow(rule.relativePath));
       continue;
     }
 
@@ -150,4 +163,7 @@ if (require.main === module) {
 module.exports = {
   workflowRules,
   workflowsDirectory,
+  localWorkflowDirectory,
+  formatWorkflowOwnershipGuidance,
+  describeMissingWorkflow,
 };
