@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+process.env.BROWSER_SESSION_STORE_MODE = 'memory';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-authorization-convergence';
+
 const roleRoutes = require('../src/routes/role.routes');
 const regionRoutes = require('../src/routes/region.routes');
 const warehouseRoutes = require('../src/routes/warehouse.routes');
@@ -8,6 +11,8 @@ const salesRouteRoutes = require('../src/routes/sales-route.routes');
 const economicActivityRoutes = require('../src/routes/economic-activity.routes');
 const productRoutes = require('../src/routes/product.routes');
 const inventoryRoutes = require('../src/routes/inventory.routes');
+const agentRoutes = require('../src/routes/agent.routes');
+const orderRoutes = require('../src/routes/order.routes');
 
 function getRouteGuard(router, path, method) {
   const layer = router.stack.find((entry) => entry.route && entry.route.path === path && entry.route.methods[method]);
@@ -152,6 +157,75 @@ test('inventory routes keep explicit permission boundaries for view, status upda
 
   const allowedLotQa = await runGuard(lotQaGuard, { role: 'quality', companyId: '7', permissions: ['inventory.qa.manage'] });
   assert.equal(allowedLotQa, undefined);
+});
+
+test('agent workspace routes stay explicit through centralized access policies without changing the commercial-agent token contract', async () => {
+  const dashboardGuard = getRouteGuard(agentRoutes, '/dashboard', 'get');
+  const visitCreateGuard = getRouteGuard(agentRoutes, '/visits', 'post');
+  const orderCreateGuard = getRouteGuard(agentRoutes, '/stores/:storeId/orders', 'post');
+
+  const deniedSupervisor = await runGuard(dashboardGuard, {
+    role: 'sales_supervisor',
+    companyId: '7',
+    sub: '15',
+    permissions: ['sales.orders.create', 'sales.routes.view.all', 'customer.activities.manage'],
+  });
+  assert.equal(deniedSupervisor?.statusCode, 403);
+
+  const deniedMissingActivityPermission = await runGuard(visitCreateGuard, {
+    role: 'sales',
+    companyId: '7',
+    sub: '15',
+    permissions: ['sales.orders.create', 'sales.routes.view.own'],
+  });
+  assert.equal(deniedMissingActivityPermission?.statusCode, 403);
+
+  const allowedSalesAgent = await runGuard(orderCreateGuard, {
+    role: 'sales_agent',
+    companyId: '7',
+    sub: '15',
+    permissions: ['sales.orders.create', 'sales.routes.view.own', 'customer.activities.manage'],
+  });
+  assert.equal(allowedSalesAgent, undefined);
+
+  const allowedCustomAgent = await runGuard(dashboardGuard, {
+    role: 'sales',
+    companyId: '7',
+    sub: '15',
+    permissions: ['sales.orders.create', 'sales.routes.view.own', 'customer.activities.manage'],
+  });
+  assert.equal(allowedCustomAgent, undefined);
+});
+
+test('order routes keep their documented access-policy split between role-governed legacy operations and permission-governed draft mutations', async () => {
+  const listGuard = getRouteGuard(orderRoutes, '/', 'get');
+  const createGuard = getRouteGuard(orderRoutes, '/', 'post');
+  const approveGuard = getRouteGuard(orderRoutes, '/:id/approve', 'post');
+  const dispatchGuard = getRouteGuard(orderRoutes, '/:id/dispatch', 'post');
+
+  const deniedList = await runGuard(listGuard, { role: 'sales_agent', companyId: '7', permissions: ['sales.orders.create'] });
+  assert.equal(deniedList?.statusCode, 403);
+
+  const allowedLegacySalesList = await runGuard(listGuard, { role: 'sales', companyId: '7' });
+  assert.equal(allowedLegacySalesList, undefined);
+
+  const deniedCreate = await runGuard(createGuard, { role: 'sales', companyId: '7', permissions: ['clients.view'] });
+  assert.equal(deniedCreate?.statusCode, 403);
+
+  const allowedCreate = await runGuard(createGuard, { role: 'sales', companyId: '7', permissions: ['sales.orders.create'] });
+  assert.equal(allowedCreate, undefined);
+
+  const deniedApprove = await runGuard(approveGuard, { role: 'warehouse', companyId: '7' });
+  assert.equal(deniedApprove?.statusCode, 403);
+
+  const allowedApprove = await runGuard(approveGuard, { role: 'sales', companyId: '7' });
+  assert.equal(allowedApprove, undefined);
+
+  const deniedDispatch = await runGuard(dispatchGuard, { role: 'sales', companyId: '7' });
+  assert.equal(deniedDispatch?.statusCode, 403);
+
+  const allowedDispatch = await runGuard(dispatchGuard, { role: 'warehouse', companyId: '7' });
+  assert.equal(allowedDispatch, undefined);
 });
 
 test('economic activity lookup keeps admin and sales restrictions through centralized access policies', async () => {

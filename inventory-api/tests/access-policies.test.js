@@ -79,6 +79,7 @@ test('access policies preserve strict registry lookups and explicit actor-scope 
     .sort((left, right) => left[0].localeCompare(right[0]));
 
   assert.deepEqual(scopedPolicies, [
+    ['agent.workspace.access', 'agent-workspace-user'],
     ['company.create-global', 'global-root'],
     ['company.list-global', 'global-root'],
     ['company.root-companies.create', 'global-root'],
@@ -135,6 +136,7 @@ test('authorizeAccessPolicy records actor-scope audit metadata when a base-allow
   }, async () => {
     const roleCompanyCreateGuard = authorizeAccessPolicy('role.company.create');
     const rootListGuard = authorizeAccessPolicy('company.list-global');
+    const agentWorkspaceGuard = authorizeAccessPolicy('agent.workspace.access');
 
     const deniedCompanyAdminScope = await runGuard(roleCompanyCreateGuard, { role: 'admin', companyId: null });
     assert.equal(deniedCompanyAdminScope?.statusCode, 403);
@@ -143,9 +145,18 @@ test('authorizeAccessPolicy records actor-scope audit metadata when a base-allow
     const deniedGlobalRootScope = await runGuard(rootListGuard, { role: 'root', companyId: '7' });
     assert.equal(deniedGlobalRootScope?.statusCode, 403);
     assert.equal(deniedGlobalRootScope?.code, 'forbidden');
+
+    const deniedAgentWorkspaceScope = await runGuard(agentWorkspaceGuard, {
+      role: 'sales_supervisor',
+      companyId: '7',
+      sub: '15',
+      permissions: ['sales.orders.create', 'sales.routes.view.all', 'customer.activities.manage'],
+    });
+    assert.equal(deniedAgentWorkspaceScope?.statusCode, 403);
+    assert.equal(deniedAgentWorkspaceScope?.code, 'forbidden');
   });
 
-  assert.equal(recordedPayloads.length, 2);
+  assert.equal(recordedPayloads.length, 3);
   assert.deepEqual(recordedPayloads.map((payload) => ({
     action: payload.action,
     reasonCode: payload.reasonCode,
@@ -170,7 +181,36 @@ test('authorizeAccessPolicy records actor-scope audit metadata when a base-allow
       role: 'root',
       companyId: '7',
     },
+    {
+      action: 'security.authorization.access_policy',
+      reasonCode: 'actor_scope_denied',
+      policyId: 'agent.workspace.access',
+      actorScope: 'agent-workspace-user',
+      role: 'sales_supervisor',
+      companyId: '7',
+    },
   ]);
+});
+
+test('authorizeAccessPolicy preserves agent workspace actor-scope semantics for commercial-agent tokens', async () => {
+  const guard = authorizeAccessPolicy('agent.workspace.access');
+
+  const deniedSupervisorError = await runGuard(guard, {
+    role: 'sales_supervisor',
+    companyId: '7',
+    sub: '15',
+    permissions: ['sales.orders.create', 'sales.routes.view.all', 'customer.activities.manage'],
+  });
+  assert.equal(deniedSupervisorError?.statusCode, 403);
+  assert.equal(deniedSupervisorError?.code, 'forbidden');
+
+  const allowedCustomAgentError = await runGuard(guard, {
+    role: 'sales',
+    companyId: '7',
+    sub: '15',
+    permissions: ['sales.orders.create', 'sales.routes.view.own', 'customer.activities.manage'],
+  });
+  assert.equal(allowedCustomAgentError, undefined);
 });
 
 test('authorizeAccessPolicy skips actor-scope denial auditing when the base guard already denies the request', async () => {
