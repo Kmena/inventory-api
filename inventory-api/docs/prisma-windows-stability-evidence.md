@@ -17,7 +17,22 @@ The approved closeout criterion for this repository is:
 
 A new failure classified as `windows_rename_lock` during the same closeout cycle prevents claiming `estabilizado con evidencia CI` for that cycle.
 
-## 3. Workflow under governance
+## 3. Evidence hierarchy
+### Primary evidence
+The repository treats the following as primary closeout evidence:
+- real CI Windows executions of `.github/workflows/windows-prisma-build.yml`;
+- stable and repeatable success of the guarded `npm run build` step in that workflow;
+- workflow/log evidence and this operational document kept in sync.
+
+### Complementary evidence
+The repository allows the following as complementary evidence only:
+- local developer runs of `npm run build`;
+- local wrapper diagnostics and retry classification output;
+- ad-hoc troubleshooting notes or one-off reruns outside the official CI Windows baseline.
+
+Complementary evidence is useful for diagnosis and remediation planning, but complementary local developer runs do not on their own overturn a CI-based closeout verdict.
+
+## 4. Workflow under governance
 - Executable workflow: `.github/workflows/windows-prisma-build.yml`
 - Hosted workflow source of truth: repository-root `/.github/workflows/`
 - Local validator/test resolution: root official workflow tree only
@@ -25,7 +40,7 @@ A new failure classified as `windows_rename_lock` during the same closeout cycle
 - Node version: `24`
 - Runner: `windows-latest`
 
-## 4. Failure classification taxonomy
+## 5. Failure classification taxonomy
 When the guarded build fails, the repository uses the following diagnostic states:
 
 - `windows_rename_lock`
@@ -34,7 +49,7 @@ When the guarded build fails, the repository uses the following diagnostic state
 
 The wrapper remains responsible for explicit retryable vs non-retryable Prisma classification. The workflow closeout layer is responsible for preserving the real build exit code while publishing auditable evidence.
 
-## 5. Real CI evidence gathered
+## 6. Real CI evidence gathered
 
 | Run ID | Job ID | Event | Run attempt | Branch | Commit SHA | Created at (UTC) | Result | Notes |
 |---|---|---|---|---|---|---|---|---|
@@ -47,9 +62,12 @@ The wrapper remains responsible for explicit retryable vs non-retryable Prisma c
 | `30043427099` | `89330039291` | `pull_request` | `2` | `login-guidelines-alignment` | `f1ab9a26842a36e98aa4f042128d88c484e37a28` | `2026-07-23T20:45:24Z` | `success` | Documented rerun of the hardened workflow with 1 artifact published |
 | `30281935398` | `90030223669` | `push` | `1` | `34-p11-extrenal-audit-fix` | `24106ee8fae3e5a21197e3a6494261e08e0ee8d7` | `2026-07-27T15:50:57Z` | `success` | Root-official workflow aligned to Node 24; Jobs API confirms `Set up Node.js 24` and artifact `windows-prisma-build-log-30281935398` |
 
-## 6. Current conclusion
+## 7. Current conclusion
 ### Verdict
 **`estabilizado con evidencia CI`**
+
+### Baseline interpretation during local remediation
+A local Windows `npm run build` failure classified as `windows_rename_lock` remains important diagnostic input for remediation work and must be recorded in implementation reports when it occurs. However, by policy it is complementary evidence only and does not on its own overturn a CI-based closeout verdict unless the same closeout cycle also records new primary CI Windows failure evidence.
 
 ### Why the criterion is now considered satisfied
 The repository now has:
@@ -62,18 +80,18 @@ The repository now has:
 
 Based on the approved criterion, the current evidence is sufficient to classify the risk as **`estabilizado con evidencia CI`**.
 
-## 7. Evidence validated in the hardened workflow version
+## 8. Evidence validated in the hardened workflow version
 The hardened workflow has now been remotely validated as publishing or supporting:
 - workflow summary contract;
 - build log artifact publication;
 - explicit final failure gate preserving the real build exit code.
 
-## 8. How to preserve the closeout safely
+## 9. How to preserve the closeout safely
 1. Keep `.github/workflows/windows-prisma-build.yml` as the executable source of truth.
 2. Preserve `npm run validate:workflow-baseline` and the workflow characterization tests, which validate 9 root official workflows including `p0-quality-gates.yml`.
 3. If a future run produces `windows_rename_lock`, reassess whether the verdict should fall back to `residual gobernado` for that cycle.
 
-## 9. Related repository files
+## 10. Related repository files
 - `.github/workflows/windows-prisma-build.yml`
 - `inventory-api/scripts/prisma-generate-safe.js`
 - `inventory-api/scripts/prisma-generate-safe-lib.js`
@@ -81,7 +99,7 @@ The hardened workflow has now been remotely validated as publishing or supportin
 - `inventory-api/tests/prisma-windows-build-stabilization.test.js`
 - `inventory-api/tests/workflow-baseline-characterization.test.js`
 
-## 10. Historical spec linkage
+## 11. Historical spec linkage
 - `specs/p8-prisma-windows-build-stabilization/implementation-report.md`
 - `specs/p9-windows-prisma-build-evidence/implementation-report.md`
 - `specs/p9-prisma-windows-closeout/implementation-report.md`

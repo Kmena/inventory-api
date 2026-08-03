@@ -5,9 +5,14 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const rootPublicPath = path.join(__dirname, '..', 'src', 'public', 'root');
+const testsPath = __dirname;
+
+function readRootFile(relativePath) {
+  return fs.readFileSync(path.join(rootPublicPath, relativePath), 'utf8');
+}
 
 function executeRootScript(relativePath, context) {
-  const source = fs.readFileSync(path.join(rootPublicPath, relativePath), 'utf8');
+  const source = readRootFile(relativePath);
   vm.runInContext(source, context, { filename: relativePath });
 }
 
@@ -59,4 +64,32 @@ test('root shell modules publish and consume dependencies through the bounded Ro
   assert.equal(Array.isArray(manifest.items), true);
   assert.equal(typeof browserWindow.RootShell.require('guards').isRootUser, 'function');
   assert.equal(typeof browserWindow.RootShell.require('sessionAdapter').bootstrap, 'function');
+});
+
+test('sensitive root-shell modules keep isolated characterization coverage and extracted seams', () => {
+  const routerSource = readRootFile('router.js');
+  const zonesAdminSource = readRootFile(path.join('views', 'zones-admin.js'));
+  const zonesHelpersSource = readRootFile(path.join('views', 'zones-admin.helpers.js'));
+
+  assert.ok(fs.existsSync(path.join(testsPath, 'root-shell-router-characterization.test.js')));
+  assert.ok(fs.existsSync(path.join(testsPath, 'zones-view-selection-filters-characterization.test.js')));
+  assert.ok(fs.existsSync(path.join(testsPath, 'zones-view-dialog-feedback-characterization.test.js')));
+
+  assert.match(routerSource, /rootShell\.register\('router'/);
+  assert.match(routerSource, /function getFirstAccessibleRoute\(session\)/);
+  assert.match(routerSource, /function resolveRoute\(hashValue, session\)/);
+
+  assert.match(zonesAdminSource, /zonesAdminHelpers\.getFilteredZones\(zones, zoneSearchTerm\)/);
+  assert.match(zonesAdminSource, /zonesAdminHelpers\.getSelectedZone\(zones, selectedZoneId, zoneSearchTerm\)/);
+  assert.match(zonesAdminSource, /zonesAdminHelpers\.getFilteredSubregions\(selectedZone, subregionSearchTerm\)/);
+  assert.match(zonesAdminSource, /zonesAdminHelpers\.resetFormState\(zoneForm, zoneFormMessage, zoneFieldMap\)/);
+  assert.match(zonesAdminSource, /zonesAdminHelpers\.resetFormState\(subzoneForm, subzoneFormMessage, subzoneFieldMap\)/);
+  assert.match(zonesAdminSource, /zonesAdminHelpers\.renderFormError\(zoneFormMessage, zoneFieldMap, error, 'No se pudo crear la zona\.'/);
+  assert.match(zonesAdminSource, /zonesAdminHelpers\.renderFormError\(subzoneFormMessage, subzoneFieldMap, error, 'No se pudo crear la subzona\.'/);
+  assert.match(zonesAdminSource, /zonesAdminHelpers\.setSubmitButtonState\(zoneSubmitButton, \{/);
+  assert.match(zonesAdminSource, /zonesAdminHelpers\.setSubmitButtonState\(subzoneSubmitButton, \{/);
+
+  assert.match(zonesHelpersSource, /function resetFormState\(formElement, messageElement, fieldMap\)/);
+  assert.match(zonesHelpersSource, /function renderFormError\(messageElement, fieldMap, error, fallbackMessage\)/);
+  assert.match(zonesHelpersSource, /function setSubmitButtonState\(buttonElement, options\)/);
 });

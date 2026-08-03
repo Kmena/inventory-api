@@ -20,6 +20,9 @@ test('root shell manifest keeps actor-aware companies and roles routes', () => {
   assert.match(manifestSource, /visibilityRule: guards\.isCompanyAdmin/);
   assert.match(manifestSource, /routeKey: 'admin_home'/);
   assert.match(manifestSource, /createAdminPendingEntry\('admin-home', 'Inicio', 'house'/);
+  assert.match(manifestSource, /label: 'Zonas'/);
+  assert.match(manifestSource, /routeKey: 'zones'/);
+  assert.match(manifestSource, /dependencyTag: 'zones-view'/);
   assert.match(manifestSource, /includeInRootNav: false/);
 });
 
@@ -35,4 +38,6 @@ test('root shell guards and router keep actor-scoped route fallback behavior', (
   assert.match(routerSource, /guards\.canAccessRoute\(session, item\)/);
   assert.match(routerSource, /routeKey: fallbackRouteKey/);
   assert.match(routerSource, /requestedRouteKey/);
+  assert.match(routerSource, /const zonesAdminView = rootShell\.require\('views\.zonesAdmin'\)/);
+  assert.match(routerSource, /item\.routeKey === 'zones'/);
 });

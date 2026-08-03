@@ -48,12 +48,15 @@ test('supported public runtime assets now include the minimal root shell while l
     'root/manifest.js',
     'root/roles-api.js',
     'root/router.js',
+    'root/zones-api.js',
     'root/session-adapter.js',
     'root/ui.js',
     'root/views/companies-admin.js',
     'root/views/home.js',
     'root/views/in-process.js',
     'root/views/roles-admin.js',
+    'root/views/zones-admin.helpers.js',
+    'root/views/zones-admin.js',
     'shared/auth.js',
     'shared/session.js',
     'styles.css',
@@ -110,12 +113,16 @@ test('public login, no-access and migration screens keep strict same-origin wiri
   assert.match(rootShellHtmlSource, /<script src="\/root\/registry\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/companies-api\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/roles-api\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/zones-api\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/ui\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/companies-admin\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/roles-admin\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/zones-admin\.helpers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/zones-admin\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/app\.js"><\/script>/);
   assert.match(rootShellManifestSource, /routeKey: 'companies'/);
   assert.match(rootShellManifestSource, /routeKey: 'roles_permissions'/);
+  assert.match(rootShellManifestSource, /routeKey: 'zones'/);
   assert.match(stylesSource, /\.root-sidebar,\s*\n\.root-sidebar \*/);
   assert.match(stylesSource, /\.root-sidebar__scroll \{[\s\S]*overflow-y: auto;[\s\S]*scrollbar-width: thin;[\s\S]*scrollbar-color: rgba\(203, 213, 225, 0\.28\) transparent;/);
   assert.match(stylesSource, /\.root-sidebar__nav,[\s\S]*\.root-sidebar__section-body,[\s\S]*\.root-sidebar__subnav \{[\s\S]*overflow-x: clip;/);

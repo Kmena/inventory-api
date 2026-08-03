@@ -93,7 +93,19 @@
   const productionItem = createAdminPendingEntry('production', 'Produccion', 'factory');
   const agentsItem = createAdminPendingEntry('agents', 'Agentes', 'users-round');
   const routesItem = createAdminPendingEntry('routes', 'Rutas', 'map');
-  const zonesItem = createAdminPendingEntry('zones', 'Zonas', 'map-pinned');
+  const zonesItem = createRouteItem({
+    id: 'zones',
+    label: 'Zonas',
+    routeKey: 'zones',
+    href: '/root/#zones',
+    implemented: true,
+    activeMatchers: ['zones'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'map-pinned',
+    includeInRootNav: false,
+    dependencyTag: 'zones-view',
+  });
   const clientsItem = createAdminPendingEntry('clients', 'Clientes', 'briefcase-business');
   const purchasesItem = createAdminPendingEntry('purchases', 'Compras', 'shopping-bag');
   const warehousesItem = createAdminPendingEntry('warehouses', 'Bodegas', 'warehouse');

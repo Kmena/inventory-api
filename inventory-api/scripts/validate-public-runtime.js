@@ -17,12 +17,15 @@ const expectedJavaScriptFiles = [
   'root/registry.js',
   'root/roles-api.js',
   'root/router.js',
+  'root/zones-api.js',
   'root/session-adapter.js',
   'root/ui.js',
   'root/views/companies-admin.js',
   'root/views/home.js',
   'root/views/in-process.js',
   'root/views/roles-admin.js',
+  'root/views/zones-admin.helpers.js',
+  'root/views/zones-admin.js',
   'shared/auth.js',
   'shared/session.js',
 ];
@@ -191,9 +194,12 @@ function validateRootShellRuntimeContracts() {
     || !rootHtmlSource.includes('/root/registry.js')
     || !rootHtmlSource.includes('/root/companies-api.js')
     || !rootHtmlSource.includes('/root/roles-api.js')
+    || !rootHtmlSource.includes('/root/zones-api.js')
     || !rootHtmlSource.includes('/root/ui.js')
     || !rootHtmlSource.includes('/root/views/companies-admin.js')
     || !rootHtmlSource.includes('/root/views/roles-admin.js')
+    || !rootHtmlSource.includes('/root/views/zones-admin.helpers.js')
+    || !rootHtmlSource.includes('/root/views/zones-admin.js')
     || !rootHtmlSource.includes('/root/app.js')) {
     throw new Error('root/index.html: missing contract -> shared helper and shell script wiring');
   }
@@ -213,6 +219,7 @@ function validateRootShellRuntimeContracts() {
   if (!rootManifestSource.includes("label: 'Inicio'")
     || !rootManifestSource.includes("label: 'Empresas'")
     || !rootManifestSource.includes("label: 'Roles y permisos'")
+    || !rootManifestSource.includes("label: 'Zonas'")
     || !rootManifestSource.includes("label: 'Pendientes'")) {
     throw new Error('root/manifest.js: missing contract -> bounded admin navigation items');
   }

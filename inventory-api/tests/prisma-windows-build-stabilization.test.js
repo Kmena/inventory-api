@@ -6,6 +6,7 @@ const path = require('node:path');
 const applicationRoot = path.join(__dirname, '..');
 const hostedRepositoryRoot = path.resolve(applicationRoot, '..');
 const workflowPath = path.join(hostedRepositoryRoot, '.github', 'workflows', 'windows-prisma-build.yml');
+const buildEvidencePath = path.join(applicationRoot, 'docs', 'prisma-windows-stability-evidence.md');
 const wrapperLibrary = require('../scripts/prisma-generate-safe-lib.js');
 
 function read(filePath) {
@@ -70,4 +71,16 @@ test('wrapper uses bounded retry delays for Windows lock stabilization', () => {
   assert.equal(wrapperLibrary.getWindowsRetryDelayMs(1), 750);
   assert.equal(wrapperLibrary.getWindowsRetryDelayMs(2), 1500);
   assert.equal(wrapperLibrary.getWindowsRetryDelayMs(3), 1500);
+});
+
+test('Prisma Windows stability evidence distinguishes primary CI closure evidence from complementary local diagnostics', () => {
+  const evidenceSource = read(buildEvidencePath);
+
+  assert.match(evidenceSource, /## 2\. Closeout criterion/);
+  assert.match(evidenceSource, /CI Windows/);
+  assert.match(evidenceSource, /## 3\. Evidence hierarchy/);
+  assert.match(evidenceSource, /Primary evidence/);
+  assert.match(evidenceSource, /Complementary evidence/);
+  assert.match(evidenceSource, /local developer runs/);
+  assert.match(evidenceSource, /do not on their own overturn a CI-based closeout verdict/);
 });

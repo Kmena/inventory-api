@@ -1,5 +1,68 @@
 # Tasks
 
+## TASK-042: Implement company-admin zones view in the supported root shell
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Embedded browser runtime / Geography administration
+**Requirement:** `zones-view`; company-admin root-shell module delivery over the existing regions contract
+**Reason:** The approved company-admin sidebar already exposed `Zonas`, but the route still resolved to the shared neutral `in_process` view and did not provide an implemented geography-management surface.
+**Current problem resolved:** `#zones` is now a functional company-admin route in the supported `/root/` shell, backed by `GET /api/regions/company`, `POST /api/regions/company`, and `POST /api/regions/company/:regionId/subregions`, with local in-memory search, create-zone/create-subzone modal flows, toast feedback, temporary subzone highlight, and mobile consecutive list/detail behavior.
+**Implemented change:** Added the root-shell zones API adapter and zones view modules, wired the route through the manifest/router/runtime validator, expanded the bounded browser-runtime typecheck allowlist to include the new files, refreshed root-shell characterization/governance coverage, and synchronized architecture-facing documentation to the implemented state. Later follow-up work under `quality-baseline-recovery` added small helper seams in `src/public/root/views/zones-admin.helpers.js` for selection/filter and dialog/form behavior, plus isolated characterization coverage in `tests/zones-view-selection-filters-characterization.test.js` and `tests/zones-view-dialog-feedback-characterization.test.js`, without changing the supported API or shell contract.
+**Affected files:** `scripts/validate-public-runtime.js`, `src/public/root/index.html`, `src/public/root/manifest.js`, `src/public/root/router.js`, `src/public/root/zones-api.js`, `src/public/root/views/zones-admin.helpers.js`, `src/public/root/views/zones-admin.js`, `src/public/styles.css`, `tests/public-surface-characterization.test.js`, `tests/root-shell-route-governance.test.js`, `tests/zones-view.e2e.js`, `tsconfig.typecheck.json`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `TASK-039` and `TASK-040` completed baseline
+**Database impact:** None
+**API impact:** None; reused existing region company endpoints and did not change backend contracts
+**Container impact:** None
+**Security impact:** Low direct impact; medium UX/traceability impact through a supported authenticated geography-management surface
+**Acceptance criteria:** `#zones` is reachable for company-admin users; the page loads data from the existing regions endpoints; zone/subzone search remains local in memory; create-zone and create-subzone flows succeed with inline error handling; mobile uses consecutive list/detail behavior; public-runtime validators and bounded tests reflect the new route.
+**Validation evidence:** `npm run lint:public-runtime`; `npm run typecheck`; `npm run validate:public-runtime`; `npm run lint`; `node --test tests/root-shell-route-governance.test.js tests/public-surface-characterization.test.js tests/zones-view.e2e.js`; `npm run build` ⚠️ pre-existing local Windows Prisma rename-lock `EPERM`; `node --test tests/zones-view-selection-filters-characterization.test.js`; `node --test tests/zones-view-dialog-feedback-characterization.test.js`; `node --test tests/zones-view.e2e.js`; `node --test tests/root-shell-route-governance.test.js`; `npm run validate:public-runtime`; `npm run typecheck`; `npm run lint:public-runtime`
+**Required tests:** Preserve `tests/root-shell-route-governance.test.js`, `tests/public-surface-characterization.test.js`, `tests/zones-view-selection-filters-characterization.test.js`, `tests/zones-view-dialog-feedback-characterization.test.js`, and `tests/zones-view.e2e.js` coverage for the supported `#zones` route.
+**Migration considerations:** Preserve the existing company-regions API contract and the current root-shell actor split; do not reinterpret the implemented view as a new backend geography module boundary.
+**Rollback or mitigation:** Revert the zones route wiring and view modules together if a supported-shell regression is detected, while preserving validator/test updates for diagnosis.
+**Risk:** Medium
+
+## TASK-043: Add isolated characterization for zones dialogs and feedback flows
+**Status:** Completed
+**Priority:** Medium
+**Domain:** Embedded browser runtime / Root shell maintainability
+**Requirement:** `quality-baseline-recovery` TASK-005
+**Reason:** Selection/filter behavior had isolated coverage, but dialog lifecycle, inline errors, and toast feedback remained concentrated in `zones-admin.js`.
+**Current problem resolved:** `#zones` no longer depends only on integrated behavior for dialog open/close/reset, submit feedback, and inline error rendering; those behaviors now have focused characterization coverage.
+**Implemented change:** Added isolated characterization coverage for zone/subzone dialogs, success toast behavior, inline error rendering, and field-error handling without changing the supported UI contract. The implementation kept the existing DOM/API contract and extracted only small helper seams in `zones-admin.helpers.js` for `resetFormState`, `renderFormError`, and `setSubmitButtonState`.
+**Affected files:** `src/public/root/views/zones-admin.js`, `src/public/root/views/zones-admin.helpers.js`, `tests/zones-view-dialog-feedback-characterization.test.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `TASK-042` completed baseline
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium regression-prevention impact
+**Acceptance criteria:** Dialog open/close/reset, success feedback, inline error messaging, and field-error behavior are covered by isolated tests while `tests/zones-view.e2e.js` remains green.
+**Validation evidence:** `node --test tests/zones-view-dialog-feedback-characterization.test.js`; `node --test tests/zones-view.e2e.js`; `node --test tests/zones-view-selection-filters-characterization.test.js`; `node --test tests/root-shell-route-governance.test.js`; `npm run validate:public-runtime`; `npm run typecheck`; `npm run lint:public-runtime`
+**Required tests:** Preserve `tests/zones-view-dialog-feedback-characterization.test.js`, `tests/zones-view-selection-filters-characterization.test.js`, `tests/zones-view.e2e.js`, and `tests/root-shell-route-governance.test.js` coverage.
+**Migration considerations:** Preserve current DOM contract and API usage.
+**Rollback or mitigation:** Revert only the added seam/tests if they unintentionally alter supported UI behavior.
+**Risk:** Medium
+
+## TASK-041: Align coding-standards canonical path and compatibility governance
+**Status:** Completed
+**Priority:** Low
+**Domain:** Repository/platform governance / Documentation ownership
+**Requirement:** `coding-standard-doc-path-alignment`; FR-001; FR-002; FR-003; FR-004; FR-005; AC-001; AC-002; AC-003
+**Reason:** The repository needed one authoritative coding-standards path without leaving two independently maintained standards bodies.
+**Current problem resolved:** `docs/coding_standard.md` now holds the full standards body, `docs/coding-standards.md` is only a compatibility notice, and repo-owned docs/tests/scripts are guarded against stale hyphenated-path references.
+**Implemented change:** Completed through `coding-standard-doc-path-alignment`; established `docs/coding_standard.md` as canonical, reduced `docs/coding-standards.md` to a compatibility bridge, added `tests/coding-standard-path-alignment.test.js`, and refreshed spec evidence for the final path policy.
+**Affected files:** `docs/coding_standard.md`, `docs/coding-standards.md`, `tests/coding-standard-path-alignment.test.js`, `specs/coding-standard-doc-path-alignment/**`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
+**Dependencies:** None
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance and drift-prevention impact
+**Acceptance criteria:** `docs/coding_standard.md` remains the single authoritative standards body; `docs/coding-standards.md` remains compatibility-only; a focused repository test fails if stale repo-owned hyphenated references or duplicate authoritative content reappear.
+**Validation evidence:** `node --test tests/coding-standard-path-alignment.test.js`; `node --test tests/workflow-baseline-characterization.test.js`; `npm run typecheck`; `npm run build` ⚠️ pre-existing local Windows Prisma rename-lock `EPERM`
+**Required tests:** Preserve `tests/coding-standard-path-alignment.test.js` and `tests/workflow-baseline-characterization.test.js` coverage for documentation-path governance.
+**Migration considerations:** Keep the compatibility bridge until remaining consumers no longer depend on the hyphenated path; do not restore a second full copy of the standards body.
+**Rollback or mitigation:** Revert only the documentation-path alignment slice if an external dependency unexpectedly requires temporary rollback, while keeping the path-governance evidence for diagnosis.
+**Risk:** Low
+
 ## TASK-040: Harden company-admin sidebar overflow behavior and regression coverage
 **Status:** Completed
 **Priority:** Medium
