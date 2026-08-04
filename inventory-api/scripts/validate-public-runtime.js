@@ -10,20 +10,35 @@ const expectedJavaScriptFiles = [
   'login.js',
   'migration.js',
   'no-access.js',
+  'root/agents-api.js',
   'root/app.js',
+  'root/clients-api.js',
   'root/companies-api.js',
   'root/guards.js',
   'root/manifest.js',
   'root/registry.js',
+  'root/runtime-contract.js',
   'root/roles-api.js',
   'root/router.js',
+  'root/routes-api.js',
   'root/zones-api.js',
   'root/session-adapter.js',
   'root/ui.js',
+  'root/views/agents-admin.helpers.js',
+  'root/views/agents-admin.renderers.js',
+  'root/views/agents-admin.js',
+  'root/views/clients-admin.helpers.js',
+  'root/views/clients-admin.renderers.js',
+  'root/views/clients-admin.state.js',
+  'root/views/clients-admin.js',
   'root/views/companies-admin.js',
   'root/views/home.js',
   'root/views/in-process.js',
   'root/views/roles-admin.js',
+  'root/views/routes-admin.helpers.js',
+  'root/views/routes-admin.renderers.js',
+  'root/views/routes-admin.state.js',
+  'root/views/routes-admin.js',
   'root/views/zones-admin.helpers.js',
   'root/views/zones-admin.js',
   'shared/auth.js',
@@ -86,6 +101,91 @@ function collectLocalAssetReferences(htmlSource) {
 
 function validateJavaScriptSyntax(filePath) {
   new vm.Script(readSource(filePath), { filename: filePath });
+}
+
+function collectRootShellLoaderScripts(rootHtmlSource) {
+  return collectLocalAssetReferences(rootHtmlSource).filter((assetPath) => assetPath.startsWith('/shared/') || assetPath.startsWith('/root/'));
+}
+
+function loadRootShellRuntimeContract() {
+  const browserWindow = {};
+  const context = vm.createContext({
+    Map,
+    window: browserWindow,
+  });
+  browserWindow.window = browserWindow;
+
+  vm.runInContext(readSource(path.join(publicRoot, 'root', 'registry.js')), context, { filename: 'root/registry.js' });
+  vm.runInContext(readSource(path.join(publicRoot, 'root', 'runtime-contract.js')), context, { filename: 'root/runtime-contract.js' });
+
+  return browserWindow.RootShell.require('runtimeContract');
+}
+
+function buildRootShellLoaderDriftMessage(actualScriptPaths, expectedScriptPaths) {
+  const missingScripts = expectedScriptPaths.filter((scriptPath) => !actualScriptPaths.includes(scriptPath));
+  const extraScripts = actualScriptPaths.filter((scriptPath) => !expectedScriptPaths.includes(scriptPath));
+  const firstMisorderedIndex = actualScriptPaths.findIndex((scriptPath, index) => expectedScriptPaths[index] !== scriptPath);
+  const details = [];
+
+  if (missingScripts.length > 0) {
+    details.push(`missing scripts: ${missingScripts.join(', ')}`);
+  }
+
+  if (extraScripts.length > 0) {
+    details.push(`unexpected scripts: ${extraScripts.join(', ')}`);
+  }
+
+  if (firstMisorderedIndex !== -1) {
+    details.push(`misordered script at index ${firstMisorderedIndex}: expected ${expectedScriptPaths[firstMisorderedIndex]} but found ${actualScriptPaths[firstMisorderedIndex]}`);
+  }
+
+  if (details.length === 0) {
+    details.push('loader script order differs from the approved runtime contract');
+  }
+
+  return `root/index.html: loader contract drift -> ${details.join('; ')}`;
+}
+
+function validateRootShellLoaderContract(rootHtmlSource) {
+  const runtimeContract = loadRootShellRuntimeContract();
+  const approvedLoaderScripts = runtimeContract.getLoaderScriptPaths();
+  const actualLoaderScripts = collectRootShellLoaderScripts(rootHtmlSource);
+
+  if (JSON.stringify(actualLoaderScripts) !== JSON.stringify(approvedLoaderScripts)) {
+    throw new Error(buildRootShellLoaderDriftMessage(actualLoaderScripts, approvedLoaderScripts));
+  }
+
+  for (const scriptContract of runtimeContract.loaderScripts) {
+    const relativeScriptPath = scriptContract.path.replace(/^\//, '');
+    const absoluteScriptPath = path.join(publicRoot, relativeScriptPath);
+    const scriptSource = readSource(absoluteScriptPath);
+    const consumerIndex = approvedLoaderScripts.indexOf(scriptContract.path);
+
+    for (const registeredModuleName of scriptContract.registers) {
+      const registerSnippet = `rootShell.register('${registeredModuleName}'`;
+      if (!scriptSource.includes(registerSnippet)) {
+        throw new Error(`${relativeScriptPath}: loader contract drift -> missing RootShell registration for ${registeredModuleName}`);
+      }
+    }
+
+    for (const requiredModuleName of scriptContract.requiresModules) {
+      const requireSnippet = `rootShell.require('${requiredModuleName}')`;
+      if (!scriptSource.includes(requireSnippet)) {
+        throw new Error(`${relativeScriptPath}: loader contract drift -> missing RootShell dependency on ${requiredModuleName}`);
+      }
+    }
+
+    for (const requiredScriptPath of scriptContract.requiresScripts) {
+      const providerIndex = approvedLoaderScripts.indexOf(requiredScriptPath);
+      if (providerIndex === -1) {
+        throw new Error(`${relativeScriptPath}: loader contract drift -> unknown required script ${requiredScriptPath}`);
+      }
+
+      if (providerIndex >= consumerIndex) {
+        throw new Error(`${relativeScriptPath}: loader contract drift -> required script ${requiredScriptPath} must load before ${scriptContract.path}`);
+      }
+    }
+  }
 }
 
 function validateHtmlAssets(filePath) {
@@ -183,25 +283,33 @@ function validateRootShellRuntimeContracts() {
   const rootRouterSource = readSource(path.join(publicRoot, 'root', 'router.js'));
   const rootManifestSource = readSource(path.join(publicRoot, 'root', 'manifest.js'));
   const rootGuardsSource = readSource(path.join(publicRoot, 'root', 'guards.js'));
+  const rootRuntimeContractSource = readSource(path.join(publicRoot, 'root', 'runtime-contract.js'));
   const rootSessionAdapterSource = readSource(path.join(publicRoot, 'root', 'session-adapter.js'));
 
   if (!rootHtmlSource.includes('id="root-main"') || !rootHtmlSource.includes('id="root-view"')) {
     throw new Error('root/index.html: missing contract -> shell landmarks and view outlet');
   }
 
-  if (!rootHtmlSource.includes('/shared/session.js')
-    || !rootHtmlSource.includes('/shared/auth.js')
-    || !rootHtmlSource.includes('/root/registry.js')
-    || !rootHtmlSource.includes('/root/companies-api.js')
-    || !rootHtmlSource.includes('/root/roles-api.js')
-    || !rootHtmlSource.includes('/root/zones-api.js')
-    || !rootHtmlSource.includes('/root/ui.js')
-    || !rootHtmlSource.includes('/root/views/companies-admin.js')
-    || !rootHtmlSource.includes('/root/views/roles-admin.js')
-    || !rootHtmlSource.includes('/root/views/zones-admin.helpers.js')
-    || !rootHtmlSource.includes('/root/views/zones-admin.js')
-    || !rootHtmlSource.includes('/root/app.js')) {
-    throw new Error('root/index.html: missing contract -> shared helper and shell script wiring');
+  validateRootShellLoaderContract(rootHtmlSource);
+
+  if (!rootRuntimeContractSource.includes("bootstrapModuleNames = Object.freeze(['sessionAdapter', 'guards', 'manifest', 'router'])")) {
+    throw new Error('root/runtime-contract.js: missing contract -> approved bootstrap module inventory');
+  }
+
+  if (!rootRuntimeContractSource.includes('assertNavigationItems(items)')) {
+    throw new Error('root/runtime-contract.js: missing contract -> manifest validation seam');
+  }
+
+  if (!rootAppSource.includes("rootShell.require('runtimeContract')")) {
+    throw new Error('root/app.js: missing contract -> runtime contract bootstrap dependency');
+  }
+
+  if (!rootAppSource.includes('runtimeContract.requireModules(runtimeContract.bootstrapModuleNames)')) {
+    throw new Error('root/app.js: missing contract -> contract-driven bootstrap module resolution');
+  }
+
+  if (!rootAppSource.includes('runtimeContract.assertNavigationItems(rootShellManifest.items)')) {
+    throw new Error('root/app.js: missing contract -> contract-driven manifest validation');
   }
 
   if (!rootAppSource.includes('rootShellSessionAdapter.bootstrap()')) {
@@ -218,6 +326,9 @@ function validateRootShellRuntimeContracts() {
 
   if (!rootManifestSource.includes("label: 'Inicio'")
     || !rootManifestSource.includes("label: 'Empresas'")
+    || !rootManifestSource.includes("label: 'Agentes'")
+    || !rootManifestSource.includes("label: 'Clientes'")
+    || !rootManifestSource.includes("label: 'Rutas'")
     || !rootManifestSource.includes("label: 'Roles y permisos'")
     || !rootManifestSource.includes("label: 'Zonas'")
     || !rootManifestSource.includes("label: 'Pendientes'")) {

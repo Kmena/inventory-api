@@ -6,12 +6,41 @@ const { PrismaClient } = require('@prisma/client');
  * }} PrismaClientWithReadiness
  */
 
-const prisma = /** @type {PrismaClientWithReadiness} */ (new PrismaClient());
+/** @type {import('@prisma/client').PrismaClient | null} */
+let prismaClient = null;
 
-async function checkDatabaseReadiness(prismaClient = prisma) {
-  await prismaClient.$queryRaw`SELECT 1`;
+function getPrismaClient() {
+  if (!prismaClient) {
+    prismaClient = new PrismaClient();
+  }
+
+  return prismaClient;
 }
 
-prisma.checkDatabaseReadiness = checkDatabaseReadiness;
+async function checkDatabaseReadiness(prismaInstance = getPrismaClient()) {
+  await prismaInstance.$queryRaw`SELECT 1`;
+}
+
+const prisma = /** @type {PrismaClientWithReadiness} */ (new Proxy({ checkDatabaseReadiness }, {
+  get(target, property, receiver) {
+    if (property === 'checkDatabaseReadiness') {
+      return target.checkDatabaseReadiness;
+    }
+
+    const activeClient = getPrismaClient();
+    const value = Reflect.get(activeClient, property, receiver);
+    return typeof value === 'function' ? value.bind(activeClient) : value;
+  },
+  set(target, property, value) {
+    if (property === 'checkDatabaseReadiness') {
+      target.checkDatabaseReadiness = value;
+      return true;
+    }
+
+    const activeClient = getPrismaClient();
+    activeClient[property] = value;
+    return true;
+  },
+}));
 
 module.exports = prisma;

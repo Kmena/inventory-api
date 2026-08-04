@@ -3,7 +3,7 @@
 ## 1. Purpose and scope
 This document describes only the architecture currently implemented and the active decisions currently governing the repository.
 
-This refresh reflects the repository state after `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-009`, together with `hotspot-seams-doc-ownership` `TASK-001` through `TASK-008`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, and the implemented `root-shell-follow-up-alignment` slice, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`, in addition to the already-implemented browser-runtime reduction, runtime-contract governance convergence, Redis browser-session operational safeguards, DB-free versus DB-backed suite separation for the affected browser/runtime boundary, and the currently implemented permission-governance runtime slices.
+This refresh reflects the repository state after `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-009`, together with `hotspot-seams-doc-ownership` `TASK-001` through `TASK-008`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, the implemented `root-shell-follow-up-alignment` slice, `root-shell-commercial-views`, and `root-shell-commercial-views-hardening`, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, and `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`, in addition to the already-implemented browser-runtime reduction, runtime-contract governance convergence, Redis browser-session operational safeguards, DB-free versus DB-backed suite separation for the affected browser/runtime boundary, and the currently implemented permission-governance runtime slices.
 
 ## 2. Current active architecture summary
 The repository remains a single-deployable Node.js 24 Express + Prisma modular monolith.
@@ -31,7 +31,7 @@ The implemented `/root/` shell now has a split actor presentation inside the sam
 The implemented root shell is no longer limited to `Inicio` and a generic pending route. It now includes:
 - root-global routes at `#home` and `#companies`;
 - company-admin explicit sidebar routes at `#admin_home`, `#products`, `#lots`, `#movements`, `#production`, `#agents`, `#routes`, `#zones`, `#clients`, `#purchases`, `#warehouses`, `#approvals`, `#reports`, `#users`, `#roles_permissions`, and `#settings`;
-- functional company-admin views at `#roles_permissions` and `#zones`; and
+- functional company-admin views at `#roles_permissions`, `#zones`, `#agents`, `#clients`, and `#routes`; and
 - a shared neutral `in_process` view used by the remaining current company-admin routes.
 
 This refresh also accounts for the now-completed `p10-permission-governance` analysis package plus its implemented follow-up slices in `p28`, `p30`, and `p32`: a practical explainer of the governance recommendations lives in `docs/permission-governance-decisions.md`, while the active runtime foundation lives under `src/security/permission-governance*.js` and is now consumed by selected backend services for both company creation and company-role creation hardening, including dedicated denial-path audit visibility for the approved company-role create deny.
@@ -86,10 +86,24 @@ Observable current runtime/governance areas:
 - **Prisma**: schema and migration history
 - **Shared browser helpers (`src/public/shared/session.js`, `src/public/shared/auth.js`)**: cookie-session bootstrap/read/cleanup and authenticated browser fetch/logout helpers
 - **Login runtime (`src/public/index.html`, `src/public/login.js`)**: public auth entrypoint and post-login destination resolution
-- **Root shell (`src/public/root/**`)**: supported authenticated root entrypoint, session bootstrap, bounded `window.RootShell` registry seam (`register`, `require`, `has`), actor-aware guards, manifest-driven navigation, hash router, shared shell UI helpers, split actor furniture (root top-nav vs. company-admin sidebar), shell-owned global offsets, view-owned internal content layout, home view, neutral in-process fallback, root-only Companies Admin view, company-admin Roles/Permissions Admin view, company-admin Zones master-detail view, grouped tenant-admin sidebar IA with explicit placeholder routes, overflow-hardened sidebar styling (fixed header/footer, central scroll lane, truncated labels/footer copy, collapsed-only tooltip reveal, thin scrollbars), logout trigger, and bounded modularity guardrails enforced by `tests/root-shell-modularity-governance.test.js` for the registry contract plus the current router/zones seam expectations
+- **Root shell (`src/public/root/**`)**: supported authenticated root entrypoint, session bootstrap, bounded `window.RootShell` registry seam (`register`, `require`, `has`), explicit `runtime-contract.js` loader/module contract for the approved shared helpers and root-shell scripts, contract-driven app bootstrap/manifest validation, actor-aware guards, manifest-driven navigation, hash router, shared shell UI helpers, split actor furniture (root top-nav vs. company-admin sidebar), shell-owned global offsets, view-owned internal content layout, home view, neutral in-process fallback, root-only Companies Admin view, company-admin Roles/Permissions Admin view, company-admin Zones master-detail view, company-admin Agents two-panel commercial-user view, company-admin Clients list/detail workspace, company-admin Routes overview/detail workspace, grouped tenant-admin sidebar IA with explicit placeholder routes, overflow-hardened sidebar styling (fixed header/footer, central scroll lane, truncated labels/footer copy, collapsed-only tooltip reveal, thin scrollbars), logout trigger, and bounded modularity guardrails enforced by `tests/root-shell-modularity-governance.test.js` plus `scripts/validate-public-runtime.js` for the registry contract, loader script inventory, and the current router/zones/commercial seam expectations
 - **Zones helper seam (`src/public/root/views/zones-admin.helpers.js`)**: owns local text normalization, zone/subzone filtering, selected-zone fallback, field-error helpers, dialog utility behavior, form reset/render helpers, and submit-button state helpers reused by `zones-admin.js`
 - **Zones view controller (`src/public/root/views/zones-admin.js`)**: owns DOM event wiring, async load/create flows, toast lifecycle, mobile list/detail transitions, and integration with `zones-api.js`, while delegating small selection/filter and dialog/form seams to `zones-admin.helpers.js`
+- **Agents helper seam (`src/public/root/views/agents-admin.helpers.js`)**: owns commercial-role detection, company-user plus routes-overview dataset composition, local search/group filtering, and metrics summarization for the supported `#agents` screen
+- **Agents renderer seam (`src/public/root/views/agents-admin.renderers.js`)**: owns list, detail, assigned-route, assignment-editor, and goals rendering for the supported `#agents` screen
+- **Agents view controller (`src/public/root/views/agents-admin.js`)**: owns DOM event wiring, partial-degradation handling, company-user creation flow, route-assignment UX, and orchestration over `agents-api.js`, delegating HTML rendering to `agents-admin.renderers.js`
+- **Clients helper seam (`src/public/root/views/clients-admin.helpers.js`)**: owns local client filtering plus client, store, reference, and document payload shaping for the supported `#clients` screen
+- **Clients renderer seam (`src/public/root/views/clients-admin.renderers.js`)**: owns client list/detail and related markup rendering for the supported `#clients` screen
+- **Clients state seam (`src/public/root/views/clients-admin.state.js`)**: owns zone-option flattening, selected-client resolution, and list-summary text derivation for the supported `#clients` screen
+- **Clients view controller (`src/public/root/views/clients-admin.js`)**: owns list/detail DOM orchestration, client create/update/deactivate flows, append-only store/document/reference behavior, taxpayer lookup, and document download integration over `clients-api.js`, delegating rendering/state helpers to the extracted seams
+- **Routes helper seam (`src/public/root/views/routes-admin.helpers.js`)**: owns local route filtering, overview summarization, route/goals payload shaping, and simplified coordinate projection for the supported `#routes` screen
+- **Routes renderer seam (`src/public/root/views/routes-admin.renderers.js`)**: owns route detail, covered-store, goals, and simplified SVG map rendering for the supported `#routes` screen
+- **Routes state seam (`src/public/root/views/routes-admin.state.js`)**: owns selected-route resolution, route-summary text derivation, and goal-row selection helpers for the supported `#routes` screen
+- **Routes view controller (`src/public/root/views/routes-admin.js`)**: owns route overview/detail DOM orchestration, route create/update flows, subzone and agent assignment saves, per-agent goal replace-all saves, and covered-store/map workflow over `routes-api.js`, delegating rendering/state helpers to the extracted seams
 - **Root Zones API adapter (`src/public/root/zones-api.js`)**: same-origin browser adapter for `GET /api/regions/company`, `POST /api/regions/company`, and `POST /api/regions/company/:regionId/subregions`
+- **Root Agents API adapter (`src/public/root/agents-api.js`)**: same-origin browser adapter for company-user list/create, company-role list, sales-route overview loading, and route-assignment saves across `/api/users/company`, `/api/roles/company`, and `/api/sales-routes/company/**`
+- **Root Clients API adapter (`src/public/root/clients-api.js`)**: same-origin browser adapter for supported client, client-classification, client-document-type, store, reference, document, taxpayer, economic-activity, and regions calls under `/api/clients/**`, `/api/taxpayers/lookup?identification=...`, `/api/economic-activities`, and `/api/regions/company`
+- **Root Routes API adapter (`src/public/root/routes-api.js`)**: same-origin browser adapter for route overview/detail/create/update, subzone assignment, agent assignment, and agent-goal saves under `/api/sales-routes/company/**`
 - **Root Companies API adapter (`src/public/root/companies-api.js`)**: same-origin browser adapter for root-company list/create/status operations against `/api/companies/root/companies` and `/api/companies/root/companies/:companyId/status`
 - **Root Roles API adapter (`src/public/root/roles-api.js`)**: same-origin browser adapter for permission catalog and company-role list/create operations against `/api/roles/permissions` and `/api/roles/company`
 - **Migration / no-access surfaces**: supported fallback pages for deprecated-route rendering and non-wave-one transition behavior
@@ -136,7 +150,8 @@ Current public-runtime dependency constraints now in effect:
 - the current browser-runtime `typecheck` baseline remains intentionally bounded and explicit, covering `src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`, and the approved `src/public/root/**` shell files only.
 - bounded governance evidence now also includes `src/security/access-policies.js`, while still avoiding repository-wide `src/security/**` typecheck expansion.
 - the root shell is governed by an explicit bounded `typecheck` allowlist plus lint, `validate-public-runtime`, smoke tests, characterization tests, route-governance tests, root-shell modularity tests, and browser E2E.
-- for sensitive root-shell modules, active governance now requires verifiable isolated characterization and/or continued use of the currently extracted seams: `router.js` is protected by `tests/root-shell-router-characterization.test.js`, and `zones-admin.js` is protected by helper-seam assertions and isolated characterization coverage in `tests/root-shell-modularity-governance.test.js`, `tests/zones-view-selection-filters-characterization.test.js`, and `tests/zones-view-dialog-feedback-characterization.test.js`.
+- the intended local validation entrypoints for browser/runtime governance are the repository-owned wrappers `scripts/run-eslint.js` and `scripts/run-tsc.js`, which keep `npm run lint:public-runtime` and `npm run typecheck` portable without depending on shell-exposed CLI shims.
+- for sensitive root-shell modules, active governance now requires verifiable isolated characterization and/or continued use of the currently extracted seams: `router.js` is protected by `tests/root-shell-router-characterization.test.js`, `zones-admin.js` is protected by helper-seam assertions and isolated characterization coverage in `tests/root-shell-modularity-governance.test.js`, `tests/zones-view-selection-filters-characterization.test.js`, and `tests/zones-view-dialog-feedback-characterization.test.js`, and the supported commercial views are now protected by direct seam/governance coverage in `tests/agents-view-characterization.test.js`, `tests/clients-view-characterization.test.js`, `tests/routes-view-characterization.test.js`, `tests/root-shell-modularity-governance.test.js`, `tests/public-surface-characterization.test.js`, `tests/public-runtime-http-smoke.test.js`, `tests/typecheck-ci-hardening-governance.test.js`, and the browser-level regression lane in `tests/root-shell-commercial-views.e2e.js`.
 - actor-aware route visibility is enforced in the shell manifest/guards for UX purposes, but backend company and role endpoints remain the authoritative security boundary.
 - retired legacy pages and `legacy-public-runtime/` may not re-enter supported runtime, validator scope, or typecheck scope without a new approved specification.
 
@@ -173,6 +188,9 @@ Current public HTML/browser contract:
 - `#companies` is a root-only shell surface backed by `/api/companies/root/companies` list/create/status contracts
 - `#roles_permissions` is a company-admin shell surface backed by `/api/roles/permissions` and `/api/roles/company` list/create contracts
 - `#zones` is a company-admin shell surface backed by `/api/regions/company` and `/api/regions/company/:regionId/subregions`, with local in-memory search and server round-trips limited to load, refresh, and successful create actions
+- `#agents` is a company-admin shell surface backed by `/api/users/company`, `/api/roles/company`, and `/api/sales-routes/company`, with frontend dataset composition, local filtering, company-user creation, and route-assignment saves through existing sales-route assignment contracts
+- `#clients` is a company-admin shell surface backed by `/api/clients/company`, `/api/clients/:id`, `/api/clients/classifications/company`, `/api/clients/document-types`, `/api/clients/company/:clientId/stores`, `/api/clients/:clientId/documents`, `/api/clients/:clientId/references`, `/api/clients/:clientId/documents/:documentId/download`, `/api/taxpayers/lookup?identification=...`, `/api/economic-activities`, and `/api/regions/company`
+- `#routes` is a company-admin shell surface backed by `/api/sales-routes/company`, `/api/sales-routes/company/:routeId`, `/api/sales-routes/company/:routeId/subzones`, `/api/sales-routes/company/:routeId/assignments`, `/api/sales-routes/company/agents/:userId/goals`, and `/api/regions/company`
 - the remaining current company-admin sidebar routes render the shared neutral `in_process` view, with `#admin_home` as the default landing when no hash is present
 - no supported root-shell contract exists today for company edit/delete/detail, role update/delete, permission mutation, or user-role reassignment
 - no runtime company-role update flow currently exists, so update hardening remains deferred until an approved update surface is implemented
@@ -195,7 +213,7 @@ Current observable security boundaries include:
 - same-origin `Origin` validation on mutating cookie-authenticated requests in `authenticate.js`
 - explicit no-fallback failure behavior when Redis-backed browser-session persistence is configured but unreachable
 - client-side root guards acting only as UX gates; backend APIs remain the authority
-- the current shell actor split is global `root` without `companyId` for the top-nav shell and routes `#home` / `#companies`, and `admin` with `companyId` for the sidebar shell where `#admin_home` is the default landing, `#roles_permissions` and `#zones` are the functional tenant-admin routes, and the remaining approved sidebar routes currently render the shared neutral `in_process` view
+- the current shell actor split is global `root` without `companyId` for the top-nav shell and routes `#home` / `#companies`, and `admin` with `companyId` for the sidebar shell where `#admin_home` is the default landing, `#roles_permissions`, `#zones`, `#agents`, `#clients`, and `#routes` are the functional tenant-admin routes, and the remaining approved sidebar routes currently render the shared neutral `in_process` view
 
 ## 10. Current container and deployment architecture
 Follow-up validation now confirms the upgraded bcrypt native dependency path works with the versioned Docker assets: `inventory-api/Dockerfile` builds successfully, in-container bcrypt smoke passes, and the application starts successfully far enough to serve `GET /health` when documented runtime prerequisites are supplied. This does not change the versioned Docker assets themselves and is not documented as an active dependency vulnerability.
@@ -222,7 +240,7 @@ Current implemented testing posture includes:
 - governance tests for runtime-contract completeness and OpenAPI consistency
 - browser E2E coverage
 - bounded browser-runtime typecheck coverage over `src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`, and the approved `src/public/root/**` shell files
-- focused route/modularity/browser coverage through `tests/root-shell-route-governance.test.js`, `tests/root-shell-modularity-governance.test.js`, `tests/public-surface-characterization.test.js`, `tests/zones-view-selection-filters-characterization.test.js`, `tests/zones-view-dialog-feedback-characterization.test.js`, and `tests/zones-view.e2e.js`
+- focused route/modularity/browser coverage through `tests/root-shell-route-governance.test.js`, `tests/root-shell-router-characterization.test.js`, `tests/root-shell-modularity-governance.test.js`, `tests/public-surface-characterization.test.js`, `tests/agents-view-characterization.test.js`, `tests/clients-view-characterization.test.js`, `tests/routes-view-characterization.test.js`, `tests/zones-view-selection-filters-characterization.test.js`, `tests/zones-view-dialog-feedback-characterization.test.js`, and `tests/zones-view.e2e.js`
 - inventory hotspot characterization coverage through `tests/inventory-service-hotspot-characterization.test.js`, freezing paginated inventory movement/alert seams, alert disappearance conflict handling, and transaction propagation around `updateLotQa` and `registerStockEntry`
 - agent-workspace hotspot characterization coverage through `tests/agent-workspace-hotspot-characterization.test.js`, freezing tenant-scoped store filtering/sorting, store summary serialization, and current order-payload coercion/delegation behavior
 - product hotspot characterization coverage through `tests/product-service-hotspot-characterization.test.js`, freezing repository-transaction ownership for `createProduct`, derived lot-usability decoration, category-cache reuse during import, and import-time inventory registration coupling
@@ -291,6 +309,29 @@ Recorded post-implementation evidence supplied by the user for `quality-baseline
 - `node --test tests/root-shell-route-governance.test.js` passed
 - `npm run typecheck` passed
 - `npm run lint:public-runtime` passed
+
+Recorded post-implementation evidence supplied by the user for `root-shell-commercial-views`:
+- `npm run validate:public-runtime` passed
+- `node --test tests/root-shell-route-governance.test.js` passed
+- `node --test tests/root-shell-router-characterization.test.js` passed
+- `node --test tests/public-surface-characterization.test.js` passed
+- `node --test tests/agents-view-characterization.test.js` passed
+- `node --test tests/clients-view-characterization.test.js` passed
+- `node --test tests/routes-view-characterization.test.js` passed
+- `node --test tests/public-runtime-http-smoke.test.js tests/prisma-client-baseline-characterization.test.js tests/public-surface-characterization.test.js tests/typecheck-ci-hardening-governance.test.js` now passes in the intended local Windows-oriented validation lane, keeping the Prisma-adjacent smoke assertions DB-idle until a Prisma operation is explicitly requested
+- `npm run lint:public-runtime` now passes through the repository-owned `scripts/run-eslint.js` wrapper instead of depending on a shell-exposed `eslint` shim
+- `npm run typecheck` now passes through the repository-owned `scripts/run-tsc.js` wrapper instead of depending on a shell-exposed `tsc` shim
+- `node --test tests/root-shell-commercial-views.e2e.js` now passes as the representative browser E2E lane for the supported `#agents`, `#clients`, and `#routes` views
+
+Recorded post-implementation evidence supplied by the user for `root-shell-commercial-views-hardening`:
+- `node --test tests/agents-view-characterization.test.js tests/clients-view-characterization.test.js tests/routes-view-characterization.test.js tests/root-shell-modularity-governance.test.js` passed
+- `node --test tests/public-surface-characterization.test.js tests/public-runtime-http-smoke.test.js tests/typecheck-ci-hardening-governance.test.js` passed
+- `node --test tests/root-shell-commercial-views.e2e.js` passed
+- `node --test tests/payment-tenant-scope.test.js tests/invoice-payment-sync-characterization.test.js tests/pagination.test.js tests/payment-receipt-security.test.js tests/audit-instrumentation.test.js` passed
+- `npm run lint` passed
+- `npm run typecheck` passed
+- `npm run build` passed
+- `npm run validate:public-runtime` passed
 
 Recorded post-implementation evidence supplied by the user for `repository-baseline-score-recovery` `TASK-007`:
 - `node --test tests/inventory-service-hotspot-characterization.test.js tests/inventory-alerts-tenant-scope.test.js tests/approval-baseline-compatibility.test.js` passed
@@ -396,7 +437,7 @@ Recorded post-implementation evidence supplied by the user for `p27`:
 - keep native `bcrypt` as the active password-hashing library rather than redesigning auth hashing in this slice
 - keep the approved dependency baseline on `bcrypt@^6.0.0`
 - keep dependency-hygiene governance at zero approved residual vulnerabilities
-- treat missing Docker-daemon evidence as an operational validation gap, not as proof of a remaining repository vulnerability
+- keep the recorded Docker-daemon validation evidence for the native bcrypt path as completed operational support, not as pending architecture work
 Currently implemented or actively governing decisions:
 - keep the application as a single deployable modular monolith
 - keep the embedded browser runtime inside the same Express process
@@ -416,6 +457,7 @@ Currently implemented or actively governing decisions:
 - keep Companies Admin bounded to the existing root-company list/create/status endpoints only
 - keep Roles/Permissions Admin bounded to the existing permission catalog and company-role list/create endpoints only
 - keep Zones bounded to the existing company-regions list/create/subregion-create endpoints only
+- keep `#agents`, `#clients`, and `#routes` as active company-admin root-shell modules over the existing backend contracts, preserving the extracted renderer/state seams and governance coverage added during `root-shell-commercial-views-hardening`
 - keep the remaining approved company-admin sidebar entries mapped to the shared neutral `in_process` view until later approved slices implement real modules
 - keep company-admin sidebar tooltips display-gated until collapsed hover/focus so hidden tooltip boxes do not affect layout width
 - keep header/footer fixed and constrain scrolling plus styled scrollbar behavior to the middle sidebar region only
@@ -446,10 +488,13 @@ Currently implemented or actively governing decisions:
 - broad service responsibilities
 - operational/readiness/browser governance still depends on synchronized docs, scripts, tests, manifest metadata, and workflows
 - the repository still carries a temporary compatibility bridge at the legacy hyphenated coding-standards path; governance relies on maintainers not restoring a second full standards body there, with `tests/coding-standard-path-alignment.test.js` acting as the preventive guardrail
-- the root shell is still a bounded first wave implemented through ordered global scripts rather than a stronger module-loading boundary, even though its internal dependency contract is now contained through `window.RootShell` and guarded by dedicated modularity tests
+- the root shell is still a bounded first wave implemented through ordered global scripts rather than a stronger module-loading boundary, but the approved script inventory and minimal provider-before-consumer expectations are now centralized in `src/public/root/runtime-contract.js` and guarded by dedicated validator/test coverage around loader drift
 - root-shell navigation is local-manifest based and not yet centralized with any broader cross-role navigation model
 - the company-admin sidebar IA is richer than the currently implemented module set, because many visible entries still converge on the shared neutral `in_process` view
+- the commercial root-shell modules are still UI-layer compositions over existing REST contracts rather than dedicated application-layer frontend modules; `#agents` composes data from users, roles, and routes in the browser, and `#clients` / `#routes` still keep large DOM-oriented controllers even after adjacent renderer/state seam extraction
 - the `#zones` screen is still implemented as a sizable plain-script DOM workflow; selection/filter behavior and small dialog/form seams now have extracted helper support plus isolated characterization coverage, but the main async UI orchestration remains centralized in `src/public/root/views/zones-admin.js`
+- shell visibility is stricter than some backend authorization contracts: the current manifest exposes `#agents`, `#clients`, and `#routes` only to `company-admin`, even though some backing APIs also admit broader backend roles such as `sales` or `sales_supervisor`
+- requester-supplied hardening evidence for this slice now shows the public-runtime smoke lane, commercial browser E2E lane, and local Windows-friendly lint/typecheck entrypoints passing; the remaining Windows-specific Prisma concern stays limited to the separately documented `npm run build` generate rename-lock behavior rather than the targeted smoke or tooling commands
 - sidebar state logic currently hardcodes some group identifiers and route-specific UI assumptions inside `src/public/root/app.js`
 - role/permission governance remains hybrid, and the completed `p10` package has only been partially translated into runtime behavior: centralized policy data, governed-operation evaluation, the stable company-creation deny, the first company-role platform-scope deny, denial-path audit visibility for that deny, and a bounded admin-route actor-scope convergence seam now exist, but broader backend role-governance hardening and full repository-wide access-policy convergence are still incomplete
 - no runtime company-role update flow currently exists, so update hardening remains intentionally undocumented as active behavior
@@ -471,7 +516,7 @@ Currently implemented or actively governing decisions:
 ## 14. Open decisions requiring clarification
 Open future decisions visible after this refresh:
 - whether the approved company-admin sidebar entries should keep mapping to the shared neutral `in_process` view or graduate to distinct route contracts in the next slice
-- which company-admin sidebar module should be the next functional destination after `Roles y permisos` and `Zonas`
+- which company-admin sidebar module should be the next functional destination after the current implemented set (`Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas`)
 - whether root-shell navigation should remain local to `src/public/root/manifest.js` or later converge on a broader approved manifest model
 - whether additional browser roles beyond the current wave-one rule should later use `/root/` as a supported destination
 - whether the approved root-shell `typecheck` allowlist should later expand beyond the current explicit `src/public/root/**` file set

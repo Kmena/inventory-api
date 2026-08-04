@@ -100,7 +100,7 @@ test('reduced public runtime serves only the remaining supported JavaScript asse
   const server = app.listen(0);
   t.after(() => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))));
 
-  const supportedAssets = ['/login.js', '/migration.js', '/shared/auth.js', '/shared/session.js', '/root/app.js', '/root/router.js', '/root/registry.js', '/root/companies-api.js', '/root/roles-api.js', '/root/ui.js', '/root/views/companies-admin.js', '/root/views/roles-admin.js'];
+  const supportedAssets = ['/login.js', '/migration.js', '/shared/auth.js', '/shared/session.js', '/root/app.js', '/root/router.js', '/root/registry.js', '/root/companies-api.js', '/root/roles-api.js', '/root/agents-api.js', '/root/clients-api.js', '/root/routes-api.js', '/root/ui.js', '/root/views/companies-admin.js', '/root/views/roles-admin.js', '/root/views/agents-admin.helpers.js', '/root/views/agents-admin.renderers.js', '/root/views/agents-admin.js', '/root/views/clients-admin.helpers.js', '/root/views/clients-admin.renderers.js', '/root/views/clients-admin.state.js', '/root/views/clients-admin.js', '/root/views/routes-admin.helpers.js', '/root/views/routes-admin.renderers.js', '/root/views/routes-admin.state.js', '/root/views/routes-admin.js'];
 
   for (const assetPath of supportedAssets) {
     const response = await request(server, assetPath);
