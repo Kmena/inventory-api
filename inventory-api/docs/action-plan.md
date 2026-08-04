@@ -1,7 +1,7 @@
 # Architectural Action Plan
 
 ## 1. Objective
-Keep architecture-facing documentation synchronized with the real repository state after `hotspot-seams-doc-ownership` tasks 1-8 closure, in addition to the previously documented `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-008`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, and the related governance slices built on `p34-bounded-governance-coverage-expansion`, `p35-governance-baseline-sync-guardrails`, and `p36-bounded-doc-validator-ownership-alignment`. This refresh now also captures the implemented hotspot seam reductions that preserve the layered monolith while splitting `src/security/access-policies.js` into facade + registry + actor-scope + denial-audit ownership, extracting focused service seams in inventory, agent workspace, and product flows, and recording that the minimum and expanded validation matrix passed for the intended memory-session aggregate lane.
+Keep architecture-facing documentation synchronized with the real repository state after `hotspot-seams-doc-ownership` tasks 1-8 closure, in addition to the previously documented `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-008`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, `root-shell-commercial-views`, `root-shell-commercial-views-hardening`, and the related governance slices built on `p34-bounded-governance-coverage-expansion`, `p35-governance-baseline-sync-guardrails`, and `p36-bounded-doc-validator-ownership-alignment`. This refresh now also captures the implemented hotspot seam reductions that preserve the layered monolith while splitting `src/security/access-policies.js` into facade + registry + actor-scope + denial-audit ownership, extracting focused service seams in inventory, agent workspace, and product flows, and recording that the minimum and expanded validation matrix passed for the intended memory-session aggregate lane.
 
 This refresh also records the completed `bcrypt-supply-chain-closeout` feature: the repository dependency baseline now uses `bcrypt@^6.0.0`, the prior approved bcrypt residual chain has been removed from the lockfile and audit baseline, and dependency hygiene now enforces a zero-residual posture.
 
@@ -13,12 +13,17 @@ In scope for the current plan:
 - preserve the browser-session cookie model and reuse of `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout`
 - preserve explicit documentation that the remaining browser-session residual risk belongs to the HTTPS follow-up dependency in `specs/p11-https-browser-session-migration/` and is not an in-slice blocker for these bounded governance/documentation slices
 - preserve wave-one root-shell eligibility for `root` and `admin` with `companyId`
-- preserve actor-aware `/root/` shell navigation with root-global top navigation and the rebranded company-admin sidebar, keeping `#companies` for global root and `#roles_permissions` plus `#zones` for company-admin users with `companyId`
-- preserve the current company-admin sidebar IA grouped into `Inicio`, `Operacion`, `Control`, and `Administracion`, while recognizing that many visible items still render the shared neutral `in_process` view
+- preserve actor-aware `/root/` shell navigation with root-global top navigation and the rebranded company-admin sidebar, keeping `#companies` for global root and `#roles_permissions`, `#zones`, `#agents`, `#clients`, and `#routes` for company-admin users with `companyId`
+- preserve the current company-admin sidebar IA grouped into `Inicio`, `Operacion`, `Control`, and `Administracion`, while recognizing that several visible items still render the shared neutral `in_process` view
 - preserve the implemented visual hardening of the company-admin sidebar: fixed header/footer, central-only scrolling, defensive overflow rules, collapsed-only tooltip reveal, and thin styled scrollbar treatment on `.root-sidebar__scroll`
 - preserve the implemented Companies Admin shell flow over the existing root-company list/create/status endpoints
 - preserve the implemented Roles/Permissions Admin shell flow over the existing permission catalog and company-role list/create endpoints
 - preserve the implemented Zones shell flow over the existing company regions list/create and subregion-create endpoints
+- preserve the implemented Agents shell flow over the existing company users, company roles, and sales-routes overview/assignment endpoints
+- preserve the implemented Clients shell flow over the existing clients, classifications, document-types, regions, taxpayer, and economic-activities endpoints, including the aligned `/api/taxpayers/lookup?identification=...` browser adapter contract
+- preserve the implemented Routes shell flow over the existing sales-routes and regions endpoints
+- preserve the extracted commercial renderer/state seams now in effect: `src/public/root/views/agents-admin.renderers.js`, `src/public/root/views/clients-admin.renderers.js`, `src/public/root/views/clients-admin.state.js`, `src/public/root/views/routes-admin.renderers.js`, and `src/public/root/views/routes-admin.state.js`
+- preserve the narrow behavior-preserving cleanup inside `src/services/payment.service.js` validated by the existing payment regression lanes
 - preserve `/migration.html?mode=post-login-transition` for non-wave-one browser profiles
 - preserve the extracted hotspot seams now in effect: `src/security/access-policy-registry.js`, `src/security/access-policy-actor-scope.js`, `src/security/access-policy-audit.js`, `src/services/inventory-alerts.service.js`, `src/services/agent-workspace-store-state.service.js`, `src/services/product-permission-shaping.service.js`, and `src/services/product-pricing.service.js`
 - keep docs, validators, tests, and runtime contracts aligned to the implemented public runtime
@@ -30,7 +35,7 @@ In scope for the current plan:
 - record only the bounded follow-up work still visible after the implemented root-shell slice
 - record the implemented bcrypt dependency closeout without overstating it as an auth redesign
 - preserve stored-hash and hash-generation compatibility under `bcrypt@^6.0.0`
-- preserve truthful documentation that Docker validation remains an environment evidence gap only
+- preserve truthful documentation that Docker validation for the bcrypt native path is already recorded as completed evidence, not pending architecture work
 
 ## 3. Out of scope
 - reactivating legacy HTML pages as supported runtime
@@ -41,7 +46,7 @@ In scope for the current plan:
 - broadening root-shell eligibility or navigation beyond what is implemented today without a later approved slice
 
 ## 4. Requirements addressed
-This plan reflects the implemented `zones-view`, `sidebar-rebrand-permissions` `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-008`, `p27`, `p28`, `p29`, `p30`, `p31`, `p32`, `p33`, `p34`, `p35`, `p36`, `p37`, and `p38` behavior now observable in code and tests:
+This plan reflects the implemented `zones-view`, `sidebar-rebrand-permissions` `TASK-001`, `TASK-002`, `TASK-003`, `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-008`, `p27`, `p28`, `p29`, `p30`, `p31`, `p32`, `p33`, `p34`, `p35`, `p36`, `p37`, `p38`, `root-shell-commercial-views`, and `root-shell-commercial-views-hardening` behavior now observable in code and tests:
 - a new supported root SPA shell exists at `/root/`
 - browser login routes wave-one root-eligible users to `/root/` instead of `/migration.html?mode=post-login-transition`
 - the root shell reuses the existing browser-session model and `GET /api/auth/me` for bootstrap
@@ -50,7 +55,13 @@ This plan reflects the implemented `zones-view`, `sidebar-rebrand-permissions` `
 - global root sessions now keep top navigation, see `Empresas`, and can use bounded Companies Admin list/create/status flows from the shell
 - company-admin sessions with `companyId` now receive the rebranded sidebar, see grouped tenant-admin navigation, land on `#admin_home` when no hash is present, and can use bounded permission catalog + company-role list/create flows from the shell through `Roles y permisos`
 - company-admin sessions can also use the implemented `#zones` view to list zones, locally search zones/subzones, create zones, and create subzones through the existing company-regions endpoints
-- the approved company-admin sidebar entries now have explicit route keys in `root/manifest.js`; `Roles y permisos` and `Zonas` are functionally implemented and the remaining current company-admin sidebar routes render the shared neutral `in_process` view
+- company-admin sessions can use the implemented `#agents` view to compose a commercial-user dataset from users, roles, and route overview data, create company users, and persist route assignments from an agent-centric shell flow
+- company-admin sessions can use the implemented `#clients` view to list clients, open in-shell detail, create/update/deactivate clients, add stores, upload documents, create references, run taxpayer lookup through the aligned `/api/taxpayers/lookup?identification=...` contract, and download documents through existing backend contracts
+- company-admin sessions can use the implemented `#routes` view to create routes, edit definition, save subzones, save assignments, manage per-agent goals, inspect covered stores, and render a simplified in-shell map using existing backend contracts
+- the commercial shell controllers now delegate bounded rendering/state responsibilities to adjacent renderer/state seams instead of keeping all list/detail/map/summary markup inside the main controller files
+- browser/runtime governance now also covers the extracted commercial seams through modularity, public-surface, smoke, typecheck-governance, and browser E2E assertions
+- the narrow `payment.service.js` maintainability cleanup completed without changing payment lifecycle, tenant-scope, audit, pagination, or receipt/security contracts
+- the approved company-admin sidebar entries now have explicit route keys in `root/manifest.js`; `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas` are functionally implemented and the remaining current company-admin sidebar routes render the shared neutral `in_process` view
 - layout ownership is normalized so the shell owns actor-specific offsets and outer content placement while views own only their internal module layout
 - the company-admin sidebar now hardens latent overflow behavior by hiding tooltip boxes until collapsed hover/focus, applying defensive `box-sizing` and `min-width: 0` rules to nested wrappers, truncating long labels/footer text, and limiting the styled thin scrollbar to the central scroll region while header and footer remain fixed
 - no runtime role update/delete/reassignment UI was added
@@ -94,13 +105,13 @@ Problems already corrected by earlier browser-runtime slices plus `p27`:
 Problems still open after `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-008`, and `p38`:
 - non-wave-one browser roles still land on the transition page rather than a functional supported destination
 - root-shell navigation remains local-manifest based and not yet integrated with any broader approved navigation model
-- the company-admin sidebar still exposes many approved-but-not-yet-functional modules through the shared neutral `in_process` view; this is current supported behavior, but additional module implementation remains pending after `Roles y permisos` and `Zonas`
+- the company-admin sidebar still exposes several approved-but-not-yet-functional modules through the shared neutral `in_process` view; this is current supported behavior, but additional module implementation remains pending after `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas`
 - browser-runtime `typecheck` now includes the approved `src/public/root/**` shell files through an explicit allowlist, while remaining intentionally bounded
 - docs/tests/validators must continue staying synchronized so the root shell and legacy-route policies do not drift
-- the new modularity guardrail is intentionally narrow and only freezes the currently approved containment baseline for `router.js` and `zones-admin.js`; broader root-shell decomposition is still pending if future slices grow `app.js` or introduce new sensitive modules
+- the modularity guardrail remains intentionally narrow, but its containment baseline now also freezes delegation from the commercial controllers to the extracted renderer/state seams in addition to `router.js` and `zones-admin.js`; broader root-shell decomposition is still pending if future slices grow `app.js` or introduce new sensitive modules
 - the temporary coding-standards compatibility bridge should not be expanded back into a second independently maintained standards body
 - permission governance remains only partially implemented: the central policy foundation, the stable `company.create` deny, the first enforced company-role create deny, denial-path audit visibility for that deny, and the bounded company/company-role admin actor-scope convergence seam now exist, but broader backend role-governance hardening, root-shell UI consumption, and repository-wide access-policy convergence remain pending
-- the feature validation matrix is closed for the intended memory-session aggregate lane, but local Windows Prisma generate instability remains a separate documented platform issue during `npm run build`
+- the feature validation matrix is closed for the intended memory-session aggregate lane, the representative commercial browser E2E lane now also passes, and local Windows Prisma generate instability remains a separate documented platform issue during `npm run build`
 - `src/services/agent-workspace.service.js` and `src/services/product.service.js` remain large service hotspots; the extracted seams reduce mixed responsibilities, but the production orchestration boundaries are still concentrated in those facade services
 - metadata reconciliation for permission-governance sequencing is complete, and the former `p30-company-role-governance-hardening` plus `p32-governance-denial-audit-visibility` follow-up dependencies are now implemented for the current create-flow boundary
 - no runtime company-role update flow exists yet, so update hardening remains deferred until an actual update surface is approved
@@ -131,6 +142,10 @@ Problems still open after `quality-baseline-recovery` `TASK-007`, `repository-ba
 - explicit company-admin sidebar route items remain declared in `src/public/root/manifest.js`
 - non-functional company-admin sidebar routes continue rendering the shared neutral `in_process` view
 - the implemented `#zones` flow continues using the existing company-regions endpoints and local in-memory search rather than introducing new backend search contracts
+- the implemented `#agents` flow continues composing data in the browser from existing users/roles/routes contracts rather than introducing a dedicated admin-agents backend endpoint
+- the implemented `#clients` flow continues keeping detail and related append-only actions inside the shell, preserving the aligned `/api/taxpayers/lookup?identification=...` adapter contract and using existing client/store/document/reference contracts rather than reviving legacy client-detail pages
+- the implemented `#routes` flow continues using existing sales-route contracts and a lightweight SVG map rather than introducing an external map dependency
+- the implemented commercial controllers continue delegating renderer/state work to their extracted adjacent seams rather than collapsing those responsibilities back into single large files
 - shell-owned global offsets remain separate from per-view internal layout
 - deprecated legacy HTML routes keep returning `410 Gone` and the migration screen from the same URL without redirect
 - `/migration.html?mode=post-login-transition` remains a supported 200 response for non-wave-one browser profiles
@@ -152,7 +167,7 @@ Incremental future changes now visible:
 1. preserve the implemented actor-aware `/root/` shell as the supported admin browser baseline, including root top-nav and company-admin sidebar variants;
 2. keep legacy HTML deprecation enforced at the HTTP boundary;
 3. extend the root shell only through later approved bounded slices, rather than expanding it through legacy-page restoration;
-4. extend the richer company-admin sidebar IA beyond the current shared neutral `in_process` placeholders through explicit module implementations, building on the already-functional `#roles_permissions` and `#zones` routes;
+4. extend the richer company-admin sidebar IA beyond the current shared neutral `in_process` placeholders through explicit module implementations, building on the already-functional `#roles_permissions`, `#zones`, `#agents`, `#clients`, and `#routes` routes;
 5. decide whether additional browser roles should later move from `/migration.html?mode=post-login-transition` into supported shell destinations;
 6. decide whether the bounded root-shell `typecheck` allowlist should later widen beyond the current approved file set;
 7. keep unsupported company edit/delete/detail and role update/delete/reassignment flows out of the shell until backed by approved slices and real runtime contracts;
@@ -171,6 +186,7 @@ No immediate API contract change is planned.
 
 Current integration posture to preserve:
 - auth/session APIs remain stable;
+- the supported root-shell clients adapter remains aligned with the backend taxpayer lookup contract at `/api/taxpayers/lookup?identification=...`;
 - `POST /api/auth/logout` remains part of the governed runtime contract baseline;
 - `GET /health` remains a stable liveness response;
 - `GET /health/ready` remains the operational readiness boundary for database + browser-session-store dependencies;
@@ -180,9 +196,8 @@ Current integration posture to preserve:
 ## 12. Container and deployment changes
 No versioned container-file change is required for this closeout refresh.
 
-Operational follow-up still visible:
-- rerun Docker build/runtime validation for the upgraded native bcrypt path when Docker daemon access is available;
-- keep this as an environment-evidence follow-up only, not as a residual vulnerability or code-level defect.
+Recorded operational follow-up now closed:
+- Docker build/runtime validation for the upgraded native bcrypt path was rerun successfully and remains historical evidence rather than pending architecture work.
 
 No new container or deployment change is currently required.
 
@@ -216,28 +231,32 @@ Future security follow-up may include:
 - preserve `tests/bcrypt-supply-chain-closeout.test.js` as characterization coverage for stored-hash compatibility and current hash-generation call sites
 - preserve `tests/dependency-hygiene-governance.test.js` as the zero-residual governance guardrail
 - preserve clean-workspace validation evidence for `npm ci`, `npm run lint`, `npm run typecheck`, `npm run test -- --silent`, `npm run verify`, `npm audit --json`, and `npm run validate:dependency-hygiene`
-- rerun Docker-specific validation only when an environment with Docker daemon access is available
+- preserve the recorded Docker-specific validation evidence for the native bcrypt path and rerun it only if a later slice changes container/runtime assumptions
 
 Continue validating the implemented repository baseline through:
 1. `npm run validate:public-runtime`
 2. `node --test tests/public-surface-characterization.test.js`
 3. `node --test tests/public-runtime-http-smoke.test.js`
 4. `node --test tests/root-shell-route-governance.test.js`
-5. `node --test tests/root-shell-modularity-governance.test.js`
-6. `node --test tests/zones-view-selection-filters-characterization.test.js`
-7. `node --test tests/zones-view-dialog-feedback-characterization.test.js`
-8. `node --test tests/zones-view.e2e.js`
-9. `node --test tests/browser-e2e.e2e.js`
-10. `node --test tests/inventory-service-hotspot-characterization.test.js tests/inventory-alerts-tenant-scope.test.js tests/approval-baseline-compatibility.test.js`
-11. `node --test tests/agent-workspace-hotspot-characterization.test.js tests/product-service-hotspot-characterization.test.js`
-12. `npm run lint:public-runtime`
-13. `npm run lint`
-14. `npm run typecheck`
-15. `npm run build`
-16. `set NODE_ENV=test&& set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/access-policies.test.js tests/administrative-authorization-characterization.test.js tests/authorization-convergence-characterization.test.js`
-17. `node --test tests/documentation-ownership-governance.test.js tests/p36-doc-validator-ownership.test.js tests/workflow-baseline-characterization.test.js`
-18. `node --test tests/agent-workspace-hotspot-characterization.test.js tests/agent-workspace-tenant-scope.test.js tests/agent-workspace-contract-characterization.test.js`
-19. `node --test tests/product-service-hotspot-characterization.test.js tests/product-delete-semantics.test.js tests/pagination.test.js`
+5. `node --test tests/root-shell-router-characterization.test.js`
+6. `node --test tests/root-shell-modularity-governance.test.js`
+7. `node --test tests/agents-view-characterization.test.js`
+8. `node --test tests/clients-view-characterization.test.js`
+9. `node --test tests/routes-view-characterization.test.js`
+10. `node --test tests/zones-view-selection-filters-characterization.test.js`
+11. `node --test tests/zones-view-dialog-feedback-characterization.test.js`
+12. `node --test tests/zones-view.e2e.js`
+13. `node --test tests/browser-e2e.e2e.js`
+14. `node --test tests/inventory-service-hotspot-characterization.test.js tests/inventory-alerts-tenant-scope.test.js tests/approval-baseline-compatibility.test.js`
+15. `node --test tests/agent-workspace-hotspot-characterization.test.js tests/product-service-hotspot-characterization.test.js`
+16. `npm run lint:public-runtime`
+17. `npm run lint`
+18. `npm run typecheck`
+19. `npm run build`
+20. `set NODE_ENV=test&& set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/access-policies.test.js tests/administrative-authorization-characterization.test.js tests/authorization-convergence-characterization.test.js`
+21. `node --test tests/documentation-ownership-governance.test.js tests/p36-doc-validator-ownership.test.js tests/workflow-baseline-characterization.test.js`
+22. `node --test tests/agent-workspace-hotspot-characterization.test.js tests/agent-workspace-tenant-scope.test.js tests/agent-workspace-contract-characterization.test.js`
+23. `node --test tests/product-service-hotspot-characterization.test.js tests/product-delete-semantics.test.js tests/pagination.test.js`
 
 Hotspot characterization notes to preserve:
 - characterization coverage now exists for the current `inventory.service` seam and should remain in place before any future refactor of pagination logic, alert transitions, transaction propagation, or the boundary with `inventory-transaction-support.service.js`
@@ -304,6 +323,29 @@ Recorded post-implementation evidence supplied by the user for `quality-baseline
 - `node --test tests/root-shell-route-governance.test.js` passed
 - `npm run typecheck` passed
 - `npm run lint:public-runtime` passed
+
+Recorded post-implementation evidence supplied by the user for `root-shell-commercial-views`:
+- `npm run validate:public-runtime` passed
+- `node --test tests/root-shell-route-governance.test.js` passed
+- `node --test tests/root-shell-router-characterization.test.js` passed
+- `node --test tests/public-surface-characterization.test.js` passed
+- `node --test tests/agents-view-characterization.test.js` passed
+- `node --test tests/clients-view-characterization.test.js` passed
+- `node --test tests/routes-view-characterization.test.js` passed
+- `node --test tests/public-runtime-http-smoke.test.js tests/prisma-client-baseline-characterization.test.js tests/public-surface-characterization.test.js tests/typecheck-ci-hardening-governance.test.js` now passes in the intended local Windows-oriented validation lane, keeping the Prisma-adjacent smoke assertions DB-idle until a Prisma operation is explicitly requested
+- `npm run lint:public-runtime` now passes through the repository-owned `scripts/run-eslint.js` wrapper instead of depending on a shell-exposed `eslint` shim
+- `npm run typecheck` now passes through the repository-owned `scripts/run-tsc.js` wrapper instead of depending on a shell-exposed `tsc` shim
+- `node --test tests/root-shell-commercial-views.e2e.js` now passes as the representative browser E2E lane for the supported `#agents`, `#clients`, and `#routes` views
+
+Recorded post-implementation evidence supplied by the user for `root-shell-commercial-views-hardening`:
+- `node --test tests/agents-view-characterization.test.js tests/clients-view-characterization.test.js tests/routes-view-characterization.test.js tests/root-shell-modularity-governance.test.js` passed
+- `node --test tests/public-surface-characterization.test.js tests/public-runtime-http-smoke.test.js tests/typecheck-ci-hardening-governance.test.js` passed
+- `node --test tests/root-shell-commercial-views.e2e.js` passed
+- `node --test tests/payment-tenant-scope.test.js tests/invoice-payment-sync-characterization.test.js tests/pagination.test.js tests/payment-receipt-security.test.js tests/audit-instrumentation.test.js` passed
+- `npm run lint` passed
+- `npm run typecheck` passed
+- `npm run build` passed
+- `npm run validate:public-runtime` passed
 
 Recorded post-implementation evidence supplied by the user for `repository-baseline-score-recovery` `TASK-008`:
 - `node --test tests/agent-workspace-hotspot-characterization.test.js tests/product-service-hotspot-characterization.test.js` passed
@@ -384,11 +426,11 @@ Test-baseline notes to preserve:
 - the new root shell is currently governed by an explicit bounded browser-runtime `typecheck` allowlist plus lint, validator, smoke, characterization, and browser E2E coverage
 
 ## 15. Migration stages
-### Stage 30 — Completed
+### Stage 31 — Completed
 - Close the approved bcrypt supply-chain remediation by upgrading to `bcrypt@^6.0.0`, removing the `@mapbox/node-pre-gyp` / `tar` residual chain from the checked-in dependency tree, adding stored-hash compatibility coverage, and moving dependency hygiene to a zero-approved-residual baseline
 
-### Stage 31 — Proposed
-- Rerun Docker build/runtime validation for the native bcrypt path in an environment with Docker daemon access and attach evidence without changing the approved zero-residual dependency posture
+### Stage 32 — Completed
+- Rerun Docker build/runtime validation for the native bcrypt path and attach evidence without changing the approved zero-residual dependency posture
 
 ### Stage 1 — Completed
 - Reduce the active public runtime to the supported minimal baseline in `src/public/`
@@ -444,53 +486,57 @@ Test-baseline notes to preserve:
 - Normalize shell/view layout ownership so shell-level offsets are not duplicated inside admin views
 - Harden the implemented company-admin sidebar against latent horizontal overflow and lock the CSS contract in `tests/public-surface-characterization.test.js`
 
-### Stage 17 — Proposed
-- Add the next supported root-shell modules beyond the current bounded Companies and Roles/Permissions views through approved incremental slices
+### Stage 17 — Completed
+- Add the supported company-admin commercial root-shell modules at `#agents`, `#clients`, and `#routes` over the existing backend contracts, validators, and characterization suites
+
+### Stage 17A — Completed
+- Harden the supported commercial root-shell modules by extracting adjacent renderer/state seams, aligning the clients taxpayer lookup adapter to `/api/taxpayers/lookup?identification=...`, expanding browser/governance coverage, and preserving payment-service behavior through the existing payment regression lane
 
 ### Stage 18 — Proposed
-- Replace transition-only landings for additional browser roles when approved supported destinations exist
+- Add the next supported root-shell modules beyond the current bounded Companies, Roles/Permissions, Zones, Agents, Clients, and Routes views through approved incremental slices
 
 ### Stage 19 — Proposed
+- Replace transition-only landings for additional browser roles when approved supported destinations exist
+
+### Stage 20 — Proposed
 - Expand browser-runtime typecheck coverage only if a later approved slice widens the current bounded root-shell allowlist
 
-### Stage 20 — Completed
+### Stage 21 — Completed
 - Introduce centralized permission-governance foundation, first stable `company.create` deny, and warning-based backend consumption for company-role creation
 
-### Stage 21 — Completed
+### Stage 22 — Completed
 - Harden company-role creation so platform-scoped permissions such as `companies.manage` are denied before persistence while non-approved sensitive combinations remain warning-only
 
-### Stage 22 — Completed
+### Stage 23 — Completed
 - Add dedicated denial-path audit visibility for the approved company-role create deny using the existing safe audit seam while preserving the same `403` response contract
 
-### Stage 23 — Completed
+### Stage 24 — Completed
 - Introduce bounded actor-scope convergence in route policies for company/company-role admin flows while preserving service-level governance enforcement, dedicated `company.create-global`, and distinct route-level versus service-level denial auditing
 
-### Stage 24 — Completed
+### Stage 25 — Completed
 - Align the in-scope legacy runtime-contract governance validator to canonical `docs/**` ownership and add bounded regression coverage so `internal-docs/**` remains auxiliary only for this seam
 
-### Stage 25 — Completed
+### Stage 26 — Completed
 - Align coding-standards documentation ownership so `docs/coding_standard.md` is canonical, the legacy hyphenated alias is compatibility-only, and `tests/coding-standard-path-alignment.test.js` protects against stale repo-owned hyphenated references
 
-### Stage 26 — Completed
+### Stage 27 — Completed
 - Add isolated characterization for `#zones` dialogs and feedback flows, preserving the current DOM/API contract while extracting only small helper seams for reset, inline error rendering, and submit-button state
 
-### Stage 27 — Completed
-- Freeze the current root-shell containment baseline with verifiable modularity guardrails over the bounded `window.RootShell` registry contract, isolated router characterization, and the extracted zones helper seams
+### Stage 28 — Completed
+- Freeze the current root-shell containment baseline with verifiable modularity guardrails over the bounded `window.RootShell` registry contract, isolated router characterization, the extracted zones helper seams, and the follow-up explicit `src/public/root/runtime-contract.js` loader/module contract enforced by `scripts/validate-public-runtime.js`
 
-### Stage 28 — Proposed
+### Stage 29 — Proposed
 - Consume the governance foundation in additional backend role-governance operations and approved UI slices, including any future update-flow hardening once an update surface exists
 
-### Stage 29 — Completed
+### Stage 30 — Completed
 - Reduce the `hotspot-seams-doc-ownership` hotspots incrementally by preserving the access-policy facade, extracting registry / actor-scope / denial-audit seams, extracting focused inventory / agent-workspace / product service seams, consolidating the canonical documentation ownership map, and closing the intended memory-session validation matrix
 
 ## 16. Risks and mitigations
-| Native bcrypt path was upgraded successfully, but Docker-specific validation was not rerun in the implementation environment | Low | Keep documentation explicit that this is only an environment evidence gap; rerun Docker validation when daemon access is available |
-
 | Risk | Level | Mitigation |
 |---|---|---|
 | Legacy HTML runtime is accidentally reintroduced into `src/public/` or treated as supported again | High | Keep `validate-public-runtime`, browser/runtime characterization tests, and docs aligned to the supported inventory |
 | Future work changes `/root/` behavior without updating validators and browser tests | High | Keep root-shell contract checks in validator, smoke tests, characterization tests, and browser E2E |
-| The richer company-admin sidebar IA is misread as fully implemented module coverage instead of mostly shared `in_process` placeholders | Medium | Keep docs explicit that `Roles y permisos` and `Zonas` are the current functional tenant-admin destinations and add new functional modules only through approved slices |
+| The richer company-admin sidebar IA is misread as fully implemented module coverage instead of a mixed state of active modules plus `in_process` placeholders | Medium | Keep docs explicit that `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas` are the current functional tenant-admin destinations and add new functional modules only through approved slices |
 | Non-wave-one roles remain on an informational transition landing longer than expected | Medium | Keep the behavior explicit in docs and move those roles only through approved supported-destination slices |
 | Root shell now uses a bounded `window.RootShell` registry seam, but still depends on plain ordered static scripts and not on a broader module system | Low | Preserve current validator/test coverage, keep the allowlist explicit, and defer any framework/ES-module redesign to a later approved slice |
 | Permission-governance follow-up sequencing is misread because `p10` is analysis, `p28` is only a partial runtime implementation, and future contributors may reintroduce stale dependency metadata | Medium | Record the partial implementation explicitly, preserve the completed `p29` reconciliation plus the closed `p30` and `p32` follow-up slices in docs/spec metadata, and do not overstate current enforcement scope |
@@ -507,12 +553,13 @@ Test-baseline notes to preserve:
 - confirm the lockfile no longer resolves the bcrypt path through `@mapbox/node-pre-gyp` or `tar`
 - confirm `npm audit --json` remains at `0` vulnerabilities in a clean workspace
 - confirm `npm run validate:dependency-hygiene` still reports `Approved residual set: none`
-- rerun Docker build/runtime validation only in an environment with Docker daemon access
+- confirm the recorded Docker build/runtime validation evidence remains applicable unless a later container/runtime slice changes bcrypt or native-module assumptions
 
 For future follow-up work, manually confirm:
 - `src/public/` still contains the supported root shell and does not re-expose warehouse or agent runtime directories
 - `/root/` still loads successfully
 - `#zones` still loads for company-admin users, performs search locally, and creates zones/subzones through the existing company-regions endpoints
+- `#agents`, `#clients`, and `#routes` still load for company-admin users and continue using the current helper/API/view seams, including the extracted renderer/state files and aligned taxpayer lookup adapter, without reviving legacy HTML pages
 - docs and specs distinguish clearly between `p10` analysis outputs and the implemented `p28` and `p30` runtime slices
 - permission-governance dependency metadata no longer treats `p30-company-role-governance-hardening` or `p32-governance-denial-audit-visibility` as pending for the current company-role create-flow boundary
 - `docs/coding_standard.md` remains the full coding-standards body and the legacy hyphenated alias remains only a compatibility notice
@@ -525,4 +572,4 @@ For future follow-up work, manually confirm:
 ## 19. Approval status
 The `bcrypt-supply-chain-closeout` implementation itself is complete from a repository-code and governance perspective. The previously recorded environment-specific Docker evidence follow-up has now been executed successfully; remaining follow-up is limited to general native-module/toolchain operational awareness rather than unfinished bcrypt remediation.
 
-**Status:** Documentation refresh now reflects the implemented state after `hotspot-seams-doc-ownership` tasks 1-8 in addition to the previously completed browser/runtime and governance slices. The repository now documents the active access-policy split (`access-policies.js` facade plus registry / actor-scope / denial-audit helpers), the extracted inventory/agent-workspace/product service seams, the canonical documentation ownership map including `docs/tasks.md`, and the focused documentation-governance test coverage. No additional production API or database redesign is documented here. Remaining follow-up is limited to future additive seam work and the separately documented local Windows Prisma rename-lock instability during build generation.
+**Status:** Documentation refresh now reflects the implemented state after `root-shell-runtime-modularity-hardening`, `root-shell-commercial-views-hardening`, `root-shell-commercial-views`, `hotspot-seams-doc-ownership` tasks 1-8, and the previously completed browser/runtime and governance slices. The repository now documents the active company-admin commercial shell modules (`#agents`, `#clients`, `#routes`), their extracted renderer/state seams, the explicit `src/public/root/runtime-contract.js` loader/module contract, the aligned root-shell taxpayer lookup adapter contract, the strengthened browser/governance coverage, the active access-policy split (`access-policies.js` facade plus registry / actor-scope / denial-audit helpers), the extracted inventory/agent-workspace/product service seams, and the canonical documentation ownership map including `docs/tasks.md`. No additional production API or database redesign is documented here. Remaining follow-up is limited to future additive seam work, current shell/UI expansion choices, and the separately documented platform/tooling risks outside this bounded hardening slice.

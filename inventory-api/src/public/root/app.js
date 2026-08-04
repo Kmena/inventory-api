@@ -2,10 +2,8 @@
 const inventoryAuth = /** @type {any} */ (window).InventoryAuth;
 const inventorySession = /** @type {any} */ (window).InventorySession;
 const rootShell = /** @type {any} */ (window).RootShell;
-const rootShellSessionAdapter = rootShell.require('sessionAdapter');
-const rootShellGuards = rootShell.require('guards');
-const rootShellManifest = rootShell.require('manifest');
-const rootShellRouter = rootShell.require('router');
+const runtimeContract = rootShell.require('runtimeContract');
+const [rootShellSessionAdapter, rootShellGuards, rootShellManifest, rootShellRouter] = runtimeContract.requireModules(runtimeContract.bootstrapModuleNames);
 
 const shellElement = /** @type {HTMLElement | null} */ (document.querySelector('.root-shell'));
 const statusElement = /** @type {HTMLElement | null} */ (document.getElementById('root-shell-status'));
@@ -459,11 +457,7 @@ logoutButton.addEventListener('click', async () => {
   });
 });
 
-for (const item of rootShellManifest.items) {
-  if (typeof item.visibilityRule !== 'function' || !item.routeKey) {
-    throw new Error('El manifest del shell root contiene una configuracion invalida.');
-  }
-}
+runtimeContract.assertNavigationItems(rootShellManifest.items);
 
 bindSidebarInteractions();
 bootstrapRootShell();

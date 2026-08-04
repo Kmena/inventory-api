@@ -103,20 +103,37 @@ async function validatePaymentInvoice(invoiceId, companyId, db = null) {
   return invoice;
 }
 
+function normalizeReceiptFile(receiptFile) {
+  if (!receiptFile) {
+    return null;
+  }
+
+  return {
+    ...receiptFile,
+    _validatedReceiptPayload: validatePaymentReceiptPayload(receiptFile),
+  };
+}
+
+function buildPaymentAuditState(payment, extraState = {}) {
+  return {
+    id: payment.id,
+    invoiceId: payment.invoiceId,
+    amount: payment.amount,
+    status: payment.status,
+    ...extraState,
+  };
+}
+
 async function createPayment(payload, auth, req = null) {
   const companyId = assertCompanyScope(auth);
   assertHasAnyPermission(auth, PAYMENT_MANAGE_OWN_PERMISSIONS, 'No tiene permisos para registrar pagos');
   const invoice = await validatePaymentInvoice(payload.invoiceId, companyId);
   assertInvoiceAllowsNewPayments(invoice);
 
-  const normalizedReceiptFile = payload.receiptFile
-    ? {
-        ...payload.receiptFile,
-        _validatedReceiptPayload: validatePaymentReceiptPayload(payload.receiptFile),
-      }
-    : null;
+  const normalizedReceiptFile = normalizeReceiptFile(payload.receiptFile);
 
   const paymentId = normalizedReceiptFile ? await paymentRepository.reservePaymentId() : null;
+  /** @type {any} */
   let payment;
 
   try {
@@ -158,14 +175,11 @@ async function createPayment(payload, auth, req = null) {
     resourceType: 'payment',
     resourceId: payment.id,
     outcome: 'SUCCESS',
-    afterState: {
-      id: payment.id,
-      invoiceId: payment.invoiceId,
-      amount: payment.amount,
+    afterState: buildPaymentAuditState(payment, {
       status: 'PENDING_APPROVAL',
       submittedByUserId: getActorUserId(auth),
       hasReceiptEvidence: Boolean((createdPayment?.receipts || []).length),
-    },
+    }),
   });
 
   return serializePayment(createdPayment);
@@ -198,12 +212,7 @@ async function updatePayment(id, payload, auth, req = null) {
     throw createHttpError(404, 'Pago no encontrado', 'not_found');
   }
 
-  const normalizedReceiptFile = payload.receiptFile
-    ? {
-        ...payload.receiptFile,
-        _validatedReceiptPayload: validatePaymentReceiptPayload(payload.receiptFile),
-      }
-    : null;
+  const normalizedReceiptFile = normalizeReceiptFile(payload.receiptFile);
 
   const paymentWithReceipt = normalizedReceiptFile
     ? await replacePaymentReceiptEvidence(updatedPayment, normalizedReceiptFile, auth)
@@ -215,21 +224,13 @@ async function updatePayment(id, payload, auth, req = null) {
     resourceType: 'payment',
     resourceId: id,
     outcome: 'SUCCESS',
-    beforeState: {
-      id: existingPayment.id,
-      invoiceId: existingPayment.invoiceId,
-      amount: existingPayment.amount,
-      status: existingPayment.status,
+    beforeState: buildPaymentAuditState(existingPayment, {
       reference: existingPayment.reference,
-    },
-    afterState: {
-      id: paymentWithReceipt.id,
-      invoiceId: paymentWithReceipt.invoiceId,
-      amount: paymentWithReceipt.amount,
-      status: paymentWithReceipt.status,
+    }),
+    afterState: buildPaymentAuditState(paymentWithReceipt, {
       reference: paymentWithReceipt.reference,
       hasReceiptEvidence: Boolean((paymentWithReceipt.receipts || []).length),
-    },
+    }),
   });
 
   return serializePayment(paymentWithReceipt);
@@ -257,15 +258,10 @@ async function markPaymentUnderReview(id, payload, auth, req = null) {
     resourceType: 'payment',
     resourceId: id,
     outcome: 'SUCCESS',
-    beforeState: {
-      id: existingPayment.id,
-      status: existingPayment.status,
-    },
-    afterState: {
-      id: updatedPayment.id,
-      status: updatedPayment.status,
+    beforeState: buildPaymentAuditState(existingPayment),
+    afterState: buildPaymentAuditState(updatedPayment, {
       reviewReason: updatedPayment.reviewReason,
-    },
+    }),
   });
 
   return serializePayment(updatedPayment);
@@ -315,20 +311,12 @@ async function approvePayment(id, payload, auth, req = null) {
     resourceType: 'payment',
     resourceId: id,
     outcome: 'SUCCESS',
-    beforeState: {
-      id: existingPayment.id,
-      status: existingPayment.status,
-      invoiceId: existingPayment.invoiceId,
-      amount: existingPayment.amount,
-    },
-    afterState: {
-      id: approvedPayment.id,
-      status: approvedPayment.status,
-      invoiceId: approvedPayment.invoiceId,
+    beforeState: buildPaymentAuditState(existingPayment),
+    afterState: buildPaymentAuditState(approvedPayment, {
       approvedAt: approvedPayment.approvedAt,
       invoiceStatus: synchronizedInvoice?.status,
       invoicePaidAt: synchronizedInvoice?.paidAt || null,
-    },
+    }),
   });
 
   return serializePayment(approvedPayment);
@@ -368,15 +356,10 @@ async function rejectPayment(id, payload, auth, req = null) {
     resourceType: 'payment',
     resourceId: id,
     outcome: 'SUCCESS',
-    beforeState: {
-      id: existingPayment.id,
-      status: existingPayment.status,
-    },
-    afterState: {
-      id: rejectedPayment.id,
-      status: rejectedPayment.status,
+    beforeState: buildPaymentAuditState(existingPayment),
+    afterState: buildPaymentAuditState(rejectedPayment, {
       rejectionReason: rejectedPayment.rejectionReason,
-    },
+    }),
   });
 
   return serializePayment(rejectedPayment);
@@ -420,21 +403,15 @@ async function reversePayment(id, auth, reason, req = null) {
     resourceType: 'payment',
     resourceId: id,
     outcome: 'SUCCESS',
-    beforeState: {
-      id: existingPayment.id,
-      invoiceId: existingPayment.invoiceId,
-      amount: existingPayment.amount,
-      status: existingPayment.status,
-    },
-    afterState: {
-      id,
+    beforeState: buildPaymentAuditState(existingPayment),
+    afterState: buildPaymentAuditState(existingPayment, {
       status: 'REVERSED',
       reversedAt,
       reversedByUserId,
       reversalReason: reason,
       invoiceStatus: synchronizedInvoice?.status,
       invoicePaidAt: synchronizedInvoice?.paidAt || null,
-    },
+    }),
   });
 
   return serializePayment(reversedPayment);

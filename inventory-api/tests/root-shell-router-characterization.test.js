@@ -37,6 +37,9 @@ function createRouterHarness() {
   browserWindow.RootShell.register('views.companiesAdmin', createView('companies-view'));
   browserWindow.RootShell.register('views.rolesAdmin', createView('roles-view'));
   browserWindow.RootShell.register('views.zonesAdmin', createView('zones-view'));
+  browserWindow.RootShell.register('views.agentsAdmin', createView('agents-view'));
+  browserWindow.RootShell.register('views.clientsAdmin', createView('clients-view'));
+  browserWindow.RootShell.register('views.routesAdmin', createView('routes-view'));
 
   executeRootScript('router.js', context);
 
@@ -102,6 +105,21 @@ test('router resolves supported actor routes and unknown hashes without changing
   assert.equal(adminRolesResolution.routeKey, 'roles_permissions');
   assert.equal(adminRolesResolution.view.name, 'roles-view');
 
+  const adminAgentsResolution = router.resolveRoute('#agents', createCompanyAdminSession());
+  assert.equal(adminAgentsResolution.allowed, true);
+  assert.equal(adminAgentsResolution.routeKey, 'agents');
+  assert.equal(adminAgentsResolution.view.name, 'agents-view');
+
+  const adminClientsResolution = router.resolveRoute('#clients', createCompanyAdminSession());
+  assert.equal(adminClientsResolution.allowed, true);
+  assert.equal(adminClientsResolution.routeKey, 'clients');
+  assert.equal(adminClientsResolution.view.name, 'clients-view');
+
+  const adminRoutesResolution = router.resolveRoute('#routes', createCompanyAdminSession());
+  assert.equal(adminRoutesResolution.allowed, true);
+  assert.equal(adminRoutesResolution.routeKey, 'routes');
+  assert.equal(adminRoutesResolution.view.name, 'routes-view');
+
   const adminUnknownResolution = router.resolveRoute('#missing-route', createCompanyAdminSession());
   assert.equal(adminUnknownResolution.allowed, true);
   assert.equal(adminUnknownResolution.requestedRouteKey, 'missing-route');
@@ -112,7 +130,7 @@ test('router resolves supported actor routes and unknown hashes without changing
 test('router renderRoute delegates to the resolved view contract', () => {
   const router = createRouterHarness();
   const session = createCompanyAdminSession();
-  const resolution = router.resolveRoute('#zones', session);
+  const resolution = router.resolveRoute('#routes', session);
 
-  assert.equal(router.renderRoute(resolution, session), 'zones-view:admin:zones');
+  assert.equal(router.renderRoute(resolution, session), 'routes-view:admin:routes');
 });

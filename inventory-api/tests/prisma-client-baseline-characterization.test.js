@@ -26,3 +26,11 @@ test('payment receipt evidence repository import chain resolves the shared Prism
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.doesNotMatch(result.stderr || '', /\.prisma\/client\/default/);
 });
+
+test('public runtime app import stays DB-idle until a Prisma operation is requested', () => {
+  const result = runNode("process.env.NODE_ENV='test'; process.env.BROWSER_SESSION_STORE_MODE='memory'; require('./src/app'); setTimeout(() => process.exit(0), 150);");
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.doesNotMatch(result.stderr || '', /Prisma Client could not locate the Query Engine/);
+  assert.doesNotMatch(result.stdout || '', /Prisma Client could not locate the Query Engine/);
+});

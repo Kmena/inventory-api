@@ -91,8 +91,32 @@
   const lotsItem = createAdminPendingEntry('lots', 'Lotes', 'layers-3');
   const movementsItem = createAdminPendingEntry('movements', 'Movimientos', 'arrow-left-right');
   const productionItem = createAdminPendingEntry('production', 'Produccion', 'factory');
-  const agentsItem = createAdminPendingEntry('agents', 'Agentes', 'users-round');
-  const routesItem = createAdminPendingEntry('routes', 'Rutas', 'map');
+  const agentsItem = createRouteItem({
+    id: 'agents',
+    label: 'Agentes',
+    routeKey: 'agents',
+    href: '/root/#agents',
+    implemented: true,
+    activeMatchers: ['agents'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'users-round',
+    includeInRootNav: false,
+    dependencyTag: 'root-shell-commercial-views',
+  });
+  const routesItem = createRouteItem({
+    id: 'routes',
+    label: 'Rutas',
+    routeKey: 'routes',
+    href: '/root/#routes',
+    implemented: true,
+    activeMatchers: ['routes'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'map',
+    includeInRootNav: false,
+    dependencyTag: 'root-shell-commercial-views',
+  });
   const zonesItem = createRouteItem({
     id: 'zones',
     label: 'Zonas',
@@ -106,7 +130,19 @@
     includeInRootNav: false,
     dependencyTag: 'zones-view',
   });
-  const clientsItem = createAdminPendingEntry('clients', 'Clientes', 'briefcase-business');
+  const clientsItem = createRouteItem({
+    id: 'clients',
+    label: 'Clientes',
+    routeKey: 'clients',
+    href: '/root/#clients',
+    implemented: true,
+    activeMatchers: ['clients'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'briefcase-business',
+    includeInRootNav: false,
+    dependencyTag: 'root-shell-commercial-views',
+  });
   const purchasesItem = createAdminPendingEntry('purchases', 'Compras', 'shopping-bag');
   const warehousesItem = createAdminPendingEntry('warehouses', 'Bodegas', 'warehouse');
   const approvalsItem = createAdminPendingEntry('approvals', 'Aprobaciones', 'badge-check');

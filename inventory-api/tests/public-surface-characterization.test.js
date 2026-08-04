@@ -23,13 +23,26 @@ test('embedded UI keeps explicit browser-first quality gates for the reduced run
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
   const validateScriptSource = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'validate-public-runtime.js'), 'utf8');
 
-  assert.equal(packageJson.scripts['lint:public-runtime'], 'eslint src/public --max-warnings 0');
+  assert.equal(packageJson.scripts['lint:public-runtime'], 'node scripts/run-eslint.js src/public --max-warnings 0');
+  assert.equal(packageJson.scripts.typecheck, 'node scripts/run-tsc.js --project tsconfig.typecheck.json');
   assert.equal(packageJson.scripts['validate:public-runtime'], 'node scripts/validate-public-runtime.js');
   assert.match(packageJson.scripts.verify, /lint:public-runtime/);
   assert.match(packageJson.scripts.verify, /validate:public-runtime/);
   assert.match(validateScriptSource, /validatePublicRuntimeInventory/);
   assert.match(validateScriptSource, /validateLoginRuntimeContracts/);
+  assert.match(validateScriptSource, /validateRootShellLoaderContract/);
   assert.match(validateScriptSource, /validateMigrationRuntimeContracts/);
+});
+
+test('local lint and typecheck scripts resolve package CLI entrypoints without relying on shell bin shims', () => {
+  const eslintWrapperSource = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'run-eslint.js'), 'utf8');
+  const tscWrapperSource = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'run-tsc.js'), 'utf8');
+
+  assert.match(eslintWrapperSource, /require\.resolve\(`\$\{packageName\}\/package\.json`/);
+  assert.match(eslintWrapperSource, /spawnSync\(process\.execPath/);
+  assert.match(tscWrapperSource, /require\.resolve\('typescript\/package\.json'/);
+  assert.match(tscWrapperSource, /lib', 'tsc\.js'/);
+  assert.match(tscWrapperSource, /spawnSync\(process\.execPath/);
 });
 
 test('supported public runtime assets now include the minimal root shell while legacy warehouse and agent runtimes remain retired', () => {
@@ -41,20 +54,35 @@ test('supported public runtime assets now include the minimal root shell while l
     'no-access.html',
     'no-access.js',
     'root/index.html',
+    'root/agents-api.js',
     'root/app.js',
+    'root/clients-api.js',
     'root/companies-api.js',
     'root/guards.js',
     'root/registry.js',
+    'root/runtime-contract.js',
     'root/manifest.js',
     'root/roles-api.js',
     'root/router.js',
+    'root/routes-api.js',
     'root/zones-api.js',
     'root/session-adapter.js',
     'root/ui.js',
+    'root/views/agents-admin.helpers.js',
+    'root/views/agents-admin.renderers.js',
+    'root/views/agents-admin.js',
+    'root/views/clients-admin.helpers.js',
+    'root/views/clients-admin.renderers.js',
+    'root/views/clients-admin.state.js',
+    'root/views/clients-admin.js',
     'root/views/companies-admin.js',
     'root/views/home.js',
     'root/views/in-process.js',
     'root/views/roles-admin.js',
+    'root/views/routes-admin.helpers.js',
+    'root/views/routes-admin.renderers.js',
+    'root/views/routes-admin.state.js',
+    'root/views/routes-admin.js',
     'root/views/zones-admin.helpers.js',
     'root/views/zones-admin.js',
     'shared/auth.js',
@@ -111,16 +139,34 @@ test('public login, no-access and migration screens keep strict same-origin wiri
   assert.match(rootShellHtmlSource, /Saltar al contenido principal/);
   assert.match(rootShellHtmlSource, /Panel root/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/registry\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/runtime-contract\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/companies-api\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/roles-api\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/zones-api\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/agents-api\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/clients-api\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/routes-api\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/ui\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/companies-admin\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/roles-admin\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/zones-admin\.helpers\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/zones-admin\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/agents-admin\.helpers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/agents-admin\.renderers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/agents-admin\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/clients-admin\.helpers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/clients-admin\.renderers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/clients-admin\.state\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/clients-admin\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/routes-admin\.helpers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/routes-admin\.renderers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/routes-admin\.state\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/routes-admin\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/app\.js"><\/script>/);
   assert.match(rootShellManifestSource, /routeKey: 'companies'/);
+  assert.match(rootShellManifestSource, /routeKey: 'agents'/);
+  assert.match(rootShellManifestSource, /routeKey: 'clients'/);
+  assert.match(rootShellManifestSource, /routeKey: 'routes'/);
   assert.match(rootShellManifestSource, /routeKey: 'roles_permissions'/);
   assert.match(rootShellManifestSource, /routeKey: 'zones'/);
   assert.match(stylesSource, /\.root-sidebar,\s*\n\.root-sidebar \*/);
@@ -128,8 +174,10 @@ test('public login, no-access and migration screens keep strict same-origin wiri
   assert.match(stylesSource, /\.root-sidebar__nav,[\s\S]*\.root-sidebar__section-body,[\s\S]*\.root-sidebar__subnav \{[\s\S]*overflow-x: clip;/);
   assert.match(stylesSource, /\.root-sidebar__label \{[\s\S]*text-overflow: ellipsis;[\s\S]*white-space: nowrap;/);
   assert.match(stylesSource, /\.root-sidebar__tooltip \{[\s\S]*display: none;/);
-  assert.match(rootShellAppSource, /rootShell\.require\('sessionAdapter'\)/);
-  assert.match(rootShellAppSource, /rootShell\.require\('router'\)/);
+  assert.match(stylesSource, /\.commercial-list-item \{[\s\S]*background: #fff;[\s\S]*color: var\(--text\);/);
+  assert.match(stylesSource, /\.commercial-list-item:hover,[\s\S]*\.commercial-list-item:focus-visible \{[\s\S]*background: #f8fafc;[\s\S]*color: var\(--text\);/);
+  assert.match(rootShellAppSource, /rootShell\.require\('runtimeContract'\)/);
+  assert.match(rootShellAppSource, /runtimeContract\.requireModules\(runtimeContract\.bootstrapModuleNames\)/);
   assert.match(rootShellAppSource, /function configureShellForActor\(session\)/);
   assert.match(rootShellAppSource, /renderNavigation\(session\)/);
   assert.match(rootShellAppSource, /rootShellSessionAdapter\.bootstrap\(\)/);

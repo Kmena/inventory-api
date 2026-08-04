@@ -7,17 +7,17 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "lint": "eslint src scripts tests --max-warnings 0",
-    "typecheck": "tsc --project tsconfig.typecheck.json",
+    "lint": "node scripts/run-eslint.js src scripts tests --max-warnings 0",
+    "typecheck": "node scripts/run-tsc.js --project tsconfig.typecheck.json",
     "build": "node scripts/prisma-generate-safe.js",
-    "lint:public-runtime": "eslint src/public --max-warnings 0",
+    "lint:public-runtime": "node scripts/run-eslint.js src/public --max-warnings 0",
     "validate:public-runtime": "node scripts/validate-public-runtime.js",
     "validate:workflow-baseline": "node scripts/validate-workflow-baseline.js",
     "validate:dependency-hygiene": "node scripts/validate-dependency-hygiene.js",
     "validate:restore-readiness": "node scripts/validate-restore-readiness.js",
     "validate:operational-readiness": "node scripts/validate-operational-readiness.js",
     "playwright:install": "playwright install chromium",
-    "test:e2e:browser": "node --test tests/browser-e2e.e2e.js tests/root-shell-layout.e2e.js",
+    "test:e2e:browser": "node --test tests/browser-e2e.e2e.js tests/root-shell-layout.e2e.js tests/root-shell-commercial-views.e2e.js",
     "test:e2e:root-layout": "node --test tests/root-shell-layout.e2e.js",
     "test:redis-path": "node --test tests/browser-session-redis-store.test.js",
     "verify": "npm run lint && npm run typecheck && npm run lint:public-runtime && npm run validate:public-runtime && npm run validate:workflow-baseline && npm run validate:restore-readiness && npm run validate:operational-readiness && npm run build && npm run test",
@@ -49,7 +49,7 @@
     "eslint": "^9.39.5",
     "playwright": "^1.55.1",
     "prisma": "^5.22.0",
-    "typescript": "^7.0.2"
+    "typescript": "^5.9.2"
   },
   "overrides": {
     "body-parser": "1.20.6",
