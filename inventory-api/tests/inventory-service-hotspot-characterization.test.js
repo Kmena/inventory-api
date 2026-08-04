@@ -62,6 +62,29 @@ function buildLot(overrides = {}) {
   };
 }
 
+test('updateProductById scopes inventory-linked product writes by company when the helper is used from supported flows', async () => {
+  const product = await inventoryRepository.updateProductById(
+    41n,
+    7n,
+    { quantity: { increment: 2 } },
+    {
+      product: {
+        updateMany: async ({ where, data }) => {
+          assert.deepEqual(where, { id: 41n, companyId: 7n, isActive: true });
+          assert.deepEqual(data, { quantity: { increment: 2 } });
+          return { count: 1 };
+        },
+        findFirst: async ({ where }) => {
+          assert.deepEqual(where, { id: 41n, companyId: 7n, isActive: true });
+          return { id: 41n, companyId: 7n, quantity: 12 };
+        },
+      },
+    },
+  );
+
+  assert.deepEqual(product, { id: 41n, companyId: 7n, quantity: 12 });
+});
+
 test('listMovements preserves company scope and paginated response shape', async () => {
   let receivedArguments = null;
 
@@ -288,8 +311,9 @@ test('registerStockEntry keeps context loading, advisory lock, and persistence o
         observedTxs.push(receivedTx);
         return { id: 103n, warehouseId: payload.warehouseId, productId: payload.productId, quantity: payload.quantity, reservedQuantity: 0 };
       },
-      updateProductById: async (_productId, _payload, receivedTx) => {
+      updateProductById: async (_productId, companyId, _payload, receivedTx) => {
         observedTxs.push(receivedTx);
+        assert.equal(companyId, 7n);
         return { id: 5n, quantity: 8 };
       },
       createStockMovementRecord: async (payload, receivedTx) => {

@@ -17,12 +17,29 @@ function includeOrder() {
   };
 }
 
-function findAllOrders(companyId) {
-  return prisma.order.findMany({
-    where: { companyId },
-    orderBy: { id: 'asc' },
-    include: includeOrder(),
-  });
+function findAllOrders(companyId, pagination = null) {
+  const where = { companyId };
+  const orderBy = /** @type {import('@prisma/client').Prisma.OrderOrderByWithRelationInput} */ ({ id: 'asc' });
+  const include = includeOrder();
+
+  if (!pagination) {
+    return prisma.order.findMany({
+      where,
+      orderBy,
+      include,
+    });
+  }
+
+  return prisma.$transaction([
+    prisma.order.count({ where }),
+    prisma.order.findMany({
+      where,
+      orderBy,
+      skip: pagination.skip,
+      take: pagination.take,
+      include,
+    }),
+  ]).then(([totalItems, items]) => ({ totalItems, items }));
 }
 
 function findOrderById(id, companyId) {

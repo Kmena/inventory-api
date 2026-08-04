@@ -1,5 +1,26 @@
 # Tasks
 
+## TASK-052: Refresh architecture-facing docs after bcrypt supply-chain closeout
+**Status:** Completed
+**Priority:** Low
+**Domain:** Repository/platform governance / Architecture documentation
+**Requirement:** `bcrypt-supply-chain-closeout` FR-003; FR-004; FR-005; FR-007; FR-008
+**Reason:** After the approved bcrypt remediation was implemented, architecture-facing documentation still needed to reflect the real dependency baseline, zero-residual governance posture, and the remaining Docker evidence gap honestly.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `bcrypt@^6.0.0` as the active auth dependency baseline, no longer describe the `@mapbox/node-pre-gyp` / `tar` chain as an approved residual, and distinguish Docker validation unavailability from actual repository vulnerability state.
+**Implemented change:** Synchronized architecture-facing documentation to the implemented bcrypt closeout, recorded zero approved residual vulnerabilities as the current dependency-hygiene baseline, and documented Docker validation as an environment evidence gap only.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `specs/bcrypt-supply-chain-closeout/implementation-report.md`, `audit-baseline.json`, `docs/audit/dependency-hygiene-baseline.md`
+**Database impact:** None
+**API impact:** None
+**Container impact:** None to versioned assets; documentation now records pending environment-specific Docker evidence
+**Security impact:** Medium positive governance impact through accurate supply-chain posture documentation
+**Acceptance criteria:** Architecture-facing docs reflect `bcrypt@^6.0.0`, closure of the `@mapbox/node-pre-gyp` / `tar` residual chain, zero approved residual vulnerabilities, and Docker validation as an evidence gap rather than a code-level residual vulnerability.
+**Validation evidence:** Clean mirrored workspace: `npm ci`; `npm run lint`; `npm run typecheck`; `npm run test -- --silent`; `npm run verify`; `npm audit --json` with `0` vulnerabilities; `npm run validate:dependency-hygiene` with `Approved residual set: none`; `node --test tests/bcrypt-supply-chain-closeout.test.js`; `node --test tests/dependency-hygiene-governance.test.js`
+**Required tests:** Preserve bcrypt compatibility coverage and dependency-hygiene governance coverage.
+**Migration considerations:** Do not reopen auth redesign, password migration, or dependency exceptions while documenting this closeout.
+**Rollback or mitigation:** Revert documentation-only wording if later verified dependency evidence changes.
+**Risk:** Low
+
 ## TASK-051: Refresh architecture-facing docs after hotspot validation closure
 **Status:** Completed
 **Priority:** Low

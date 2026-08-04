@@ -13,6 +13,7 @@ const productRoutes = require('../src/routes/product.routes');
 const inventoryRoutes = require('../src/routes/inventory.routes');
 const agentRoutes = require('../src/routes/agent.routes');
 const orderRoutes = require('../src/routes/order.routes');
+const invoiceRoutes = require('../src/routes/invoice.routes');
 
 function getRouteGuard(router, path, method) {
   const layer = router.stack.find((entry) => entry.route && entry.route.path === path && entry.route.methods[method]);
@@ -226,6 +227,30 @@ test('order routes keep their documented access-policy split between role-govern
 
   const allowedDispatch = await runGuard(dispatchGuard, { role: 'warehouse', companyId: '7' });
   assert.equal(allowedDispatch, undefined);
+});
+
+test('invoice routes stay aligned with the canonical access-policy facade without widening legacy role access', async () => {
+  const listGuard = getRouteGuard(invoiceRoutes, '/', 'get');
+  const inconsistenciesGuard = getRouteGuard(invoiceRoutes, '/inconsistencies', 'get');
+  const deleteGuard = getRouteGuard(invoiceRoutes, '/:id', 'delete');
+
+  const allowedSalesList = await runGuard(listGuard, { role: 'sales', companyId: '7' });
+  assert.equal(allowedSalesList, undefined);
+
+  const deniedWarehouseList = await runGuard(listGuard, { role: 'warehouse', companyId: '7' });
+  assert.equal(deniedWarehouseList?.statusCode, 403);
+
+  const allowedAdminInconsistencies = await runGuard(inconsistenciesGuard, { role: 'admin', companyId: '7' });
+  assert.equal(allowedAdminInconsistencies, undefined);
+
+  const deniedSalesInconsistencies = await runGuard(inconsistenciesGuard, { role: 'sales', companyId: '7' });
+  assert.equal(deniedSalesInconsistencies?.statusCode, 403);
+
+  const deniedSalesDelete = await runGuard(deleteGuard, { role: 'sales', companyId: '7' });
+  assert.equal(deniedSalesDelete?.statusCode, 403);
+
+  const allowedAdminDelete = await runGuard(deleteGuard, { role: 'admin', companyId: '7' });
+  assert.equal(allowedAdminDelete, undefined);
 });
 
 test('economic activity lookup keeps admin and sales restrictions through centralized access policies', async () => {

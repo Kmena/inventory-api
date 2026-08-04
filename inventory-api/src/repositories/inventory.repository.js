@@ -275,8 +275,19 @@ function createInventoryAlert(data, db = prisma) {
   return db.inventoryAlert.create({ data });
 }
 
-function updateProductById(id, data, db = prisma) {
-  return db.product.update({ where: { id }, data });
+async function updateProductById(id, companyId, data, db = prisma) {
+  const result = await db.product.updateMany({
+    where: { id, companyId, isActive: true },
+    data,
+  });
+
+  if (result.count === 0) {
+    return null;
+  }
+
+  return db.product.findFirst({
+    where: { id, companyId, isActive: true },
+  });
 }
 
 function findLotForCompanyWithActiveWarehouseStocks(lotId, companyId, db = prisma) {

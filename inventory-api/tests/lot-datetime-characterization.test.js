@@ -28,8 +28,9 @@ function createInventoryTransactionStub() {
         id: 3n,
         companyId: 10n,
         name: 'Producto de prueba',
+        quantity: 1,
       }),
-      update: async () => ({ id: 3n, quantity: 1 }),
+      updateMany: async () => ({ count: 1 }),
     },
     lot: {
       findFirst: async () => null,

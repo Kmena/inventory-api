@@ -81,4 +81,10 @@ if (missingFiles.length) {
   process.exit(1);
 }
 
+const composeSource = fs.readFileSync(path.join(repositoryRoot, 'docker-compose.prod.yml'), 'utf8');
+if (/^(?:\s{4})ports:\s*\r?\n(?:\s{6})-\s*"\$\{POSTGRES_PORT:-5432\}:5432"/m.test(composeSource)) {
+  fail('docker-compose.prod.yml must not publish the Postgres service to the host by default.');
+  process.exit(1);
+}
+
 process.stdout.write(`Production baseline validation passed using ${describeEnvSource()}.\n`);

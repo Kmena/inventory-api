@@ -16,6 +16,8 @@ For governance tooling, `inventory-api/.github/workflows/` is not the current au
 
 Within the browser runtime, the active public surface is intentionally constrained but now includes a supported actor-aware root SPA shell under `src/public/root/` served at `/root/`.
 
+This refresh also includes the completed `bcrypt-supply-chain-closeout` governance slice. The application still uses native `bcrypt` in the existing auth/service flows, but the active dependency baseline is now `bcrypt@^6.0.0`, with the checked-in lockfile resolving through `node-gyp-build` instead of the previous `@mapbox/node-pre-gyp` / `tar` chain. No auth API, browser-session, or persistence architecture was redesigned in this slice.
+
 The implemented `/root/` shell now has a split actor presentation inside the same static runtime:
 - global `root` keeps the top-navigation shell variant; and
 - `company-admin` receives a rebranded fixed sidebar variant with grouped navigation, desktop collapse, and mobile drawer behavior.
@@ -77,6 +79,9 @@ Observable current runtime/governance areas:
 - **Express app (`src/app.js`)**: middleware chain, route mounting, static file serving, route-segmented security headers, and the deprecated-HTML gate that returns `410 Gone` for legacy browser URLs
 - **Middlewares**: authentication, authorization, throttling, payload validation, metrics, request context
 - **Services**: orchestration and business-flow logic
+- **Dependency-hygiene validator (`scripts/validate-dependency-hygiene.js`)**: executes `npm audit --json` and now enforces a zero-approved-residual baseline
+- **Dependency-hygiene governance artifacts (`audit-baseline.json`, `docs/audit/dependency-hygiene-baseline.md`)**: record the current zero-vulnerability repository posture
+- **Bcrypt compatibility suite (`tests/bcrypt-supply-chain-closeout.test.js`)**: freezes stored-hash compatibility and current hash-generation behavior without changing auth architecture
 - **Repositories**: main Prisma persistence access pattern
 - **Prisma**: schema and migration history
 - **Shared browser helpers (`src/public/shared/session.js`, `src/public/shared/auth.js`)**: cookie-session bootstrap/read/cleanup and authenticated browser fetch/logout helpers
@@ -90,16 +95,18 @@ Observable current runtime/governance areas:
 - **Migration / no-access surfaces**: supported fallback pages for deprecated-route rendering and non-wave-one transition behavior
 - **Legacy runtime archive (`legacy-public-runtime/`)**: preserved transition backup/reference inventory, not part of the served runtime
 - **Access-policy facade (`src/security/access-policies.js`)**: preserves the observable middleware contract through `authorizeAccessPolicy(...)`, `getAccessPolicy(...)`, and `listAccessPolicies(...)`, composing the extracted registry, actor-scope, and denial-audit seams
-- **Access-policy registry seam (`src/security/access-policy-registry.js`)**: owns the declarative route-policy catalog, including current mode, role/permission sets, boundaries, transitions, and selected actor-scope metadata
+- **Access-policy registry seam (`src/security/access-policy-registry.js`)**: owns the declarative route-policy catalog, including current mode, role/permission sets, boundaries, transitions, and selected actor-scope metadata; invoice routes now consume this facade consistently through explicit invoice policy IDs
 - **Access-policy actor-scope seam (`src/security/access-policy-actor-scope.js`)**: owns `global-root`, `company-admin`, and `agent-workspace-user` actor-scope evaluation plus actor-scope denial error construction
 - **Access-policy denial-audit seam (`src/security/access-policy-audit.js`)**: owns route-level actor-scope denial auditing through action `security.authorization.access_policy`
 - **Permission-governance foundation (`src/security/permission-governance*.js`)**: owns centralized role-bundle definitions, permission metadata, governed-operation inventory, approved combination rules, global-root detection, reusable warning contract, and operation evaluation (`allow` / `warn` / `deny`)
 - **Company service**: still owns company orchestration and now rechecks `company.create` through the governance foundation before persistence
 - **Role service**: owns company-role creation flow, rejects platform-scoped permission assignment such as `companies.manage` before persistence, records governance warnings in audit metadata for successful allow/warn flows, and emits dedicated fail-open denial audit attempts with action `roles.company.create.governance_denied` for the enforced deny path
 - **Inventory alerts seam (`src/services/inventory-alerts.service.js`)**: owns inventory-alert permission checks, serialization, valid status transitions, metadata merge behavior, and alert-focused audit coordination while `inventory.service.js` keeps broader stock and lot orchestration
+- **Inventory product-total helper (`src/repositories/inventory.repository.js`)**: supported stock-entry and lot QA flows now update product totals through `updateProductById(id, companyId, data, db)`, which scopes by both `id` and `companyId` via `updateMany(...)` plus scoped re-read
 - **Agent workspace store-state seam (`src/services/agent-workspace-store-state.service.js`)**: owns visit-state derivation, route normalization, invoice visibility rules, debt serialization, store-card shaping, sorting, and purchase-history shaping while `agent-workspace.service.js` keeps actor scoping and higher-level orchestration
-- **Product permission/pricing seams (`src/services/product-permission-shaping.service.js`, `src/services/product-pricing.service.js`)**: own permission-aware product serialization, derived lot-usability decoration, and general-price synchronization while `product.service.js` keeps product CRUD/import orchestration and inventory-linked stock registration
+- **Product permission/pricing seams (`src/services/product-permission-shaping.service.js`, `src/services/product-pricing.service.js`)**: own permission-aware product serialization, derived lot-usability decoration, and general-price synchronization while `product.service.js` keeps product CRUD/import orchestration and inventory-linked stock registration; the final supported product update mutation now delegates to `product.repository.updateProduct(id, companyId, data, tx)` inside the existing transaction
 - **Browser-session service**: owns opaque browser-session lifecycle, store-readiness checks, explicit 503 mapping for store unavailability, and related audit instrumentation
+- **Order list contract seam (`src/routes/order.routes.js`, `src/services/order.service.js`, `src/repositories/order.repository.js`)**: parses optional pagination query params and preserves the dual `GET /api/orders` contract of legacy array responses without pagination params versus `{ items, pagination }` envelopes when pagination is requested
 - **Health router**: exposes liveness and readiness, combining Prisma readiness with browser-session-store readiness
 - **Aggregate test runner**: `scripts/run-tests.js` discovers `.test.js` files, applies preferred ordering, forwards Node test arguments, and injects the default test-safe environment
 - **Public-runtime validator**: `scripts/validate-public-runtime.js` governs the supported public inventory, validates legacy relocation, and asserts login, migration, and root-shell contracts
@@ -109,8 +116,11 @@ Observable current runtime/governance areas:
 - **Workflow-baseline validator**: `scripts/validate-workflow-baseline.js` verifies the root hosted workflow contracts, including the dedicated Redis browser-session lane
 
 ## 6. Current dependency rules
+- dependency-hygiene governance now assumes zero approved residual vulnerabilities; any future `npm audit` finding is expected to fail validation unless the baseline and approval posture are explicitly updated;
+- auth/password flows remain service-layer consumers of native `bcrypt`; dependency upgrades must preserve stored-hash compatibility and current hash-generation semantics;
 Observed dependency direction remains mostly:
 - routes -> services -> repositories -> Prisma
+- supported product and inventory write paths now preserve tenant scope at the repository mutation boundary instead of relying only on prior scoped reads
 - routes with policy enforcement -> `src/security/access-policies.js` facade -> access-policy registry / actor-scope / denial-audit seams -> middleware outcome
 - services with governance-sensitive operations -> `src/security/permission-governance.service.js` -> repositories / audit
 - public browser runtime pages -> shared browser helpers -> HTTP API
@@ -137,6 +147,8 @@ Current persistence architecture remains:
 - repositories as the main application-level persistence access pattern
 - service orchestration above repositories
 
+Current product and inventory stock-related mutation paths still keep transaction orchestration in services, but the final product mutations now enforce company scope at repository level.
+
 The inspected `p27`, `p28`, `p30`, and `p32` refreshes introduced no database ownership or transaction-boundary changes.
 
 ## 8. Current API and integration contracts
@@ -150,6 +162,7 @@ Current active contracts relevant to architecture:
 - `/api/auth/me` returns the current authenticated user and refreshes browser-session cookies
 - `/api/auth/logout` invalidates the backend-owned browser session and clears browser cookies
 - `POST /api/companies/` now uses the dedicated route policy `company.create-global` while preserving the same endpoint and `403` semantics
+- `GET /api/orders` is intentionally backward compatible: it returns the legacy array contract without pagination params and returns `{ items, pagination }` when `page` or `pageSize` is supplied
 
 Current public HTML/browser contract:
 - supported public HTML: `/`, `/index.html`, `/no-access.html`, `/migration.html`, `/root/`
@@ -176,7 +189,8 @@ Current observable security boundaries include:
 - company list/create now uses an intentionally clearer split contract: access policies declare explicit `global-root` actor scope for the affected admin routes, including the dedicated `company.create-global` route policy for `POST /api/companies/`, while `company.service.js` preserves the governance-service-backed global-root business check
 - login throttling on the login route
 - security headers in the Express app, including CSP selection by route
-- strict same-origin CSP on `/`, `/index.html`, `/no-access.html`, `/migration.html`, `/root/`, and deprecated legacy HTML routes that receive the migration response
+- strict same-origin CSP on `/`, `/index.html`, `/no-access.html`, `/migration.html`, `/root/`, and deprecated legacy HTML routes that receive the migration response, without the previously retired CDN allowances
+- JWT verification is pinned to the application's explicit signing algorithm allowlist in `src/lib/auth.js`
 - browser-session cookies with `HttpOnly` on the opaque session cookie, `SameSite=Lax`, and conditional `Secure` enforcement for production or HTTPS-capable requests
 - same-origin `Origin` validation on mutating cookie-authenticated requests in `authenticate.js`
 - explicit no-fallback failure behavior when Redis-backed browser-session persistence is configured but unreachable
@@ -184,12 +198,14 @@ Current observable security boundaries include:
 - the current shell actor split is global `root` without `companyId` for the top-nav shell and routes `#home` / `#companies`, and `admin` with `companyId` for the sidebar shell where `#admin_home` is the default landing, `#roles_permissions` and `#zones` are the functional tenant-admin routes, and the remaining approved sidebar routes currently render the shared neutral `in_process` view
 
 ## 10. Current container and deployment architecture
+Follow-up validation now confirms the upgraded bcrypt native dependency path works with the versioned Docker assets: `inventory-api/Dockerfile` builds successfully, in-container bcrypt smoke passes, and the application starts successfully far enough to serve `GET /health` when documented runtime prerequisites are supplied. This does not change the versioned Docker assets themselves and is not documented as an active dependency vulnerability.
 Current observed deployment architecture:
 - application Dockerfile with multi-stage build
 - non-root runtime user
 - Docker healthcheck bound to `GET /health/ready`
 - compose files aligned to the Redis-backed browser-session baseline
 - repository-root GitHub Actions workflows as the official hosted automation layer
+- the versioned production Compose baseline keeps Postgres internal to the Docker network and does not expose the DB port on the host
 
 Current platform baseline is Node 24 in:
 - `package.json` engines
@@ -197,6 +213,7 @@ Current platform baseline is Node 24 in:
 - repository-root workflow Node setup steps
 
 ## 11. Current testing strategy
+- dependency-governance coverage now also includes `tests/dependency-hygiene-governance.test.js` for the zero-residual baseline and `tests/bcrypt-supply-chain-closeout.test.js` for stored-hash compatibility, login continuity, and current hash-generation behavior
 Current implemented testing posture includes:
 - `scripts/run-tests.js` as the official aggregate repository test runner
 - inventory validation through `scripts/validate-public-runtime.js`
@@ -210,6 +227,7 @@ Current implemented testing posture includes:
 - agent-workspace hotspot characterization coverage through `tests/agent-workspace-hotspot-characterization.test.js`, freezing tenant-scoped store filtering/sorting, store summary serialization, and current order-payload coercion/delegation behavior
 - product hotspot characterization coverage through `tests/product-service-hotspot-characterization.test.js`, freezing repository-transaction ownership for `createProduct`, derived lot-usability decoration, category-cache reuse during import, and import-time inventory registration coupling
 - access-policy hotspot characterization coverage through `tests/access-policies.test.js` and `tests/authorization-convergence-characterization.test.js`, freezing strict registry lookup behavior, actor-scope inventories, denial-audit metadata, and selected route-policy mappings without changing runtime semantics
+- targeted due-diligence remediation coverage now also includes `tests/product-service-hotspot-characterization.test.js`, `tests/inventory-service-hotspot-characterization.test.js`, `tests/pagination.test.js`, `tests/order-lifecycle-contract-characterization.test.js`, `tests/auth-hardening-characterization.test.js`, `tests/lot-datetime-characterization.test.js`, and `tests/production-baseline-characterization.test.js`
 - `docs/test-suite-catalog.md` as the maintained reference for the affected DB-free vs DB-backed suite boundary
 - `tests/coding-standard-path-alignment.test.js` as the focused governance check for canonical versus compatibility coding-standards paths
 - `tests/documentation-ownership-governance.test.js` as the focused governance check for the ownership map and the canonical workflow/documentation references
@@ -375,6 +393,10 @@ Recorded post-implementation evidence supplied by the user for `p27`:
 - `node --test tests/public-runtime-http-smoke.test.js tests/public-surface-characterization.test.js tests/browser-runtime-auth-convergence-inventory.test.js` passed
 
 ## 12. Active architectural decisions
+- keep native `bcrypt` as the active password-hashing library rather than redesigning auth hashing in this slice
+- keep the approved dependency baseline on `bcrypt@^6.0.0`
+- keep dependency-hygiene governance at zero approved residual vulnerabilities
+- treat missing Docker-daemon evidence as an operational validation gap, not as proof of a remaining repository vulnerability
 Currently implemented or actively governing decisions:
 - keep the application as a single deployable modular monolith
 - keep the embedded browser runtime inside the same Express process
@@ -409,6 +431,8 @@ Currently implemented or actively governing decisions:
 - keep the bounded actor-scope convergence seam limited to selected admin flows plus the agent workspace routes rather than broadening it into a repository-wide authorization redesign
 - keep update-flow governance deferred until an actual company-role update surface exists in runtime
 - keep the browser-runtime `typecheck` baseline bounded to the explicit shared-auth/login seam plus the approved `src/public/root/**` shell allowlist, without broadening to all `src/public/**`
+- keep HSTS deferred until deployment, TLS-termination, and trusted-proxy assumptions are standardized in-repo; current app-layer hardening stops at CSP and explicit JWT algorithm pinning
+- if HSTS is ever revisited, allow only conditional enablement behind explicit deployment assumptions, require `TRUST_PROXY` to be explicit before proxied enablement, and keep `preload` out of scope
 - keep the official aggregate test runner defaulted to `NODE_ENV=test` and `BROWSER_SESSION_STORE_MODE=memory` unless explicitly overridden
 - keep a separate explicit Redis-path validation lane instead of folding Redis dependence back into the default aggregate suite
 - keep browser-session readiness visible at `/health/ready`
@@ -416,6 +440,8 @@ Currently implemented or actively governing decisions:
 - keep the default aggregate validation lane memory-backed for browser sessions and treat Windows Prisma generate rename-lock failures as a separate documented platform concern, not as evidence of hotspot-seam regressions
 
 ## 13. Known architectural limitations
+- the repository still depends on a native password-hashing module path (`bcrypt` via `node-gyp-build`), so some environments may require prebuilt-binary compatibility or fallback compilation support;
+- full DB-backed container readiness and end-to-end auth behavior were not expanded in the bounded Docker follow-up, even though build and startup smoke evidence now exists;
 - layered architecture without strict hexagonal separation
 - broad service responsibilities
 - operational/readiness/browser governance still depends on synchronized docs, scripts, tests, manifest metadata, and workflows

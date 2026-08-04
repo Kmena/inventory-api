@@ -24,6 +24,23 @@ function withModuleStubs(stubsByModule, run) {
     });
 }
 
+test('listOrders preserves the legacy array contract when pagination params are absent', async () => {
+  const orders = await withModuleStubs(
+    [
+      [orderRepository, {
+        findAllOrders: async (companyId, pagination) => {
+          assert.equal(companyId, 7n);
+          assert.equal(pagination, null);
+          return [{ id: 2n, status: 'DRAFT' }];
+        },
+      }],
+    ],
+    () => orderService.listOrders({ companyId: '7', sub: '10', role: 'sales' }),
+  );
+
+  assert.deepEqual(orders, [{ id: 2n, status: 'DRAFT' }]);
+});
+
 test('getOrder returns not_found when the order is outside the authenticated tenant scope', async () => {
   await withModuleStubs(
     [

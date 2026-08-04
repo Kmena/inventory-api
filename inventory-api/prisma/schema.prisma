@@ -239,29 +239,30 @@ model CompanyConfig {
 }
 
 model User {
-  id           BigInt     @id @default(autoincrement())
-  companyId    BigInt?    @map("company_id")
-  roleId       BigInt?    @map("role_id")
-  fullName     String     @map("full_name")
-  email        String?
-  username     String     @unique
-  passwordHash String     @map("password_hash")
-  phone        String?
-  status       UserStatus @default(ACTIVE)
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
-  company      Company?   @relation(fields: [companyId], references: [id])
-  role         Role?      @relation(fields: [roleId], references: [id])
-  orders       Order[]    @relation("order_user")
-  approvals    Order[]    @relation("order_approver")
-  createdProducts Product[] @relation("product_creator")
-  stockMovements StockMovement[]
-  lotStatusHistory LotStatusHistory[]
+  id                    BigInt                  @id @default(autoincrement())
+  companyId             BigInt?                 @map("company_id")
+  roleId                BigInt?                 @map("role_id")
+  fullName              String                  @map("full_name")
+  email                 String?
+  username              String                  @unique
+  passwordHash          String                  @map("password_hash")
+  phone                 String?
+  status                UserStatus              @default(ACTIVE)
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+  company               Company?                @relation(fields: [companyId], references: [id])
+  role                  Role?                   @relation(fields: [roleId], references: [id])
+  orders                Order[]                 @relation("order_user")
+  approvals             Order[]                 @relation("order_approver")
+  createdProducts       Product[]               @relation("product_creator")
+  stockMovements        StockMovement[]
+  lotStatusHistory      LotStatusHistory[]
   salesRouteAssignments SalesRouteAssignment[]
   salesGoals            SalesGoal[]
   routeVisitLogs        RouteVisitLog[]
-  auditEvents           AuditEvent[] @relation("audit_event_actor")
+  auditEvents           AuditEvent[]            @relation("audit_event_actor")
 
+  @@index([companyId, id])
   @@map("users")
 }
 
@@ -1001,6 +1002,8 @@ model OrderItem {
   order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product         Product  @relation(fields: [productId], references: [id])
 
+  @@index([orderId])
+  @@index([productId])
   @@map("order_items")
 }
 
@@ -1020,6 +1023,8 @@ model Invoice {
   order     Order?        @relation(fields: [orderId], references: [id])
   payments  Payment[]
 
+  @@index([clientId])
+  @@index([orderId])
   @@map("invoices")
 }
 

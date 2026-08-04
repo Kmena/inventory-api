@@ -1,6 +1,7 @@
 const orderRepository = require('../repositories/order.repository');
 const inventoryService = require('./inventory.service');
 const { createHttpError } = require('../lib/errors');
+const { buildPaginatedResponse } = require('../lib/pagination');
 const audit = require('../lib/audit');
 const { assertLifecycleStatusAllowed } = require('./approval-baseline.service');
 const {
@@ -13,9 +14,15 @@ const {
   toOrderItemsCreate,
 } = require('./order-access-policy.service');
 
-async function listOrders(auth) {
+async function listOrders(auth, pagination = null) {
   const { companyId } = scope(auth);
-  return orderRepository.findAllOrders(companyId);
+  const orders = await orderRepository.findAllOrders(companyId, pagination);
+  if (!pagination) {
+    return orders;
+  }
+
+  const paginatedOrders = /** @type {{ items: Array<any>, totalItems: number }} */ (orders);
+  return buildPaginatedResponse(paginatedOrders.items, pagination, paginatedOrders.totalItems);
 }
 
 async function getOrder(id, auth) {

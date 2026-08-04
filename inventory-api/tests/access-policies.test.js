@@ -50,6 +50,14 @@ test('access policies centralize stable role and permission boundaries', () => {
   const geocodingPolicy = getAccessPolicy('integration.geocoding.search');
   assert.equal(geocodingPolicy.mode, 'role');
   assert.deepEqual(geocodingPolicy.roles, ['admin', 'sales']);
+
+  const invoiceListPolicy = getAccessPolicy('invoice.list');
+  assert.equal(invoiceListPolicy.mode, 'role');
+  assert.deepEqual(invoiceListPolicy.roles, ['admin', 'sales']);
+
+  const invoiceDeletePolicy = getAccessPolicy('invoice.delete');
+  assert.equal(invoiceDeletePolicy.mode, 'role');
+  assert.deepEqual(invoiceDeletePolicy.roles, ['admin']);
 });
 
 test('access policies identify operational endpoints still in progressive role-to-permission transition', () => {

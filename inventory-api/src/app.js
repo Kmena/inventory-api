@@ -96,11 +96,11 @@ function selectContentSecurityPolicy(pathName) {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    "script-src 'self' https://unpkg.com https://cdn.jsdelivr.net",
-    "style-src 'self' 'unsafe-inline' https://unpkg.com",
-    "img-src 'self' data: https:",
-    "font-src 'self' https://unpkg.com data:",
-    "connect-src 'self' https://nominatim.openstreetmap.org",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
   ]);
 }
 

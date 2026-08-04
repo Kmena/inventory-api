@@ -82,6 +82,11 @@ npm run validate:operational-readiness
 docker compose -f docker-compose.prod.yml config
 ```
 
+Nota de hardening operativo aprobada en esta ola:
+- db no publica puerto al host en `docker-compose.prod.yml`;
+- el acceso operativo esperado al contenedor Postgres es acceso interno por docker compose exec o desde servicios del mismo stack;
+- cualquier exposición adicional debe resolverse fuera de este baseline o mediante una enmienda aprobada.
+
 ### 3. Construir imagen
 ```bash
 docker compose -f docker-compose.prod.yml build
@@ -193,6 +198,7 @@ rm -f .env.production.local
 
 ### Persistencia
 - PostgreSQL persiste en el volumen `postgres_data`.
+- La base de datos del baseline productivo no publica puerto al host por defecto; el acceso previsto es interno al stack Docker.
 - Redis sostiene la persistencia soportada de browser sessions fuera de test y se referencia vía `REDIS_URL`.
 - Archivos operativos del runtime persisten en `app_storage`.
 
@@ -215,6 +221,12 @@ Límites explícitos del workflow:
 - no hace deploy a `staging`, `production` ni a otros ambientes
 - no requiere secretos de registry para el baseline actual
 - no sustituye una estrategia posterior de publicación a registry o despliegue
+
+## Postura HSTS en este baseline
+- HSTS permanece diferido en este baseline porque el repositorio no estandariza todavía TLS, reverse proxy ni el contrato operativo de trusted proxy.
+- Cualquier trabajo futuro de HSTS queda acotado a enablement condicional solamente; no se aprueba enablement incondicional en esta ola.
+- `TRUST_PROXY` debe pasar a ser un input explícito del baseline antes de cualquier enablement futuro de HSTS detrás de proxy.
+- `preload` queda fuera de alcance para ese primer slice futuro.
 
 ## Límites conocidos
 - No incluye TLS, reverse proxy ni certificados.

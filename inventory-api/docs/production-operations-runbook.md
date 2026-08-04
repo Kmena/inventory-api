@@ -23,6 +23,13 @@ Este runbook documenta la evidencia operativa adicional versionada que acompaña
 - `.env.production` materializado desde `.env.production.example`
 - variables obligatorias validadas con `npm run validate:production-baseline`
 
+## Postura de red del baseline productivo
+- `docker-compose.prod.yml` ya no publica el puerto PostgreSQL al host.
+- El acceso esperado a la base del baseline es interno al stack mediante `docker compose -f docker-compose.prod.yml exec -T db ...`.
+- Si un entorno requiere exposición adicional, debe documentarse como excepción operativa fuera de este baseline mínimo.
+- HSTS permanece diferido porque este baseline no estandariza todavía la topología TLS ni el contrato de trusted proxy necesario para emitir `Strict-Transport-Security` con seguridad.
+- Si HSTS se evalúa más adelante, el único camino aprobado es enablement condicional, con `TRUST_PROXY` explícito antes de cualquier ruta detrás de proxy y con `preload` fuera de alcance.
+
 ## Señales operativas mínimas versionadas
 ### Health y readiness
 - liveness: `GET /health`

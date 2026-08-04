@@ -188,23 +188,19 @@ async function createProduct(payload, auth) {
 }
 
 async function updateProduct(id, payload, auth) {
+  const scope = authScope(auth);
   const existingProduct = await getProduct(id, auth);
 
   return productRepository.transaction(async (tx) => {
     const data = buildProductWriteData(payload, auth, existingProduct);
-    const product = await tx.product.update({
-      where: { id },
-      data,
-      include: productRepository.productInclude,
-    });
+    const product = await productRepository.updateProduct(id, scope.companyId, data, tx);
+    if (!product) {
+      throw createHttpError(404, 'Producto no encontrado', 'not_found');
+    }
 
     await syncGeneralPrice(tx, product.id, data.price, data.currency ?? product.currency);
 
-    const updatedProduct = await tx.product.findUnique({
-      where: { id: product.id },
-      include: productRepository.productInclude,
-    });
-    return serializeProductForPermissions(updatedProduct, auth);
+    return serializeProductForPermissions(product, auth);
   });
 }
 
@@ -288,11 +284,11 @@ async function importProducts(rows, auth) {
           continue;
         }
 
-        const updated = await tx.product.update({
-          where: { id: row.id },
-          data,
-          include: productRepository.productInclude,
-        });
+        const updated = await productRepository.updateProduct(row.id, companyId, data, tx);
+        if (!updated) {
+          summary.skipped.push({ id: row.id.toString(), name: row.name, reason: 'not_found_during_update' });
+          continue;
+        }
 
         await syncGeneralPrice(tx, updated.id, data.price, data.currency);
 
