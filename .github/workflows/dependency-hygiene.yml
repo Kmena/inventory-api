@@ -40,7 +40,21 @@ jobs:
       - name: Publish dependency audit summary
         if: always()
         run: |
-          node -e "const fs=require('node:fs'); const report=JSON.parse(fs.readFileSync('dependency-audit.json','utf8')); const totals=report.metadata?.vulnerabilities || {}; const names=Object.keys(report.vulnerabilities || {}); const lines=['# Dependency hygiene baseline', '', '- Validation command: `npm run validate:dependency-hygiene`', `- Residual vulnerabilities: ${totals.total ?? 0} total (${totals.low ?? 0} low, ${totals.moderate ?? 0} moderate, ${totals.high ?? 0} high, ${totals.critical ?? 0} critical)`, `- Residual packages: ${names.length ? names.join(', ') : 'none'}`]; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('dependency-audit.json', 'utf8'));
+          const totals = report.metadata?.vulnerabilities || {};
+          const names = Object.keys(report.vulnerabilities || {});
+          const lines = [
+            '# Dependency hygiene baseline',
+            '',
+            '- Validation command: `npm run validate:dependency-hygiene`',
+            `- Residual vulnerabilities: ${totals.total ?? 0} total (${totals.low ?? 0} low, ${totals.moderate ?? 0} moderate, ${totals.high ?? 0} high, ${totals.critical ?? 0} critical)`,
+            `- Residual packages: ${names.length ? names.join(', ') : 'none'}`,
+          ];
+
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          NODE
 
       - name: Upload dependency audit artifact
         if: always()

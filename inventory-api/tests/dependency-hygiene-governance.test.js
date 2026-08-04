@@ -4,8 +4,27 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const dependencyHygieneValidator = require('../scripts/validate-dependency-hygiene');
+const { repositoryRoot } = require('./internal-docs-optional');
 
-const baselineDocPath = path.join(__dirname, '..', 'docs', 'audit', 'dependency-hygiene-baseline.md');
+function resolveBaselineDocPath() {
+  const candidatePaths = [
+    path.join(repositoryRoot, 'docs', 'audit', 'dependency-hygiene-baseline.md'),
+    path.join(process.cwd(), 'docs', 'audit', 'dependency-hygiene-baseline.md'),
+    path.join(process.cwd(), 'inventory-api', 'docs', 'audit', 'dependency-hygiene-baseline.md'),
+  ];
+
+  const existingPath = candidatePaths.find((candidatePath) => fs.existsSync(candidatePath));
+
+  if (existingPath) {
+    return existingPath;
+  }
+
+  throw new Error(
+    `Unable to locate dependency hygiene baseline document. Checked: ${candidatePaths.join(', ')}`,
+  );
+}
+
+const baselineDocPath = resolveBaselineDocPath();
 
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
