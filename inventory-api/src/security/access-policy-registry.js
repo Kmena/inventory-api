@@ -156,6 +156,42 @@ const ACCESS_POLICIES = Object.freeze({
     transition: 'permission-plus-actor-scope',
     actorScope: 'agent-workspace-user',
   },
+  'invoice.list': {
+    mode: 'role',
+    roles: ['admin', 'sales'],
+    boundary: 'tenant-operational',
+    transition: 'documented-legacy-role',
+  },
+  'invoice.inconsistencies': {
+    mode: 'role',
+    roles: ['admin'],
+    boundary: 'tenant-admin-legacy',
+    transition: 'documented-legacy-role',
+  },
+  'invoice.detail': {
+    mode: 'role',
+    roles: ['admin', 'sales'],
+    boundary: 'tenant-operational',
+    transition: 'documented-legacy-role',
+  },
+  'invoice.create': {
+    mode: 'role',
+    roles: ['admin', 'sales'],
+    boundary: 'tenant-operational',
+    transition: 'documented-legacy-role',
+  },
+  'invoice.update': {
+    mode: 'role',
+    roles: ['admin', 'sales'],
+    boundary: 'tenant-operational',
+    transition: 'documented-legacy-role',
+  },
+  'invoice.delete': {
+    mode: 'role',
+    roles: ['admin'],
+    boundary: 'tenant-admin-legacy',
+    transition: 'documented-legacy-role',
+  },
   'payment.list': {
     mode: 'permission',
     permissions: ['sales.manage', 'collections.view.all', 'collections.manage.own', 'collections.payments.approve', 'collections.payments.reverse'],

@@ -9,6 +9,8 @@ const invoiceRepository = require('../src/repositories/invoice.repository');
 const invoiceService = require('../src/services/invoice.service');
 const paymentRepository = require('../src/repositories/payment.repository');
 const paymentService = require('../src/services/payment.service');
+const orderRepository = require('../src/repositories/order.repository');
+const orderService = require('../src/services/order.service');
 const userRepository = require('../src/repositories/user.repository');
 const userService = require('../src/services/user.service');
 const warehouseRepository = require('../src/repositories/warehouse.repository');
@@ -136,6 +138,45 @@ test('listInvoices returns paginated responses without changing legacy tenant sc
     totalPages: 3,
   });
   assert.deepEqual(result.items, [{ id: 11n, number: 'F-001' }]);
+});
+
+test('listOrders preserves the legacy array response when pagination is not requested', async () => {
+  const result = await withStubs(
+    [[orderRepository, {
+      findAllOrders: async (_companyId, pagination) => {
+        assert.equal(pagination, null);
+        return [{ id: 81n, status: 'DRAFT' }];
+      },
+    }]],
+    () => orderService.listOrders({ companyId: '9', sub: '4', role: 'sales' }),
+  );
+
+  assert.deepEqual(result, [{ id: 81n, status: 'DRAFT' }]);
+});
+
+test('listOrders returns paginated metadata only when pagination is requested', async () => {
+  const result = await withStubs(
+    [[orderRepository, {
+      findAllOrders: async (_companyId, pagination) => {
+        assert.deepEqual(pagination, { page: 2, pageSize: 1, skip: 1, take: 1 });
+        return {
+          totalItems: 3,
+          items: [{ id: 82n, status: 'APPROVED' }],
+        };
+      },
+    }]],
+    () => orderService.listOrders({ companyId: '9', sub: '4', role: 'sales' }, { page: 2, pageSize: 1, skip: 1, take: 1 }),
+  );
+
+  assert.deepEqual(result, {
+    items: [{ id: 82n, status: 'APPROVED' }],
+    pagination: {
+      page: 2,
+      pageSize: 1,
+      totalItems: 3,
+      totalPages: 3,
+    },
+  });
 });
 
 test('listPayments returns paginated responses when requested', async () => {

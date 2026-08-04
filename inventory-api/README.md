@@ -160,12 +160,15 @@ El baseline vigente depende de estos workflows del root hospedado:
 - `../.github/workflows/static-checks.yml`
 - `../.github/workflows/contract-validations.yml`
 - `../.github/workflows/repository-tests.yml`
+- `../.github/workflows/dependency-hygiene.yml`
+- `../.github/workflows/db-constraints-tests.yml`
 - `../.github/workflows/windows-prisma-build.yml`
 - `../.github/workflows/browser-e2e.yml`
+- `../.github/workflows/redis-browser-session-tests.yml`
 - `../.github/workflows/operational-smoke.yml`
 - `../.github/workflows/build-and-publish.yml`
 
-En conjunto cubren instalación, generación de Prisma, validaciones de contratos, test suite, browser E2E, smoke operativo y el gate dedicado de Prisma/Windows en `push`, `pull_request` y `workflow_dispatch` según corresponda.
+En conjunto cubren instalación, generación de Prisma, validaciones de contratos, baseline de vulnerabilidades con `npm audit`, test suite, constraints DB-backed, browser E2E, smoke operativo, el lane Redis de browser sessions y el gate dedicado de Prisma/Windows en `push`, `pull_request` y `workflow_dispatch` según corresponda.
 
 El workflow `static-checks` es además la fuente obligatoria del baseline de Node 24 y del typecheck incremental aprobado para superficies de alto valor del runtime, repositorios y validadores versionados.
 
@@ -376,12 +379,15 @@ Los scripts soportados del repositorio para validación del backend son:
 | `npm run validate:public-runtime` | gate individual | validación de sintaxis JS + referencias locales HTML en `src/public/` | Sí |
 | `npm run build` | gate individual | generación de Prisma Client requerida por runtime | Sí |
 | `npm run test` | gate individual | suites automatizadas obligatorias del backend | Sí |
+| `npm run validate:workflow-baseline` | gate individual | valida contratos de workflows hospedados en `../.github/workflows/` | Sí |
+| `npm run validate:dependency-hygiene` | gate individual | valida que `npm audit` solo deje el residual aprobado y documentado | Sí |
 | `npm run verify` | gate agregado | ejecución fail-fast de `lint + typecheck + lint:public-runtime + validate:public-runtime + validate:workflow-baseline + validate:operational-readiness + build + test` | Sí |
 | `npm run validate:agent-workspace` | diagnóstico | validación adicional de workspace/agente fuera del gate obligatorio | No |
 
 Reglas de uso del contrato actual:
 
 - `verify` reutiliza exactamente los mismos scripts obligatorios definidos de forma individual, incluyendo `validate:workflow-baseline` y `validate:operational-readiness`.
+- `validate:dependency-hygiene` se ejecuta como lane dedicado porque el cierre actual distingue explícitamente upgrades seguros ya aplicados de upgrades breaking todavía diferidos.
 - `src/public` ya no depende solo del gate sintáctico: queda cubierto además por `lint:public-runtime` y por validación de referencias HTML locales.
 - `validate:agent-workspace` permanece como diagnóstico opcional mientras no forme parte del gate obligatorio aprobado.
 - La evidencia canónica del repositorio debe ejecutarse con Node 24 LTS, que es el baseline vigente del repositorio.

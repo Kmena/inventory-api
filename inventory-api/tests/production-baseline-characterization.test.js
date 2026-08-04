@@ -22,6 +22,7 @@ test('production compose baseline includes db, migrate and app services with per
   assert.match(composeSource, /^(?: {2})migrate:/m);
   assert.match(composeSource, /^(?: {2})app:/m);
   assert.match(composeSource, /command: \["npm", "run", "prisma:deploy"\]/);
+  assert.doesNotMatch(composeSource, /POSTGRES_PORT:-5432\}:5432/);
   assert.match(composeSource, /postgres_data:/);
   assert.match(composeSource, /app_storage:/);
   assert.match(composeSource, /condition: service_healthy/);
@@ -40,6 +41,11 @@ test('production baseline documentation covers validation, migrations, health ch
   assert.match(docSource, /npm run validate:restore-readiness/);
   assert.match(docSource, /npm run validate:operational-readiness/);
   assert.match(docSource, /docker compose -f docker-compose.prod.yml run --rm migrate/);
+  assert.match(docSource, /(db no publica puerto al host|base de datos no publica puerto al host|acceso interno por docker compose exec)/i);
+  assert.match(docSource, /HSTS permanece diferido/i);
+  assert.match(docSource, /TRUST_PROXY/);
+  assert.match(docSource, /condicional/i);
+  assert.match(docSource, /preload.*fuera de alcance/i);
   assert.match(docSource, /production-operations-runbook\.md/);
   assert.match(docSource, /(sha256sum|production-operations-runbook\.md)/);
   assert.match(docSource, /(backup\.sql\.sha256|restore-readiness-baseline\.md)/);

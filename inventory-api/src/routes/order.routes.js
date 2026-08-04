@@ -4,6 +4,7 @@ const authenticate = require('../middlewares/authenticate');
 const { authorizeAccessPolicy } = require('../security/access-policies');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
+const { parsePaginationQuery } = require('../lib/pagination');
 const { createOrderSchema, updateOrderSchema } = require('../schemas/order.schema');
 const orderService = require('../services/order.service');
 
@@ -11,7 +12,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', authorizeAccessPolicy('order.list'), async (req, res, next) => {
-  try { return res.json(await orderService.listOrders(req.auth)); } catch (error) { return next(error); }
+  try { return res.json(await orderService.listOrders(req.auth, parsePaginationQuery(req.query))); } catch (error) { return next(error); }
 });
 
 router.get('/:id', authorizeAccessPolicy('order.detail'), async (req, res, next) => {

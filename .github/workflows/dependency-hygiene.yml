@@ -1,0 +1,50 @@
+name: dependency-hygiene
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-hygiene:
+    name: dependency-hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: inventory-api
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: inventory-api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Capture dependency audit evidence
+        run: npm audit --json > dependency-audit.json || true
+
+      - name: Validate approved dependency hygiene baseline
+        run: npm run validate:dependency-hygiene
+
+      - name: Publish dependency audit summary
+        if: always()
+        run: |
+          node -e "const fs=require('node:fs'); const report=JSON.parse(fs.readFileSync('dependency-audit.json','utf8')); const totals=report.metadata?.vulnerabilities || {}; const names=Object.keys(report.vulnerabilities || {}); const lines=['# Dependency hygiene baseline', '', '- Validation command: `npm run validate:dependency-hygiene`', `- Residual vulnerabilities: ${totals.total ?? 0} total (${totals.low ?? 0} low, ${totals.moderate ?? 0} moderate, ${totals.high ?? 0} high, ${totals.critical ?? 0} critical)`, `- Residual packages: ${names.length ? names.join(', ') : 'none'}`]; fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');"
+
+      - name: Upload dependency audit artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit
+          path: inventory-api/dependency-audit.json

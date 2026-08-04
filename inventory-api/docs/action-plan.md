@@ -3,6 +3,8 @@
 ## 1. Objective
 Keep architecture-facing documentation synchronized with the real repository state after `hotspot-seams-doc-ownership` tasks 1-8 closure, in addition to the previously documented `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-008`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, and the related governance slices built on `p34-bounded-governance-coverage-expansion`, `p35-governance-baseline-sync-guardrails`, and `p36-bounded-doc-validator-ownership-alignment`. This refresh now also captures the implemented hotspot seam reductions that preserve the layered monolith while splitting `src/security/access-policies.js` into facade + registry + actor-scope + denial-audit ownership, extracting focused service seams in inventory, agent workspace, and product flows, and recording that the minimum and expanded validation matrix passed for the intended memory-session aggregate lane.
 
+This refresh also records the completed `bcrypt-supply-chain-closeout` feature: the repository dependency baseline now uses `bcrypt@^6.0.0`, the prior approved bcrypt residual chain has been removed from the lockfile and audit baseline, and dependency hygiene now enforces a zero-residual posture.
+
 ## 2. Scope
 In scope for the current plan:
 - preserve the supported root shell under `src/public/root/` and its `/root/` entrypoint
@@ -26,6 +28,9 @@ In scope for the current plan:
 - keep `tests/governance-baseline-sync-guardrails.test.js` as the focused documentation-sync guardrail for the selected post-`p34` statements only, not as repository-wide documentation automation
 - reflect `docs/permission-governance-decisions.md` and the implemented `src/security/permission-governance*.js` foundation without overstating broader runtime enforcement
 - record only the bounded follow-up work still visible after the implemented root-shell slice
+- record the implemented bcrypt dependency closeout without overstating it as an auth redesign
+- preserve stored-hash and hash-generation compatibility under `bcrypt@^6.0.0`
+- preserve truthful documentation that Docker validation remains an environment evidence gap only
 
 ## 3. Out of scope
 - reactivating legacy HTML pages as supported runtime
@@ -74,6 +79,9 @@ This plan reflects the implemented `zones-view`, `sidebar-rebrand-permissions` `
 - `docs/documentation-ownership-map.md` now classifies `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, canonical workflow ownership, and the extracted auth/service/repository seam examples
 
 ## 5. Current problems addressed
+- the previous approved bcrypt residual chain `bcrypt@5.1.1 -> @mapbox/node-pre-gyp@1.0.11 -> tar@6.2.1` is now removed from the checked-in dependency tree
+- dependency hygiene no longer carries approved residual vulnerabilities for this repository baseline
+- stored bcrypt 5.x hashes remain compatible under the upgraded dependency path
 Problems already corrected by earlier browser-runtime slices plus `p27`:
 - the runtime no longer lacks a supported authenticated root destination for wave-one root users
 - `root` and company `admin` users no longer depend on the temporary transition landing as their primary supported post-login destination
@@ -170,6 +178,12 @@ Current integration posture to preserve:
 - `/root/` remains a supported browser entrypoint backed by static assets in the same Express runtime.
 
 ## 12. Container and deployment changes
+No versioned container-file change is required for this closeout refresh.
+
+Operational follow-up still visible:
+- rerun Docker build/runtime validation for the upgraded native bcrypt path when Docker daemon access is available;
+- keep this as an environment-evidence follow-up only, not as a residual vulnerability or code-level defect.
+
 No new container or deployment change is currently required.
 
 Container baseline to preserve:
@@ -180,6 +194,11 @@ Container baseline to preserve:
 - Redis-backed supported non-test browser-session baseline
 
 ## 13. Security changes
+Security/governance posture now reflected by the repository:
+- the previously documented bcrypt supply-chain residual is closed;
+- `audit-baseline.json` and `docs/audit/dependency-hygiene-baseline.md` now record a zero-vulnerability npm audit posture;
+- `scripts/validate-dependency-hygiene.js` rejects any future residual drift by default.
+
 Security posture to preserve:
 - same-origin cookie-session auth model for supported browser flows
 - no persisted bearer tokens in `localStorage`
@@ -194,6 +213,11 @@ Future security follow-up may include:
 - continuing broader HTTPS/cookie hardening tracked in the existing browser-session follow-up work
 
 ## 14. Test strategy
+- preserve `tests/bcrypt-supply-chain-closeout.test.js` as characterization coverage for stored-hash compatibility and current hash-generation call sites
+- preserve `tests/dependency-hygiene-governance.test.js` as the zero-residual governance guardrail
+- preserve clean-workspace validation evidence for `npm ci`, `npm run lint`, `npm run typecheck`, `npm run test -- --silent`, `npm run verify`, `npm audit --json`, and `npm run validate:dependency-hygiene`
+- rerun Docker-specific validation only when an environment with Docker daemon access is available
+
 Continue validating the implemented repository baseline through:
 1. `npm run validate:public-runtime`
 2. `node --test tests/public-surface-characterization.test.js`
@@ -360,6 +384,12 @@ Test-baseline notes to preserve:
 - the new root shell is currently governed by an explicit bounded browser-runtime `typecheck` allowlist plus lint, validator, smoke, characterization, and browser E2E coverage
 
 ## 15. Migration stages
+### Stage 30 — Completed
+- Close the approved bcrypt supply-chain remediation by upgrading to `bcrypt@^6.0.0`, removing the `@mapbox/node-pre-gyp` / `tar` residual chain from the checked-in dependency tree, adding stored-hash compatibility coverage, and moving dependency hygiene to a zero-approved-residual baseline
+
+### Stage 31 — Proposed
+- Rerun Docker build/runtime validation for the native bcrypt path in an environment with Docker daemon access and attach evidence without changing the approved zero-residual dependency posture
+
 ### Stage 1 — Completed
 - Reduce the active public runtime to the supported minimal baseline in `src/public/`
 
@@ -454,6 +484,8 @@ Test-baseline notes to preserve:
 - Reduce the `hotspot-seams-doc-ownership` hotspots incrementally by preserving the access-policy facade, extracting registry / actor-scope / denial-audit seams, extracting focused inventory / agent-workspace / product service seams, consolidating the canonical documentation ownership map, and closing the intended memory-session validation matrix
 
 ## 16. Risks and mitigations
+| Native bcrypt path was upgraded successfully, but Docker-specific validation was not rerun in the implementation environment | Low | Keep documentation explicit that this is only an environment evidence gap; rerun Docker validation when daemon access is available |
+
 | Risk | Level | Mitigation |
 |---|---|---|
 | Legacy HTML runtime is accidentally reintroduced into `src/public/` or treated as supported again | High | Keep `validate-public-runtime`, browser/runtime characterization tests, and docs aligned to the supported inventory |
@@ -471,6 +503,12 @@ Test-baseline notes to preserve:
 - Preserve the `410 Gone` gate, reduced `src/public/` inventory, and the supported `/root/` entrypoint unless a new approved spec explicitly changes the supported browser contract.
 
 ## 18. Manual validation
+- confirm `package.json` still declares `bcrypt@^6.0.0`
+- confirm the lockfile no longer resolves the bcrypt path through `@mapbox/node-pre-gyp` or `tar`
+- confirm `npm audit --json` remains at `0` vulnerabilities in a clean workspace
+- confirm `npm run validate:dependency-hygiene` still reports `Approved residual set: none`
+- rerun Docker build/runtime validation only in an environment with Docker daemon access
+
 For future follow-up work, manually confirm:
 - `src/public/` still contains the supported root shell and does not re-expose warehouse or agent runtime directories
 - `/root/` still loads successfully
@@ -485,4 +523,6 @@ For future follow-up work, manually confirm:
 - `npm run validate:public-runtime` and the affected browser/runtime tests still pass when touching browser-runtime seams
 
 ## 19. Approval status
+The `bcrypt-supply-chain-closeout` implementation itself is complete from a repository-code and governance perspective. The previously recorded environment-specific Docker evidence follow-up has now been executed successfully; remaining follow-up is limited to general native-module/toolchain operational awareness rather than unfinished bcrypt remediation.
+
 **Status:** Documentation refresh now reflects the implemented state after `hotspot-seams-doc-ownership` tasks 1-8 in addition to the previously completed browser/runtime and governance slices. The repository now documents the active access-policy split (`access-policies.js` facade plus registry / actor-scope / denial-audit helpers), the extracted inventory/agent-workspace/product service seams, the canonical documentation ownership map including `docs/tasks.md`, and the focused documentation-governance test coverage. No additional production API or database redesign is documented here. Remaining follow-up is limited to future additive seam work and the separately documented local Windows Prisma rename-lock instability during build generation.

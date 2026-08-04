@@ -94,6 +94,7 @@ async function registerStockEntryInTransaction(tx, payload, auth) {
   const warehouseStock = await changeWarehouseStock(tx, context, payload.quantity, 0);
   const product = await inventoryRepository.updateProductById(
     context.product.id,
+    context.companyId,
     { quantity: { increment: payload.quantity } },
     tx,
   );
@@ -286,6 +287,7 @@ async function adjustStock(payload, auth, req = null) {
 
     const product = await inventoryRepository.updateProductById(
       context.product.id,
+      context.companyId,
       payload.direction === 'IN'
         ? { quantity: { increment: payload.quantity } }
         : { quantity: { decrement: payload.quantity } },
@@ -375,6 +377,7 @@ async function reserveStockForOrder(orderId, auth, req = null) {
 
       await inventoryRepository.updateProductById(
         context.product.id,
+        context.companyId,
         { reservedQuantity: { increment: quantity } },
         tx,
       );
@@ -453,6 +456,7 @@ async function releaseStockReservation(orderId, cancel, auth, req = null) {
       const stock = await changeWarehouseStock(tx, context, 0, -reserved);
       await inventoryRepository.updateProductById(
         context.product.id,
+        context.companyId,
         { reservedQuantity: { decrement: reserved } },
         tx,
       );
@@ -538,6 +542,7 @@ async function dispatchOrder(orderId, auth, req = null) {
       const stock = await changeWarehouseStock(tx, context, -quantity, -quantity);
       await inventoryRepository.updateProductById(
         context.product.id,
+        context.companyId,
         {
           quantity: { decrement: quantity },
           reservedQuantity: { decrement: quantity },

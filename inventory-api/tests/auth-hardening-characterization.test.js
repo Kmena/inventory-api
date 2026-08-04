@@ -6,8 +6,16 @@ const path = require('node:path');
 
 process.env.NODE_ENV = 'test';
 
+const jwt = require('jsonwebtoken');
+
 const app = require('../src/app');
 const authService = require('../src/services/auth.service');
+const {
+  ACCESS_TOKEN_ALGORITHM,
+  ACCESS_TOKEN_ALGORITHMS,
+  signAccessToken,
+  verifyAccessToken,
+} = require('../src/lib/auth');
 const geocodingRoutes = require('../src/routes/geocoding.routes');
 const taxpayerRoutes = require('../src/routes/taxpayer.routes');
 const {
@@ -118,6 +126,36 @@ async function runThrottleMiddleware(middleware, reqOverrides = {}) {
   };
 }
 
+test('access tokens are signed and verified with an explicit algorithm allowlist', () => {
+  const token = signAccessToken({
+    id: 1n,
+    username: 'alice',
+    companyId: 7n,
+    role: {
+      code: 'admin',
+      rolePermissions: [{ isEnabled: true, permission: { code: 'products.manage', isActive: true } }],
+    },
+  });
+
+  const decoded = jwt.decode(token, { complete: true });
+  assert.equal(decoded.header.alg, ACCESS_TOKEN_ALGORITHM);
+  assert.deepEqual(ACCESS_TOKEN_ALGORITHMS, [ACCESS_TOKEN_ALGORITHM]);
+  assert.equal(verifyAccessToken(token).sub, '1');
+});
+
+test('verifyAccessToken rejects tokens signed with non-allowlisted algorithms even with the same secret', () => {
+  const incompatibleToken = jwt.sign(
+    { sub: '1', username: 'alice', companyId: '7' },
+    process.env.JWT_SECRET || 'change_this_super_secret_key',
+    { algorithm: 'HS384' },
+  );
+
+  assert.throws(
+    () => verifyAccessToken(incompatibleToken),
+    /invalid algorithm/i,
+  );
+});
+
 test('public login, no-access and retired legacy html routes all receive the strict CSP baseline', async () => {
   await withHttpServer(async (baseUrl) => {
     const loginResponse = await get(baseUrl, '/');
@@ -134,6 +172,7 @@ test('public login, no-access and retired legacy html routes all receive the str
       assert.equal(headerResponse.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
       assert.equal(headerResponse.headers.get('x-content-type-options'), 'nosniff');
       assert.equal(headerResponse.headers.get('x-frame-options'), 'DENY');
+      assert.equal(headerResponse.headers.get('strict-transport-security'), null);
     }
 
     assert.equal(retiredLegacyResponse.status, 410);
@@ -254,6 +293,14 @@ test('route-specific lookup throttles remain mounted separately from login throt
   assert.equal(geocodingThrottleMiddleware.name, 'enforceRequestThrottle');
   assert.equal(taxpayerThrottleMiddleware.name, 'enforceRequestThrottle');
   assert.notEqual(geocodingThrottleMiddleware, taxpayerThrottleMiddleware);
+});
+
+test('fallback CSP no longer carries retired CDN or direct third-party connect allowances', () => {
+  const appSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'app.js'), 'utf8');
+
+  assert.doesNotMatch(appSource, /unpkg\.com/);
+  assert.doesNotMatch(appSource, /cdn\.jsdelivr\.net/);
+  assert.doesNotMatch(appSource, /nominatim\.openstreetmap\.org/);
 });
 
 test('app no longer relies on a single global 25mb parser baseline', () => {

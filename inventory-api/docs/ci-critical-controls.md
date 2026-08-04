@@ -53,6 +53,7 @@ Current examples:
 | Tenant, document, and payment security regressions | security | Strong | `repository-tests` | Strong runtime regressions remain inside the aggregate mandatory suite. |
 | Authorization and route-guard characterization | security / business logic | Partial characterization only | Supportive, not sufficient alone | Useful context, not closure by itself. |
 | Runtime, workflow, and operational contract validation | governance / business logic | Strong | `contract-validations` and `operational-smoke` | Explicit validator-based governance evidence. |
+| Dependency vulnerability baseline drift detection | security / supply chain | Strong | `dependency-hygiene` | Captures `npm audit` evidence, validates the approved residual package set, and publishes the audit artifact/summary. |
 | Browser critical flows | business logic / embedded runtime | Strong | `browser-e2e` | Critical browser-first regression gate. |
 | Redis-backed browser-session non-default path | security / embedded runtime | Strong | `redis-browser-session-tests` | Dedicated mandatory lane for the supported Redis-backed browser-session path outside the default memory-mode aggregate suite. |
 | Windows Prisma build stability | platform | Strong | `windows-prisma-build` | Dedicated operational evidence, not replaced by aggregate verify. |
@@ -71,6 +72,7 @@ The current repository can prove the following expected required-job baseline fr
 - `static-checks`
 - `contract-validations`
 - `repository-tests`
+- `dependency-hygiene`
 - `db-constraints-tests`
 - `windows-prisma-build`
 - `browser-e2e`
@@ -82,7 +84,7 @@ In practice, successful branches and pull requests already rely on passing the p
 ## 6. Manual hosted verification checklist
 The following final closeout evidence still requires manual verification in GitHub hosted settings because it is not stored in versioned repository contents:
 - confirm branch protection is enabled for the primary integration branch;
-- confirm the hosted required status checks include the approved repo-verifiable baseline jobs;
+- confirm the hosted required status checks include the approved repo-verifiable baseline jobs, including `dependency-hygiene`;
 - confirm the hosted check names exactly match the versioned workflow job names listed above;
 - confirm no obsolete Node 20 or superseded workflow names remain configured as required checks;
 - record the verification date, reviewer, and hosted evidence location used for closeout approval.

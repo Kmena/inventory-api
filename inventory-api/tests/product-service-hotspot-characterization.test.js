@@ -24,6 +24,97 @@ function withStubs(moduleStubs, run) {
     });
 }
 
+test('updateProduct routes the final mutation through the company-scoped repository helper', async () => {
+  const tx = {
+    productPrice: {},
+  };
+  const observed = {
+    updateCall: null,
+    priceUpdates: [],
+  };
+
+  tx.productPrice.updateMany = async (payload) => {
+    observed.priceUpdates.push({ type: 'updateMany', payload });
+  };
+  tx.productPrice.create = async (payload) => {
+    observed.priceUpdates.push({ type: 'create', payload });
+  };
+
+  const result = await withStubs(
+    [
+      [productRepository, {
+        transaction: async (work) => work(tx),
+        findProductById: async (productId, companyId) => ({
+          id: productId,
+          companyId,
+          createdByUserId: 15n,
+          productType: 'FINISHED_PRODUCT',
+          sellableKind: 'STANDARD',
+          taxExempt: false,
+          taxCategory: 'VAT_STANDARD',
+          taxRate: 13,
+          density: null,
+          densityUnit: null,
+          isActive: true,
+          lotStrategy: 'TRACKED',
+          kgConversionFactor: 1,
+          category: { categoryType: 'PT' },
+          cabysCode: null,
+          warehouseLotStocks: [],
+        }),
+        updateProduct: async (productId, companyId, data, receivedTx) => {
+          observed.updateCall = { productId, companyId, data, receivedTx };
+          return {
+            id: productId,
+            companyId,
+            currency: 'USD',
+            ...data,
+            warehouseLotStocks: [],
+          };
+        },
+      }],
+      [inventoryService, {
+        deriveLotUsability: () => ({ sellable: true, expired: false, reason: null }),
+      }],
+    ],
+    () => productService.updateProduct(
+      77n,
+      {
+        name: 'Producto actualizado',
+        price: 21.25,
+        currency: 'USD',
+      },
+      { companyId: '7', sub: '15', permissions: ['products.manage'] },
+    ),
+  );
+
+  assert.deepEqual(observed.updateCall, {
+    productId: 77n,
+    companyId: 7n,
+    data: {
+      name: 'Producto actualizado',
+      price: 21.25,
+      currency: 'USD',
+      companyId: 7n,
+      createdByUserId: 15n,
+      productType: 'FINISHED_PRODUCT',
+      sellableKind: 'STANDARD',
+      cabysCode: null,
+      taxExempt: false,
+      taxCategory: 'VAT_STANDARD',
+      taxRate: 13,
+      density: null,
+      densityUnit: null,
+      isActive: true,
+      lotStrategy: 'TRACKED',
+      kgConversionFactor: 1,
+    },
+    receivedTx: tx,
+  });
+  assert.equal(result.id, 77n);
+  assert.deepEqual(observed.priceUpdates.map((entry) => entry.type), ['updateMany', 'create']);
+});
+
 test('createProduct zeroes stock counters, syncs general price, and keeps initial-lot registration inside the repository transaction', async () => {
   const tx = {
     product: {},
@@ -198,6 +289,10 @@ test('importProducts reuses tenant inventory/category context and registers init
           observed.findProductsByIdsArgs = { ids, companyId };
           return [{ id: 300n, companyId: 7n, name: 'Existente', category: { categoryType: 'PT' }, prices: [] }];
         },
+        updateProduct: async (productId, companyId, data, receivedTx) => {
+          observed.updatedProducts.push({ productId, companyId, data, receivedTx });
+          return { id: productId, name: data.name };
+        },
         transaction: async (work) => work(tx),
       }],
       [inventoryService, {
@@ -244,6 +339,12 @@ test('importProducts reuses tenant inventory/category context and registers init
   assert.equal(observed.categoryFindFirstCalls, 1);
   assert.equal(observed.categoryCreateCalls, 1);
   assert.equal(observed.updatedProducts.length, 1);
+  assert.deepEqual(observed.updatedProducts[0], {
+    productId: 300n,
+    companyId: 7n,
+    data: observed.updatedProducts[0].data,
+    receivedTx: tx,
+  });
   assert.equal(observed.createdProducts.length, 2);
   assert.equal(observed.createdProducts[0].quantity, 0);
   assert.equal(observed.createdProducts[0].reservedQuantity, 0);

@@ -91,6 +91,18 @@ test('dedicated Redis browser-session workflow keeps the mandatory non-default s
   assert.doesNotMatch(workflowSource, /run:\s+npm run test\s*$/m);
 });
 
+test('dependency hygiene workflow preserves the audited npm audit evidence lane', () => {
+  const workflowSource = readWorkflow('dependency-hygiene.yml');
+
+  assert.match(workflowSource, /^\s{2}dependency-hygiene:\s*$/m);
+  assert.match(workflowSource, /node-version:\s+'24'/);
+  assert.match(workflowSource, /run:\s+npm ci/);
+  assert.match(workflowSource, /npm audit --json > dependency-audit\.json \|\| true/);
+  assert.match(workflowSource, /run:\s+npm run validate:dependency-hygiene/);
+  assert.match(workflowSource, /GITHUB_STEP_SUMMARY/);
+  assert.match(workflowSource, /actions\/upload-artifact@v4/);
+});
+
 test('critical controls documentation keeps the repo-verifiable required-job baseline and manual hosted verification boundary explicit', () => {
   const source = fs.readFileSync(criticalControlsDocPath, 'utf8');
 
@@ -98,6 +110,7 @@ test('critical controls documentation keeps the repo-verifiable required-job bas
   assert.match(source, /`static-checks`/);
   assert.match(source, /`contract-validations`/);
   assert.match(source, /`repository-tests`/);
+  assert.match(source, /`dependency-hygiene`/);
   assert.match(source, /`db-constraints-tests`/);
   assert.match(source, /`windows-prisma-build`/);
   assert.match(source, /`browser-e2e`/);
@@ -131,5 +144,5 @@ test('validate-workflow-baseline passes when the versioned workflows preserve th
   });
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /Validated 10 workflow baseline files/);
+  assert.match(result.stdout, /Validated 11 workflow baseline files/);
 });

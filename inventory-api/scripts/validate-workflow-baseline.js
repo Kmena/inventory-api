@@ -35,6 +35,18 @@ const workflowRules = [
     ],
   },
   {
+    relativePath: 'dependency-hygiene.yml',
+    checks: [
+      { description: 'defines a dependency-hygiene job', pattern: /^\s{2}dependency-hygiene:\s*$/m },
+      { description: 'pins Node.js 24', pattern: /node-version:\s+'24'/ },
+      { description: 'installs dependencies with npm ci', pattern: /run:\s+npm ci/ },
+      { description: 'captures dependency audit evidence', pattern: /npm audit --json > dependency-audit\.json \|\| true/ },
+      { description: 'runs the dependency hygiene validator', pattern: /run:\s+npm run validate:dependency-hygiene/ },
+      { description: 'publishes workflow summary evidence', pattern: /GITHUB_STEP_SUMMARY/ },
+      { description: 'uploads the dependency audit artifact', pattern: /uses:\s+actions\/upload-artifact@v4/ },
+    ],
+  },
+  {
     relativePath: 'db-constraints-tests.yml',
     checks: [
       { description: 'defines a dedicated db-constraints-tests job', pattern: /^\s{2}db-constraints-tests:\s*$/m },
