@@ -31,7 +31,12 @@ const prisma = /** @type {PrismaClientWithReadiness} */ (new Proxy({ checkDataba
     const value = Reflect.get(activeClient, property, receiver);
     return typeof value === 'function' ? value.bind(activeClient) : value;
   },
-  set(_target, property, value) {
+  set(target, property, value) {
+    if (property === 'checkDatabaseReadiness') {
+      target.checkDatabaseReadiness = value;
+      return true;
+    }
+
     const activeClient = getPrismaClient();
     activeClient[property] = value;
     return true;
