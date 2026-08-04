@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const dependencyHygieneValidator = require('../scripts/validate-dependency-hygiene');
-const { repositoryRoot } = require('./internal-docs-optional');
+const { repositoryRoot, skipIfMissing } = require('./internal-docs-optional');
 
 function resolveBaselineDocPath() {
   const candidatePaths = [
@@ -24,8 +24,6 @@ function resolveBaselineDocPath() {
   );
 }
 
-const baselineDocPath = resolveBaselineDocPath();
-
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
@@ -34,7 +32,18 @@ test('dependency hygiene validator no longer approves any bcrypt-chain residual 
   assert.deepEqual(Object.keys(dependencyHygieneValidator.approvedResidualVulnerabilities), []);
 });
 
-test('dependency hygiene baseline doc records the bcrypt closeout with a zero-vulnerability audit result', () => {
+test('dependency hygiene baseline doc records the bcrypt closeout with a zero-vulnerability audit result', (t) => {
+  if (
+    skipIfMissing(
+      t,
+      ['docs/audit/dependency-hygiene-baseline.md'],
+      'dependency hygiene baseline doc artifact is not present in this checkout layout',
+    )
+  ) {
+    return;
+  }
+
+  const baselineDocPath = resolveBaselineDocPath();
   const source = read(baselineDocPath);
 
   assert.match(source, /npm audit --json/i);
