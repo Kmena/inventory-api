@@ -51,6 +51,24 @@
     {
       "method": "GET",
       "mountPath": "/api/products",
+      "expressPath": "/categories/company",
+      "routeFile": "src/routes/product.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "product-category-admin-outside-current-openapi-baseline",
+      "reason": "El listado de categorías de inventario por empresa es una superficie factual añadida en el slice inventory-admin-views, pero no se incluye todavía en el baseline OpenAPI parcial mientras no se expanda la cobertura del dominio de categorías."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/products",
+      "expressPath": "/categories/company",
+      "routeFile": "src/routes/product.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "product-category-admin-outside-current-openapi-baseline",
+      "reason": "La creación de categorías de inventario por empresa sigue soportada en runtime y protegida por tenant scope, pero permanece fuera del contrato OpenAPI parcial hasta que se expanda la cobertura del dominio de categorías."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/products",
       "expressPath": "/:id",
       "routeFile": "src/routes/product.routes.js",
       "contractStatus": "intentionally-excluded",

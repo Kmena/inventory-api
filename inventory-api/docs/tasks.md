@@ -1,5 +1,68 @@
 # Tasks
 
+## TASK-055: Refresh architecture-facing docs after the modern products and categories admin implementation
+**Status:** Completed
+**Priority:** Low
+**Domain:** Embedded browser runtime / Architecture documentation
+**Requirement:** `inventory-admin-views` `TASK-007`; `inventory-admin-views` `TASK-008`
+**Reason:** After `#products` became a functional company-admin screen and tenant category administration moved into the supported root shell, the architecture-facing documents still needed to stop describing `#products` as a placeholder route and record the real runtime/testing state.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, and `docs/audit/current-code-audit.md` now describe `#products` as a functional root-shell module over `/api/products/**` plus `GET/POST /api/products/categories/company`, while keeping `#lots` documented as the remaining inventory placeholder and recording the bounded typecheck/public-runtime governance gap honestly.
+**Implemented change:** Synchronized architecture-facing docs and the current-code audit to the post-`TASK-007` / `TASK-008` repository truth, including products helper/state/renderer seams, runtime-contract membership, category admin surface behavior, strengthened characterization/E2E coverage, and the still-bounded browser-runtime typecheck scope.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `docs/audit/current-code-audit.md`
+**Dependencies:** `inventory-admin-views` `TASK-007` and `TASK-008` implemented by `sdd-implementation-agent-0c5369`
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance accuracy impact
+**Acceptance criteria:** Architecture-facing docs reflect the observable products/categories implementation without overstating future inventory modules, and the remaining typecheck/governance gaps remain documented as current debt rather than hidden.
+**Validation evidence:** User-supplied results for `node --test tests/products-view-characterization.test.js tests/products-view.e2e.js`, `node --test tests/public-surface-characterization.test.js tests/root-shell-router-characterization.test.js`, `npm run lint`, `npm run lint:public-runtime`, `npm run typecheck`, `npm run validate:public-runtime`, and `npm run build`.
+**Required tests:** Preserve product characterization/E2E coverage, route/public-surface governance coverage, and the existing inventory adapter/category contract coverage.
+**Migration considerations:** Keep the current backend product/category contracts stable; do not reinterpret the implemented UI as a broader inventory redesign.
+**Rollback or mitigation:** Revert documentation-only wording if later verified code changes alter the current products/categories runtime behavior.
+**Risk:** Low
+
+## TASK-054: Refresh architecture-facing docs after the modern movements view implementation
+**Status:** Completed
+**Priority:** Low
+**Domain:** Embedded browser runtime / Architecture documentation
+**Requirement:** `inventory-admin-views` `TASK-006`
+**Reason:** After `#movements` became a functional company-admin screen, the architecture-facing documents still needed to stop describing it as a placeholder route and record the real runtime/testing state.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `#movements` as a functional root-shell module over paginated `GET /api/inventory/movements`, while keeping `#products` and `#lots` documented as the remaining placeholder routes and recording the bounded typecheck/public-surface governance gap honestly.
+**Implemented change:** Synchronized architecture-facing docs to the post-`TASK-006` repository truth, including movement helper/renderer seams, runtime-contract membership, movement-specific characterization/E2E coverage, and the still-bounded typecheck/public-surface governance gaps.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `inventory-admin-views` `TASK-006` implemented by `sdd-implementation-agent-0c5369`
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance accuracy impact
+**Acceptance criteria:** Architecture-facing docs reflect the observable movements implementation without overstating future inventory modules, and the remaining typecheck/governance gaps remain documented as current debt rather than hidden.
+**Validation evidence:** User-supplied results for `node --test tests/movements-view-characterization.test.js tests/movements-view.e2e.js`, `npm run lint`, `npm run lint:public-runtime`, `npm run typecheck`, `npm run validate:public-runtime`, and `npm run build`.
+**Required tests:** Preserve movement characterization/E2E coverage and public-runtime governance coverage.
+**Migration considerations:** Keep the current backend inventory movements contract stable; do not reinterpret the implemented UI as a broader inventory redesign.
+**Rollback or mitigation:** Revert documentation-only wording if later verified code changes alter the current movements runtime behavior.
+**Risk:** Low
+
+## TASK-053: Refresh architecture-facing docs after the modern warehouses view implementation
+**Status:** Completed
+**Priority:** Low
+**Domain:** Embedded browser runtime / Architecture documentation
+**Requirement:** `inventory-admin-views` `TASK-005`
+**Reason:** After `#warehouses` became a functional company-admin screen, the architecture-facing documents still needed to stop describing it as a placeholder route and record the real runtime/testing state.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/audit/current-code-audit.md` now describe `#warehouses` as a functional root-shell module over `GET/POST /api/warehouses/company`, while keeping `#products`, `#lots`, and `#movements` documented as placeholders and recording the remaining bounded typecheck gap honestly.
+**Implemented change:** Synchronized architecture-facing docs and the current-code audit to the post-`TASK-005` repository truth, including warehouses helper/renderer seams, runtime-contract membership, warehouse-specific characterization/E2E coverage, and the still-bounded typecheck/public-surface governance gaps.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/audit/current-code-audit.md`, `docs/tasks.md`
+**Dependencies:** `inventory-admin-views` `TASK-005` implemented by `sdd-implementation-agent-0c5369`
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance accuracy impact
+**Acceptance criteria:** Architecture-facing docs reflect the observable warehouses implementation without overstating future inventory modules, and the remaining typecheck/governance gaps remain documented as current debt rather than hidden.
+**Validation evidence:** User-supplied results for `node --test tests/warehouses-view-characterization.test.js`, `node --test tests/warehouses-view.e2e.js`, `npm run lint`, `npm run lint:public-runtime`, `npm run typecheck`, `npm run validate:public-runtime`, and `npm run build`.
+**Required tests:** Preserve warehouse characterization/E2E coverage and public-runtime governance coverage.
+**Migration considerations:** Keep the current backend warehouse contract stable; do not reinterpret the implemented UI as a broader inventory redesign.
+**Rollback or mitigation:** Revert documentation-only wording if later verified code changes alter the current warehouses runtime behavior.
+**Risk:** Low
+
 ## TASK-052: Refresh architecture-facing docs after bcrypt supply-chain closeout
 **Status:** Completed
 **Priority:** Low

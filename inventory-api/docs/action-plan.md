@@ -1,7 +1,7 @@
 # Architectural Action Plan
 
 ## 1. Objective
-Keep architecture-facing documentation synchronized with the real repository state after `hotspot-seams-doc-ownership` tasks 1-8 closure, in addition to the previously documented `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-008`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, `root-shell-commercial-views`, `root-shell-commercial-views-hardening`, and the related governance slices built on `p34-bounded-governance-coverage-expansion`, `p35-governance-baseline-sync-guardrails`, and `p36-bounded-doc-validator-ownership-alignment`. This refresh now also captures the implemented hotspot seam reductions that preserve the layered monolith while splitting `src/security/access-policies.js` into facade + registry + actor-scope + denial-audit ownership, extracting focused service seams in inventory, agent workspace, and product flows, and recording that the minimum and expanded validation matrix passed for the intended memory-session aggregate lane.
+Keep architecture-facing documentation synchronized with the real repository state after `inventory-admin-views` `TASK-007` (modern products/inventory view) and `TASK-008` (frontend administration surface for categories), together with the previously documented `inventory-admin-views` `TASK-006` movements implementation, `TASK-005` warehouses implementation, `hotspot-seams-doc-ownership` tasks 1-8 closure, `zones-view`, `coding-standard-doc-path-alignment`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-008`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, `root-shell-commercial-views`, `root-shell-commercial-views-hardening`, and the related governance slices built on `p34-bounded-governance-coverage-expansion`, `p35-governance-baseline-sync-guardrails`, and `p36-bounded-doc-validator-ownership-alignment`. This refresh now also captures that `#products` graduated from a route-specific placeholder to a functional company-admin screen over the existing product and tenant-category backend contracts, while preserving the layered monolith and the previously implemented hotspot seam reductions in security, inventory, agent workspace, and product flows.
 
 This refresh also records the completed `bcrypt-supply-chain-closeout` feature: the repository dependency baseline now uses `bcrypt@^6.0.0`, the prior approved bcrypt residual chain has been removed from the lockfile and audit baseline, and dependency hygiene now enforces a zero-residual posture.
 
@@ -13,7 +13,12 @@ In scope for the current plan:
 - preserve the browser-session cookie model and reuse of `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout`
 - preserve explicit documentation that the remaining browser-session residual risk belongs to the HTTPS follow-up dependency in `specs/p11-https-browser-session-migration/` and is not an in-slice blocker for these bounded governance/documentation slices
 - preserve wave-one root-shell eligibility for `root` and `admin` with `companyId`
-- preserve actor-aware `/root/` shell navigation with root-global top navigation and the rebranded company-admin sidebar, keeping `#companies` for global root and `#roles_permissions`, `#zones`, `#agents`, `#clients`, and `#routes` for company-admin users with `companyId`
+- preserve actor-aware `/root/` shell navigation with root-global top navigation and the rebranded company-admin sidebar, keeping `#companies` for global root and `#warehouses`, `#products`, `#movements`, `#roles_permissions`, `#zones`, `#agents`, `#clients`, and `#routes` for company-admin users with `companyId`
+- preserve the now-implemented inventory shell adapter seams in `src/public/root/products-api.js`, `categories-api.js`, `inventory-api.js`, and `warehouses-api.js`, plus their loader-contract governance in `root/runtime-contract.js`, `root/index.html`, and `scripts/validate-public-runtime.js`
+- preserve the implemented warehouses view seams in `src/public/root/views/warehouses-admin.js`, `warehouses-admin.helpers.js`, and `warehouses-admin.renderers.js`, including permission-aware read-only versus create behavior, in-memory filtering, and the existing `/api/warehouses/company` contract
+- preserve the implemented products view seams in `src/public/root/views/products-admin.js`, `products-admin.helpers.js`, `products-admin.renderers.js`, and `products-admin.state.js`, including permission-aware product/category actions, paginated product listing, local current-page search/category filtering, detail loading, and the existing `/api/products/**` plus `GET/POST /api/products/categories/company` contracts
+- preserve the implemented movements view seams in `src/public/root/views/movements-admin.js`, `movements-admin.helpers.js`, and `movements-admin.renderers.js`, including permission-aware read-only access, server-side filters, pagination, drawer detail behavior, and the existing `GET /api/inventory/movements` contract
+- preserve the implemented tenant-scoped product category backend contract at `GET/POST /api/products/categories/company`
 - preserve the current company-admin sidebar IA grouped into `Inicio`, `Operacion`, `Control`, and `Administracion`, while recognizing that several visible items still render the shared neutral `in_process` view
 - preserve the implemented visual hardening of the company-admin sidebar: fixed header/footer, central-only scrolling, defensive overflow rules, collapsed-only tooltip reveal, and thin styled scrollbar treatment on `.root-sidebar__scroll`
 - preserve the implemented Companies Admin shell flow over the existing root-company list/create/status endpoints
@@ -58,10 +63,12 @@ This plan reflects the implemented `zones-view`, `sidebar-rebrand-permissions` `
 - company-admin sessions can use the implemented `#agents` view to compose a commercial-user dataset from users, roles, and route overview data, create company users, and persist route assignments from an agent-centric shell flow
 - company-admin sessions can use the implemented `#clients` view to list clients, open in-shell detail, create/update/deactivate clients, add stores, upload documents, create references, run taxpayer lookup through the aligned `/api/taxpayers/lookup?identification=...` contract, and download documents through existing backend contracts
 - company-admin sessions can use the implemented `#routes` view to create routes, edit definition, save subzones, save assignments, manage per-agent goals, inspect covered stores, and render a simplified in-shell map using existing backend contracts
+- the root shell now has approved inventory adapter seams for products, categories, inventory, and warehouses; `#warehouses`, `#products`, and `#movements` now use those adapters in production code, while `#lots` remains placeholder-only for now
+- tenant-scoped product category list/create is now implemented on the backend under the existing product route namespace without database changes
 - the commercial shell controllers now delegate bounded rendering/state responsibilities to adjacent renderer/state seams instead of keeping all list/detail/map/summary markup inside the main controller files
 - browser/runtime governance now also covers the extracted commercial seams through modularity, public-surface, smoke, typecheck-governance, and browser E2E assertions
 - the narrow `payment.service.js` maintainability cleanup completed without changing payment lifecycle, tenant-scope, audit, pagination, or receipt/security contracts
-- the approved company-admin sidebar entries now have explicit route keys in `root/manifest.js`; `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas` are functionally implemented and the remaining current company-admin sidebar routes render the shared neutral `in_process` view
+- the approved company-admin sidebar entries now have explicit route keys in `root/manifest.js`; `Bodegas`, `Productos`, `Movimientos`, `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas` are functionally implemented and the remaining current company-admin sidebar routes render the shared neutral `in_process` view
 - layout ownership is normalized so the shell owns actor-specific offsets and outer content placement while views own only their internal module layout
 - the company-admin sidebar now hardens latent overflow behavior by hiding tooltip boxes until collapsed hover/focus, applying defensive `box-sizing` and `min-width: 0` rules to nested wrappers, truncating long labels/footer text, and limiting the styled thin scrollbar to the central scroll region while header and footer remain fixed
 - no runtime role update/delete/reassignment UI was added
@@ -105,8 +112,9 @@ Problems already corrected by earlier browser-runtime slices plus `p27`:
 Problems still open after `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-008`, and `p38`:
 - non-wave-one browser roles still land on the transition page rather than a functional supported destination
 - root-shell navigation remains local-manifest based and not yet integrated with any broader approved navigation model
-- the company-admin sidebar still exposes several approved-but-not-yet-functional modules through the shared neutral `in_process` view; this is current supported behavior, but additional module implementation remains pending after `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas`
-- browser-runtime `typecheck` now includes the approved `src/public/root/**` shell files through an explicit allowlist, while remaining intentionally bounded
+- the company-admin sidebar still exposes several approved-but-not-yet-functional modules through the shared neutral `in_process` view; this is current supported behavior, but additional module implementation remains pending after `Bodegas`, `Productos`, `Movimientos`, `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas`; within the inventory group, `#warehouses`, `#products`, and `#movements` are now functional while `#lots` remains the only dedicated placeholder route rather than a generic `in_process` route
+- the browser-runtime typecheck allowlist still lags behind the approved runtime inventory and does not cover the warehouses/products screen files, runtime-contract file, or several related inventory modules
+- browser-runtime `typecheck` uses an explicit allowlist and remains intentionally bounded, but it does not yet include the full approved `src/public/root/**` runtime inventory
 - docs/tests/validators must continue staying synchronized so the root shell and legacy-route policies do not drift
 - the modularity guardrail remains intentionally narrow, but its containment baseline now also freezes delegation from the commercial controllers to the extracted renderer/state seams in addition to `router.js` and `zones-admin.js`; broader root-shell decomposition is still pending if future slices grow `app.js` or introduce new sensitive modules
 - the temporary coding-standards compatibility bridge should not be expanded back into a second independently maintained standards body
@@ -135,6 +143,9 @@ Problems still open after `quality-baseline-recovery` `TASK-007`, `repository-ba
 - root-shell logout continues through `/api/auth/logout`
 - global `root` keeps the current top-navigation shell variant
 - company-admin keeps the rebranded sidebar shell variant
+- `#warehouses` keeps using `GET/POST /api/warehouses/company` with same-origin cookie-authenticated fetches through `warehouses-api.js`
+- `#products` keeps using paginated `GET /api/products/`, `GET /api/products/:id`, `POST /api/products/`, `PUT /api/products/:id`, `DELETE /api/products/:id`, and tenant category list/create at `GET/POST /api/products/categories/company` through same-origin cookie-authenticated fetches via `products-api.js` and `categories-api.js`
+- `#movements` keeps using paginated `GET /api/inventory/movements` with same-origin cookie-authenticated fetches through `inventory-api.js`, plus warehouse-label enrichment through `warehouses-api.js`
 - the sidebar keeps header/footer fixed while only the middle navigation lane scrolls
 - hidden tooltip boxes stay display-gated until collapsed hover/focus instead of contributing to layout width
 - `root` and `admin` with `companyId` continue landing on `/root/`
@@ -167,9 +178,9 @@ Incremental future changes now visible:
 1. preserve the implemented actor-aware `/root/` shell as the supported admin browser baseline, including root top-nav and company-admin sidebar variants;
 2. keep legacy HTML deprecation enforced at the HTTP boundary;
 3. extend the root shell only through later approved bounded slices, rather than expanding it through legacy-page restoration;
-4. extend the richer company-admin sidebar IA beyond the current shared neutral `in_process` placeholders through explicit module implementations, building on the already-functional `#roles_permissions`, `#zones`, `#agents`, `#clients`, and `#routes` routes;
+4. extend the richer company-admin sidebar IA beyond the current shared neutral `in_process` placeholders through explicit module implementations, building on the already-functional `#warehouses`, `#products`, `#movements`, `#roles_permissions`, `#zones`, `#agents`, `#clients`, and `#routes` routes plus the remaining lots follow-up foundation;
 5. decide whether additional browser roles should later move from `/migration.html?mode=post-login-transition` into supported shell destinations;
-6. decide whether the bounded root-shell `typecheck` allowlist should later widen beyond the current approved file set;
+6. decide whether the bounded root-shell `typecheck` allowlist should widen to cover the full approved runtime inventory rather than the current narrower file set;
 7. keep unsupported company edit/delete/detail and role update/delete/reassignment flows out of the shell until backed by approved slices and real runtime contracts;
 8. preserve the implemented bounded company/company-role admin convergence seam as the current baseline rather than reinterpreting it as pending work;
 9. preserve `legacy-public-runtime/` only as transitional backup/reference inventory until equivalent SPA sections are implemented and validated, then remove it in a later approved slice;
@@ -182,7 +193,7 @@ Incremental future changes now visible:
 No database change is planned for this post-implementation refresh.
 
 ## 11. API and integration changes
-No immediate API contract change is planned.
+No immediate API contract change is planned beyond preserving the implemented warehouses, products, and movements screens plus the remaining lots follow-up foundation.
 
 Current integration posture to preserve:
 - auth/session APIs remain stable;
@@ -190,6 +201,11 @@ Current integration posture to preserve:
 - `POST /api/auth/logout` remains part of the governed runtime contract baseline;
 - `GET /health` remains a stable liveness response;
 - `GET /health/ready` remains the operational readiness boundary for database + browser-session-store dependencies;
+- `GET/POST /api/products/categories/company` remains the current tenant-scoped category contract for the inventory-admin follow-up work;
+- the registered root inventory adapters remain aligned to `/api/products/**`, `/api/inventory/**`, and `/api/warehouses/company` without adding new frontend transport patterns;
+- the supported warehouses browser flow remains bounded to list/create only; no edit, delete, movement, stock, or detail API was added in that slice;
+- the supported products browser flow remains bounded to paginated list/detail/create/update/deactivate behavior plus tenant category list/create; no new inventory lots flow, bulk import redesign, or backend contract reshaping was added in this slice;
+- the supported movements browser flow remains bounded to read-only list/filter/pagination/detail behavior over `GET /api/inventory/movements`; no edit, delete, reverse, or write API was added in this slice;
 - the deprecated legacy HTML contract remains an HTTP `410` response contract, not a redirect contract;
 - `/root/` remains a supported browser entrypoint backed by static assets in the same Express runtime.
 
@@ -243,20 +259,24 @@ Continue validating the implemented repository baseline through:
 7. `node --test tests/agents-view-characterization.test.js`
 8. `node --test tests/clients-view-characterization.test.js`
 9. `node --test tests/routes-view-characterization.test.js`
-10. `node --test tests/zones-view-selection-filters-characterization.test.js`
-11. `node --test tests/zones-view-dialog-feedback-characterization.test.js`
-12. `node --test tests/zones-view.e2e.js`
-13. `node --test tests/browser-e2e.e2e.js`
-14. `node --test tests/inventory-service-hotspot-characterization.test.js tests/inventory-alerts-tenant-scope.test.js tests/approval-baseline-compatibility.test.js`
-15. `node --test tests/agent-workspace-hotspot-characterization.test.js tests/product-service-hotspot-characterization.test.js`
-16. `npm run lint:public-runtime`
-17. `npm run lint`
-18. `npm run typecheck`
-19. `npm run build`
-20. `set NODE_ENV=test&& set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/access-policies.test.js tests/administrative-authorization-characterization.test.js tests/authorization-convergence-characterization.test.js`
-21. `node --test tests/documentation-ownership-governance.test.js tests/p36-doc-validator-ownership.test.js tests/workflow-baseline-characterization.test.js`
-22. `node --test tests/agent-workspace-hotspot-characterization.test.js tests/agent-workspace-tenant-scope.test.js tests/agent-workspace-contract-characterization.test.js`
-23. `node --test tests/product-service-hotspot-characterization.test.js tests/product-delete-semantics.test.js tests/pagination.test.js`
+10. `node --test tests/warehouses-view-characterization.test.js`
+11. `node --test tests/warehouses-view.e2e.js`
+12. `node --test tests/products-view-characterization.test.js`
+13. `node --test tests/products-view.e2e.js`
+14. `node --test tests/zones-view-selection-filters-characterization.test.js`
+15. `node --test tests/zones-view-dialog-feedback-characterization.test.js`
+16. `node --test tests/zones-view.e2e.js`
+17. `node --test tests/browser-e2e.e2e.js`
+18. `node --test tests/inventory-service-hotspot-characterization.test.js tests/inventory-alerts-tenant-scope.test.js tests/approval-baseline-compatibility.test.js`
+19. `node --test tests/agent-workspace-hotspot-characterization.test.js tests/product-service-hotspot-characterization.test.js`
+20. `npm run lint:public-runtime`
+21. `npm run lint`
+22. `npm run typecheck`
+23. `npm run build`
+24. `set NODE_ENV=test&& set BROWSER_SESSION_STORE_MODE=memory&& node --test tests/access-policies.test.js tests/administrative-authorization-characterization.test.js tests/authorization-convergence-characterization.test.js`
+25. `node --test tests/documentation-ownership-governance.test.js tests/p36-doc-validator-ownership.test.js tests/workflow-baseline-characterization.test.js`
+26. `node --test tests/agent-workspace-hotspot-characterization.test.js tests/agent-workspace-tenant-scope.test.js tests/agent-workspace-contract-characterization.test.js`
+27. `node --test tests/product-service-hotspot-characterization.test.js tests/product-delete-semantics.test.js tests/pagination.test.js`
 
 Hotspot characterization notes to preserve:
 - characterization coverage now exists for the current `inventory.service` seam and should remain in place before any future refactor of pagination logic, alert transitions, transaction propagation, or the boundary with `inventory-transaction-support.service.js`
@@ -347,7 +367,33 @@ Recorded post-implementation evidence supplied by the user for `root-shell-comme
 - `npm run build` passed
 - `npm run validate:public-runtime` passed
 
-Recorded post-implementation evidence supplied by the user for `repository-baseline-score-recovery` `TASK-008`:
+Recorded post-implementation evidence supplied by the user for `inventory-admin-views` `TASK-005`:
+- `node --test tests/warehouses-view-characterization.test.js` passed
+- `node --test tests/warehouses-view.e2e.js` passed
+- `npm run lint` passed
+- `npm run lint:public-runtime` passed
+- `npm run typecheck` passed
+- `npm run validate:public-runtime` passed
+- `npm run build` passed
+
+Recorded post-implementation evidence supplied by the user for `inventory-admin-views` `TASK-006`:
+- `node --test tests/movements-view-characterization.test.js tests/movements-view.e2e.js` passed
+- `npm run lint` passed
+- `npm run lint:public-runtime` passed
+- `npm run typecheck` passed
+- `npm run validate:public-runtime` passed
+- `npm run build` passed
+
+Recorded post-implementation evidence supplied by the user for `inventory-admin-views` `TASK-007` and `TASK-008`:
+- `node --test tests/products-view-characterization.test.js tests/products-view.e2e.js` passed
+- `node --test tests/public-surface-characterization.test.js tests/root-shell-router-characterization.test.js` passed
+- `npm run lint` passed
+- `npm run lint:public-runtime` passed
+- `npm run typecheck` passed
+- `npm run validate:public-runtime` passed
+- `npm run build` passed
+
+Recorded post-implementation evidence supplied by the user for `repository-baseline-score-recovery` `TASK-007`:
 - `node --test tests/agent-workspace-hotspot-characterization.test.js tests/product-service-hotspot-characterization.test.js` passed
 - `npm run test -- --silent` passed
 - `npm run lint` passed
@@ -493,7 +539,13 @@ Test-baseline notes to preserve:
 - Harden the supported commercial root-shell modules by extracting adjacent renderer/state seams, aligning the clients taxpayer lookup adapter to `/api/taxpayers/lookup?identification=...`, expanding browser/governance coverage, and preserving payment-service behavior through the existing payment regression lane
 
 ### Stage 18 — Proposed
-- Add the next supported root-shell modules beyond the current bounded Companies, Roles/Permissions, Zones, Agents, Clients, and Routes views through approved incremental slices
+- Add the next supported root-shell modules beyond the current bounded Companies, Warehouses, Products, Roles/Permissions, Zones, Agents, Clients, Routes, and Movements views through approved incremental slices
+
+### Stage 18A — Completed
+- Promote `#warehouses` from a dedicated placeholder route to a functional company-admin inventory-admin screen with bounded list/create behavior, helper/renderer seams, runtime-contract registration, and direct browser regression coverage over the existing `/api/warehouses/company` contract
+
+### Stage 18B — Completed
+- Promote `#products` from a dedicated placeholder route to a functional company-admin inventory-admin screen with helper/state/renderer seams, tenant category administration UI, runtime-contract registration, and direct browser regression coverage over `/api/products/**` plus `GET/POST /api/products/categories/company`
 
 ### Stage 19 — Proposed
 - Replace transition-only landings for additional browser roles when approved supported destinations exist
@@ -536,7 +588,7 @@ Test-baseline notes to preserve:
 |---|---|---|
 | Legacy HTML runtime is accidentally reintroduced into `src/public/` or treated as supported again | High | Keep `validate-public-runtime`, browser/runtime characterization tests, and docs aligned to the supported inventory |
 | Future work changes `/root/` behavior without updating validators and browser tests | High | Keep root-shell contract checks in validator, smoke tests, characterization tests, and browser E2E |
-| The richer company-admin sidebar IA is misread as fully implemented module coverage instead of a mixed state of active modules plus `in_process` placeholders | Medium | Keep docs explicit that `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas` are the current functional tenant-admin destinations and add new functional modules only through approved slices |
+| The richer company-admin sidebar IA is misread as fully implemented module coverage instead of a mixed state of active modules plus `in_process` placeholders | Medium | Keep docs explicit that `Bodegas`, `Productos`, `Movimientos`, `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas` are the current functional tenant-admin destinations and add new functional modules only through approved slices |
 | Non-wave-one roles remain on an informational transition landing longer than expected | Medium | Keep the behavior explicit in docs and move those roles only through approved supported-destination slices |
 | Root shell now uses a bounded `window.RootShell` registry seam, but still depends on plain ordered static scripts and not on a broader module system | Low | Preserve current validator/test coverage, keep the allowlist explicit, and defer any framework/ES-module redesign to a later approved slice |
 | Permission-governance follow-up sequencing is misread because `p10` is analysis, `p28` is only a partial runtime implementation, and future contributors may reintroduce stale dependency metadata | Medium | Record the partial implementation explicitly, preserve the completed `p29` reconciliation plus the closed `p30` and `p32` follow-up slices in docs/spec metadata, and do not overstate current enforcement scope |
@@ -558,6 +610,9 @@ Test-baseline notes to preserve:
 For future follow-up work, manually confirm:
 - `src/public/` still contains the supported root shell and does not re-expose warehouse or agent runtime directories
 - `/root/` still loads successfully
+- `#warehouses` still loads for company-admin users, preserves read-only versus create behavior by effective permission, supports local search/filters, and keeps the create dialog aligned to the existing `/api/warehouses/company` contract
+- `#products` still loads for company-admin users, preserves paginated listing plus detail behavior, preserves permission-aware create/edit/deactivate and category create flows, and stays aligned to the existing `/api/products/**` plus `GET/POST /api/products/categories/company` contracts
+- `#movements` still loads for company-admin users, preserves read-only history behavior, uses server-side `warehouseId` / `productId` / `lotId` filters plus pagination over `GET /api/inventory/movements`, and keeps the drawer limited to audit detail without historical mutation actions
 - `#zones` still loads for company-admin users, performs search locally, and creates zones/subzones through the existing company-regions endpoints
 - `#agents`, `#clients`, and `#routes` still load for company-admin users and continue using the current helper/API/view seams, including the extracted renderer/state files and aligned taxpayer lookup adapter, without reviving legacy HTML pages
 - docs and specs distinguish clearly between `p10` analysis outputs and the implemented `p28` and `p30` runtime slices
@@ -572,4 +627,4 @@ For future follow-up work, manually confirm:
 ## 19. Approval status
 The `bcrypt-supply-chain-closeout` implementation itself is complete from a repository-code and governance perspective. The previously recorded environment-specific Docker evidence follow-up has now been executed successfully; remaining follow-up is limited to general native-module/toolchain operational awareness rather than unfinished bcrypt remediation.
 
-**Status:** Documentation refresh now reflects the implemented state after `root-shell-runtime-modularity-hardening`, `root-shell-commercial-views-hardening`, `root-shell-commercial-views`, `hotspot-seams-doc-ownership` tasks 1-8, and the previously completed browser/runtime and governance slices. The repository now documents the active company-admin commercial shell modules (`#agents`, `#clients`, `#routes`), their extracted renderer/state seams, the explicit `src/public/root/runtime-contract.js` loader/module contract, the aligned root-shell taxpayer lookup adapter contract, the strengthened browser/governance coverage, the active access-policy split (`access-policies.js` facade plus registry / actor-scope / denial-audit helpers), the extracted inventory/agent-workspace/product service seams, and the canonical documentation ownership map including `docs/tasks.md`. No additional production API or database redesign is documented here. Remaining follow-up is limited to future additive seam work, current shell/UI expansion choices, and the separately documented platform/tooling risks outside this bounded hardening slice.
+**Status:** Documentation refresh now reflects the implemented state after `inventory-admin-views` `TASK-007`, `TASK-008`, `TASK-006`, `TASK-005`, `root-shell-runtime-modularity-hardening`, `root-shell-commercial-views-hardening`, `root-shell-commercial-views`, `hotspot-seams-doc-ownership` tasks 1-8, and the previously completed browser/runtime and governance slices. The repository now documents `#warehouses`, `#products`, and `#movements` as active company-admin inventory-admin modules, preserves the explicit `src/public/root/runtime-contract.js` loader/module contract, records the strengthened warehouse-, product-, category-, and movement-specific regression coverage, and keeps `#lots` explicitly documented as the remaining inventory placeholder. No additional production API or database redesign is documented here. Remaining follow-up is limited to future additive seam work, current shell/UI expansion choices, the bounded typecheck coverage gap, and the separately documented platform/tooling risks outside this slice.

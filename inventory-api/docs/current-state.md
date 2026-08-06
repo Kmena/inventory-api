@@ -3,7 +3,7 @@
 ## 1. System overview
 `inventory-api/` is a single-deployable Node.js 24 Express + Prisma application with REST APIs and an embedded browser runtime served by the same Express process.
 
-Current browser/runtime and access-governance state verified from repository contents after `zones-view`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-009`, together with `hotspot-seams-doc-ownership` `TASK-001` through `TASK-008`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, `root-shell-follow-up-alignment`, `root-shell-commercial-views`, and `root-shell-commercial-views-hardening`, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, and `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`:
+Current browser/runtime and access-governance state verified from repository contents after `inventory-admin-views` `TASK-007` and `TASK-008`, together with `zones-view`, `sidebar-rebrand-permissions` `TASK-004`, `quality-baseline-recovery` `TASK-007`, `repository-baseline-score-recovery` `TASK-009`, `hotspot-seams-doc-ownership` `TASK-001` through `TASK-008`, `p38-root-shell-modularity-hardening`, `p37-root-spa-companies-roles-admin`, `root-shell-follow-up-alignment`, `root-shell-commercial-views`, and `root-shell-commercial-views-hardening`, building on `p36-bounded-doc-validator-ownership-alignment`, `p35-governance-baseline-sync-guardrails`, `p34-bounded-governance-coverage-expansion`, and `p33-admin-authorization-governance-convergence`:
 - the active public browser runtime under `src/public/` is intentionally small and now includes a supported root SPA shell entrypoint;
 - supported public HTML documents are `/`, `/index.html`, `/no-access.html`, `/migration.html`, and the root shell entrypoint at `/root/` backed by `src/public/root/index.html`;
 - the supported `/root/` shell now has two observable actor variants: global `root` users keep the existing top navigation, while `admin` users with `companyId` receive a rebranded administrative sidebar shell with explicit hash routes for visible menu items;
@@ -35,6 +35,8 @@ Repository-governance state verified in this refresh:
 - the same hardening slice also introduced focused service seams at `src/services/inventory-alerts.service.js`, `src/services/agent-workspace-store-state.service.js`, `src/services/product-permission-shaping.service.js`, and `src/services/product-pricing.service.js` without changing the public API surface;
 - the validation/documentation closure for that slice is also now reflected: the governance baseline sync guardrail passed, coding-standard path alignment passed, lint passed, typecheck passed, and the aggregate suite passed in the intended memory browser-session mode (`BROWSER_SESSION_STORE_MODE=memory`);
 - `tests/root-shell-commercial-views.e2e.js` now provides browser-level regression coverage for the supported `#agents`, `#clients`, and `#routes` shell flows, including visible headings/content, dialog open-close behavior, active-selection/detail assertions, representative create/update/assignment saves, local in-memory filtering, taxpayer lookup contract assertions, and lightweight route-map rendering assertions;
+- user-supplied validation evidence for the current inventory-admin follow-up reports `PASS` for `tests/product-category-contract-characterization.test.js`, `tests/root-inventory-adapters-characterization.test.js`, `tests/root-shell-route-governance.test.js`, `tests/root-shell-router-characterization.test.js`, and `tests/public-surface-characterization.test.js` in memory browser-session mode, together with `npm run lint`, `npm run typecheck`, `npm run validate:public-runtime`, and `npm run build`;
+- user-supplied validation evidence for the completed `inventory-admin-views` cycle covering the modern `#products` screen and category admin surface reports `PASS` for `node --test tests/products-view-characterization.test.js tests/products-view.e2e.js`, `node --test tests/public-surface-characterization.test.js tests/root-shell-router-characterization.test.js`, `npm run lint`, `npm run lint:public-runtime`, `npm run typecheck`, `npm run validate:public-runtime`, and `npm run build`;
 - the repository keeps an explicit Redis-path validation lane through `npm run test:redis-path` and the parent-root hosted workflow `../.github/workflows/redis-browser-session-tests.yml` relative to `inventory-api/`;
 - `/health/ready` depends on both database readiness and browser-session-store readiness.
 
@@ -73,6 +75,10 @@ Observed active `src/public/` inventory:
 - `root/agents-api.js`
 - `root/clients-api.js`
 - `root/routes-api.js`
+- `root/products-api.js`
+- `root/categories-api.js`
+- `root/inventory-api.js`
+- `root/warehouses-api.js`
 - `root/views/home.js`
 - `root/views/in-process.js`
 - `root/views/companies-admin.js`
@@ -90,6 +96,14 @@ Observed active `src/public/` inventory:
 - `root/views/routes-admin.js`
 - `root/views/routes-admin.renderers.js`
 - `root/views/routes-admin.state.js`
+- `root/views/warehouses-admin.helpers.js`
+- `root/views/warehouses-admin.renderers.js`
+- `root/views/warehouses-admin.js`
+- `root/views/products-admin.js`
+- `root/views/lots-admin.js`
+- `root/views/movements-admin.helpers.js`
+- `root/views/movements-admin.renderers.js`
+- `root/views/movements-admin.js`
 - `root/registry.js`
 
 Observed preserved legacy inventory outside runtime:
@@ -127,16 +141,18 @@ The active root browser surface is a vanilla-JS SPA shell under `src/public/root
 - an implemented `home` view and a shared neutral `in_process` fallback view;
 - a root-only Companies Admin view at `#companies`;
 - a company-admin Roles/Permissions Admin view at `#roles_permissions`;
+- company-admin inventory route modules at `#warehouses`, `#products`, `#lots`, and `#movements`; `#warehouses` is a functional RootShell inventory-admin screen backed by `GET/POST /api/warehouses/company`, `#products` is a functional RootShell inventory-admin screen backed by paginated `GET /api/products/`, `GET /api/products/:id`, `POST /api/products/`, `PUT /api/products/:id`, `DELETE /api/products/:id`, and tenant category list/create via `GET/POST /api/products/categories/company`, `#lots` is a functional RootShell inventory-admin screen backed by `GET /api/inventory/stocks` (for the `lots` array), `GET /api/inventory/alerts`, and `GET /api/warehouses/company` with a data-sufficiency gate that degrades gracefully when lot fields are insufficient, `#movements` is a functional RootShell inventory-admin screen backed by paginated `GET /api/inventory/movements`, while `#lots` still resolves to a dedicated placeholder view module with inventory-themed follow-up copy instead of the generic `in_process` screen; the shell also registers same-origin inventory adapter modules (`productsApi`, `categoriesApi`, `inventoryApi`, `warehousesApi`) for those routes;
 - a company-admin Zones view at `#zones` backed by the existing regions company endpoints;
 - a company-admin Agents view at `#agents` that composes users, company roles, and sales-route overview data to show commercial users, assigned routes, visible goals, and route-assignment updates from an agent-centric screen;
 - a company-admin Clients view at `#clients` backed by the existing client, classification, document-type, regions, taxpayer, and economic-activity endpoints, with list/detail behavior in the same shell plus create, update, deactivate, store, document, reference, lookup, and download actions;
 - a company-admin Routes view at `#routes` backed by the existing sales-route and regions contracts, with overview metrics, route definition editing, subzone assignment, agent assignment, per-agent goal editing, covered-store lists, and a simplified SVG map derived from store coordinates;
-- an expanded company-admin information architecture rendered from `root/manifest.js`, grouped into `Inicio`, `Operacion`, `Control`, and `Administracion`, where `#admin_home`, `#products`, `#lots`, `#movements`, `#production`, `#purchases`, `#warehouses`, `#approvals`, `#reports`, `#users`, and `#settings` still resolve to the shared neutral `in_process` view, while `#agents`, `#routes`, `#zones`, `#clients`, and `#roles_permissions` are functional tenant-admin routes;
+- an expanded company-admin information architecture rendered from `root/manifest.js`, grouped into `Inicio`, `Operacion`, `Control`, and `Administracion`; inside the `Inventario` group, the sidebar order is now `Bodegas`, `Productos`, `Lotes`, `Movimientos`, followed by the other operational entries; `#warehouses`, `#products`, `#lots`, and `#movements` are functional tenant-admin routes; within the inventory group all four routes are now functional; `#agents`, `#routes`, `#zones`, `#clients`, and `#roles_permissions` remain functional tenant-admin routes, and `#admin_home`, `#production`, `#purchases`, `#approvals`, `#reports`, `#users`, and `#settings` still resolve to the shared neutral `in_process` view;
 - the `#zones` view currently implements local in-memory search for zones and subzones, manual refresh, create-zone and create-subzone dialogs, toast feedback, temporary subzone highlight after creation, and a mobile consecutive list/detail flow. `src/public/root/views/zones-admin.helpers.js` now owns small seams for selection/filter logic plus dialog/form support such as reset, inline field-error rendering, and submit-button state, while the main async UI orchestration remains concentrated in `src/public/root/views/zones-admin.js`;
 - the `#agents` view keeps helper-owned commercial-role filtering and dataset composition in `src/public/root/views/agents-admin.helpers.js`, now delegates list/detail/assignment rendering to `src/public/root/views/agents-admin.renderers.js`, and keeps DOM orchestration, metrics, modal create flow, and route-assignment interactions in `agents-admin.js` over `agents-api.js`;
 - the `#clients` view keeps helper-owned local filters and payload shaping in `src/public/root/views/clients-admin.helpers.js`, delegates detail/list rendering to `src/public/root/views/clients-admin.renderers.js`, delegates zone-option and selected-client summary state to `src/public/root/views/clients-admin.state.js`, and keeps DOM orchestration plus create/update/deactivate, append-only store/document/reference actions, taxpayer lookup, and document download behavior in `clients-admin.js` over `clients-api.js`;
 - the `#routes` view keeps helper-owned local search, route-payload shaping, goal replace-all payload shaping, and simplified map projection in `src/public/root/views/routes-admin.helpers.js`, delegates detail/map rendering to `src/public/root/views/routes-admin.renderers.js`, delegates selected-route and goal-row state helpers to `src/public/root/views/routes-admin.state.js`, and keeps DOM orchestration and save flows in `routes-admin.js` over `routes-api.js`;
 - `src/public/root/app.js` now resolves its bootstrap module set and manifest validation through `runtime-contract.js` instead of duplicating that inventory inline, keeping the entrypoint narrower while preserving the current hash-route behavior;
+- `src/public/root/runtime-contract.js` and `src/public/root/index.html` now treat the four inventory adapter scripts (`products-api.js`, `categories-api.js`, `inventory-api.js`, `warehouses-api.js`) plus the current inventory view-support scripts (`warehouses-admin.helpers.js`, `warehouses-admin.renderers.js`, `warehouses-admin.js`, `products-admin.helpers.js`, `products-admin.state.js`, `products-admin.renderers.js`, `products-admin.js`, `lots-admin.js`, `movements-admin.helpers.js`, `movements-admin.renderers.js`, `movements-admin.js`) as approved RootShell loader-contract members, so the runtime validator enforces their presence and load order together with the other supported shell modules;
 - `tests/root-shell-modularity-governance.test.js` now verifies both the bounded `window.RootShell` registry contract and the explicit loader contract baseline, while `scripts/validate-public-runtime.js` fails on missing, extra, or misordered approved shell scripts.
 
 The legacy browser HTML pages are not an active runtime module even though their files remain preserved under `legacy-public-runtime/`.
@@ -150,6 +166,8 @@ Observable current runtime and governance areas:
 - Company, role, and user administration
 - Client management and client documents
 - Product catalog and inventory
+  - tenant-scoped product, category, warehouse, stock, lot, and movement contracts remain backend-served from the same Express runtime
+  - the product area now includes a minimal company-scoped category contract at `GET/POST /api/products/categories/company`
 - Warehouses and geography
 - Sales routes and agent workspace APIs
 - Orders, invoices, and payments
@@ -157,6 +175,7 @@ Observable current runtime and governance areas:
   - login and session bootstrap
   - root shell wave-one SPA entrypoint
   - company-admin roles/permissions, zones, agents, clients, and routes views
+  - company-admin inventory administration modules, including functional warehouses, products, lots, and movements screens
   - migration and no-access fallbacks
 - Repository/platform governance
 - CI/workflow governance
@@ -170,7 +189,10 @@ Examples currently implemented:
 - serve the supported root shell at `/root/`;
 - bootstrap the root shell from the current browser session and redirect invalid sessions back to login;
 - allow wave-one root-shell access for `root` users and `admin` users with `companyId`;
-- render actor-aware shell navigation so global root users keep top navigation with `Empresas`, while company admins get a rebranded sidebar with grouped tenant-admin navigation, `#admin_home` as the default landing when no hash is present, and `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas` as the functional sidebar destinations today;
+- render actor-aware shell navigation so global root users keep top navigation with `Empresas`, while company admins get a rebranded sidebar with grouped tenant-admin navigation, `#admin_home` as the default landing when no hash is present, the inventory group ordered as `Bodegas`, `Productos`, `Lotes`, `Movimientos`, all four functional RootShell inventory admin destinations (`#warehouses`, `#products`, `#lots`, `#movements`), and registered same-origin adapter seams for those inventory screens;
+- let a tenant-scoped actor with `inventory.view` or `inventory.manage` use `#warehouses` to load company warehouses, view local KPI/filter summaries, and search/filter the in-memory warehouse dataset through `GET /api/warehouses/company`, with `inventory.manage` additionally allowed to create warehouses through `POST /api/warehouses/company`;
+- let a tenant-scoped actor with `inventory.view` or `inventory.manage` use `#movements` to load paginated movement history through `GET /api/inventory/movements`, apply server-side `warehouseId`, `productId`, and `lotId` filters, move between result pages, and inspect a read-only detail drawer without any historical mutation action;
+- let a tenant-scoped actor with the required product or inventory permissions list company inventory categories through `GET /api/products/categories/company` and create categories through `POST /api/products/categories/company`;
 - let a global root user load companies from `GET /api/companies/root/companies`;
 - let a global root user create companies from the shell through `POST /api/companies/root/companies`;
 - let a global root user toggle company active status from the shell through `PATCH /api/companies/root/companies/:companyId/status`;
@@ -187,7 +209,7 @@ Examples currently implemented:
 - respond to direct legacy HTML requests such as `/root/dashboard.html`, `/warehouse/products.html`, or `/agent/workspace.html` with the shared migration screen and HTTP `410 Gone` without redirect;
 - answer `GET /health` with a backward-compatible liveness payload;
 - answer `GET /health/ready` with database and browser-session-store dependency state, returning `503` when Prisma readiness fails or when the configured Redis session store is down;
-- serve JSON APIs for companies, roles, users, clients, products, orders, invoices, payments, inventory, warehouses, regions, sales routes, agent workflows, taxpayers, geocoding, and economic activities;
+- serve JSON APIs for companies, roles, users, clients, products, product categories, orders, invoices, payments, inventory, warehouses, regions, sales routes, agent workflows, taxpayers, geocoding, and economic activities;
 - enforce that only a global `root` actor (`role === 'root'` and no `companyId`) can create companies through a bounded converged contract: the company admin routes now declare explicit global-root actor scope in `src/security/access-policies.js`, while the current governance service + company service boundary still preserves the sensitive business check;
 - create company-scoped custom roles while rejecting platform-scoped permissions such as `companies.manage`, preserving current warning-only posture for non-approved sensitive combinations, recording governance warnings in audit metadata for successful allow/warn flows, and emitting dedicated service-level denial audit attempts with action `roles.company.create.governance_denied` when the enforced deny path is hit and request audit context exists;
 - update products through a company-scoped repository mutation helper inside the existing transaction flow instead of relying on a raw bare-id final write;
@@ -213,7 +235,7 @@ Examples currently implemented:
 5. If there is no valid session, the browser returns to `/` with `reason=session-expired`.
 6. If the session is authenticated but not eligible for the root shell, the browser is sent to `/no-access.html`.
 7. If the session is eligible, `root/app.js` configures actor-specific shell furniture from `root/manifest.js`: global `root` sees top navigation, while `company-admin` sees the rebranded grouped sidebar.
-8. `root/router.js` resolves the hash route against explicit manifest items. Global root routes remain `home` and `companies`. Company-admin routes include `admin_home`, `products`, `lots`, `movements`, `production`, `agents`, `routes`, `zones`, `clients`, `purchases`, `warehouses`, `approvals`, `reports`, `users`, `roles_permissions`, and `settings`, with missing or unauthorized hashes falling back to the first accessible route; the current functional company-admin routes are `roles_permissions`, `zones`, `agents`, `clients`, and `routes`, while the remaining company-admin routes render the shared neutral `in_process` view.
+8. `root/router.js` resolves the hash route against explicit manifest items. Global root routes remain `home` and `companies`. Company-admin routes include `admin_home`, `products`, `lots`, `movements`, `production`, `agents`, `routes`, `zones`, `clients`, `purchases`, `warehouses`, `approvals`, `reports`, `users`, `roles_permissions`, and `settings`, with missing or unauthorized hashes falling back to the first accessible route; the current functional company-admin inventory routes are `warehouses`, `products`, `lots`, `movements`, `roles_permissions`, `zones`, `agents`, `clients`, and `routes`, `lots` still resolves to a dedicated placeholder view, and the remaining company-admin routes render the shared neutral `in_process` view.
 8.1. For company-admin sessions with no hash present, the first accessible route is `#admin_home`.
 8.2. Root-shell modules publish and consume internal dependencies through `window.RootShell` instead of many unrelated top-level `window.RootShell*` globals.
 9. `companies-admin.js` mounts root-company list/create/status behavior through `companies-api.js` for global root sessions.
@@ -222,6 +244,7 @@ Examples currently implemented:
 10.2. `agents-admin.js` mounts a two-panel commercial-user workflow through `agents-api.js`, using helper-owned dataset composition/filtering plus `agents-admin.renderers.js` for list/detail/assignment rendering, and it tolerates partial degradation when roles or route overview requests fail.
 10.3. `clients-admin.js` mounts a list/detail client workspace through `clients-api.js`, using helper-owned local filters and payload shaping, `clients-admin.renderers.js` for list/detail rendering, and `clients-admin.state.js` for selected-client and summary resolution while keeping client creation, update, and append-only related actions inside the supported shell workspace.
 10.4. `routes-admin.js` mounts route overview/detail workflows through `routes-api.js`, using helper-owned local search, payload shaping, and map projection helpers plus `routes-admin.renderers.js` and `routes-admin.state.js` for detail/map/goal-row rendering state while treating per-agent goals as replace-all saves.
+10.5. The root-shell loader contract now also registers `products-api.js`, `categories-api.js`, `inventory-api.js`, and `warehouses-api.js` as same-origin browser adapters over `/api/products/**`, `/api/inventory/**`, and `/api/warehouses/company`; `#warehouses` consumes `warehousesApi` directly for list/create flows, `#products` consumes `productsApi` and `categoriesApi` for paginated list/detail/create/update/deactivate flows plus tenant category listing/creation, `#movements` consumes `inventoryApi` plus `warehousesApi` for paginated read-only movement history and filter enrichment, while the current `#lots` route still renders placeholder content.
 11. Logout uses the shared auth helper and returns the browser to login.
 
 ### API flow
@@ -250,6 +273,8 @@ Examples currently implemented:
 - `BrowserSessionMemoryStore` keeps sessions in-process, eagerly drops expired entries, supports explicit invalidation, and exposes readiness as `memory`.
 - `BrowserSessionRedisStore` persists opaque sessions under the configured key prefix in Redis, uses a raw TCP Redis protocol client, and exposes readiness via `PING` without silently falling back to memory mode.
 - company-scoped product mutation helpers now use scoped `updateMany(...)` plus follow-up `findFirst(...)` reads on supported product/inventory write paths so tenant scope is preserved at the final mutation boundary.
+- the current category implementation reuses the existing `Category` and `Inventory` persistence model; `product.service.listCategories` first resolves the authenticated actor's `inventory` by `companyId`, returns `[]` when none exists, and `createCategory` writes only inside that resolved tenant inventory.
+- the minimal product-category backend contract introduced no schema or migration change.
 - `p27-root-initial-spa-shell`, `p28-flexible-permission-governance-foundation`, `p30-company-role-governance-hardening`, and `p32-governance-denial-audit-visibility` introduced no database schema or migration changes.
 
 ## 8. APIs and integrations
@@ -265,7 +290,7 @@ Relevant public-surface behavior now in effect:
 - `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` remain supported and are outside the HTML deprecation scope;
 - `/root/` is a supported authenticated browser entrypoint for the actor-aware root shell;
 - the current shell contract includes a split UI model in the same document: root-global top navigation and company-admin sidebar navigation with explicit sidebar hash routes;
-- root-shell API consumption now includes `GET /api/companies/root/companies`, `POST /api/companies/root/companies`, `PATCH /api/companies/root/companies/:companyId/status`, `GET /api/roles/permissions`, `GET /api/roles/company`, `POST /api/roles/company`, `GET /api/regions/company`, `POST /api/regions/company`, `POST /api/regions/company/:regionId/subregions`, `GET /api/users/company`, `POST /api/users/company`, `GET /api/sales-routes/company`, `GET /api/sales-routes/company/:routeId`, `POST /api/sales-routes/company`, `PUT /api/sales-routes/company/:routeId`, `PUT /api/sales-routes/company/:routeId/subzones`, `PUT /api/sales-routes/company/:routeId/assignments`, `PUT /api/sales-routes/company/agents/:userId/goals`, `GET /api/clients/company`, `POST /api/clients/company`, `PUT /api/clients/:id`, `DELETE /api/clients/:id`, `POST /api/clients/company/:clientId/stores`, `POST /api/clients/:clientId/documents`, `POST /api/clients/:clientId/references`, `GET /api/clients/:clientId/documents/:documentId/download`, `GET /api/clients/classifications/company`, `GET /api/clients/document-types`, `GET /api/taxpayers/lookup?identification=...`, and `GET /api/economic-activities`;
+- root-shell API consumption now includes `GET /api/companies/root/companies`, `POST /api/companies/root/companies`, `PATCH /api/companies/root/companies/:companyId/status`, `GET /api/roles/permissions`, `GET /api/roles/company`, `POST /api/roles/company`, `GET /api/regions/company`, `POST /api/regions/company`, `POST /api/regions/company/:regionId/subregions`, `GET /api/users/company`, `POST /api/users/company`, `GET /api/sales-routes/company`, `GET /api/sales-routes/company/:routeId`, `POST /api/sales-routes/company`, `PUT /api/sales-routes/company/:routeId`, `PUT /api/sales-routes/company/:routeId/subzones`, `PUT /api/sales-routes/company/:routeId/assignments`, `PUT /api/sales-routes/company/agents/:userId/goals`, `GET /api/clients/company`, `POST /api/clients/company`, `PUT /api/clients/:id`, `DELETE /api/clients/:id`, `POST /api/clients/company/:clientId/stores`, `POST /api/clients/:clientId/documents`, `POST /api/clients/:clientId/references`, `GET /api/clients/:clientId/documents/:documentId/download`, `GET /api/clients/classifications/company`, `GET /api/clients/document-types`, `GET /api/taxpayers/lookup?identification=...`, `GET /api/economic-activities`, and now also the registered inventory-shell adapter contracts `GET /api/products/`, `GET /api/products/:id`, `POST /api/products/`, `PUT /api/products/:id`, `DELETE /api/products/:id`, `GET /api/products/categories/company`, `POST /api/products/categories/company`, `GET /api/inventory/stocks`, `GET /api/inventory/alerts`, `GET /api/inventory/movements`, `PATCH /api/inventory/lots/:lotId/qa`, `GET /api/warehouses/company`, and `POST /api/warehouses/company`;
 - `POST /api/auth/logout` remains part of the governed runtime-contract inventory;
 - `GET /api/orders` preserves the legacy array contract when pagination params are absent and returns `{ items, pagination }` only when `page` or `pageSize` is supplied;
 - legacy HTML paths are not redirected to new routes; they return `410 Gone` from the same URL;
@@ -278,6 +303,7 @@ Current observable behavior:
 - authorization remains middleware/policy based;
 - role/permission governance remains hybrid in runtime code: `src/security/access-policies.js` is still the stable authorization facade and central policy entrypoint, but declarative policy data, actor-scope checks, and route-level denial-audit behavior are now split into focused helper modules under `src/security/access-policy-*.js`; the repository also contains a centralized permission-governance foundation used by services for governed-operation evaluation;
 - a bounded route-policy convergence seam now exists for the highest-signal company/company-role admin flows and the agent workspace routes: company list/create and root-company list/create policies declare explicit `global-root` actor scope, company-role list/create policies declare explicit `company-admin` actor scope, and agent workspace routes now declare explicit `agent-workspace-user` actor scope before the downstream service-layer checks run;
+- the inventory-admin follow-up now also relies on permission-governed product/inventory policies in `src/security/access-policy-registry.js`, including `product.list`, `product.detail`, `product.create`, `product.update`, `product.delete`, `product.category.list`, `product.category.create`, `inventory.stocks.list`, `inventory.alerts.list`, `inventory.movements.list`, `inventory.lot-qa.update`, `warehouse.company.list`, and `warehouse.company.create`;
 - the planning/governance analysis package for this area is documented in `specs/p10-permission-governance/`, `docs/permission-governance-decisions.md` summarizes the recommended governance model, `p28` implemented the first runtime slice with a central policy model, reusable warning contract, and stable `company.create` deny rule for non-global-root actors, `p30` added enforced company-role creation denial for platform-scoped permissions, and `p32` added dedicated service-level denial audit visibility for that approved deny path;
 - `tests/access-policies.test.js` and `tests/authorization-convergence-characterization.test.js` now freeze current access-policy behavior for strict policy lookup, actor-scope inventories, actor-scope denial audit metadata, and selected route-policy mappings without changing runtime authorization semantics;
 - browser login can request a backend-owned browser session by sending `X-Inventory-Browser-Session: cookie` to `/api/auth/login`;
@@ -296,7 +322,7 @@ Current post-login behavior in code:
 - `src/public/login.js` routes `root` users and `admin` users with `companyId` to `/root/`;
 - inside `/root/`, `src/public/root/guards.js` restricts shell eligibility to those same two actor types;
 - inside `/root/`, `src/public/root/registry.js` centralizes shell dependency registration and lookup while preserving the existing plain-script delivery model;
-- inside the shell, navigation visibility is actor-aware: global `root` users keep the top-nav experience and can access `#home` and `#companies`, while company `admin` users with `companyId` receive the rebranded grouped sidebar with `#admin_home` as the default landing, explicit placeholder routes for the approved sidebar IA, and functional access to `#roles_permissions`, `#zones`, `#agents`, `#clients`, and `#routes`;
+- inside the shell, navigation visibility is actor-aware: global `root` users keep the top-nav experience and can access `#home` and `#companies`, while company `admin` users with `companyId` receive the rebranded grouped sidebar with `#admin_home` as the default landing, dedicated inventory route modules for `#warehouses`, `#products`, `#lots`, and `#movements`, registered inventory adapter seams for those routes, and functional access to `#warehouses`, `#movements`, `#roles_permissions`, `#zones`, `#agents`, `#clients`, and `#routes`; the remaining approved sidebar entries still resolve to the shared neutral `in_process` view;
 - `root/router.js` falls back to the first accessible route when a hash route is missing or not allowed;
 - backend APIs remain authoritative; shell guards are UX-level gates only;
 - `sales_supervisor`, warehouse-capable sessions, and operational-agent sessions still route to `/migration.html?mode=post-login-transition`;
@@ -344,9 +370,13 @@ The active browser/runtime governance now relies on:
 - `tests/root-shell-route-governance.test.js`
 - `tests/root-shell-router-characterization.test.js`
 - `tests/root-shell-modularity-governance.test.js`
+- `tests/root-inventory-adapters-characterization.test.js`
+- `tests/product-category-contract-characterization.test.js`
 - `tests/agents-view-characterization.test.js`
 - `tests/clients-view-characterization.test.js`
 - `tests/routes-view-characterization.test.js`
+- `tests/warehouses-view-characterization.test.js`
+- `tests/warehouses-view.e2e.js`
 - `tests/browser-e2e.e2e.js`
 - `tests/zones-view-selection-filters-characterization.test.js`
 - `tests/zones-view-dialog-feedback-characterization.test.js`
@@ -450,6 +480,13 @@ Additional requester-supplied validation evidence for `repository-baseline-score
 - `npm run typecheck` ✅
 - `npm run build` ✅
 
+Additional requester-supplied validation evidence for `inventory-admin-views` follow-up tasks 003 and 004:
+- `npm run lint` ✅
+- `npm run typecheck` ✅
+- `npm run validate:public-runtime` ✅
+- `npm run build` ✅
+- `set BROWSER_SESSION_STORE_MODE=memory && node --test tests/product-category-contract-characterization.test.js tests/root-inventory-adapters-characterization.test.js tests/root-shell-route-governance.test.js tests/root-shell-router-characterization.test.js tests/public-surface-characterization.test.js` ✅
+
 Additional requester-supplied validation evidence for `hotspot-seams-doc-ownership` tasks 1-8:
 - `node --test tests/governance-baseline-sync-guardrails.test.js` ✅
 - `node --test tests/coding-standard-path-alignment.test.js` ✅
@@ -537,6 +574,23 @@ Additional requester-supplied validation evidence for `p37`:
 - `npm run build` ✅
 - `npm run test -- --silent` ⚠️ pre-existing unrelated failures remain
 
+Additional requester-supplied validation evidence for `inventory-admin-views` `TASK-005`:
+- `node --test tests/warehouses-view-characterization.test.js` ✅
+- `node --test tests/warehouses-view.e2e.js` ✅
+- `npm run lint` ✅
+- `npm run lint:public-runtime` ✅
+- `npm run typecheck` ✅
+- `npm run validate:public-runtime` ✅
+- `npm run build` ✅
+
+Additional requester-supplied validation evidence for `inventory-admin-views` `TASK-006`:
+- `node --test tests/movements-view-characterization.test.js tests/movements-view.e2e.js` ✅
+- `npm run lint` ✅
+- `npm run lint:public-runtime` ✅
+- `npm run typecheck` ✅
+- `npm run validate:public-runtime` ✅
+- `npm run build` ✅
+
 Additional requester-supplied validation evidence for `p34`:
 - `npm run typecheck` ✅
 - `node --test tests/typecheck-ci-hardening-governance.test.js` ✅
@@ -580,8 +634,8 @@ Additional requester-supplied validation evidence for `p27`:
 - `node --test tests/public-runtime-http-smoke.test.js tests/public-surface-characterization.test.js tests/browser-runtime-auth-convergence-inventory.test.js` ✅
 
 Note on current static analysis scope:
-- `tsconfig.typecheck.json` keeps an explicit browser-runtime allowlist that includes `src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`, and the approved `src/public/root/**` shell files.
-- The supported root shell remains additionally governed by lint, runtime validator, smoke tests, characterization tests, and browser E2E.
+- `tsconfig.typecheck.json` keeps an explicit browser-runtime allowlist that includes `src/public/shared/session.js`, `src/public/shared/auth.js`, `src/public/login.js`, and a selected subset of `src/public/root/**` shell files, but not the entire approved root-shell runtime inventory.
+- The supported root shell therefore relies on a mix of bounded typecheck coverage plus lint, runtime validator, smoke tests, characterization tests, and browser E2E.
 
 ## 13. Behavior to preserve
 - Express must continue serving the supported browser runtime from `src/public/`.
@@ -593,7 +647,9 @@ Note on current static analysis scope:
 - company-admin sessions with no hash must continue landing on `#admin_home`.
 - The root shell must continue offering safe logout through `/api/auth/logout`.
 - global root users must continue seeing `Empresas` and not the tenant roles route.
-- company-admin users with `companyId` must continue seeing explicit sidebar route items, with `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas` as the functional tenant-admin destinations and the remaining approved sidebar entries resolving to the shared neutral `in_process` view.
+- company-admin users with `companyId` must continue seeing explicit sidebar route items, with `Bodegas`, `Productos`, `Lotes`, and `Movimientos` grouped under `Inventario`; `#warehouses` must continue loading and creating warehouses through the existing `/api/warehouses/company` backend contract, `#products` must continue loading paginated products, opening detail, and conditionally allowing product/category mutations through `/api/products/**` and `/api/products/categories/company`, `#movements` must continue loading paginated movement history through `GET /api/inventory/movements`, `#lots` continues resolving to its dedicated placeholder view, `Roles y permisos`, `Zonas`, `Agentes`, `Clientes`, and `Rutas` remain the other functional tenant-admin destinations, and the remaining approved sidebar entries still resolve to the shared neutral `in_process` view.
+- the `#warehouses` view must continue enforcing read-only versus create behavior through effective permissions (`inventory.view` / `inventory.manage`), preserve local search and filter behavior over the in-memory warehouse dataset, preserve KPI fallback derivation when `summary` is absent, and preserve the create-dialog behavior that re-applies `defaultSellableSource` and disables sellable-source selection for virtual warehouse types.
+- the `#products` view must continue using paginated product listing as its primary browser contract, preserve local search plus category filtering over the current page dataset, preserve contextual detail loading, preserve permission-aware create/edit/deactivate actions through `products.manage`, preserve permission-aware category list/create actions through the current product/inventory permissions, and keep deactivation messaging aligned with the active-product list semantics.
 - the `#zones` view must continue using the existing company regions endpoints, keep searches local in memory, preserve the create-zone/create-subzone modal flows, and preserve the mobile consecutive list/detail interaction.
 - the `#agents` view must continue composing its dataset from `GET /api/users/company`, `GET /api/roles/company`, and `GET /api/sales-routes/company`, preserve local search/group filtering, preserve company-user creation through `POST /api/users/company`, and preserve route-assignment persistence through the existing sales-route assignment endpoint.
 - the `#clients` view must continue keeping client detail inside the supported shell, preserve local search/classification/status filtering, preserve create/update/deactivate behavior, and preserve append-only store/document/reference actions over the existing backend contracts.
@@ -616,7 +672,9 @@ Note on current static analysis scope:
 ## 14. Known defects
 - `npm run build` can still fail locally on Windows with the pre-existing Prisma rename-lock `EPERM` issue during Prisma generate; however, `docs/prisma-windows-stability-evidence.md` now records the hosted repository closeout verdict as `estabilizado con evidencia CI` while explicitly classifying the developer-local Windows operating baseline as `residual gobernado` when `windows_rename_lock` still reproduces.
 - The current Windows wrapper/workflow baseline still has open diagnostic gaps: it classifies retryable rename-lock failures, preserves the real exit code, and now writes a minimal latest-run diagnostics report under `logs/prisma-generate-last-run.json`, but it does not yet identify the locking local process or capture richer process-attribution evidence.
+- The browser-runtime typecheck allowlist remains narrower than the supported root-shell inventory and still leaves the implemented products runtime files outside static typecheck coverage, relying instead on lint, runtime-contract validation, characterization tests, and browser E2E.
 - The full `hotspot-seams-doc-ownership` validation matrix closes only for the documented memory-session aggregate lane; the Windows Prisma rename-lock remains an external environment/platform defect rather than a feature regression.
+- `tsconfig.typecheck.json` still uses a bounded explicit include list for browser-runtime files and does not currently include every approved root-shell inventory module. Observable omissions include `src/public/root/runtime-contract.js`, `src/public/root/categories-api.js`, `src/public/root/inventory-api.js`, `src/public/root/products-api.js`, `src/public/root/warehouses-api.js`, `src/public/root/views/warehouses-admin.helpers.js`, `src/public/root/views/warehouses-admin.renderers.js`, `src/public/root/views/warehouses-admin.js`, `src/public/root/views/products-admin.helpers.js`, `src/public/root/views/products-admin.state.js`, `src/public/root/views/products-admin.renderers.js`, `src/public/root/views/products-admin.js`, `src/public/root/views/lots-admin.js`, `src/public/root/views/movements-admin.helpers.js`, `src/public/root/views/movements-admin.renderers.js`, and `src/public/root/views/movements-admin.js`, even though those files are part of the supported runtime inventory.
 - Permission-governance hardening identified in `specs/p10-permission-governance/` remains only partially implemented, but the enforced scope has advanced: the centralized policy foundation, the stable `company.create` deny rule, and a first company-role deny rule now exist; company-role creation rejects platform-scoped permissions such as `companies.manage` before persistence, denied attempts can now emit dedicated service-level audit events through action `roles.company.create.governance_denied`, and other sensitive combinations still remain warning-only in success-path audit metadata.
 - Denied company-role governance attempts are now recorded through the existing safe audit seam from the service-level denial path when request audit context is available; the dedicated action is `roles.company.create.governance_denied`, the recorded outcome is `REJECTED`, and metadata includes `governanceDecision`, `denialCode`, `ruleId`, `affectedPermissions`, `requestedPermissionCodes`, and `companyId`. This remains distinct from route-level authorization denial auditing and preserves the same `403` response contract.
 - `src/services/agent-workspace.service.js` and `src/services/product.service.js` remain large orchestration hotspots with mixed coordination, filtering/serialization, and cross-service transaction responsibilities, although focused seams now exist in `agent-workspace-store-state.service.js`, `product-permission-shaping.service.js`, and `product-pricing.service.js`.
@@ -635,9 +693,12 @@ Note on current static analysis scope:
 - Operational assurance still depends on synchronization across docs, validators, tests, README, env examples, compose files, and workflows.
 - The root shell still uses global browser objects and ordered file-level script composition rather than module bundling or stronger client-side encapsulation, although the current `window.RootShell` registry, explicit `runtime-contract.js` loader contract, and modularity governance tests now provide a bounded containment seam.
 - Company-admin sidebar behavior in `src/public/root/app.js` currently includes hardcoded group identifiers and UI-state assumptions (`inventory-group`, `sales-group`, route-specific checks), which is workable but brittle for future menu expansion even after layout ownership was normalized.
+- The warehouses screen is now partially decomposed into `warehouses-admin.js`, `warehouses-admin.helpers.js`, and `warehouses-admin.renderers.js`, but the main controller still owns DOM wiring, async orchestration, and dialog lifecycle in a single plain-script module rather than a fuller application/use-case boundary.
+- The movements screen is now partially decomposed into `movements-admin.js`, `movements-admin.helpers.js`, and `movements-admin.renderers.js`, but the main controller still owns DOM wiring, async orchestration, pagination event handling, and drawer lifecycle in a single plain-script module rather than a fuller application/use-case boundary.
+- The products screen is now partially decomposed into `products-admin.js`, `products-admin.helpers.js`, `products-admin.renderers.js`, and `products-admin.state.js`, but the main controller still owns DOM wiring, async orchestration, dialog lifecycle, and mutation coordination in a single plain-script module rather than a fuller application/use-case boundary.
 - The zones screen is still implemented as plain-script DOM orchestration in `src/public/root/views/zones-admin.js` and `zones-admin.helpers.js`; behavior is now covered by E2E plus isolated selection/filter and dialog/feedback characterization tests, but the view remains large and UI-stateful rather than decomposed into smaller modules.
 - The commercial root-shell screens are still plain-script DOM controllers with large mount functions in `agents-admin.js`, `clients-admin.js`, and `routes-admin.js`; maintainability improved because renderer/state seams now own list/detail/map/summary rendering and selection state concerns, but the main orchestration remains controller-centric rather than decomposed into fuller application/use-case boundaries.
-- The browser-runtime `typecheck` baseline now includes the approved root-shell files through an explicit allowlist rather than a broad `src/public/**` expansion.
+- The browser-runtime `typecheck` baseline remains intentionally bounded through an explicit allowlist rather than a broad `src/public/**` expansion, and several approved inventory runtime files still remain outside that list.
 - A temporary compatibility bridge still exists at the legacy hyphenated coding-standards path; the authoritative coding-standards content now lives only at `docs/coding_standard.md` and drift is guarded by `tests/coding-standard-path-alignment.test.js`.
 - `legacy-public-runtime/` remains in-repo as transitional backup/reference debt until equivalent SPA functionality is implemented and validated.
 

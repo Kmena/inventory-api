@@ -2785,6 +2785,16 @@ Debe registrar:
 - cantidad
 - origen funcional (`sale_dispatch`, `manual_entry`, `adjustment`, `production_consume`, etc.)
 
+Motivos de entrada aprobados (`movementType: IN`) — catálogo inicial confirmado:
+- `PURCHASE` — Compra a proveedor
+- `PRODUCTION_OUTPUT` — Salida de produccion interna
+- `INITIAL_LOAD` — Carga inicial del inventario
+- `RETURN_FROM_CLIENT` — Devolucion de cliente
+- `TRANSFER_IN` — Traslado entrada desde otra bodega
+- `MANUAL_ENTRY` — Entrada manual sin clasificar (default)
+
+Nota: el catálogo puede ampliarse cuando negocio lo requiera mediante un cambio en `createStockEntrySchema` y `ENTRY_REASON_CODES`.
+
 Motivos extraordinarios sugeridos:
 - `LOT_EXPIRED`
 - `QA_FAILURE`
