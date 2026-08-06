@@ -360,6 +360,18 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'tenant-operational',
     transition: 'permission-governed',
   },
+  'product.category.list': {
+    mode: 'permission',
+    permissions: ['products.view', 'products.manage', 'inventory.view', 'inventory.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  'product.category.create': {
+    mode: 'permission',
+    permissions: ['products.manage', 'inventory.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
   'product.create': {
     mode: 'permission',
     permissions: ['products.manage'],

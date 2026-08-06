@@ -87,9 +87,45 @@
   const adminHomeItem = createAdminPendingEntry('admin-home', 'Inicio', 'house', {
     routeKey: 'admin_home',
   });
-  const productsItem = createAdminPendingEntry('products', 'Productos', 'package');
-  const lotsItem = createAdminPendingEntry('lots', 'Lotes', 'layers-3');
-  const movementsItem = createAdminPendingEntry('movements', 'Movimientos', 'arrow-left-right');
+  const productsItem = createRouteItem({
+    id: 'products',
+    label: 'Productos',
+    routeKey: 'products',
+    href: '/root/#products',
+    implemented: true,
+    activeMatchers: ['products'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'package',
+    includeInRootNav: false,
+    dependencyTag: 'inventory-admin-views',
+  });
+  const lotsItem = createRouteItem({
+    id: 'lots',
+    label: 'Lotes',
+    routeKey: 'lots',
+    href: '/root/#lots',
+    implemented: true,
+    activeMatchers: ['lots'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'layers-3',
+    includeInRootNav: false,
+    dependencyTag: 'inventory-admin-views',
+  });
+  const movementsItem = createRouteItem({
+    id: 'movements',
+    label: 'Movimientos',
+    routeKey: 'movements',
+    href: '/root/#movements',
+    implemented: true,
+    activeMatchers: ['movements'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'arrow-left-right',
+    includeInRootNav: false,
+    dependencyTag: 'inventory-admin-views',
+  });
   const productionItem = createAdminPendingEntry('production', 'Produccion', 'factory');
   const agentsItem = createRouteItem({
     id: 'agents',
@@ -144,7 +180,19 @@
     dependencyTag: 'root-shell-commercial-views',
   });
   const purchasesItem = createAdminPendingEntry('purchases', 'Compras', 'shopping-bag');
-  const warehousesItem = createAdminPendingEntry('warehouses', 'Bodegas', 'warehouse');
+  const warehousesItem = createRouteItem({
+    id: 'warehouses',
+    label: 'Bodegas',
+    routeKey: 'warehouses',
+    href: '/root/#warehouses',
+    implemented: true,
+    activeMatchers: ['warehouses'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'warehouse',
+    includeInRootNav: false,
+    dependencyTag: 'inventory-admin-views',
+  });
   const approvalsItem = createAdminPendingEntry('approvals', 'Aprobaciones', 'badge-check');
   const reportsItem = createAdminPendingEntry('reports', 'Reportes', 'bar-chart-3');
   const usersItem = createAdminPendingEntry('users', 'Usuarios', 'user-cog');
@@ -227,6 +275,7 @@
           visibilityRule: guards.isCompanyAdmin,
           actorScope: 'company-admin',
           items: [
+            { type: 'item', ...warehousesItem },
             { type: 'item', ...productsItem },
             { type: 'item', ...lotsItem },
             { type: 'item', ...movementsItem },
@@ -255,7 +304,6 @@
       title: 'Control',
       visibilityRule: guards.isCompanyAdmin,
       entries: [
-        { type: 'item', ...warehousesItem },
         { type: 'item', ...approvalsItem },
         { type: 'item', ...reportsItem },
       ],

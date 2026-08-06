@@ -80,6 +80,22 @@ const updateProductSchema = productFieldsSchema.partial().omit({
   reservedQuantity: true,
 });
 
+const createCategorySchema = z.object({
+  name: z.string().trim().min(2).max(255),
+  categoryType: z.enum(['PT', 'MP', 'EM']).default('PT'),
+  sortOrder: z.coerce.number().int().min(0).optional(),
+}).strict();
+
+/**
+ * Schema for creating a ProductSubcategory (user-managed sub-grouping within a system Category).
+ * Example: "Shampoo" inside the "Producto Terminado" (PT) category.
+ */
+const createSubcategorySchema = z.object({
+  categoryId: z.coerce.bigint({ required_error: 'La categoria padre es obligatoria' }),
+  name: z.string().trim().min(2).max(255),
+  code: z.string().trim().min(1).max(50).optional(),
+}).strict();
+
 const importProductRowSchema = z.object({
   id: z.coerce.bigint(),
   code: z.string().max(50).optional().nullable(),
@@ -126,5 +142,5 @@ const importProductsSchema = z.object({
   rows: z.array(importProductRowSchema).min(1),
 });
 
-module.exports = { createProductSchema, updateProductSchema, importProductsSchema };
+module.exports = { createProductSchema, updateProductSchema, createCategorySchema, createSubcategorySchema, importProductsSchema };
 

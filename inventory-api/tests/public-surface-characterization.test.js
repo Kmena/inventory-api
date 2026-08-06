@@ -78,6 +78,13 @@ test('supported public runtime assets now include the minimal root shell while l
     'root/views/companies-admin.js',
     'root/views/home.js',
     'root/views/in-process.js',
+    'root/views/lots-admin.helpers.js',
+    'root/views/lots-admin.js',
+    'root/views/lots-admin.renderers.js',
+    'root/views/lots-admin.state.js',
+    'root/views/products-admin.helpers.js',
+    'root/views/products-admin.renderers.js',
+    'root/views/products-admin.state.js',
     'root/views/roles-admin.js',
     'root/views/routes-admin.helpers.js',
     'root/views/routes-admin.renderers.js',
@@ -160,6 +167,14 @@ test('public login, no-access and migration screens keep strict same-origin wiri
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/clients-admin\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/routes-admin\.helpers\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/routes-admin\.renderers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/products-admin\.helpers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/products-admin\.state\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/products-admin\.renderers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/products-admin\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/lots-admin\.helpers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/lots-admin\.state\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/lots-admin\.renderers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/lots-admin\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/routes-admin\.state\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/routes-admin\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/app\.js"><\/script>/);

@@ -95,6 +95,70 @@ function findProductsByIds(ids, companyId) {
   });
 }
 
+function findInventoryByCompanyId(companyId, db = prisma) {
+  return db.inventory.findUnique({
+    where: { companyId },
+  });
+}
+
+function findActiveCategoriesByInventoryId(inventoryId, db = prisma) {
+  return db.category.findMany({
+    where: {
+      inventoryId,
+      isActive: true,
+    },
+    orderBy: [
+      { sortOrder: 'asc' },
+      { name: 'asc' },
+    ],
+  });
+}
+
+function findActiveCategoriesWithSubcategories(inventoryId, db = prisma) {
+  return db.category.findMany({
+    where: { inventoryId, isActive: true },
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    include: {
+      subcategories: {
+        where: { isActive: true },
+        orderBy: { name: 'asc' },
+      },
+    },
+  });
+}
+
+function findCategoryByType(inventoryId, categoryType, db = prisma) {
+  return db.category.findFirst({
+    where: { inventoryId, categoryType },
+  });
+}
+
+function findCategoryByName(inventoryId, name, db = prisma) {
+  return db.category.findFirst({
+    where: {
+      inventoryId,
+      name: { equals: name, mode: 'insensitive' },
+    },
+  });
+}
+
+function createCategory(data, db = prisma) {
+  return db.category.create({ data });
+}
+
+function findSubcategoryByName(categoryId, name, db = prisma) {
+  return db.productSubcategory.findFirst({
+    where: {
+      categoryId,
+      name: { equals: name, mode: 'insensitive' },
+    },
+  });
+}
+
+function createSubcategory(data, db = prisma) {
+  return db.productSubcategory.create({ data });
+}
+
 function createProduct(data) {
   return prisma.product.create({ data, include: productInclude });
 }
@@ -130,6 +194,14 @@ module.exports = {
   findAllProducts,
   findProductById,
   findProductsByIds,
+  findInventoryByCompanyId,
+  findActiveCategoriesByInventoryId,
+  findActiveCategoriesWithSubcategories,
+  findCategoryByType,
+  findCategoryByName,
+  createCategory,
+  findSubcategoryByName,
+  createSubcategory,
   createProduct,
   updateProduct,
   deactivateCompanyProduct,

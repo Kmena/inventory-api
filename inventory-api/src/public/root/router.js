@@ -10,6 +10,10 @@
   const agentsAdminView = rootShell.require('views.agentsAdmin');
   const clientsAdminView = rootShell.require('views.clientsAdmin');
   const routesAdminView = rootShell.require('views.routesAdmin');
+  const warehousesAdminView = rootShell.require('views.warehousesAdmin');
+  const productsAdminView = rootShell.require('views.productsAdmin');
+  const lotsAdminView = rootShell.require('views.lotsAdmin');
+  const movementsAdminView = rootShell.require('views.movementsAdmin');
 
   function normalizeHashRoute(hashValue) {
     return String(hashValue || '').replace(/^#/, '').trim();
@@ -66,6 +70,22 @@
 
     if (item.routeKey === 'routes') {
       return routesAdminView;
+    }
+
+    if (item.routeKey === 'warehouses') {
+      return warehousesAdminView;
+    }
+
+    if (item.routeKey === 'products') {
+      return productsAdminView;
+    }
+
+    if (item.routeKey === 'lots') {
+      return lotsAdminView;
+    }
+
+    if (item.routeKey === 'movements') {
+      return movementsAdminView;
     }
 
     return inProcessView;

@@ -40,6 +40,10 @@ function createRouterHarness() {
   browserWindow.RootShell.register('views.agentsAdmin', createView('agents-view'));
   browserWindow.RootShell.register('views.clientsAdmin', createView('clients-view'));
   browserWindow.RootShell.register('views.routesAdmin', createView('routes-view'));
+  browserWindow.RootShell.register('views.warehousesAdmin', createView('warehouses-view'));
+  browserWindow.RootShell.register('views.productsAdmin', createView('products-view'));
+  browserWindow.RootShell.register('views.lotsAdmin', createView('lots-view'));
+  browserWindow.RootShell.register('views.movementsAdmin', createView('movements-view'));
 
   executeRootScript('router.js', context);
 
@@ -119,6 +123,26 @@ test('router resolves supported actor routes and unknown hashes without changing
   assert.equal(adminRoutesResolution.allowed, true);
   assert.equal(adminRoutesResolution.routeKey, 'routes');
   assert.equal(adminRoutesResolution.view.name, 'routes-view');
+
+  const adminWarehousesResolution = router.resolveRoute('#warehouses', createCompanyAdminSession());
+  assert.equal(adminWarehousesResolution.allowed, true);
+  assert.equal(adminWarehousesResolution.routeKey, 'warehouses');
+  assert.equal(adminWarehousesResolution.view.name, 'warehouses-view');
+
+  const adminProductsResolution = router.resolveRoute('#products', createCompanyAdminSession());
+  assert.equal(adminProductsResolution.allowed, true);
+  assert.equal(adminProductsResolution.routeKey, 'products');
+  assert.equal(adminProductsResolution.view.name, 'products-view');
+
+  const adminLotsResolution = router.resolveRoute('#lots', createCompanyAdminSession());
+  assert.equal(adminLotsResolution.allowed, true);
+  assert.equal(adminLotsResolution.routeKey, 'lots');
+  assert.equal(adminLotsResolution.view.name, 'lots-view');
+
+  const adminMovementsResolution = router.resolveRoute('#movements', createCompanyAdminSession());
+  assert.equal(adminMovementsResolution.allowed, true);
+  assert.equal(adminMovementsResolution.routeKey, 'movements');
+  assert.equal(adminMovementsResolution.view.name, 'movements-view');
 
   const adminUnknownResolution = router.resolveRoute('#missing-route', createCompanyAdminSession());
   assert.equal(adminUnknownResolution.allowed, true);

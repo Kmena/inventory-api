@@ -1503,6 +1503,91 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   gap: 18px;
   min-width: 0;
 }
+.warehouses-page,
+.movements-page {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.warehouses-workspace {
+  display: grid;
+  gap: 18px;
+}
+.warehouses-filter-bar {
+  grid-template-columns: minmax(220px, 1fr) repeat(4, minmax(150px, 1fr)) auto;
+}
+.movements-filter-bar {
+  grid-template-columns: repeat(3, minmax(180px, 1fr)) auto auto;
+}
+.warehouses-table-wrapper,
+.movements-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.warehouses-table-wrapper table {
+  width: max(100%, 980px);
+  min-width: 980px;
+  table-layout: fixed;
+}
+.movements-table-wrapper table {
+  width: max(100%, 1100px);
+  min-width: 1100px;
+  table-layout: fixed;
+}
+.warehouses-table-wrapper th,
+.warehouses-table-wrapper td,
+.movements-table-wrapper th,
+.movements-table-wrapper td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.warehouses-row-detail {
+  margin-top: 6px;
+}
+.movements-pagination {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.warehouses-state {
+  display: grid;
+  gap: 10px;
+  text-align: center;
+}
+.warehouses-state h3 {
+  margin: 0;
+}
+.warehouses-state__meta {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.warehouses-helper {
+  margin-top: 6px;
+}
+.warehouses-helper--warning {
+  color: #92400e;
+}
+.warehouses-metric-card__hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: var(--primary-dark);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.warehouses-metric-card__hint--placeholder {
+  visibility: hidden;
+}
 .routes-workspace {
   min-width: 0;
 }
@@ -1696,6 +1781,12 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   .routes-filter-bar {
     grid-template-columns: 1fr 1fr;
   }
+  .warehouses-filter-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .movements-filter-bar {
+    grid-template-columns: 1fr 1fr;
+  }
   .routes-subregions-panel {
     max-height: none;
     overflow: visible;
@@ -1719,6 +1810,18 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   .routes-filter-bar {
     grid-template-columns: 1fr;
   }
+  .warehouses-filter-bar {
+    grid-template-columns: 1fr;
+  }
+  .movements-filter-bar {
+    grid-template-columns: 1fr;
+  }
+  .movements-pagination {
+    justify-content: stretch;
+  }
+  .movements-pagination button {
+    flex: 1 1 0;
+  }
   .clients-workspace {
     padding: 14px;
     gap: 18px;
@@ -1728,7 +1831,9 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   .field-wide {
     grid-column: auto;
   }
-  .clients-table-wrapper {
+  .clients-table-wrapper,
+  .warehouses-table-wrapper,
+  .movements-table-wrapper {
     border: 0;
     overflow: visible;
   }
@@ -1737,27 +1842,47 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   .clients-table-wrapper tbody,
   .clients-table-wrapper tr,
   .clients-table-wrapper th,
-  .clients-table-wrapper td {
+  .clients-table-wrapper td,
+  .warehouses-table-wrapper table,
+  .warehouses-table-wrapper thead,
+  .warehouses-table-wrapper tbody,
+  .warehouses-table-wrapper tr,
+  .warehouses-table-wrapper th,
+  .warehouses-table-wrapper td,
+  .movements-table-wrapper table,
+  .movements-table-wrapper thead,
+  .movements-table-wrapper tbody,
+  .movements-table-wrapper tr,
+  .movements-table-wrapper th,
+  .movements-table-wrapper td {
     display: block;
     min-width: 0;
     width: 100%;
   }
-  .clients-table-wrapper thead {
+  .clients-table-wrapper thead,
+  .warehouses-table-wrapper thead,
+  .movements-table-wrapper thead {
     display: none;
   }
-  .clients-table-wrapper tr {
+  .clients-table-wrapper tr,
+  .warehouses-table-wrapper tr,
+  .movements-table-wrapper tr {
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 12px;
     margin-bottom: 12px;
     background: #fff;
   }
-  .clients-table-wrapper td {
+  .clients-table-wrapper td,
+  .warehouses-table-wrapper td,
+  .movements-table-wrapper td {
     border-bottom: 0;
     padding: 8px 0;
     white-space: normal;
   }
-  .clients-table-wrapper td::before {
+  .clients-table-wrapper td::before,
+  .warehouses-table-wrapper td::before,
+  .movements-table-wrapper td::before {
     content: attr(data-label);
     display: block;
     color: var(--muted);
@@ -1766,7 +1891,11 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
     margin-bottom: 4px;
   }
   .clients-table-wrapper td:first-child::before,
-  .clients-table-wrapper td:last-child::before {
+  .clients-table-wrapper td:last-child::before,
+  .warehouses-table-wrapper td:first-child::before,
+  .warehouses-table-wrapper td:last-child::before,
+  .movements-table-wrapper td:first-child::before,
+  .movements-table-wrapper td:last-child::before {
     content: '';
     display: none;
   }
@@ -1878,6 +2007,10 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   display: grid;
   gap: 12px;
   margin: 12px 0 18px;
+}
+
+#lots-header-actions {
+  margin-bottom: 1rem;
 }
 
 .initial-lot-row {
@@ -2475,6 +2608,17 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   background: #fff;
 }
 
+.products-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.products-detail-card {
+  min-height: 100%;
+}
+
 .products-admin-table {
   min-width: 980px;
 }
@@ -2485,6 +2629,10 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
 
 .products-admin-table tbody tr:hover {
   background: #f8fbff;
+}
+
+.products-admin-table tbody tr.is-selected {
+  background: #eef5ff;
 }
 
 .numeric-cell {
@@ -2790,7 +2938,8 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   .products-kpi-grid,
   .products-form-grid,
   .product-summary-grid,
-  .product-detail-list {
+  .product-detail-list,
+  .products-workspace-grid {
     grid-template-columns: 1fr;
   }
 
@@ -3167,6 +3316,85 @@ textarea {
   border-radius: 12px;
   background: #fff;
 }
+
+/* =============================================
+   KPI cards — lotes y vistas de inventario
+   ============================================= */
+
+.kpi-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 5px;
+  min-height: 100px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: linear-gradient(145deg, #fff, #f4f7fb);
+}
+
+.kpi-card__value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.kpi-card__label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.kpi-card--warning .kpi-card__value { color: #a15c00; }
+.kpi-card--error   .kpi-card__value { color: #a11b1b; }
+.kpi-card--success .kpi-card__value { color: #116329; }
+
+/* Lotes: 6 tarjetas en 3 columnas, cede en pantallas chicas */
+.lots-kpis {
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+}
+
+@media (max-width: 900px) {
+  .lots-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 540px) {
+  .lots-kpis { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* =============================================
+   Dialog nativo compartido (.root-dialog)
+   ============================================= */
+
+dialog.root-dialog {
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.22);
+  width: min(720px, 96vw);
+  max-height: 90vh;
+  overflow: auto;
+  background: #fff;
+}
+
+dialog.root-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.38);
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.dialog-header h3 { margin: 0 0 2px; }
+.dialog-header .muted { margin: 0; font-size: 0.85rem; }
 
 @media (max-width: 720px) {
   .agent-detail-actions,
