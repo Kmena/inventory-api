@@ -106,6 +106,10 @@ test('updateProduct routes the final mutation through the company-scoped reposit
       density: null,
       densityUnit: null,
       isActive: true,
+      // inCatalog ahora siempre se incluye — fix para el bug donde
+      // buildProductWriteData omitia el campo y Prisma usaba @default(false),
+      // haciendo los productos invisibles para el agente de ventas
+      inCatalog: true,
       lotStrategy: 'TRACKED',
       kgConversionFactor: 1,
     },
