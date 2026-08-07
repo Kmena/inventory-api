@@ -199,10 +199,11 @@
     let reverseDebounceId = null;
 
     // Refs de los campos de dirección para el autorrelleno
-    const provinceInput  = /** @type {HTMLInputElement} */ (dialog.querySelector('input[name="province"]'));
-    const cantonInput    = /** @type {HTMLInputElement} */ (dialog.querySelector('input[name="canton"]'));
-    const districtInput  = /** @type {HTMLInputElement} */ (dialog.querySelector('input[name="district"]'));
-    const reverseStatus  = /** @type {HTMLElement} */ (dialog.querySelector('#store-dialog-reverse-status'));
+    const provinceInput          = /** @type {HTMLInputElement} */ (dialog.querySelector('input[name="province"]'));
+    const cantonInput            = /** @type {HTMLInputElement} */ (dialog.querySelector('input[name="canton"]'));
+    const districtInput          = /** @type {HTMLInputElement} */ (dialog.querySelector('input[name="district"]'));
+    const locationReferenceInput = /** @type {HTMLInputElement} */ (dialog.querySelector('input[name="locationReference"]'));
+    const reverseStatus          = /** @type {HTMLElement} */ (dialog.querySelector('#store-dialog-reverse-status'));
 
     // ── Geocodificación inversa: coordenadas → provincia/cantón/distrito ──────
     async function fillAddressFromCoords(lat, lng) {
@@ -223,6 +224,9 @@
         }
         if (result?.district && districtInput && !districtInput.value) {
           districtInput.value = result.district;
+        }
+        if (result?.displayName && locationReferenceInput && !locationReferenceInput.value) {
+          locationReferenceInput.value = result.displayName;
         }
         if (reverseStatus) {
           reverseStatus.textContent = result?.displayName ? `📍 ${result.displayName}` : '';
