@@ -208,8 +208,15 @@
 
       map.invalidateSize();
 
-      // Marcador draggable inicial en el centro de Costa Rica
-      marker = L.marker(COSTA_RICA_CENTER, { draggable: true }).addTo(map);
+      // Marcador draggable — usa divIcon CSS para evitar dependencia de PNGs
+      // (Leaflet vendoreado no incluye las imágenes marker-icon.png)
+      const storePin = L.divIcon({
+        className: 'store-map-pin',
+        html: '<div class="store-map-pin__dot"></div>',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+      marker = L.marker(COSTA_RICA_CENTER, { draggable: true, icon: storePin }).addTo(map);
 
       // Drag del pin → actualiza solo lat/lng (ADR-005)
       marker.on('dragend', () => {

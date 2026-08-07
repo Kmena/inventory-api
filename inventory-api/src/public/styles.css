@@ -4055,3 +4055,23 @@ dialog.root-dialog::backdrop {
 .store-dialog-geocoding__item--loading:hover {
   background: transparent;
 }
+
+/* Pin del mapa de tienda — divIcon CSS (sin PNG, compatible con Leaflet vendoreado) */
+.store-map-pin {
+  background: transparent;
+  border: none;
+}
+
+.store-map-pin__dot {
+  width: 22px;
+  height: 22px;
+  background: #1f6feb;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  cursor: grab;
+}
+
+.store-map-pin__dot:active {
+  cursor: grabbing;
+}

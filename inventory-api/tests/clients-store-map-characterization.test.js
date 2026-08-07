@@ -225,9 +225,10 @@ test('TASK-P0-008: Leaflet map is initialized with invalidateSize after showModa
   assert.ok(mapInitPos > setTimeoutPos, 'L.map() must be called inside setTimeout callback');
 });
 
-test('TASK-P0-008: draggable marker is created and dragend updates only lat/lng (ADR-005)', () => {
+test('TASK-P0-008: draggable marker uses L.divIcon to avoid missing PNG images (ADR-005)', () => {
   const src = readFile(path.join(rootViewsDir, 'clients-admin-store-dialog.js'));
   assert.ok(src.includes('draggable: true'), 'marker must be created with draggable: true (ADR-005)');
+  assert.ok(src.includes('L.divIcon('), 'marker must use L.divIcon — avoids missing marker-icon.png from vendored Leaflet');
   assert.ok(src.includes("marker.on('dragend'"), "must listen to 'dragend' event on marker");
   assert.ok(src.includes('latInput.value'), 'dragend handler must update latInput.value');
   assert.ok(src.includes('lngInput.value'), 'dragend handler must update lngInput.value');
