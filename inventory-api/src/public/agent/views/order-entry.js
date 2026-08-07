@@ -110,10 +110,20 @@ async function render(containerEl, session, params) {
   let visibleProducts = products.slice();
   let searchQuery = '';
 
+  // Mensaje de lista vacía: distingue entre sin productos disponibles y sin resultados de búsqueda
+  const noProductsAvailable = products.length === 0;
+
   // ─── Función de render de la tabla ───────────────────────────────────────
   function renderTable() {
     if (!visibleProducts.length) {
-      return '<p class="muted" style="padding:24px;text-align:center;">No se encontraron productos.</p>';
+      if (noProductsAvailable) {
+        return `
+          <div style="padding:24px;text-align:center;">
+            <p class="muted" style="margin:0 0 8px;">No hay productos disponibles para este pedido.</p>
+            <p style="font-size:0.82rem;color:#64748b;margin:0;">Para que los productos aparezcan aqui, registra entradas de lote en bodegas marcadas como <strong>fuente vendible</strong> en la administracion de inventario.</p>
+          </div>`;
+      }
+      return '<p class="muted" style="padding:24px;text-align:center;">No se encontraron productos con esa busqueda.</p>';
     }
     return `
       <div class="table-wrapper">
