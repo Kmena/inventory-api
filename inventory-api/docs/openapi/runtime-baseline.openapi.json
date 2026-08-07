@@ -956,6 +956,29 @@
         }
       }
     },
+    "/api/geocoding/reverse": {
+      "get": {
+        "operationId": "reverseGeocodeCoordinates",
+        "summary": "Geocodificación inversa: coordenadas → provincia, cantón, distrito",
+        "tags": ["external-integrations"],
+        "security": [{ "bearerAuth": [] }],
+        "x-runtime-source": {
+          "mountPath": "/api/geocoding",
+          "routeFile": "src/routes/geocoding.routes.js",
+          "expressPath": "/reverse"
+        },
+        "parameters": [
+          { "name": "lat", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "lon", "in": "query", "required": true, "schema": { "type": "number" } }
+        ],
+        "responses": {
+          "200": { "description": "Dirección normalizada con province, canton, district, displayName" },
+          "400": { "description": "Coordenadas inválidas" },
+          "429": { "description": "Demasiadas consultas de geocodificación" },
+          "502": { "description": "Proveedor geocoding no disponible" }
+        }
+      }
+    },
     "/api/taxpayers/lookup": {
       "get": {
         "operationId": "lookupTaxpayer",

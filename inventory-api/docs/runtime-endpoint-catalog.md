@@ -207,6 +207,7 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 |---|---|---|---|---|---|
 | GET | `/api/taxpayers/lookup` | Sí | `authorize('admin', 'sales')` | Consultar contribuyente externo | Timeout y errores controlados en servicio |
 | GET | `/api/geocoding/search` | Sí | `authorize('admin', 'sales')` | Buscar lugares para geocodificación | Acotado a CR y con errores controlados |
+| GET | `/api/geocoding/reverse` | Sí | `authorize('admin', 'sales')` | Geocodificación inversa: coordenadas → provincia/cantón/distrito | Llama Nominatim /reverse; respuesta normalizada para CR |
 
 ## Exclusions currently governed outside partial OpenAPI
 | Method | Path | Reason code |
