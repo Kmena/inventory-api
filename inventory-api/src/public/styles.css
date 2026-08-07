@@ -2998,6 +2998,39 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   grid-column: 1 / -1;
 }
 
+.products-checkbox-label {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.products-checkbox-label input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.products-checkbox-label span:first-of-type {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.products-field-hint {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+.products-checkbox-label:has(span) {
+  flex-wrap: wrap;
+}
+
 .products-modal-actions {
   justify-content: flex-end;
   margin-top: 18px;

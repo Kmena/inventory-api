@@ -176,6 +176,10 @@
     const code = String(formData.get('code') || '').trim();
     const unit = String(formData.get('unit') || '').trim();
     const currency = String(formData.get('currency') || '').trim();
+    // Los checkboxes HTML solo aparecen en FormData cuando estan marcados ('on').
+    // Desmarcado o ausente => null/undefined => false.
+    // La casilla viene marcada por defecto en el HTML del formulario.
+    const inCatalog = formData.get('inCatalog') === 'on';
 
     return {
       name: String(formData.get('name') || '').trim(),
@@ -187,6 +191,7 @@
       price: parseOptionalNumber(formData.get('price')),
       minStock: parseOptionalNumber(formData.get('minStock')),
       maxStock: parseOptionalNumber(formData.get('maxStock')),
+      inCatalog,
     };
   }
 
