@@ -73,28 +73,24 @@
       </section>
 
       <section class="stack-section">
-        <h4>Tiendas</h4>
-        <div class="inline-card-grid">
+        <div class="page-header">
+          <h4>Tiendas</h4>
+          <button
+            type="button"
+            id="clients-add-store-button"
+            data-client-id="${rootShellUi.escapeHtml(client.id)}"
+            data-client-name="${rootShellUi.escapeHtml(client.name || '')}"
+          >+ Agregar tienda</button>
+        </div>
+        <div id="clients-stores-list" class="inline-card-grid">
           ${renderInlineEntries(client.stores || [], 'Este cliente aun no tiene tiendas registradas.', (store) => `
             <article class="inline-card">
               <strong>${rootShellUi.escapeHtml(store.name || 'Tienda')}</strong>
               <p class="muted">${rootShellUi.escapeHtml(store.code || 'Sin codigo')} · ${rootShellUi.escapeHtml(store.subregion?.name || store.subregionName || 'Sin subzona')}</p>
+              ${store.latitude && store.longitude ? `<p class="muted" style="font-size:0.78rem;">📍 ${rootShellUi.escapeHtml(String(store.latitude))}, ${rootShellUi.escapeHtml(String(store.longitude))}</p>` : '<p class="muted" style="font-size:0.78rem;">Sin coordenadas</p>'}
             </article>
           `)}
         </div>
-        <form id="clients-store-form" class="root-form root-form--compact">
-          <input type="hidden" name="clientId" value="${rootShellUi.escapeHtml(client.id)}" />
-          <div class="root-form-grid">
-            <label><span>Nombre de tienda *</span><input name="name" type="text" required minlength="2" maxlength="255" /></label>
-            <label><span>Subzona *</span><select name="subregionId" required><option value="">Selecciona</option>${zoneOptions.map((option) => `<option value="${rootShellUi.escapeHtml(option.id)}">${rootShellUi.escapeHtml(option.regionName)} / ${rootShellUi.escapeHtml(option.name)}</option>`).join('')}</select></label>
-            <label><span>Codigo</span><input name="code" type="text" maxlength="50" /></label>
-            <label><span>Telefono</span><input name="phone" type="text" maxlength="50" /></label>
-            <label class="root-form-grid__full"><span>Direccion</span><textarea name="address" rows="2"></textarea></label>
-            <label><span>Latitud</span><input name="latitude" type="number" step="0.000001" /></label>
-            <label><span>Longitud</span><input name="longitude" type="number" step="0.000001" /></label>
-          </div>
-          <div class="action-row compact-action-row"><button type="submit">Agregar tienda</button></div>
-        </form>
       </section>
 
       <section class="stack-section">

@@ -75,6 +75,22 @@ function isDeprecatedLegacyHtmlPath(pathName) {
 }
 
 function selectContentSecurityPolicy(pathName) {
+  // Root shell admin: permite tiles de OpenStreetMap para el mapa de tiendas.
+  if (pathName === '/root/' || pathName === '/root') {
+    return buildContentSecurityPolicy([
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self'",
+      "style-src 'self'",
+      "img-src 'self' data: https://*.tile.openstreetmap.org",
+      "font-src 'self' data:",
+      "connect-src 'self'",
+    ]);
+  }
+
   // Rutas de la SPA del agente: permiten tiles de OpenStreetMap.
   // Este bloque debe evaluarse antes de isDeprecatedLegacyHtmlPath
   // porque /agent/*.html también coincide con el patron legacy.

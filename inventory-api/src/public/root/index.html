@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Inventori | Panel root</title>
+    <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body class="root-page">
@@ -74,6 +75,8 @@
 
     <button id="root-logout-button" class="secondary-button root-logout-button" type="button" aria-label="Cerrar sesion y volver al inicio de sesion" hidden>Cerrar sesion</button>
 
+    <!-- Leaflet 1.9.4 — ruta compartida /vendor/leaflet/ (ADR-001 clients-store-map) -->
+    <script src="/vendor/leaflet/leaflet.js"></script>
     <script src="/shared/session.js"></script>
     <script src="/shared/auth.js"></script>
     <script src="/root/registry.js"></script>
@@ -118,6 +121,7 @@
     <script src="/root/views/clients-admin.helpers.js"></script>
     <script src="/root/views/clients-admin.renderers.js"></script>
     <script src="/root/views/clients-admin.state.js"></script>
+    <script src="/root/views/clients-admin-store-dialog.js"></script>
     <script src="/root/views/clients-admin.js"></script>
     <script src="/root/views/routes-admin.helpers.js"></script>
     <script src="/root/views/routes-admin.renderers.js"></script>

@@ -118,6 +118,14 @@
     });
   }
 
+  async function searchPlaces(session, query) {
+    const searchParams = new URLSearchParams();
+    searchParams.set('q', query);
+    return inventoryAuth.fetchJson(session, `/api/geocoding/search?${searchParams.toString()}`, {
+      fallbackMessage: 'No se pudo consultar el buscador de mapas.',
+    });
+  }
+
   async function lookupTaxpayer(session, query) {
     const searchParams = new URLSearchParams();
     searchParams.set('identification', query);
@@ -168,6 +176,7 @@
     listEconomicActivities,
     listZones,
     lookupTaxpayer,
+    searchPlaces,
     updateClient,
     uploadDocument,
   });

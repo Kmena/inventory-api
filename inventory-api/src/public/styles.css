@@ -3973,3 +3973,85 @@ dialog.root-dialog::backdrop {
   gap: 10px;
   font-size: 0.9rem;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   clients-store-map — Dialog de tienda con mapa Leaflet
+   ═══════════════════════════════════════════════════════════ */
+
+/* Modal amplio para acomodar el mapa */
+.store-dialog-modal {
+  width: min(96vw, 740px);
+  max-height: 92vh;
+  overflow-y: auto;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+.store-dialog-modal::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* Contenedor del mapa Leaflet dentro del dialog */
+.store-dialog-map {
+  width: 100%;
+  height: 280px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  margin: 10px 0 4px;
+  background: #e5e7eb;
+}
+
+/* Buscador de geocoding */
+.store-dialog-geocoding {
+  position: relative;
+  margin-bottom: 4px;
+}
+
+.store-dialog-geocoding__dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.store-dialog-geocoding__item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.store-dialog-geocoding__item:last-child {
+  border-bottom: none;
+}
+
+.store-dialog-geocoding__item:hover {
+  background: #f0f6ff;
+}
+
+.store-dialog-geocoding__item--empty,
+.store-dialog-geocoding__item--loading {
+  cursor: default;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.store-dialog-geocoding__item--empty:hover,
+.store-dialog-geocoding__item--loading:hover {
+  background: transparent;
+}
