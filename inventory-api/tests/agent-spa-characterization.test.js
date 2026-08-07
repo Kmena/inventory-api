@@ -105,10 +105,17 @@ test('index.html script order is correct per REQ-001', () => {
   }
 });
 
-test('index.html has Leaflet version comment and AgentApp.bootstrap call', () => {
+test('index.html has Leaflet version comment and references bootstrap.js (no inline scripts)', () => {
   const html = readAgentFile('index.html');
   assert.ok(html.includes('Leaflet 1.9.4'), 'must have Leaflet version comment');
-  assert.ok(html.includes('AgentApp.bootstrap()'), 'must call AgentApp.bootstrap()');
+  assert.ok(html.includes('bootstrap.js'), 'must load bootstrap.js (not inline) to comply with script-src self CSP');
+  assert.ok(!html.includes('<script>AgentApp'), 'must NOT have inline script — blocked by script-src self CSP');
+});
+
+test('bootstrap.js calls AgentApp.bootstrap and is self-hosted', () => {
+  const src = readAgentFile('bootstrap.js');
+  assert.ok(src.includes('AgentApp.bootstrap()'), 'bootstrap.js must call AgentApp.bootstrap()');
+  assert.ok(fs.existsSync(path.join(agentPublicRoot, 'bootstrap.js')), 'bootstrap.js must exist as a separate file');
 });
 
 // ─── REQ-002 — app.js: AgentShell namespace y parseHashRoute ─────────────────
