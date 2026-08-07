@@ -1,0 +1,29 @@
+feat(agent-spa): implementar SPA del agente comercial fases A a H
+
+Phase A: Leaflet 1.9.4 vendoreado localmente (147 KB, sin CDN externo).
+CSP ampliado en src/app.js para rutas /agent/ con img-src y connect-src OSM.
+
+Phase B: Shell HTML + AgentShell namespace + hash router + state.js + helpers.js
++ api/agent-api.js. Redirect post-login de agentes a /agent/ en login.js.
+
+Phase C: Clases CSS nuevas para las 6 vistas (Dashboard, Ficha, Visita, Pedido,
+Metas, Mapa) incluyendo .agent-kpi-grid, .agent-button-group, .agent-stepper,
+.agent-success-overlay, .agent-goals-skeleton, .agent-map-marker--{status}.
+
+Phase D: views/dashboard.js - Promise.allSettled, sortStores antes del primer
+render, filtro local sin re-fetch, caption con conteo, toast al actualizar.
+
+Phase E: views/store-detail.js - pre-carga nombre desde state, 404 con mensaje
+especifico de cobertura, accordion Contactos abierto, tel: links, ActionBar sticky.
+
+Phase F: views/visit.js - ButtonGroups tactiles con role=group, saving state
+con pointerEvents+opacity, prepend de visita sin re-fetch, font-size 16px iOS.
+views/order-entry.js - Map<productId,qty>, stepper, SummaryBar en tiempo real,
+SuccessOverlay no cerrable con Escape (ADR-006), payload con discount=0.
+
+Phase G: views/goals.js - reutiliza state sin re-fetch, badge Meta alcanzada
+cuando currentAmount>=targetAmount, progressbar con aria-valuenow.
+views/map.js - L.divIcon por status, L.layerGroup, invalidateSize en setTimeout,
+fitBounds o fallback COSTA_RICA_CENTER, geolocalizacion silenciosa, filtro local.
+
+Phase H: 124/124 tests pasando (30 nuevos + 94 regresion). Sin nuevas fallas.

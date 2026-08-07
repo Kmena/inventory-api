@@ -75,6 +75,24 @@ function isDeprecatedLegacyHtmlPath(pathName) {
 }
 
 function selectContentSecurityPolicy(pathName) {
+  // Rutas de la SPA del agente: permiten tiles de OpenStreetMap.
+  // Este bloque debe evaluarse antes de isDeprecatedLegacyHtmlPath
+  // porque /agent/*.html también coincide con el patron legacy.
+  if (pathName.startsWith('/agent/')) {
+    return buildContentSecurityPolicy([
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https://*.tile.openstreetmap.org",
+      "font-src 'self' data:",
+      "connect-src 'self' https://*.tile.openstreetmap.org",
+    ]);
+  }
+
   if (strictPublicDocumentPaths.has(pathName) || isDeprecatedLegacyHtmlPath(pathName)) {
     return buildContentSecurityPolicy([
       "default-src 'self'",

@@ -45,15 +45,15 @@ function getHomeForSession(session) {
     return ROOT_SHELL_PATH;
   }
 
+  if (isOperationalAgentSession(session)) {
+    return '/agent/';
+  }
+
   if (roleCode === 'sales_supervisor') {
     return POST_LOGIN_TRANSITION_PATH;
   }
 
   if (permissions.includes('warehouse.access')) {
-    return POST_LOGIN_TRANSITION_PATH;
-  }
-
-  if (isOperationalAgentSession(session)) {
     return POST_LOGIN_TRANSITION_PATH;
   }
 
