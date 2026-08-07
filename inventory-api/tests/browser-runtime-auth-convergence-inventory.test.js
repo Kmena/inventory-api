@@ -23,14 +23,17 @@ test('shared browser helpers remain the supported convergence seam for the reduc
   assert.match(migrationSource, /inventorySession\.clearAndRedirectToLogin\(\)/);
 });
 
-test('legacy warehouse and agent runtimes remain retired while the supported root shell coexists with preserved legacy inventory', () => {
+test('legacy warehouse runtime remains retired while agent SPA and root shell coexist under src/public', () => {
   assert.equal(fs.existsSync(path.join(publicRoot, 'root')), true, 'supported root shell should exist under src/public');
   assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'root')), true, 'legacy root inventory should remain preserved for transition work');
 
-  for (const retiredDirectory of ['warehouse', 'agent']) {
-    assert.equal(fs.existsSync(path.join(publicRoot, retiredDirectory)), false, `${retiredDirectory} should not remain under src/public`);
-    assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, retiredDirectory)), true, `${retiredDirectory} should remain preserved for SPA transition work`);
-  }
+  // warehouse sigue retirado de src/public; legacy permanece en legacy-public-runtime
+  assert.equal(fs.existsSync(path.join(publicRoot, 'warehouse')), false, 'warehouse should not remain under src/public');
+  assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'warehouse')), true, 'warehouse should remain preserved for SPA transition work');
+
+  // agent fue implementado como SPA moderna (agent-spa spec); legacy del agente preservado como referencia
+  assert.equal(fs.existsSync(path.join(publicRoot, 'agent')), true, 'agent SPA should exist under src/public after agent-spa implementation');
+  assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'agent')), true, 'legacy agent should remain preserved in legacy-public-runtime for reference');
 
   assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'shared', 'lot-dates.js')), true);
 });
