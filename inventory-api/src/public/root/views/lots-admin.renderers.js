@@ -335,19 +335,17 @@
                   ${warehouseOptions}
                 </select>
               </label>
-              <label>
-                <span>Categoria</span>
-                <select id="lots-entry-category-select">
-                  <option value="">Todas las categorias</option>
-                </select>
+              <label class="field-wide">
+                <span>Buscar producto</span>
+                <input
+                  type="search"
+                  id="lots-entry-product-search"
+                  placeholder="Escriba nombre, codigo o categoria..."
+                  autocomplete="off"
+                  aria-label="Buscar producto por nombre, codigo o categoria"
+                />
               </label>
-              <label id="lots-entry-subcategory-label" hidden>
-                <span>Subcategoria</span>
-                <select id="lots-entry-subcategory-select">
-                  <option value="">Todas las subcategorias</option>
-                </select>
-              </label>
-              <label>
+              <label class="field-wide">
                 <span>Producto *</span>
                 <select name="productId" id="lots-entry-product-select" required>
                   <option value="">Cargando productos...</option>

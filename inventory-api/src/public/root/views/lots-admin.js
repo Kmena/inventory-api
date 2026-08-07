@@ -428,15 +428,10 @@
       }
 
       const productSelect = /** @type {HTMLSelectElement | null} */ (dialog.querySelector('#lots-entry-product-select'));
-      const categorySelect = /** @type {HTMLSelectElement | null} */ (dialog.querySelector('#lots-entry-category-select'));
-      const subcategorySelect = /** @type {HTMLSelectElement | null} */ (dialog.querySelector('#lots-entry-subcategory-select'));
-      const subcategoryLabel = /** @type {HTMLElement | null} */ (dialog.querySelector('#lots-entry-subcategory-label'));
+      const productSearch = /** @type {HTMLInputElement | null} */ (dialog.querySelector('#lots-entry-product-search'));
 
       if (productSelect) {
         try {
-          // Una sola llamada: el índice de categorías se deriva de los productos
-          // para garantizar que los IDs de categoria/subcategoria coincidan exactamente
-          // con los IDs usados en el filtro (evita mismatch entre listCategories y listProducts).
           const productsResponse = await productsApi.listProducts(session);
 
           // Soporta respuesta plana (array) o paginada ({ items, pagination })
@@ -446,48 +441,18 @@
               ? productsResponse.items
               : [];
 
-          // Indice derivado de los propios productos: IDs siempre coinciden con los datos
-          const categoryIndex = lotsHelpers.buildCategoryIndex(allProducts);
-
-          function applyProductFilter() {
-            const selectedCatId = categorySelect ? categorySelect.value : '';
-            const selectedSubId = subcategorySelect ? subcategorySelect.value : '';
-            const filtered = lotsHelpers.filterProductsByCategory(allProducts, selectedCatId, selectedSubId);
+          function applySearchFilter() {
+            const term = productSearch ? productSearch.value : '';
+            const filtered = lotsHelpers.filterProductsBySearch(allProducts, term);
             productSelect.innerHTML = `<option value="">Selecciona un producto</option>${lotsRenderers.renderProductOptions(filtered)}`;
           }
 
-          if (categorySelect) {
-            if (categoryIndex.length > 0) {
-              categorySelect.innerHTML = `<option value="">Todas las categorias</option>${lotsRenderers.renderCategoryOptions(categoryIndex)}`;
-            } else {
-              categorySelect.innerHTML = '<option value="">Sin categorias disponibles</option>';
-            }
-
-            categorySelect.addEventListener('change', () => {
-              const selectedCat = categoryIndex.find((c) => c.id === categorySelect.value);
-              const subcategories = (selectedCat && Array.isArray(selectedCat.subcategories))
-                ? selectedCat.subcategories
-                : [];
-
-              if (subcategorySelect && subcategoryLabel) {
-                if (subcategories.length > 0) {
-                  subcategorySelect.innerHTML = `<option value="">Todas las subcategorias</option>${lotsRenderers.renderSubcategoryOptions(subcategories)}`;
-                  subcategoryLabel.hidden = false;
-                } else {
-                  subcategorySelect.innerHTML = '<option value="">Todas las subcategorias</option>';
-                  subcategoryLabel.hidden = true;
-                }
-              }
-
-              applyProductFilter();
-            });
+          if (productSearch) {
+            productSearch.addEventListener('input', applySearchFilter);
           }
 
-          if (subcategorySelect) {
-            subcategorySelect.addEventListener('change', applyProductFilter);
-          }
-
-          applyProductFilter();
+          // Poblado inicial: muestra todos los productos
+          applySearchFilter();
 
         } catch (err) {
           productSelect.innerHTML = '<option value="">No se pudieron cargar los productos</option>';

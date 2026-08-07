@@ -647,7 +647,7 @@ test('filterProductsByCategory filters by category only', () => {
   assert.ok(result.every((p) => String(p.category.id) === '10'));
 });
 
-test('filterProductsByCategory filters by category AND subcategory', () => {
+test('filterProductsByCategory filters by category AND subcategory (strict match)', () => {
   const rootShell = createHarness();
   const helpers = rootShell.require('views.lotsAdminHelpers');
 
@@ -660,6 +660,85 @@ test('filterProductsByCategory filters by category AND subcategory', () => {
   const result = helpers.filterProductsByCategory(products, '10', '20');
   assert.equal(result.length, 1);
   assert.equal(result[0].id, 1);
+});
+
+test('filterProductsBySearch returns all products when term is empty', () => {
+  const rootShell = createHarness();
+  const helpers = rootShell.require('views.lotsAdminHelpers');
+
+  const products = [
+    { id: 1, name: 'Shampoo X', code: 'SH001', category: { name: 'Producto Terminado' }, subcategory: { name: 'Shampoo' } },
+    { id: 2, name: 'Acondicionador Y', code: 'AC001', category: { name: 'Producto Terminado' }, subcategory: null },
+  ];
+
+  assert.equal(helpers.filterProductsBySearch(products, '').length, 2);
+  assert.equal(helpers.filterProductsBySearch(products, '   ').length, 2);
+  assert.equal(helpers.filterProductsBySearch(products, null).length, 2);
+});
+
+test('filterProductsBySearch matches by product name case-insensitive', () => {
+  const rootShell = createHarness();
+  const helpers = rootShell.require('views.lotsAdminHelpers');
+
+  const products = [
+    { id: 1, name: 'Shampoo X', code: 'SH001', category: { name: 'Producto Terminado' }, subcategory: { name: 'Shampoo' } },
+    { id: 2, name: 'Acondicionador Y', code: 'AC001', category: { name: 'Producto Terminado' }, subcategory: null },
+  ];
+
+  const result = helpers.filterProductsBySearch(products, 'shampoo');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, 1);
+
+  const resultUpper = helpers.filterProductsBySearch(products, 'SHAMPOO');
+  assert.equal(resultUpper.length, 1);
+});
+
+test('filterProductsBySearch matches by product code', () => {
+  const rootShell = createHarness();
+  const helpers = rootShell.require('views.lotsAdminHelpers');
+
+  const products = [
+    { id: 1, name: 'Shampoo X', code: 'SH001', category: { name: 'Producto Terminado' }, subcategory: null },
+    { id: 2, name: 'Acondicionador Y', code: 'AC001', category: { name: 'Producto Terminado' }, subcategory: null },
+  ];
+
+  const result = helpers.filterProductsBySearch(products, 'AC001');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, 2);
+});
+
+test('filterProductsBySearch matches by category or subcategory name', () => {
+  const rootShell = createHarness();
+  const helpers = rootShell.require('views.lotsAdminHelpers');
+
+  const products = [
+    { id: 1, name: 'Producto A', code: null, category: { name: 'Materia Prima' }, subcategory: { name: 'Quimico' } },
+    { id: 2, name: 'Producto B', code: null, category: { name: 'Producto Terminado' }, subcategory: null },
+  ];
+
+  // buscar por categoria
+  const byCat = helpers.filterProductsBySearch(products, 'materia prima');
+  assert.equal(byCat.length, 1);
+  assert.equal(byCat[0].id, 1);
+
+  // buscar por subcategoria
+  const bySub = helpers.filterProductsBySearch(products, 'quimico');
+  assert.equal(bySub.length, 1);
+  assert.equal(bySub[0].id, 1);
+});
+
+test('filterProductsBySearch handles products with null name and code gracefully', () => {
+  const rootShell = createHarness();
+  const helpers = rootShell.require('views.lotsAdminHelpers');
+
+  const products = [
+    { id: 1, name: null, code: null, category: null, subcategory: null },
+    { id: 2, name: 'Shampoo Z', code: 'SZ001', category: { name: 'PT' }, subcategory: null },
+  ];
+
+  const result = helpers.filterProductsBySearch(products, 'shampoo');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].id, 2);
 });
 
 test('renderEntryDialog contains required form fields and reason code options', () => {
@@ -676,6 +755,7 @@ test('renderEntryDialog contains required form fields and reason code options', 
   assert.match(markup, /lots-entry-dialog/);
   assert.match(markup, /lots-entry-form/);
   assert.match(markup, /lots-entry-product-select/);
+  assert.match(markup, /lots-entry-product-search/);
   assert.match(markup, /lots-entry-submit-button/);
   assert.match(markup, /lots-cancel-entry-button/);
   assert.match(markup, /lots-close-entry-button/);
@@ -689,9 +769,10 @@ test('renderEntryDialog contains required form fields and reason code options', 
   assert.match(markup, /PURCHASE/);
   assert.match(markup, /INITIAL_LOAD/);
   assert.match(markup, /MANUAL_ENTRY/);
-  assert.match(markup, /lots-entry-category-select/);
-  assert.match(markup, /lots-entry-subcategory-select/);
-  assert.match(markup, /lots-entry-subcategory-label/);
+  // Los tres selectores de categoria/subcategoria fueron reemplazados por un input de busqueda
+  assert.doesNotMatch(markup, /lots-entry-category-select/);
+  assert.doesNotMatch(markup, /lots-entry-subcategory-select/);
+  assert.doesNotMatch(markup, /lots-entry-subcategory-label/);
 });
 
 test('renderCategoryOptions renders category entries and escapes names', () => {
