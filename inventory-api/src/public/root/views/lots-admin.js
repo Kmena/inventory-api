@@ -434,15 +434,20 @@
 
       if (productSelect) {
         try {
-          // Carga en paralelo: categorias (fuente de verdad del catalogo) y productos (para filtrar).
-          const [productsResponse, categoriesResponse] = await Promise.all([
-            productsApi.listProducts(session),
-            categoriesApi.listCategories(session).catch(() => []),
-          ]);
+          // Una sola llamada: el índice de categorías se deriva de los productos
+          // para garantizar que los IDs de categoria/subcategoria coincidan exactamente
+          // con los IDs usados en el filtro (evita mismatch entre listCategories y listProducts).
+          const productsResponse = await productsApi.listProducts(session);
 
-          const allProducts = Array.isArray(productsResponse) ? productsResponse : [];
-          // categoriesApi retorna [{ id, name, subcategories: [{ id, name }] }]
-          const categoryIndex = Array.isArray(categoriesResponse) ? categoriesResponse : [];
+          // Soporta respuesta plana (array) o paginada ({ items, pagination })
+          const allProducts = Array.isArray(productsResponse)
+            ? productsResponse
+            : Array.isArray(productsResponse?.items)
+              ? productsResponse.items
+              : [];
+
+          // Indice derivado de los propios productos: IDs siempre coinciden con los datos
+          const categoryIndex = lotsHelpers.buildCategoryIndex(allProducts);
 
           function applyProductFilter() {
             const selectedCatId = categorySelect ? categorySelect.value : '';
@@ -451,11 +456,15 @@
             productSelect.innerHTML = `<option value="">Selecciona un producto</option>${lotsRenderers.renderProductOptions(filtered)}`;
           }
 
-          if (categorySelect && categoryIndex.length > 0) {
-            categorySelect.innerHTML = `<option value="">Todas las categorias</option>${lotsRenderers.renderCategoryOptions(categoryIndex)}`;
+          if (categorySelect) {
+            if (categoryIndex.length > 0) {
+              categorySelect.innerHTML = `<option value="">Todas las categorias</option>${lotsRenderers.renderCategoryOptions(categoryIndex)}`;
+            } else {
+              categorySelect.innerHTML = '<option value="">Sin categorias disponibles</option>';
+            }
 
             categorySelect.addEventListener('change', () => {
-              const selectedCat = categoryIndex.find((c) => String(c.id) === categorySelect.value);
+              const selectedCat = categoryIndex.find((c) => c.id === categorySelect.value);
               const subcategories = (selectedCat && Array.isArray(selectedCat.subcategories))
                 ? selectedCat.subcategories
                 : [];
