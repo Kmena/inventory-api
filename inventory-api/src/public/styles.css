@@ -4056,6 +4056,17 @@ dialog.root-dialog::backdrop {
   background: transparent;
 }
 
+/* Estado de geocodificacion inversa */
+.store-dialog-reverse-status {
+  font-size: 0.78rem;
+  color: #475569;
+  margin: 4px 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
 /* Pin del mapa de tienda — divIcon CSS (sin PNG, compatible con Leaflet vendoreado) */
 .store-map-pin {
   background: transparent;

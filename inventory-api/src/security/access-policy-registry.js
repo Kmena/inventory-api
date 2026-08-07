@@ -336,6 +336,12 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'tenant-operational',
     transition: 'documented-legacy-role',
   },
+  'integration.geocoding.reverse': {
+    mode: 'role',
+    roles: ['admin', 'sales'],
+    boundary: 'tenant-operational',
+    transition: 'documented-legacy-role',
+  },
   'integration.taxpayer.lookup': {
     mode: 'role',
     roles: ['admin', 'sales'],

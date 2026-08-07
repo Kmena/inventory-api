@@ -93,7 +93,11 @@
             <div id="store-dialog-geocoding-dropdown" class="store-dialog-geocoding__dropdown" hidden></div>
           </div>
 
+          <p style="font-size:0.78rem;color:#64748b;margin:4px 0 6px;">💡 Hacé clic en el mapa o arrastrá el punto azul para posicionar la tienda.</p>
+
           <div id="store-dialog-map" class="store-dialog-map" aria-label="Mapa de ubicacion de la tienda"></div>
+
+          <p id="store-dialog-reverse-status" class="store-dialog-reverse-status" hidden></p>
 
           <div class="root-form-grid" style="margin-top:8px;">
             <label>
@@ -192,6 +196,58 @@
     let map = null;
     let marker = null;
     let debounceId = null;
+    let reverseDebounceId = null;
+
+    // Refs de los campos de dirección para el autorrelleno
+    const provinceInput  = /** @type {HTMLInputElement} */ (dialog.querySelector('input[name="province"]'));
+    const cantonInput    = /** @type {HTMLInputElement} */ (dialog.querySelector('input[name="canton"]'));
+    const districtInput  = /** @type {HTMLInputElement} */ (dialog.querySelector('input[name="district"]'));
+    const reverseStatus  = /** @type {HTMLElement} */ (dialog.querySelector('#store-dialog-reverse-status'));
+
+    // ── Geocodificación inversa: coordenadas → provincia/cantón/distrito ──────
+    async function fillAddressFromCoords(lat, lng) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return;
+      }
+      if (reverseStatus) {
+        reverseStatus.textContent = 'Buscando dirección…';
+        reverseStatus.hidden = false;
+      }
+      try {
+        const result = await clientsApi.reverseGeocode(session, lat, lng);
+        if (result?.province && provinceInput && !provinceInput.value) {
+          provinceInput.value = result.province;
+        }
+        if (result?.canton && cantonInput && !cantonInput.value) {
+          cantonInput.value = result.canton;
+        }
+        if (result?.district && districtInput && !districtInput.value) {
+          districtInput.value = result.district;
+        }
+        if (reverseStatus) {
+          reverseStatus.textContent = result?.displayName ? `📍 ${result.displayName}` : '';
+          reverseStatus.hidden = !result?.displayName;
+        }
+      } catch (_err) {
+        if (reverseStatus) {
+          reverseStatus.textContent = '';
+          reverseStatus.hidden = true;
+        }
+      }
+    }
+
+    // Mueve el marcador a las coordenadas dadas, actualiza inputs y lanza geocodificación inversa
+    function placeMarkerAt(lat, lng) {
+      latInput.value = lat.toFixed(6);
+      lngInput.value = lng.toFixed(6);
+      if (marker) {
+        marker.setLatLng([lat, lng]);
+        map.panTo([lat, lng]);
+      }
+      // Debounce para no lanzar una petición por cada pequeño movimiento de drag
+      clearTimeout(reverseDebounceId);
+      reverseDebounceId = setTimeout(() => fillAddressFromCoords(lat, lng), 600);
+    }
 
     // ── Inicializar Leaflet DESPUÉS de showModal (ADR-004, RISK-003) ──────────
     setTimeout(() => {
@@ -209,7 +265,6 @@
       map.invalidateSize();
 
       // Marcador draggable — usa divIcon CSS para evitar dependencia de PNGs
-      // (Leaflet vendoreado no incluye las imágenes marker-icon.png)
       const storePin = L.divIcon({
         className: 'store-map-pin',
         html: '<div class="store-map-pin__dot"></div>',
@@ -218,11 +273,15 @@
       });
       marker = L.marker(COSTA_RICA_CENTER, { draggable: true, icon: storePin }).addTo(map);
 
-      // Drag del pin → actualiza solo lat/lng (ADR-005)
+      // Click en el mapa → mueve el marcador a esa posición
+      map.on('click', (e) => {
+        placeMarkerAt(e.latlng.lat, e.latlng.lng);
+      });
+
+      // Drag del pin → actualiza lat/lng y dispara geocodificación inversa (ADR-005)
       marker.on('dragend', () => {
         const latlng = marker.getLatLng();
-        latInput.value = latlng.lat.toFixed(6);
-        lngInput.value = latlng.lng.toFixed(6);
+        placeMarkerAt(latlng.lat, latlng.lng);
       });
 
       // Edicion manual de lat/lng → reposiciona el pin
@@ -235,8 +294,7 @@
         if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
           return;
         }
-        marker.setLatLng([lat, lng]);
-        map.panTo([lat, lng]);
+        placeMarkerAt(lat, lng);
       }
 
       latInput.addEventListener('change', syncMarkerFromInputs);
@@ -245,7 +303,8 @@
 
     // ── Cerrar dialog (FINDING-001 y FINDING-002) ────────────────────────────
     function closeDialog() {
-      clearTimeout(debounceId);      // FINDING-002: cancelar debounce pendiente
+      clearTimeout(debounceId);         // FINDING-002: cancelar debounce de geocoding búsqueda
+      clearTimeout(reverseDebounceId);  // cancelar debounce de geocoding inversa
       if (map) {
         map.remove();                // FINDING-001: destruir mapa antes de remove
         map = null;
