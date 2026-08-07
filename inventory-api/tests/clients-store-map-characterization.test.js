@@ -59,7 +59,7 @@ test('agent SPA index.html uses absolute shared /vendor/leaflet/ path (ADR-001)'
 
 // ─── TASK-P0-002: CSP del root shell con OSM ─────────────────────────────────
 
-test('src/app.js selectContentSecurityPolicy adds OSM domains for /root/ and /root (RISK-001)', () => {
+test('src/app.js selectContentSecurityPolicy adds OSM domains and unsafe-inline style for /root/ (RISK-001)', () => {
   const appJs = readFile(path.join(__dirname, '..', 'src', 'app.js'));
   assert.ok(
     appJs.includes("pathName === '/root/' || pathName === '/root'"),
@@ -67,6 +67,9 @@ test('src/app.js selectContentSecurityPolicy adds OSM domains for /root/ and /ro
   );
   const rootBranchMatch = appJs.match(/pathName === '\/root\/' \|\| pathName === '\/root'[\s\S]*?img-src[^\n]+tile\.openstreetmap\.org/);
   assert.ok(rootBranchMatch, 'root CSP branch must include tile.openstreetmap.org in img-src');
+  // Leaflet requiere unsafe-inline en style-src para aplicar estilos inline a tiles y marcadores
+  const styleUnsafeMatch = appJs.match(/pathName === '\/root\/' \|\| pathName === '\/root'[\s\S]*?style-src[^\n]+'unsafe-inline'/);
+  assert.ok(styleUnsafeMatch, "root CSP branch must include 'unsafe-inline' in style-src — required by Leaflet");
 });
 
 test('GET /root/ response has img-src with OpenStreetMap tiles in CSP header (TASK-P0-008 — mapa carga tiles)', (t, done) => {
