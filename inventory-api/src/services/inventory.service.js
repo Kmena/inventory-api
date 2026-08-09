@@ -28,6 +28,8 @@ const {
   assertOrderHasOperationalWarehouse,
   getActiveAllocations,
 } = require('./inventory-transaction-support.service');
+const billingTriggerService = require('./billing-trigger.service');
+const { calculateInvoiceAmount } = require('./billing-trigger.service');
 
 async function acquireCompanyInventoryAdvisoryLock(tx, companyId) {
   await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, tx);
@@ -361,6 +363,17 @@ async function reserveStockForOrder(orderId, auth, req = null) {
       throw createHttpError(409, 'El pedido no se puede aprobar en su estado actual', 'conflict');
     }
 
+    // Auto-assign sellable warehouse when the order was created without one (e.g. agent orders)
+    if (!order.warehouseId) {
+      const sellableWarehouse = await inventoryRepository.findFirstSellableWarehouse(scope.companyId, tx);
+      if (!sellableWarehouse) {
+        throw createHttpError(409, 'No hay bodegas vendibles activas para asignar al pedido. Cree o active una bodega como fuente vendible.', 'conflict');
+      }
+      order.warehouseId = sellableWarehouse.id;
+      order.warehouse = sellableWarehouse;
+      await inventoryRepository.updateOrderById(order.id, { warehouseId: sellableWarehouse.id }, {}, tx);
+    }
+
     assertOrderHasOperationalWarehouse(order);
 
     const movementGroupId = randomUUID();
@@ -398,6 +411,17 @@ async function reserveStockForOrder(orderId, auth, req = null) {
       }
     }
 
+    // Increment client creditBalance for ALL orders on approval (CASH, TRANSFER, CREDIT).
+    // creditBalance tracks the client's outstanding financial obligation regardless of payment condition.
+    // Uses shared calculateInvoiceAmount for formula consistency (includes Math.max(0) clamp).
+    const orderAmount = calculateInvoiceAmount(order.items);
+    if (order.clientId && orderAmount > 0) {
+      await tx.client.update({
+        where: { id: order.clientId },
+        data: { creditBalance: { increment: orderAmount } },
+      });
+    }
+
     return inventoryRepository.updateOrderById(orderId, {
       approved: true,
       approvedAt: new Date(),
@@ -420,6 +444,11 @@ async function reserveStockForOrder(orderId, auth, req = null) {
       warehouseId: updatedOrder.warehouseId,
     },
   });
+
+  // Best-effort billing trigger on approval — creates invoice and pending payment
+  // so the office can track and verify agent payments from the moment the order is approved.
+  // Idempotent: generateBillingOnDispatch checks for existing invoices before creating.
+  await billingTriggerService.generateBillingOnDispatch(updatedOrder, updatedOrder.client, auth);
 
   return updatedOrder;
 }
@@ -480,6 +509,18 @@ async function releaseStockReservation(orderId, cancel, auth, req = null) {
           note: cancel
             ? `Liberacion por cancelacion de pedido ${order.id.toString()}`
             : `Liberacion de pedido ${order.id.toString()}`,
+        });
+      }
+    }
+
+    // Reverse creditBalance increment when an approved order is cancelled.
+    // Mirrors the increment in reserveStockForOrder; uses the same shared formula.
+    if (cancel && order.clientId) {
+      const orderAmount = calculateInvoiceAmount(order.items);
+      if (orderAmount > 0) {
+        await tx.client.update({
+          where: { id: order.clientId },
+          data: { creditBalance: { decrement: orderAmount } },
         });
       }
     }
@@ -598,6 +639,10 @@ async function dispatchOrder(orderId, auth, req = null) {
       warehouseId: updatedOrder.warehouseId,
     },
   });
+
+  // Best-effort billing trigger — OUTSIDE the dispatch transaction.
+  // Errors are caught and logged inside generateBillingOnDispatch; the dispatch never fails due to billing.
+  await billingTriggerService.generateBillingOnDispatch(updatedOrder, updatedOrder.client, auth);
 
   return updatedOrder;
 }

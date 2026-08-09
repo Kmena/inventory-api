@@ -225,6 +225,8 @@ test('createAgentStoreOrder preserves covered-store scope and coerces sellable o
   assert.deepEqual(captured.orderPayload, {
     clientId: 22n,
     clientStoreId: 101n,
+    paymentCondition: null,
+    transferMetadata: null,
     notes: 'Entrega prioritaria',
     responsible: 'Ana Contacto',
     transport: null,

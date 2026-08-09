@@ -25,7 +25,12 @@ function withRepositoryStubs(stubsByModule, run) {
 }
 
 function createPassThroughTransactionStub() {
-  return async (work) => work({ kind: 'tx' });
+  return async (work) => work({
+    kind: 'tx',
+    // TASK-015: creditBalance update stubs — no-op; existing tests do not assert on balance changes
+    invoice: { findUnique: async () => null },
+    client: { update: async () => null },
+  });
 }
 
 test('listPayments rejects authenticated users without company scope', async () => {

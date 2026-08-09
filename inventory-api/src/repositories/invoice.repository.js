@@ -6,9 +6,12 @@ function transaction(work) {
   return prisma.$transaction(work);
 }
 
-function findCompanyInvoices(companyId, pagination = null, db = prisma) {
+function findCompanyInvoices(companyId, pagination = null, filters = {}, db = prisma) {
   const where = {
     client: { companyId },
+    ...(filters.clientId ? { clientId: BigInt(filters.clientId) } : {}),
+    ...(filters.status?.length ? { status: { in: filters.status } } : {}),
+    ...(filters.orderId ? { orderId: BigInt(filters.orderId) } : {}),
   };
   const orderBy = /** @type {InvoiceOrderByWithRelationInput} */ ({ id: 'asc' });
   const include = { client: true, order: true, payments: true };

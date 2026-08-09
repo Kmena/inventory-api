@@ -74,6 +74,16 @@ router.get('/:clientId/documents/:documentId/download', authorizeAccessPolicy('c
   } catch (error) { return next(error); }
 });
 
+router.get('/:clientId/ledger', authorizeAccessPolicy('billing.ledger.client'), async (req, res, next) => {
+  try {
+    const options = {};
+    if (req.query.take) options.take = Math.max(1, Math.min(500, parseInt(req.query.take, 10) || 100));
+    if (req.query.skip) options.skip = Math.max(0, parseInt(req.query.skip, 10) || 0);
+    if (req.query.since) options.since = req.query.since;
+    return res.json(await clientService.getClientLedger(parseBigIntId(req.params.clientId, 'clientId'), req.auth, options));
+  } catch (error) { return next(error); }
+});
+
 router.get('/:id', authorizeAccessPolicy('client.detail'), async (req, res, next) => {
   try { return res.json(await clientService.getClient(parseBigIntId(req.params.id), req.auth)); } catch (error) { return next(error); }
 });

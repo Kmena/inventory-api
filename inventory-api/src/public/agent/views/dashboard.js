@@ -68,11 +68,15 @@ function renderStoreCard(store) {
     </button>`;
 }
 
-function renderDashboard(dashboardData, stores, goalsData, goalsError) {
+function renderDashboard(dashboardData, stores, goalsData, goalsError, ordersData, ordersError) {
   const helpers = AgentShell.require('helpers');
   const summary = dashboardData?.summary || {};
   const goalsValue = goalsError ? '—' : (Array.isArray(goalsData?.goals) ? goalsData.goals.length : '—');
   const goalsNote = goalsError ? '<span style="font-size:0.75rem;color:#ef4444;">No disponible</span>' : '';
+  const allOrders = ordersData?.orders || [];
+  const pendingOrders = allOrders.filter((o) => o.status === 'DRAFT');
+  const ordersValue = ordersError ? '—' : pendingOrders.length;
+  const ordersNote = ordersError ? '<span style="font-size:0.75rem;color:#ef4444;">No disponible</span>' : '';
 
   const vencidas = stores.filter((s) => s.status === 'VENCIDA').length;
 
@@ -98,6 +102,10 @@ function renderDashboard(dashboardData, stores, goalsData, goalsError) {
         <div class="agent-kpi-tile agent-kpi-tile--link" data-nav="goals" role="button" tabindex="0" style="cursor:pointer;">
           <span class="agent-kpi-tile__value">${helpers.escapeHtml(String(goalsValue))}</span>
           <span class="agent-kpi-tile__label">Metas activas ${goalsNote}</span>
+        </div>
+        <div class="agent-kpi-tile agent-kpi-tile--link" data-nav="orders" role="button" tabindex="0" style="cursor:pointer;${ordersValue > 0 ? 'border-color:#F59E0B;' : ''}">
+          <span class="agent-kpi-tile__value">${helpers.escapeHtml(String(ordersValue))}</span>
+          <span class="agent-kpi-tile__label">Pedidos pendientes ${ordersNote}</span>
         </div>
       </div>
 
@@ -148,10 +156,11 @@ async function render(containerEl, session, _params) {
   containerEl.innerHTML = renderSkeleton();
 
   // Carga paralela con degradación parcial (ADR-007)
-  const [dashResult, storesResult, goalsResult] = await Promise.allSettled([
+  const [dashResult, storesResult, goalsResult, ordersResult] = await Promise.allSettled([
     api.fetchDashboard(session),
     api.fetchStores(session),
     api.fetchGoals(session),
+    api.fetchOrders(session),
   ]);
 
   // Fallo bloqueante si dashboard o stores fallan
@@ -169,13 +178,15 @@ async function render(containerEl, session, _params) {
   const rawStores     = storesResult.value?.stores || storesResult.value || [];
   const goalsData     = goalsResult.value;
   const goalsError    = goalsResult.status === 'rejected';
+  const ordersData    = ordersResult.value;
+  const ordersError   = ordersResult.status === 'rejected';
 
   // Ordenar y persistir en estado (ADR-004, REQ-009)
   const sortedStores = helpers.sortStores(rawStores);
   state.setStores(sortedStores);
   if (!goalsError && goalsData) state.setGoals(goalsData.goals || []);
 
-  containerEl.innerHTML = renderDashboard(dashboardData, sortedStores, goalsData, goalsError);
+  containerEl.innerHTML = renderDashboard(dashboardData, sortedStores, goalsData, goalsError, ordersData, ordersError);
 
   // ─── Event listeners ───────────────────────────────────────────────────────
 
@@ -188,6 +199,7 @@ async function render(containerEl, session, _params) {
   const logoutBtn    = containerEl.querySelector('#dashboard-logout-btn');
   const mapBtn       = containerEl.querySelector('#dashboard-map-btn');
   const goalsTile    = containerEl.querySelector('[data-nav="goals"]');
+  const ordersTile   = containerEl.querySelector('[data-nav="orders"]');
 
   // Caption inicial
   if (captionEl) updateCaption(captionEl, sortedStores);
@@ -230,6 +242,12 @@ async function render(containerEl, session, _params) {
   if (goalsTile) {
     goalsTile.addEventListener('click', () => navigate('goals'));
     goalsTile.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') navigate('goals'); });
+  }
+
+  // Tile Pedidos
+  if (ordersTile) {
+    ordersTile.addEventListener('click', () => navigate('orders'));
+    ordersTile.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') navigate('orders'); });
   }
 
   // Botón Mapa

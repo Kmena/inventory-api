@@ -221,12 +221,30 @@
     },
     {
       "method": "GET",
+      "mountPath": "/api/agent",
+      "expressPath": "/orders",
+      "routeFile": "src/routes/agent.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "agent-orders-read-surface-outside-current-openapi-baseline",
+      "reason": "La vista de pedidos propios del agente sigue soportada en runtime, pero no se incluye todavía dentro del contrato OpenAPI parcial."
+    },
+    {
+      "method": "GET",
       "mountPath": "/api/economic-activities",
       "expressPath": "/",
       "routeFile": "src/routes/economic-activity.routes.js",
       "contractStatus": "intentionally-excluded",
       "reasonCode": "auxiliary-integration-lookup-outside-current-openapi-baseline",
       "reason": "La búsqueda de actividades económicas es una integración auxiliar factual del runtime, pero aún no forma parte de la cobertura OpenAPI parcial aprobada."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/clients",
+      "expressPath": "/:clientId/ledger",
+      "routeFile": "src/routes/client.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "client-billing-ledger-outside-current-openapi-baseline",
+      "reason": "El ledger de facturación por cliente es una superficie nueva del feature client-payment-ledger. Está soportada en runtime y gobernada por pruebas, pero no se incluye todavía en el baseline OpenAPI parcial actual."
     }
   ]
 }

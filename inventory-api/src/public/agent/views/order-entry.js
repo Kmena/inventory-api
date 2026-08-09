@@ -181,6 +181,45 @@ async function render(containerEl, session, params) {
       </div>
 
       <div class="field">
+        <label for="order-payment-condition" style="font-weight:700;">Condición de pago *</label>
+        <select id="order-payment-condition" style="font-size:16px;min-height:48px;width:100%;padding:10px 14px;border:1.5px solid #E2E8F0;border-radius:10px;background:#fff;color:#0F172A;">
+          <option value="CREDIT" selected>Crédito</option>
+          <option value="CASH">Contado</option>
+          <option value="TRANSFER">Transferencia</option>
+        </select>
+        <span class="agent-field-error" id="order-payment-condition-error" hidden>Selecciona la condición de pago.</span>
+      </div>
+
+      <div id="order-transfer-fields" hidden style="background:#EFF6FF;border:1px solid #BFDBFE;border-left:4px solid #3B82F6;border-radius:10px;padding:14px 16px;margin-top:8px;display:grid;gap:12px;">
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#1E40AF;margin-bottom:4px;">DATOS DE LA TRANSFERENCIA</div>
+        <div class="field">
+          <label for="order-transfer-bank" style="font-weight:700;">Banco *</label>
+          <input type="text" id="order-transfer-bank" maxlength="100" placeholder="Ej: BCR, Banco Nacional, BAC…" style="font-size:16px;" />
+          <span class="agent-field-error" id="order-transfer-bank-error" hidden>El banco es requerido.</span>
+        </div>
+        <div class="field">
+          <label for="order-transfer-reference" style="font-weight:700;">Referencia / comprobante *</label>
+          <input type="text" id="order-transfer-reference" maxlength="255" placeholder="Número de referencia o comprobante" style="font-size:16px;" />
+          <span class="agent-field-error" id="order-transfer-reference-error" hidden>La referencia es requerida.</span>
+        </div>
+        <div class="field">
+          <label for="order-transfer-amount" style="font-weight:700;">Monto transferido *</label>
+          <input type="number" id="order-transfer-amount" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" style="font-size:16px;" />
+          <span class="agent-field-error" id="order-transfer-amount-error" hidden>El monto debe ser mayor a cero.</span>
+        </div>
+        <div class="field">
+          <label for="order-transfer-date" style="font-weight:700;">Fecha de transferencia *</label>
+          <input type="date" id="order-transfer-date" style="font-size:16px;" />
+          <span class="agent-field-error" id="order-transfer-date-error" hidden>La fecha de transferencia es requerida.</span>
+        </div>
+      </div>
+
+      <div id="order-credit-warning" hidden class="agent-warning-banner" role="alert" aria-live="polite">
+        <span style="font-size:1.1rem;flex-shrink:0;">⚠️</span>
+        <span>Este cliente tiene saldo pendiente. Está cerca o sobre su límite de crédito. Confirme el crédito solo si tiene autorización.</span>
+      </div>
+
+      <div class="field">
         <label for="order-notes" style="font-weight:700;">Notas (opcional)</label>
         <textarea id="order-notes" rows="3" maxlength="2000" placeholder="Observaciones del pedido…" style="font-size:16px;"></textarea>
       </div>
@@ -266,6 +305,24 @@ async function render(containerEl, session, params) {
   bindSteppers();
   recalcTotal();
 
+  // ─── Payment condition toggle ─────────────────────────────────────────────
+  const paymentConditionSelect = /** @type {HTMLSelectElement|null} */ (containerEl.querySelector('#order-payment-condition'));
+  const transferFieldsBlock    = containerEl.querySelector('#order-transfer-fields');
+  const creditWarningBanner    = containerEl.querySelector('#order-credit-warning');
+
+  function updatePaymentConditionVisibility() {
+    const val = paymentConditionSelect?.value;
+    if (transferFieldsBlock) transferFieldsBlock.hidden = (val !== 'TRANSFER');
+    const showCredit = val === 'CREDIT' && (cachedStore?.isNearLimit === true);
+    if (creditWarningBanner) creditWarningBanner.hidden = !showCredit;
+  }
+
+  if (paymentConditionSelect) {
+    paymentConditionSelect.addEventListener('change', updatePaymentConditionVisibility);
+    // Trigger once on load to apply initial state
+    updatePaymentConditionVisibility();
+  }
+
   // ─── Submit ───────────────────────────────────────────────────────────────
   const confirmBtn = /** @type {HTMLButtonElement|null} */ (containerEl.querySelector('#order-confirm-btn'));
   const errorBanner = containerEl.querySelector('#order-error-banner');
@@ -275,15 +332,95 @@ async function render(containerEl, session, params) {
       const responsibleInput = /** @type {HTMLInputElement|null} */ (containerEl.querySelector('#order-responsible'));
       const notesInput       = /** @type {HTMLTextAreaElement|null} */ (containerEl.querySelector('#order-notes'));
       const responsibleError = containerEl.querySelector('#order-responsible-error');
+      const pcSelect         = /** @type {HTMLSelectElement|null} */ (containerEl.querySelector('#order-payment-condition'));
+      const pcError          = containerEl.querySelector('#order-payment-condition-error');
+      const bankInput        = /** @type {HTMLInputElement|null} */ (containerEl.querySelector('#order-transfer-bank'));
+      const refInput         = /** @type {HTMLInputElement|null} */ (containerEl.querySelector('#order-transfer-reference'));
+      const amountInput      = /** @type {HTMLInputElement|null} */ (containerEl.querySelector('#order-transfer-amount'));
+      const dateInput        = /** @type {HTMLInputElement|null} */ (containerEl.querySelector('#order-transfer-date'));
+      const bankError        = containerEl.querySelector('#order-transfer-bank-error');
+      const refError         = containerEl.querySelector('#order-transfer-reference-error');
+      const amountError      = containerEl.querySelector('#order-transfer-amount-error');
+      const dateError        = containerEl.querySelector('#order-transfer-date-error');
 
-      // Validación inline
+      let hasError = false;
+
+      // Validación: Responsable
       if (!responsibleInput?.value?.trim()) {
         if (responsibleError) responsibleError.hidden = false;
         if (responsibleInput) responsibleInput.classList.add('agent-input-error');
-        return;
+        hasError = true;
+      } else {
+        if (responsibleError) responsibleError.hidden = true;
+        if (responsibleInput) responsibleInput.classList.remove('agent-input-error');
       }
-      if (responsibleError) responsibleError.hidden = true;
-      if (responsibleInput) responsibleInput.classList.remove('agent-input-error');
+
+      // Validación: condición de pago
+      const paymentCondition = pcSelect?.value || '';
+      if (!paymentCondition) {
+        if (pcError) pcError.hidden = false;
+        if (pcSelect) pcSelect.classList.add('agent-input-error');
+        hasError = true;
+      } else {
+        if (pcError) pcError.hidden = true;
+        if (pcSelect) pcSelect.classList.remove('agent-input-error');
+      }
+
+      // Validación: campos de transferencia (solo cuando condición es TRANSFER)
+      let transferMetadata;
+      if (paymentCondition === 'TRANSFER') {
+        const bankVal   = bankInput?.value?.trim() || '';
+        const refVal    = refInput?.value?.trim() || '';
+        const amountVal = parseFloat(amountInput?.value || '0');
+        const dateVal   = dateInput?.value || '';
+
+        if (!bankVal) {
+          if (bankError) bankError.hidden = false;
+          if (bankInput) bankInput.classList.add('agent-input-error');
+          hasError = true;
+        } else {
+          if (bankError) bankError.hidden = true;
+          if (bankInput) bankInput.classList.remove('agent-input-error');
+        }
+
+        if (!refVal) {
+          if (refError) refError.hidden = false;
+          if (refInput) refInput.classList.add('agent-input-error');
+          hasError = true;
+        } else {
+          if (refError) refError.hidden = true;
+          if (refInput) refInput.classList.remove('agent-input-error');
+        }
+
+        if (!amountVal || amountVal <= 0) {
+          if (amountError) amountError.hidden = false;
+          if (amountInput) amountInput.classList.add('agent-input-error');
+          hasError = true;
+        } else {
+          if (amountError) amountError.hidden = true;
+          if (amountInput) amountInput.classList.remove('agent-input-error');
+        }
+
+        if (!dateVal) {
+          if (dateError) dateError.hidden = false;
+          if (dateInput) dateInput.classList.add('agent-input-error');
+          hasError = true;
+        } else {
+          if (dateError) dateError.hidden = true;
+          if (dateInput) dateInput.classList.remove('agent-input-error');
+        }
+
+        if (!hasError) {
+          transferMetadata = {
+            bank:      bankVal,
+            reference: refVal,
+            amount:    amountVal,
+            date:      new Date(dateVal + 'T00:00:00').toISOString(),
+          };
+        }
+      }
+
+      if (hasError) return;
 
       // Construir items del Map con qty > 0
       const items = [];
@@ -302,8 +439,10 @@ async function render(containerEl, session, params) {
       }
 
       const payload = {
-        responsibleName:  responsibleInput?.value?.trim() || undefined,
+        responsible:      responsibleInput?.value?.trim() || undefined,
         notes:            notesInput?.value?.trim() || undefined,
+        paymentCondition: paymentCondition || undefined,
+        transferMetadata: transferMetadata || undefined,
         discountPercent:  0,
         discountAmount:   0,
         totalDiscount:    0,
@@ -322,16 +461,23 @@ async function render(containerEl, session, params) {
         // SuccessOverlay — no responde a Escape ni click fuera (ADR-006)
         const overlayEl = document.createElement('div');
         overlayEl.innerHTML = renderSuccessOverlay(orderNumber, storeId);
-        document.body.appendChild(overlayEl.firstElementChild);
+        const overlayNode = overlayEl.firstElementChild;
+        document.body.appendChild(overlayNode);
 
         // Prevenir Escape
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') e.preventDefault(); }, { once: false });
+        const blockEscape = (e) => { if (e.key === 'Escape') e.preventDefault(); };
+        document.addEventListener('keydown', blockEscape);
+
+        function dismissOverlay() {
+          if (overlayNode && overlayNode.parentNode) overlayNode.parentNode.removeChild(overlayNode);
+          document.removeEventListener('keydown', blockEscape);
+        }
 
         // CTAs del overlay
         const toStoreBtn = document.querySelector('#order-success-to-store');
         const toHomeBtn  = document.querySelector('#order-success-to-home');
-        if (toStoreBtn) toStoreBtn.addEventListener('click', () => navigate('store-detail', { storeId }));
-        if (toHomeBtn)  toHomeBtn.addEventListener('click', () => navigate('dashboard'));
+        if (toStoreBtn) toStoreBtn.addEventListener('click', () => { dismissOverlay(); navigate('store-detail', { storeId }); });
+        if (toHomeBtn)  toHomeBtn.addEventListener('click', () => { dismissOverlay(); navigate('dashboard'); });
 
       } catch (err) {
         // Preservar campos y Map; mostrar banner
@@ -340,6 +486,8 @@ async function render(containerEl, session, params) {
           errorBanner.hidden = false;
         }
         if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Confirmar pedido'; }
+        // Restore payment condition visibility after network error
+        updatePaymentConditionVisibility();
         recalcTotal(); // re-evalúa disabled según qtyMap
       }
     });

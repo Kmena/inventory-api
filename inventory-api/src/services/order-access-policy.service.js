@@ -142,9 +142,11 @@ function toOrderCreateData(payload, authScope) {
     warehouseId,
     ...rest
   } = payload;
+  const isCashOverride = rest.paymentCondition === 'CASH' ? { isCash: true } : {};
   return {
     ...rest,
     ...(warehouseId === null || warehouseId === undefined ? {} : { warehouseId }),
+    ...isCashOverride,
     companyId: authScope.companyId,
     userId: authScope.userId,
     status: 'DRAFT',

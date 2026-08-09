@@ -168,3 +168,66 @@ test('removeClient converts DELETE compatibility flow into soft delete', async (
   assert.deepEqual(receivedSoftDelete, { clientId: 21n, companyId: 31n });
   assert.deepEqual(result, { count: 1 });
 });
+
+// ---------------------------------------------------------------------------
+// TEST-005: getClientLedger tenant isolation
+// ---------------------------------------------------------------------------
+
+test('getClientLedger rejects cross-tenant access (returns 404)', async () => {
+  const COMPANY_A = '101';
+  const COMPANY_B = '202';
+  const CLIENT_ID = '777';
+
+  await withRepositoryStubs(
+    {
+      findClientLedger: async (_clientId, companyId) => {
+        // Simulate DB-level tenant isolation: client 777 belongs to company 101
+        if (Number(companyId) === Number(COMPANY_B)) return null;
+        return {
+          id: 777n, code: 'TEST', name: 'Test Client',
+          creditLimit: 0, creditBalance: 0, paymentType: 'CASH', paymentDays: null,
+          invoices: [],
+        };
+      },
+    },
+    async () => {
+      // Cross-tenant: company B requesting client from company A → 404
+      await assert.rejects(
+        () => clientService.getClientLedger(CLIENT_ID, { companyId: COMPANY_B, sub: '1', permissions: [] }),
+        (error) => {
+          assert.equal(error.statusCode, 404);
+          assert.equal(error.code, 'not_found');
+          return true;
+        },
+      );
+    },
+  );
+});
+
+test('getClientLedger returns ledger for same-tenant access', async () => {
+  const COMPANY_A = '101';
+  const CLIENT_ID = '777';
+
+  const result = await withRepositoryStubs(
+    {
+      findClientLedger: async (_clientId, companyId) => {
+        if (Number(companyId) === Number(COMPANY_A)) {
+          return {
+            id: 777n, code: 'TEST', name: 'Test Client',
+            creditLimit: 1000, creditBalance: 250, paymentType: 'CREDIT', paymentDays: 30,
+            invoices: [
+              { id: 1n, number: 'INV-1', amount: 500, status: 'PENDING', paidAt: null, payments: [] },
+            ],
+          };
+        }
+        return null;
+      },
+    },
+    () => clientService.getClientLedger(CLIENT_ID, { companyId: COMPANY_A, sub: '1', permissions: [] }),
+  );
+
+  assert.ok(result.client);
+  assert.equal(Number(result.client.id), 777);
+  assert.equal(result.client.name, 'Test Client');
+  assert.equal(result.invoices.length, 1);
+});

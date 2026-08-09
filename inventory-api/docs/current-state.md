@@ -171,6 +171,14 @@ Observable current runtime and governance areas:
 - Warehouses and geography
 - Sales routes and agent workspace APIs
 - Orders, invoices, and payments
+- Billing and collections
+  - `billing-trigger.service.js` auto-generates Invoice + Payment on order **approval** and on dispatch (best-effort, outside transaction, idempotent)
+- Billing trigger on approval: creates invoice and PENDING_APPROVAL payment so the office can verify agent cash/transfer payments immediately
+- **Pending API**: invoice number and payment reference should come from an external billing/receipt API (see `docs/pending-billing-receipt-api.md`)
+  - `creditBalance` on Client is mutated at four points: increment on order approval, decrement on payment approval, increment on payment reversal, decrement on order cancellation
+  - `findClientLedger` in `client.repository.js` supports pagination (default 100 invoices, max 500, optional `since` date filter)
+  - `transferMetadata` validated with shared Zod schema at both agent-workspace and admin order-creation boundaries
+  - browser module: `billing-api.js`, `billing-admin.js`, `billing-admin.helpers.js`, `billing-admin.renderers.js`, `clients-admin-store-dialog.js`
 - Embedded browser runtime
   - login and session bootstrap
   - root shell wave-one SPA entrypoint

@@ -44,6 +44,9 @@ function createRouterHarness() {
   browserWindow.RootShell.register('views.productsAdmin', createView('products-view'));
   browserWindow.RootShell.register('views.lotsAdmin', createView('lots-view'));
   browserWindow.RootShell.register('views.movementsAdmin', createView('movements-view'));
+  // TASK-012: billing admin view stub
+  browserWindow.RootShell.register('views.billingAdmin', createView('billing-view'));
+  browserWindow.RootShell.register('views.approvalsAdmin', createView('approvals-view'));
 
   executeRootScript('router.js', context);
 
@@ -157,4 +160,35 @@ test('router renderRoute delegates to the resolved view contract', () => {
   const resolution = router.resolveRoute('#routes', session);
 
   assert.equal(router.renderRoute(resolution, session), 'routes-view:admin:routes');
+});
+
+// TASK-012: billing route registration
+test('router resolves billing route to billing admin view for company admin actors', () => {
+  const router = createRouterHarness();
+  const session = createCompanyAdminSession();
+
+  const resolution = router.resolveRoute('#billing', session);
+  assert.equal(resolution.allowed, true);
+  assert.equal(resolution.routeKey, 'billing');
+  assert.equal(resolution.view.name, 'billing-view');
+
+  // Root users cannot access billing (company-admin scope)
+  const rootResolution = router.resolveRoute('#billing', createRootSession());
+  assert.equal(rootResolution.allowed, false);
+  assert.equal(rootResolution.routeKey, 'home');
+});
+
+test('router resolves approvals route to approvals admin view for company admin actors', () => {
+  const router = createRouterHarness();
+  const session = createCompanyAdminSession();
+
+  const resolution = router.resolveRoute('#approvals', session);
+  assert.equal(resolution.allowed, true);
+  assert.equal(resolution.routeKey, 'approvals');
+  assert.equal(resolution.view.name, 'approvals-view');
+
+  // Root users cannot access approvals (company-admin scope)
+  const rootResolution = router.resolveRoute('#approvals', createRootSession());
+  assert.equal(rootResolution.allowed, false);
+  assert.equal(rootResolution.routeKey, 'home');
 });

@@ -27,7 +27,12 @@ function withRepositoryStubs(stubsByModule, run) {
 }
 
 function createPassThroughTransactionStub() {
-  return async (work) => work({ kind: 'tx' });
+  return async (work) => work({
+    kind: 'tx',
+    // TASK-015: creditBalance update stubs — no-op; existing tests do not assert on balance changes
+    invoice: { findUnique: async () => null },
+    client: { update: async () => null },
+  });
 }
 
 function clonePayment(payment) {
@@ -111,6 +116,16 @@ function createPaymentFinancialTransactionHarness({ paymentStatus, throwOnInvoic
           state: {
             payment: clonePayment(state.payment),
             invoice: cloneInvoice(state.invoice),
+          },
+          // TASK-015: stubs for creditBalance update inside the transaction
+          invoice: {
+            findUnique: async ({ where }) => {
+              const inv = state.invoice.id === where?.id ? state.invoice : null;
+              return inv ? { clientId: inv.clientId } : null;
+            },
+          },
+          client: {
+            update: async () => null, // no-op: balance tracking not asserted in legacy tests
           },
         };
 

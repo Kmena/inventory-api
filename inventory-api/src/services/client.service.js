@@ -4,6 +4,7 @@ const path = require('path');
 const clientRepository = require('../repositories/client.repository');
 const regionRepository = require('../repositories/region.repository');
 const { createHttpError } = require('../lib/errors');
+const { getPendingAmount, getAppliedAmount } = require('./invoice-financial-state');
 const { CLIENT_DOCUMENT_TYPES } = require('../lib/client-document-types');
 const {
   sanitizeClientDocumentFileName,
@@ -313,6 +314,30 @@ async function removeClient(id, auth) {
   return clientRepository.softDeleteCompanyClient(id, companyId);
 }
 
+async function getClientLedger(clientId, auth, options = {}) {
+  assertCompanyUser(auth);
+  const clientData = await clientRepository.findClientLedger(BigInt(clientId), BigInt(auth.companyId), options);
+  if (!clientData) {
+    throw createHttpError(404, 'Cliente no encontrado', 'not_found');
+  }
+  return {
+    client: {
+      id: clientData.id,
+      code: clientData.code,
+      name: clientData.name,
+      creditLimit: clientData.creditLimit,
+      creditBalance: clientData.creditBalance,
+      paymentType: clientData.paymentType,
+      paymentDays: clientData.paymentDays,
+    },
+    invoices: (clientData.invoices || []).map((invoice) => ({
+      ...invoice,
+      pendingAmount: getPendingAmount(invoice),
+      appliedAmount: getAppliedAmount(invoice),
+    })),
+  };
+}
+
 module.exports = {
   listClients,
   listCompanyClients,
@@ -327,4 +352,5 @@ module.exports = {
   getCompanyClientDocumentDownload,
   updateClient,
   removeClient,
+  getClientLedger,
 };

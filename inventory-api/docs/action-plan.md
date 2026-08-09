@@ -162,6 +162,12 @@ Problems still open after `quality-baseline-recovery` `TASK-007`, `repository-ba
 - `/migration.html?mode=post-login-transition` remains a supported 200 response for non-wave-one browser profiles
 - `legacy-public-runtime/` remains outside the served runtime and outside implicit rollback behavior
 - `npm run validate:public-runtime` and the affected browser/runtime tests remain aligned to the implemented public surface
+- the implemented billing view (`#billing`) continues providing three tabs (receivables, pending payments, client ledger) through the `billing-admin.js` RootShell module
+- billing browser scripts (`billing-api.js`, `billing-admin.js`, `billing-admin.helpers.js`, `billing-admin.renderers.js`, `clients-admin-store-dialog.js`) remain registered in the root shell manifest and public runtime validator
+- `paymentCondition` enum (`CASH`, `TRANSFER`, `CREDIT`) remains active on orders and validated at both agent-workspace and admin boundaries
+- `creditBalance` mutation contract: increment on order approval, decrement on payment approval, increment on payment reversal, decrement on order cancellation — all four points use the shared `calculateInvoiceAmount` formula
+- `billing-trigger.service.js` continues executing outside the dispatch Prisma transaction (best-effort, never throws)
+- `findClientLedger` defaults to 100 invoices ordered by `issuedAt desc` with optional pagination (`take`, `skip`, `since`)
 
 ## 8. Defects to correct
 ### Medium

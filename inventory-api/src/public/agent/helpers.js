@@ -19,6 +19,14 @@ const STATUS_BADGE_STYLES = {
   AL_DIA:           { bg: '#E2E8F0', color: '#374151', label: 'Al día'       },
 };
 
+const ORDER_STATUS_BADGE_STYLES = {
+  DRAFT:         { bg: '#FEF3C7', color: '#92400E', label: 'Pendiente de aprobación' },
+  APPROVED:      { bg: '#D1FAE5', color: '#065F46', label: 'Aprobado'                },
+  IN_PRODUCTION: { bg: '#DBEAFE', color: '#1E40AF', label: 'En producción'           },
+  DELIVERED:     { bg: '#E2E8F0', color: '#374151', label: 'Entregado'               },
+  CANCELLED:     { bg: '#FEE2E2', color: '#991B1B', label: 'Rechazado'               },
+};
+
 // ─── Funciones puras ─────────────────────────────────────────────────────────
 
 /**
@@ -98,6 +106,11 @@ function buildStatusBadge(status) {
   return `<span class="badge" style="background:${style.bg};color:${style.color};padding:2px 10px;border-radius:999px;font-size:0.78rem;font-weight:700;white-space:nowrap;">${escapeHtml(style.label)}</span>`;
 }
 
+function buildOrderStatusBadge(status) {
+  const style = ORDER_STATUS_BADGE_STYLES[status] || { bg: '#E2E8F0', color: '#374151', label: status || '—' };
+  return `<span class="badge" style="background:${style.bg};color:${style.color};padding:2px 10px;border-radius:999px;font-size:0.78rem;font-weight:700;white-space:nowrap;">${escapeHtml(style.label)}</span>`;
+}
+
 /**
  * Inserta un toast en containerEl y lo elimina tras durationMs ms.
  * @param {string} message
@@ -125,6 +138,7 @@ AgentShell.register('helpers', {
   escapeHtml,
   formatDate,
   buildStatusBadge,
+  buildOrderStatusBadge,
   showToast,
 });
 

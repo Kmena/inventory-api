@@ -65,6 +65,14 @@ async function postVisit(session, payload) {
 }
 
 /**
+ * GET /api/agent/orders — pedidos del agente.
+ * @param {any} session
+ */
+async function fetchOrders(session) {
+  return inventoryAuth.fetchJson(session, `${BASE}/orders`, { credentials: 'same-origin' });
+}
+
+/**
  * POST /api/agent/stores/:storeId/orders
  * @param {any} session
  * @param {string|number} storeId
@@ -85,6 +93,7 @@ AgentShell.register('api.agentApi', {
   fetchGoals,
   fetchStoreDetail,
   fetchOrderContext,
+  fetchOrders,
   postVisit,
   postOrder,
 });

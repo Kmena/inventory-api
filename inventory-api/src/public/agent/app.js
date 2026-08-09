@@ -68,6 +68,7 @@ const VIEW_MODULE_KEYS = {
   'store-detail':  'views.storeDetail',
   'visit':         'views.visit',
   'order':         'views.orderEntry',
+  'orders':        'views.orders',
   'goals':         'views.goals',
   'map':           'views.map',
 };

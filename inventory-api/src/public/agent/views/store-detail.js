@@ -85,14 +85,21 @@ function renderVisitHistory(history) {
 function renderPurchaseHistory(history) {
   const h = AgentShell.require('helpers');
   if (!history?.length) return '<p class="muted">Sin historial de compras.</p>';
-  return history.slice(0, 10).map((p) => `
+  return history.slice(0, 10).map((p) => {
+    const status = p.status || '—';
+    const badge = h.buildOrderStatusBadge(status);
+    return `
     <div class="detail-item" style="font-size:0.85rem;">
-      <div style="display:flex;justify-content:space-between;gap:8px;">
-        <strong>${h.escapeHtml(p.orderNumber || p.id || '—')}</strong>
-        <span>${h.escapeHtml(h.formatDate(p.createdAt))}</span>
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+        <strong>#${h.escapeHtml(String(p.orderId || p.orderNumber || p.id || '—'))}</strong>
+        ${badge}
       </div>
-      <div>${h.escapeHtml(p.status || '—')} · ${h.currency(p.total || 0)}</div>
-    </div>`).join('');
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:4px;">
+        <span>${h.escapeHtml(h.formatDate(p.createdAt))}</span>
+        <span style="font-weight:700;">${h.currency(p.total || 0)}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderSellableProducts(products) {

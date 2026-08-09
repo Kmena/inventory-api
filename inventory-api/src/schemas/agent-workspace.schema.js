@@ -27,6 +27,21 @@ const createAgentOrderSchema = z.object({
   notes: z.string().trim().max(2000).optional().nullable(),
   responsible: z.string().trim().max(255).optional().nullable(),
   items: z.array(createAgentOrderItemSchema).min(1).max(100),
+  paymentCondition: z.enum(['CASH', 'TRANSFER', 'CREDIT']).optional(),
+  transferMetadata: z.object({
+    bank: z.string().trim().min(1).max(100),
+    reference: z.string().trim().min(1).max(255),
+    amount: z.number().positive(),
+    date: z.string().datetime(),
+  }).optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.paymentCondition === 'TRANSFER' && !data.transferMetadata) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['transferMetadata'],
+      message: 'Los datos de la transferencia son obligatorios cuando la condición de pago es TRANSFER',
+    });
+  }
 });
 
 module.exports = {

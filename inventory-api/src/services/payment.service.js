@@ -66,9 +66,10 @@ function resolvePaymentReadScope(auth) {
 }
 
 
-async function listPayments(auth, pagination = null) {
+async function listPayments(auth, pagination = null, extraFilters = {}) {
   const companyId = assertCompanyScope(auth);
-  const payments = await paymentRepository.findCompanyPayments(companyId, pagination, resolvePaymentReadScope(auth));
+  const scopeOptions = { ...resolvePaymentReadScope(auth), ...extraFilters };
+  const payments = await paymentRepository.findCompanyPayments(companyId, pagination, scopeOptions);
   if (!pagination) {
     return serializePaymentList(payments);
   }
@@ -297,6 +298,18 @@ async function approvePayment(id, payload, auth, req = null) {
       throw createHttpError(409, 'El pago no pudo aprobarse', 'conflict');
     }
 
+    // TASK-015: Decrement client creditBalance when payment is approved.
+    const approvedInvoice = await tx.invoice.findUnique({
+      where: { id: transactionalPayment.invoiceId },
+      select: { clientId: true },
+    });
+    if (approvedInvoice?.clientId) {
+      await tx.client.update({
+        where: { id: approvedInvoice.clientId },
+        data: { creditBalance: { decrement: transactionalPayment.amount } },
+      });
+    }
+
     const synchronizedInvoiceResult = await synchronizeInvoiceFinancialState(transactionalPayment.invoiceId, companyId, tx);
 
     return {
@@ -389,6 +402,19 @@ async function reversePayment(id, auth, reason, req = null) {
     }
 
     const reversedPaymentResult = await paymentRepository.findCompanyPaymentById(id, companyId, {}, tx);
+
+    // TASK-015: Increment client creditBalance when an approved payment is reversed.
+    const reversedInvoice = await tx.invoice.findUnique({
+      where: { id: transactionalPayment.invoiceId },
+      select: { clientId: true },
+    });
+    if (reversedInvoice?.clientId) {
+      await tx.client.update({
+        where: { id: reversedInvoice.clientId },
+        data: { creditBalance: { increment: transactionalPayment.amount } },
+      });
+    }
+
     const synchronizedInvoiceResult = await synchronizeInvoiceFinancialState(transactionalPayment.invoiceId, companyId, tx);
 
     return {

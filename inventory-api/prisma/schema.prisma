@@ -95,6 +95,12 @@ enum LotQaStatus {
   FAILED
 }
 
+enum PaymentConditionType {
+  CASH
+  TRANSFER
+  CREDIT
+}
+
 model Role {
   id              BigInt           @id @default(autoincrement())
   code            String           @unique
@@ -934,9 +940,11 @@ model Order {
   responsible   String?
   approved      Boolean      @default(false)
   approvedAt    DateTime?    @map("approved_at")
-  isCash        Boolean      @default(false) @map("is_cash")
-  downPayment   Decimal      @default(0) @db.Decimal(14, 2) @map("down_payment")
-  total         Decimal      @default(0) @db.Decimal(14, 2)
+  isCash            Boolean              @default(false) @map("is_cash")
+  downPayment       Decimal              @default(0) @db.Decimal(14, 2) @map("down_payment")
+  paymentCondition  PaymentConditionType? @map("payment_condition")
+  transferMetadata  Json?                 @map("transfer_metadata")
+  total             Decimal              @default(0) @db.Decimal(14, 2)
   otherCosts    Decimal      @default(0) @db.Decimal(14, 2) @map("other_costs")
   transport     String?
   status        OrderStatus  @default(DRAFT)
@@ -955,6 +963,7 @@ model Order {
 
   @@index([warehouseId])
   @@index([clientStoreId])
+  @@index([paymentCondition])
   @@map("orders")
 }
 

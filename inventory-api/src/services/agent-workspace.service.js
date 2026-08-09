@@ -317,6 +317,8 @@ async function createAgentStoreOrder(storeId, payload, auth) {
   return orderService.createOrder({
     clientId: store.clientId,
     clientStoreId: store.id,
+    paymentCondition: payload.paymentCondition || null,
+    transferMetadata: payload.transferMetadata || null,
     notes: payload.notes?.trim() || null,
     responsible: payload.responsible?.trim() || null,
     transport: null,
@@ -331,6 +333,24 @@ async function createAgentStoreOrder(storeId, payload, auth) {
   }, auth);
 }
 
+async function listAgentOrders(auth) {
+  const context = await getAgentContext(auth);
+  const orders = await agentWorkspaceRepository.findAgentOrders(context.companyId, context.userId);
+  return {
+    orders: orders.map((order) => ({
+      id: order.id,
+      orderNumber: order.id,
+      status: order.status,
+      total: Number(order.total || 0),
+      createdAt: order.createdAt,
+      paymentCondition: order.paymentCondition,
+      storeName: order.clientStore?.name || null,
+      clientName: order.client?.name || null,
+      itemCount: (order.items || []).length,
+    })),
+  };
+}
+
 module.exports = {
   listAgentDashboard,
   listAgentStores,
@@ -342,6 +362,7 @@ module.exports = {
   getAgentStoreSellableProducts,
   getAgentStoreOrderContext,
   createAgentStoreOrder,
+  listAgentOrders,
 };
 
 
