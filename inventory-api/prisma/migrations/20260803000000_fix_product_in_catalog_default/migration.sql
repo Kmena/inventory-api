@@ -9,7 +9,7 @@
 -- tengan in_catalog = false (productos afectados por el bug).
 -- Productos inactivos se dejan sin cambios (ya no son visibles de todos modos).
 
-UPDATE "product"
+UPDATE "products"
 SET    "in_catalog" = true
 WHERE  "is_active"  = true
 AND    "in_catalog" = false;
