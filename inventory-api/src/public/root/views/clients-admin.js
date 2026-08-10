@@ -313,10 +313,10 @@
                 storesList.insertAdjacentHTML('afterbegin', newCard);
               }
             }
-            detailMessage.innerHTML = rootShellUi.renderInlineMessage('Tienda creada correctamente.');
             setShellStatus('Tienda creada correctamente.');
             // Recargar el detalle completo para sincronizar el estado
             await loadClientDetail(selectedClientId);
+            detailMessage.innerHTML = rootShellUi.renderInlineMessage('Tienda creada correctamente.');
           },
         );
         return;
