@@ -31,6 +31,11 @@ function buildCompanyPaymentWhere(companyId, options = {}) {
       client: { companyId },
     },
     ...(options.submittedByUserId ? { submittedByUserId: options.submittedByUserId } : {}),
+    ...(options.status ? {
+      status: Array.isArray(options.status)
+        ? { in: options.status }
+        : options.status,
+    } : {}),
   };
 }
 

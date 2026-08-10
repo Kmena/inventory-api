@@ -605,10 +605,12 @@ test('commercial views E2E: clients supports local filtering and update plus sto
   await page.getByRole('button', { name: 'Cancelar' }).click();
   await page.waitForFunction(() => globalThis.document.getElementById('clients-create-dialog')?.open === false);
 
-  await page.locator('#clients-detail-region #clients-store-form input[name="name"]').fill('Sucursal Norte 2');
-  await page.locator('#clients-detail-region #clients-store-form select[name="subregionId"]').selectOption('102');
-  await page.locator('#clients-detail-region #clients-store-form input[name="code"]').fill('SN-02');
-  await page.getByRole('button', { name: 'Agregar tienda' }).click();
+  await page.getByRole('button', { name: '+ Agregar tienda' }).click();
+  await page.waitForFunction(() => globalThis.document.querySelector('#store-dialog-form') !== null);
+  await page.locator('#store-dialog-form input[name="name"]').fill('Sucursal Norte 2');
+  await page.locator('#store-dialog-form select[name="subregionId"]').selectOption('102');
+  await page.locator('#store-dialog-form input[name="code"]').fill('SN-02');
+  await page.getByRole('button', { name: 'Crear tienda' }).click();
   await page.waitForFunction(() => globalThis.document.getElementById('clients-detail-message')?.textContent?.includes('Tienda creada correctamente.'));
   await page.waitForFunction(() => globalThis.document.getElementById('clients-detail-region')?.textContent?.includes('Sucursal Norte 2'));
   assert.equal(state.counters.createStore, 1);

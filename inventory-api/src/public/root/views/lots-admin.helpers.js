@@ -473,7 +473,7 @@
   }
 
   /**
-   * Filters a product array by category and optional subcategory.
+   * Filters a product array by category and optional subcategory (strict match).
    * Returns all products when categoryId is empty.
    * @param {Array<any>} products
    * @param {string} categoryId
@@ -486,6 +486,27 @@
       if (String(p?.category?.id || '') !== categoryId) return false;
       if (subcategoryId && String(p?.subcategory?.id || '') !== subcategoryId) return false;
       return true;
+    });
+  }
+
+  /**
+   * Filters a product array by a free-text search term.
+   * Matches against product name, code, category name and subcategory name.
+   * Returns all products when the search term is empty.
+   * @param {Array<any>} products
+   * @param {string} searchTerm
+   * @returns {Array<any>}
+   */
+  function filterProductsBySearch(products, searchTerm) {
+    const term = String(searchTerm || '').trim().toLowerCase();
+    if (!term) return products || [];
+    return (products || []).filter((p) => {
+      const name = String(p?.name || '').toLowerCase();
+      const code = String(p?.code || '').toLowerCase();
+      const categoryName = String(p?.category?.name || '').toLowerCase();
+      const subcategoryName = String(p?.subcategory?.name || '').toLowerCase();
+      return name.includes(term) || code.includes(term)
+        || categoryName.includes(term) || subcategoryName.includes(term);
     });
   }
 
@@ -555,6 +576,7 @@
     assessLotDataGate,
     buildCategoryIndex,
     filterProductsByCategory,
+    filterProductsBySearch,
     buildLotsKpis,
     buildQaPayload,
     buildStockEntryPayload,

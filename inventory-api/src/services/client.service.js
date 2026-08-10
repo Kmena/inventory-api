@@ -4,6 +4,7 @@ const path = require('path');
 const clientRepository = require('../repositories/client.repository');
 const regionRepository = require('../repositories/region.repository');
 const { createHttpError } = require('../lib/errors');
+const { getPendingAmount, getAppliedAmount } = require('./invoice-financial-state');
 const { CLIENT_DOCUMENT_TYPES } = require('../lib/client-document-types');
 const {
   sanitizeClientDocumentFileName,
@@ -45,17 +46,6 @@ function serializeClient(client) {
   return serializedClient;
 }
 
-async function listClients(auth, pagination = null) {
-  assertCompanyUser(auth);
-  const clients = await clientRepository.findCompanyClients(BigInt(auth.companyId), pagination);
-  if (pagination) {
-    const paginatedClients = /** @type {{ items: Array<any>, totalItems: number }} */ (clients);
-    return buildPaginatedResponse(paginatedClients.items.map(serializeClient), pagination, paginatedClients.totalItems);
-  }
-  const clientRows = /** @type {Array<any>} */ (clients);
-  return clientRows.map(serializeClient);
-}
-
 async function listCompanyClients(auth, pagination = null) {
   assertCompanyUser(auth);
   const clients = await clientRepository.findCompanyClients(BigInt(auth.companyId), pagination);
@@ -66,6 +56,9 @@ async function listCompanyClients(auth, pagination = null) {
   const clientRows = /** @type {Array<any>} */ (clients);
   return clientRows.map(serializeClient);
 }
+
+// listClients is an alias preserved for backward compatibility with the GET / route.
+const listClients = listCompanyClients;
 
 function validateClientDocumentPayload(payload) {
   const safeName = sanitizeClientDocumentFileName(payload.fileName);
@@ -313,6 +306,30 @@ async function removeClient(id, auth) {
   return clientRepository.softDeleteCompanyClient(id, companyId);
 }
 
+async function getClientLedger(clientId, auth, options = {}) {
+  assertCompanyUser(auth);
+  const clientData = await clientRepository.findClientLedger(BigInt(clientId), BigInt(auth.companyId), options);
+  if (!clientData) {
+    throw createHttpError(404, 'Cliente no encontrado', 'not_found');
+  }
+  return {
+    client: {
+      id: clientData.id,
+      code: clientData.code,
+      name: clientData.name,
+      creditLimit: clientData.creditLimit,
+      creditBalance: clientData.creditBalance,
+      paymentType: clientData.paymentType,
+      paymentDays: clientData.paymentDays,
+    },
+    invoices: (clientData.invoices || []).map((invoice) => ({
+      ...invoice,
+      pendingAmount: getPendingAmount(invoice),
+      appliedAmount: getAppliedAmount(invoice),
+    })),
+  };
+}
+
 module.exports = {
   listClients,
   listCompanyClients,
@@ -327,4 +344,5 @@ module.exports = {
   getCompanyClientDocumentDownload,
   updateClient,
   removeClient,
+  getClientLedger,
 };

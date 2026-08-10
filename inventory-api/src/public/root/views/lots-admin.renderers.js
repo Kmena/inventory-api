@@ -310,9 +310,18 @@
    * @returns {string}
    */
   function renderEntryDialog(warehouses) {
-    const warehouseOptions = (Array.isArray(warehouses) ? warehouses : []).map((w) =>
-      `<option value="${escapeHtml(String(w.id))}">${escapeHtml(w.name)}</option>`
-    ).join('');
+    const warehouseList = Array.isArray(warehouses) ? warehouses : [];
+    // Marca las bodegas fuente vendible con un indicador — el agente de ventas
+    // solo puede ver productos con stock en bodegas con isSellableSource=true
+    const warehouseOptions = warehouseList.map((w) => {
+      const suffix = w.isSellableSource ? ' ★ vendible' : '';
+      return `<option value="${escapeHtml(String(w.id))}">${escapeHtml(w.name)}${escapeHtml(suffix)}</option>`;
+    }).join('');
+
+    const hasSellable = warehouseList.some((w) => w.isSellableSource);
+    const sellableHint = hasSellable
+      ? '<p class="muted" style="margin:0;font-size:0.82rem;">Las bodegas marcadas con <strong>★ vendible</strong> son visibles para el agente de ventas al crear pedidos.</p>'
+      : '<p class="muted" style="margin:0;font-size:0.82rem;color:#d97706;">⚠ Ninguna bodega es fuente vendible. Los agentes no podrán ver este stock. Active <strong>Fuente vendible</strong> en al menos una bodega.</p>';
 
     return `
       <dialog id="lots-entry-dialog" class="root-dialog" aria-labelledby="lots-entry-dialog-title">
@@ -335,19 +344,18 @@
                   ${warehouseOptions}
                 </select>
               </label>
-              <label>
-                <span>Categoria</span>
-                <select id="lots-entry-category-select">
-                  <option value="">Todas las categorias</option>
-                </select>
+              <div class="field-wide" style="margin-top:-8px;">${sellableHint}</div>
+              <label class="field-wide">
+                <span>Buscar producto</span>
+                <input
+                  type="search"
+                  id="lots-entry-product-search"
+                  placeholder="Escriba nombre, codigo o categoria..."
+                  autocomplete="off"
+                  aria-label="Buscar producto por nombre, codigo o categoria"
+                />
               </label>
-              <label id="lots-entry-subcategory-label" hidden>
-                <span>Subcategoria</span>
-                <select id="lots-entry-subcategory-select">
-                  <option value="">Todas las subcategorias</option>
-                </select>
-              </label>
-              <label>
+              <label class="field-wide">
                 <span>Producto *</span>
                 <select name="productId" id="lots-entry-product-select" required>
                   <option value="">Cargando productos...</option>

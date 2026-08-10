@@ -28,4 +28,13 @@ router.get('/search', authorizeAccessPolicy('integration.geocoding.search'), geo
   }
 });
 
+router.get('/reverse', authorizeAccessPolicy('integration.geocoding.reverse'), geocodingLookupThrottle, async (req, res, next) => {
+  try {
+    const result = await geocodingService.reverseGeocode(req.query.lat, req.query.lon);
+    return res.json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 module.exports = router;

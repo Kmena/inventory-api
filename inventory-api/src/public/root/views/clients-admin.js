@@ -5,6 +5,7 @@
   const clientsHelpers = rootShell.require('views.clientsAdminHelpers');
   const clientsRenderers = rootShell.require('views.clientsAdminRenderers');
   const clientsState = rootShell.require('views.clientsAdminState');
+  const clientsAdminStoreDialog = rootShell.require('views.clientsAdminStoreDialog');
 
   function render(session) {
     const companyId = rootShellUi.escapeHtml(session?.user?.companyId || 'sin empresa');
@@ -285,6 +286,42 @@
         return;
       }
 
+      // Botón [+ Agregar tienda] — abre el dialog con mapa Leaflet
+      if (target.id === 'clients-add-store-button') {
+        const btnClientId = target.getAttribute('data-client-id') || String(selectedClientId || '');
+        const btnClientName = target.getAttribute('data-client-name') || '';
+        clientsAdminStoreDialog.open(
+          btnClientId,
+          btnClientName,
+          session,
+          zoneOptions,
+          async (createdStore) => {
+            // Actualizar la lista de tiendas en el detalle sin recargar todo
+            const storesList = detailRegion.querySelector('#clients-stores-list');
+            if (storesList && createdStore) {
+              const ui = rootShellUi;
+              const newCard = `
+                <article class="inline-card">
+                  <strong>${ui.escapeHtml(createdStore.name || 'Tienda')}</strong>
+                  <p class="muted">${ui.escapeHtml(createdStore.code || 'Sin codigo')} · ${ui.escapeHtml(createdStore.subregion?.name || createdStore.subregionName || 'Sin subzona')}</p>
+                  ${createdStore.latitude && createdStore.longitude ? `<p class="muted" style="font-size:0.78rem;">📍 ${ui.escapeHtml(String(createdStore.latitude))}, ${ui.escapeHtml(String(createdStore.longitude))}</p>` : '<p class="muted" style="font-size:0.78rem;">Sin coordenadas</p>'}
+                </article>`;
+              const emptyState = storesList.querySelector('.empty-state');
+              if (emptyState) {
+                storesList.innerHTML = newCard;
+              } else {
+                storesList.insertAdjacentHTML('afterbegin', newCard);
+              }
+            }
+            setShellStatus('Tienda creada correctamente.');
+            // Recargar el detalle completo para sincronizar el estado
+            await loadClientDetail(selectedClientId);
+            detailMessage.innerHTML = rootShellUi.renderInlineMessage('Tienda creada correctamente.');
+          },
+        );
+        return;
+      }
+
       if (target.matches('[data-document-download]')) {
         const client = getSelectedClient();
         if (!client) {
@@ -371,16 +408,6 @@
           await loadClientDetail(clientId);
           detailMessage.innerHTML = rootShellUi.renderInlineMessage('Cliente actualizado correctamente.');
           setShellStatus('Cliente actualizado correctamente.');
-          return;
-        }
-
-        if (form.id === 'clients-store-form') {
-          await clientsApi.createStore(session, clientId, clientsHelpers.buildStorePayload(formData));
-          await loadClients();
-          await loadClientDetail(clientId);
-          detailMessage.innerHTML = rootShellUi.renderInlineMessage('Tienda creada correctamente.');
-          setShellStatus('Tienda creada correctamente.');
-          form.reset();
           return;
         }
 

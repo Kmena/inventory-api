@@ -85,6 +85,14 @@ router.get('/visits', authorizeAccessPolicy('agent.workspace.access'), async (re
   }
 });
 
+router.get('/orders', authorizeAccessPolicy('agent.workspace.access'), async (req, res, next) => {
+  try {
+    return res.json(await agentWorkspaceService.listAgentOrders(req.auth));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/stores/:storeId/orders', authorizeAccessPolicy('agent.workspace.access'), validate(createAgentOrderSchema), async (req, res, next) => {
   try {
     return res.status(201).json(await agentWorkspaceService.createAgentStoreOrder(parseBigIntId(req.params.storeId, 'storeId'), req.body, req.auth));

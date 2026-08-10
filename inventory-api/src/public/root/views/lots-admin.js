@@ -2,7 +2,7 @@
   const rootShell = /** @type {any} */ (globalScope).RootShell;
   const inventoryApi = rootShell.require('inventoryApi');
   const productsApi = rootShell.require('productsApi');
-  const categoriesApi = rootShell.require('categoriesApi');
+  const _categoriesApi = rootShell.require('categoriesApi');
   const warehousesApi = rootShell.require('warehousesApi');
   const rootShellUi = rootShell.require('ui');
   const sessionAdapter = rootShell.require('sessionAdapter');
@@ -428,57 +428,31 @@
       }
 
       const productSelect = /** @type {HTMLSelectElement | null} */ (dialog.querySelector('#lots-entry-product-select'));
-      const categorySelect = /** @type {HTMLSelectElement | null} */ (dialog.querySelector('#lots-entry-category-select'));
-      const subcategorySelect = /** @type {HTMLSelectElement | null} */ (dialog.querySelector('#lots-entry-subcategory-select'));
-      const subcategoryLabel = /** @type {HTMLElement | null} */ (dialog.querySelector('#lots-entry-subcategory-label'));
+      const productSearch = /** @type {HTMLInputElement | null} */ (dialog.querySelector('#lots-entry-product-search'));
 
       if (productSelect) {
         try {
-          // Carga en paralelo: categorias (fuente de verdad del catalogo) y productos (para filtrar).
-          const [productsResponse, categoriesResponse] = await Promise.all([
-            productsApi.listProducts(session),
-            categoriesApi.listCategories(session).catch(() => []),
-          ]);
+          const productsResponse = await productsApi.listProducts(session);
 
-          const allProducts = Array.isArray(productsResponse) ? productsResponse : [];
-          // categoriesApi retorna [{ id, name, subcategories: [{ id, name }] }]
-          const categoryIndex = Array.isArray(categoriesResponse) ? categoriesResponse : [];
+          // Soporta respuesta plana (array) o paginada ({ items, pagination })
+          const allProducts = Array.isArray(productsResponse)
+            ? productsResponse
+            : Array.isArray(productsResponse?.items)
+              ? productsResponse.items
+              : [];
 
-          function applyProductFilter() {
-            const selectedCatId = categorySelect ? categorySelect.value : '';
-            const selectedSubId = subcategorySelect ? subcategorySelect.value : '';
-            const filtered = lotsHelpers.filterProductsByCategory(allProducts, selectedCatId, selectedSubId);
+          function applySearchFilter() {
+            const term = productSearch ? productSearch.value : '';
+            const filtered = lotsHelpers.filterProductsBySearch(allProducts, term);
             productSelect.innerHTML = `<option value="">Selecciona un producto</option>${lotsRenderers.renderProductOptions(filtered)}`;
           }
 
-          if (categorySelect && categoryIndex.length > 0) {
-            categorySelect.innerHTML = `<option value="">Todas las categorias</option>${lotsRenderers.renderCategoryOptions(categoryIndex)}`;
-
-            categorySelect.addEventListener('change', () => {
-              const selectedCat = categoryIndex.find((c) => String(c.id) === categorySelect.value);
-              const subcategories = (selectedCat && Array.isArray(selectedCat.subcategories))
-                ? selectedCat.subcategories
-                : [];
-
-              if (subcategorySelect && subcategoryLabel) {
-                if (subcategories.length > 0) {
-                  subcategorySelect.innerHTML = `<option value="">Todas las subcategorias</option>${lotsRenderers.renderSubcategoryOptions(subcategories)}`;
-                  subcategoryLabel.hidden = false;
-                } else {
-                  subcategorySelect.innerHTML = '<option value="">Todas las subcategorias</option>';
-                  subcategoryLabel.hidden = true;
-                }
-              }
-
-              applyProductFilter();
-            });
+          if (productSearch) {
+            productSearch.addEventListener('input', applySearchFilter);
           }
 
-          if (subcategorySelect) {
-            subcategorySelect.addEventListener('change', applyProductFilter);
-          }
-
-          applyProductFilter();
+          // Poblado inicial: muestra todos los productos
+          applySearchFilter();
 
         } catch (err) {
           productSelect.innerHTML = '<option value="">No se pudieron cargar los productos</option>';

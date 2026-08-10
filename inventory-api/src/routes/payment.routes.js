@@ -20,7 +20,12 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', authorizeAccessPolicy('payment.list'), async (req, res, next) => {
-  try { return res.json(await paymentService.listPayments(req.auth, parsePaginationQuery(req.query))); } catch (error) { return next(error); }
+  try {
+    const extraFilters = {
+      status: req.query.status ? String(req.query.status).split(',').map((s) => s.trim()).filter(Boolean) : undefined,
+    };
+    return res.json(await paymentService.listPayments(req.auth, parsePaginationQuery(req.query), extraFilters));
+  } catch (error) { return next(error); }
 });
 
 router.get('/:id', authorizeAccessPolicy('payment.detail'), async (req, res, next) => {

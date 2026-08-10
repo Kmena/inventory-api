@@ -5,19 +5,34 @@ const vm = require('node:vm');
 const publicRoot = path.join(__dirname, '..', 'src', 'public');
 const legacyRuntimeRoot = path.join(__dirname, '..', 'legacy-public-runtime');
 
-const expectedHtmlFiles = ['index.html', 'migration.html', 'no-access.html', 'root/index.html'];
+const expectedHtmlFiles = ['agent/index.html', 'index.html', 'migration.html', 'no-access.html', 'root/index.html'];
 const expectedJavaScriptFiles = [
+  'agent/api/agent-api.js',
+  'agent/app.js',
+  'agent/bootstrap.js',
+  'agent/helpers.js',
+  'agent/state.js',
+  'agent/vendor/leaflet/leaflet.js',
+  'agent/views/dashboard.js',
+  'agent/views/goals.js',
+  'agent/views/map.js',
+  'agent/views/order-entry.js',
+  'agent/views/orders.js',
+  'agent/views/store-detail.js',
+  'agent/views/visit.js',
   'login.js',
   'migration.js',
   'no-access.js',
   'root/agents-api.js',
   'root/app.js',
+  'root/billing-api.js',
   'root/categories-api.js',
   'root/clients-api.js',
   'root/companies-api.js',
   'root/guards.js',
   'root/inventory-api.js',
   'root/manifest.js',
+  'root/orders-api.js',
   'root/products-api.js',
   'root/registry.js',
   'root/runtime-contract.js',
@@ -28,9 +43,14 @@ const expectedJavaScriptFiles = [
   'root/zones-api.js',
   'root/session-adapter.js',
   'root/ui.js',
+  'root/views/approvals-admin.js',
   'root/views/agents-admin.helpers.js',
   'root/views/agents-admin.renderers.js',
   'root/views/agents-admin.js',
+  'root/views/billing-admin.helpers.js',
+  'root/views/billing-admin.js',
+  'root/views/billing-admin.renderers.js',
+  'root/views/clients-admin-store-dialog.js',
   'root/views/clients-admin.helpers.js',
   'root/views/clients-admin.renderers.js',
   'root/views/clients-admin.state.js',
@@ -61,6 +81,7 @@ const expectedJavaScriptFiles = [
   'root/views/zones-admin.js',
   'shared/auth.js',
   'shared/session.js',
+  'vendor/leaflet/leaflet.js',
 ];
 
 function toPosixPath(value) {
@@ -234,7 +255,9 @@ function validatePublicRuntimeInventory() {
   assertExactSupportedFileSet(htmlFiles, expectedHtmlFiles, 'Public HTML inventory');
   assertExactSupportedFileSet(javascriptFiles, expectedJavaScriptFiles, 'Public JavaScript inventory');
 
-  for (const retiredDirectory of ['warehouse', 'agent']) {
+  // 'warehouse' remains retired from src/public (legacy runtime relocated to legacy-public-runtime).
+  // 'agent' is no longer retired: the agent SPA now lives at src/public/agent/ as an approved supported directory.
+  for (const retiredDirectory of ['warehouse']) {
     if (fs.existsSync(path.join(publicRoot, retiredDirectory))) {
       throw new Error(`Retired public runtime directory is still exposed from src/public: ${retiredDirectory}`);
     }

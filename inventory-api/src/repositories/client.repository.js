@@ -310,6 +310,28 @@ async function findOrCreateLegalEntity(companyId, payload) {
   });
 }
 
+function findClientLedger(clientId, companyId, options = {}, db = prisma) {
+  const { take = 100, skip = 0, since } = options;
+  const invoiceWhere = since ? { issuedAt: { gte: new Date(since) } } : {};
+  return db.client.findFirst({
+    where: { id: clientId, companyId, deletedAt: null },
+    include: {
+      invoices: {
+        where: invoiceWhere,
+        take: Math.min(take, 500),
+        skip,
+        orderBy: /** @type {any} */ ([{ issuedAt: 'desc' }, { id: 'desc' }]),
+        include: {
+          payments: {
+            orderBy: /** @type {any} */ ([{ createdAt: 'desc' }, { id: 'desc' }]),
+          },
+          order: { select: { id: true, status: true } },
+        },
+      },
+    },
+  });
+}
+
 module.exports = {
   findAllClients,
   findCompanyClients,
@@ -329,4 +351,5 @@ module.exports = {
   deleteClientDocument,
   findCompanyClientDocumentById,
   createClientReference,
+  findClientLedger,
 };

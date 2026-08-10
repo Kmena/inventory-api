@@ -20,8 +20,10 @@ services:
       HACIENDA_TAXPAYER_LOOKUP_URL: ${HACIENDA_TAXPAYER_LOOKUP_URL:-https://api.hacienda.go.cr/fe/ae?identificacion={identification}}
       GEOCODING_SEARCH_URL: ${GEOCODING_SEARCH_URL:-https://nominatim.openstreetmap.org/search}
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./src:/app/src
       - ./prisma:/app/prisma
@@ -32,6 +34,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-tracksys}
       POSTGRES_USER: ${POSTGRES_USER:-tracksys}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -39,6 +46,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     ports:
       - "6379:6379"
 

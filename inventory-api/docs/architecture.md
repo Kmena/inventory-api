@@ -69,6 +69,12 @@ Observable current runtime/governance areas:
 - Warehouses and geography
 - Sales routing and agent workspace APIs
 - Orders, invoices, and payments
+- Billing and collections
+  - billing trigger architecture: `billing-trigger.service.js` is called outside the dispatch Prisma transaction (best-effort, never throws)
+  - creditBalance mutation contract with four explicit points: order approval (increment), payment approval (decrement), payment reversal (increment), order cancellation (decrement)
+  - all creditBalance mutations use the shared `calculateInvoiceAmount` formula with `Math.max(0, total)` clamp
+  - ledger endpoint (`GET /api/clients/:clientId/ledger`) with offset-based pagination (default 100, max 500) and optional `since` date filter
+  - billing browser module: `billing-admin.js` (three tabs: receivables, pending payments, client ledger), `billing-admin.helpers.js`, `billing-admin.renderers.js`, `billing-api.js`, `clients-admin-store-dialog.js`
 - Embedded browser runtime
   - login and session bootstrap
   - root shell

@@ -79,6 +79,11 @@
               <label><span>Precio</span><input name="price" type="number" min="0" step="0.01" /></label>
               <label><span>Stock minimo</span><input name="minStock" type="number" min="0" step="0.01" /></label>
               <label><span>Stock maximo</span><input name="maxStock" type="number" min="0" step="0.01" /></label>
+              <label class="products-field-full products-checkbox-label">
+                <input id="products-form-in-catalog" name="inCatalog" type="checkbox" checked />
+                <span>Visible para agentes de venta</span>
+                <span class="products-field-hint">Cuando esta activo, el producto aparece en el catalogo de pedidos del agente.</span>
+              </label>
               <label class="products-field-full"><span>Descripcion</span><textarea name="description" rows="4" maxlength="2000"></textarea></label>
             </div>
           </fieldset>
@@ -367,6 +372,9 @@
         form.elements.price.value = product.price ?? '';
         form.elements.minStock.value = product.minStock ?? '';
         form.elements.maxStock.value = product.maxStock ?? '';
+        if (form.elements.inCatalog) {
+          form.elements.inCatalog.checked = product.inCatalog !== false;
+        }
       }
       formDialog.showModal();
       formNameInput.focus();

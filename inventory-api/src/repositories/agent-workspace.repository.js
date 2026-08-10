@@ -295,6 +295,19 @@ function findSellableWarehouses(companyId) {
   });
 }
 
+function findAgentOrders(companyId, userId, take = 50) {
+  return prisma.order.findMany({
+    where: { companyId, userId },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take,
+    include: {
+      client: true,
+      clientStore: true,
+      items: { include: { product: true } },
+    },
+  });
+}
+
 module.exports = {
   findAgentUser,
   findVisibleStoresForAgent,
@@ -305,6 +318,7 @@ module.exports = {
   findSellableProducts,
   findSellableProductAvailabilityRows,
   findSellableWarehouses,
+  findAgentOrders,
 };
 
 

@@ -133,4 +133,15 @@ test('sensitive root-shell modules keep isolated characterization coverage and e
   assert.match(routesRenderersSource, /function renderSvgMap\(route\)/);
   assert.match(routesRenderersSource, /function renderRouteDetail\(route, zones, agents, selectedGoalsAgentId, goalRows\)/);
   assert.match(routesStateSource, /function getSelectedRoute\(overview, detailByRouteId, selectedRouteId\)/);
+
+  const billingAdminSource = readRootFile(path.join('views', 'billing-admin.js'));
+  const billingHelpersSource = readRootFile(path.join('views', 'billing-admin.helpers.js'));
+  const billingRenderersSource = readRootFile(path.join('views', 'billing-admin.renderers.js'));
+
+  assert.match(billingAdminSource, /rootShell\.require\('billingApi'\)/);
+  assert.match(billingAdminSource, /rootShell\.require\('views\.billingAdminHelpers'\)/);
+  assert.match(billingAdminSource, /rootShell\.require\('views\.billingAdminRenderers'\)/);
+  assert.match(billingAdminSource, /rootShell\.require\('ui'\)/);
+  assert.match(billingHelpersSource, /function escapeHtml\(/);
+  assert.match(billingRenderersSource, /rootShell\.register\('views\.billingAdminRenderers'/);
 });

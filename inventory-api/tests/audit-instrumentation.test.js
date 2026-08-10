@@ -45,7 +45,12 @@ function withStubs(stubsByModule, run) {
 }
 
 function createPassThroughTransactionStub() {
-  return async (work) => work({ kind: 'tx' });
+  return async (work) => work({
+    kind: 'tx',
+    // TASK-015: creditBalance update stubs — no-op; these audit tests do not assert on balance changes
+    invoice: { findUnique: async () => null },
+    client: { update: async () => null },
+  });
 }
 
 function createRequest() {

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventori | Workspace del agente</title>
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="agent-shell">
+  <header id="agent-top-header"></header>
+  <main id="agent-main" class="agent-main"></main>
+  <div id="agent-toast-container" aria-live="polite"></div>
+
+  <script src="/shared/session.js"></script>
+  <script src="/shared/auth.js"></script>
+  <!-- Leaflet 1.9.4 — ruta compartida /vendor/leaflet/ (ADR-001 clients-store-map) -->
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script src="app.js"></script>
+  <script src="state.js"></script>
+  <script src="helpers.js"></script>
+  <script src="api/agent-api.js"></script>
+  <script src="views/dashboard.js"></script>
+  <script src="views/store-detail.js"></script>
+  <script src="views/visit.js"></script>
+  <script src="views/order-entry.js"></script>
+  <script src="views/orders.js"></script>
+  <script src="views/goals.js"></script>
+  <script src="views/map.js"></script>
+  <script src="bootstrap.js"></script>
+</body>
+</html>

@@ -330,7 +330,19 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'tenant-admin-legacy',
     transition: 'documented-legacy-role',
   },
+  'billing.ledger.client': {
+    mode: 'role',
+    roles: ['admin', 'sales'],
+    boundary: 'tenant-operational',
+    transition: 'documented-legacy-role',
+  },
   'integration.geocoding.search': {
+    mode: 'role',
+    roles: ['admin', 'sales'],
+    boundary: 'tenant-operational',
+    transition: 'documented-legacy-role',
+  },
+  'integration.geocoding.reverse': {
     mode: 'role',
     roles: ['admin', 'sales'],
     boundary: 'tenant-operational',

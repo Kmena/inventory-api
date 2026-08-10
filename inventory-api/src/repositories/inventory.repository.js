@@ -355,6 +355,18 @@ function findLotById(id, db = prisma) {
   return db.lot.findUnique({ where: { id } });
 }
 
+function findFirstSellableWarehouse(companyId, db = prisma) {
+  return db.warehouse.findFirst({
+    where: {
+      companyId,
+      isActive: true,
+      isVirtual: false,
+      isSellableSource: true,
+    },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+  });
+}
+
 module.exports = {
   transaction,
   findAllMovements,
@@ -385,6 +397,7 @@ module.exports = {
   updateLotByIdWithWarehouseStocks,
   createLotStatusHistory,
   resolveOpenLotAlerts,
+  findFirstSellableWarehouse,
   findLotForProduct,
   findOrderForCompany,
   updateOrderById,

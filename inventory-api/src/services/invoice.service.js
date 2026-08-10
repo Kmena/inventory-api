@@ -91,9 +91,9 @@ function serializeInconsistency(invoice) {
   };
 }
 
-async function listInvoices(auth, pagination = null) {
+async function listInvoices(auth, pagination = null, filters = {}) {
   const companyId = assertCompanyScope(auth);
-  const invoices = await invoiceRepository.findCompanyInvoices(companyId, pagination);
+  const invoices = await invoiceRepository.findCompanyInvoices(companyId, pagination, filters);
   if (!pagination) {
     return invoices;
   }

@@ -193,7 +193,33 @@
     includeInRootNav: false,
     dependencyTag: 'inventory-admin-views',
   });
-  const approvalsItem = createAdminPendingEntry('approvals', 'Aprobaciones', 'badge-check');
+  // TASK-012: Billing view — client-payment-ledger feature
+  const billingItem = createRouteItem({
+    id: 'billing',
+    label: 'Facturación',
+    routeKey: 'billing',
+    href: '/root/#billing',
+    implemented: true,
+    activeMatchers: ['billing'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'receipt',
+    includeInRootNav: false,
+    dependencyTag: 'client-payment-ledger',
+  });
+  const approvalsItem = createRouteItem({
+    id: 'approvals',
+    label: 'Aprobaciones',
+    routeKey: 'approvals',
+    href: '/root/#approvals',
+    implemented: true,
+    activeMatchers: ['approvals'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'badge-check',
+    includeInRootNav: false,
+    dependencyTag: 'order-approvals',
+  });
   const reportsItem = createAdminPendingEntry('reports', 'Reportes', 'bar-chart-3');
   const usersItem = createAdminPendingEntry('users', 'Usuarios', 'user-cog');
   const settingsItem = createAdminPendingEntry('settings', 'Configuracion', 'settings');
@@ -240,6 +266,7 @@
     clientsItem,
     purchasesItem,
     warehousesItem,
+    billingItem,
     approvalsItem,
     reportsItem,
     usersItem,
@@ -304,6 +331,7 @@
       title: 'Control',
       visibilityRule: guards.isCompanyAdmin,
       entries: [
+        { type: 'item', ...billingItem },
         { type: 'item', ...approvalsItem },
         { type: 'item', ...reportsItem },
       ],

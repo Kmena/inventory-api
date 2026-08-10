@@ -53,6 +53,7 @@ test('products helpers normalize pagination, local filtering and payload shaping
   assert.equal(helpers.hasActiveFilters({ searchTerm: '', categoryId: '' }), false);
   assert.equal(helpers.hasActiveFilters({ searchTerm: 'pt', categoryId: '' }), true);
 
+  // Formulario con checkbox inCatalog marcado
   const payload = helpers.buildProductPayload(new Map([
     ['name', ' Producto demo '],
     ['code', ' PT-99 '],
@@ -63,6 +64,7 @@ test('products helpers normalize pagination, local filtering and payload shaping
     ['price', '1250.50'],
     ['minStock', '5'],
     ['maxStock', '15'],
+    ['inCatalog', 'on'],
   ]));
 
   assert.equal(payload.name, 'Producto demo');
@@ -71,6 +73,14 @@ test('products helpers normalize pagination, local filtering and payload shaping
   assert.equal(payload.price, 1250.5);
   assert.equal(payload.minStock, 5);
   assert.equal(payload.maxStock, 15);
+  assert.equal(payload.inCatalog, true, 'inCatalog debe ser true cuando el checkbox esta marcado');
+
+  // Checkbox desmarcado: FormData omite el campo => get() devuelve null o undefined
+  const payloadUnchecked = helpers.buildProductPayload(new Map([
+    ['name', 'Producto oculto'],
+    ['price', '500'],
+  ]));
+  assert.equal(payloadUnchecked.inCatalog, false, 'inCatalog debe ser false cuando el checkbox no esta en FormData');
 });
 
 test('products state/renderers expose summary, responsive markup and category list', () => {

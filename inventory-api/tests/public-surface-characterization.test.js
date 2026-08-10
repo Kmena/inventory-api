@@ -71,6 +71,11 @@ test('supported public runtime assets now include the minimal root shell while l
     'root/views/agents-admin.helpers.js',
     'root/views/agents-admin.renderers.js',
     'root/views/agents-admin.js',
+    'root/billing-api.js',
+    'root/views/billing-admin.helpers.js',
+    'root/views/billing-admin.renderers.js',
+    'root/views/billing-admin.js',
+    'root/views/clients-admin-store-dialog.js',
     'root/views/clients-admin.helpers.js',
     'root/views/clients-admin.renderers.js',
     'root/views/clients-admin.state.js',
@@ -103,10 +108,14 @@ test('supported public runtime assets now include the minimal root shell while l
 
   assert.equal(fs.existsSync(path.join(publicRoot, 'root')), true, 'root shell should now exist under src/public');
 
-  for (const retiredDirectory of ['warehouse', 'agent']) {
-    assert.equal(fs.existsSync(path.join(publicRoot, retiredDirectory)), false, `${retiredDirectory} should not remain exposed from src/public`);
-    assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, retiredDirectory)), true, `${retiredDirectory} should be relocated for SPA transition reuse`);
-  }
+  // warehouse sigue retirado de src/public; legacy permanece en legacy-public-runtime
+  assert.equal(fs.existsSync(path.join(publicRoot, 'warehouse')), false, 'warehouse should not remain exposed from src/public');
+  assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'warehouse')), true, 'warehouse should be relocated for SPA transition reuse');
+
+  // agent SPA moderna existe en src/public/agent/ (implementada en agent-spa spec)
+  assert.equal(fs.existsSync(path.join(publicRoot, 'agent')), true, 'agent SPA should now exist under src/public/agent/');
+  // el legacy del agente sigue preservado como referencia en legacy-public-runtime
+  assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'agent')), true, 'legacy agent should remain preserved in legacy-public-runtime for reference');
 
   assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'root', 'dashboard.html')), true, 'legacy root inventory should remain preserved for future transition work');
   assert.equal(fs.existsSync(path.join(publicRoot, 'shared', 'lot-dates.js')), false, 'legacy warehouse helper should leave the reduced public runtime');

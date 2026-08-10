@@ -12,7 +12,14 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', authorizeAccessPolicy('invoice.list'), async (req, res, next) => {
-  try { return res.json(await invoiceService.listInvoices(req.auth, parsePaginationQuery(req.query))); } catch (error) { return next(error); }
+  try {
+    const filters = {
+      clientId: req.query.clientId || undefined,
+      status: req.query.status ? String(req.query.status).split(',').map((s) => s.trim()).filter(Boolean) : undefined,
+      orderId: req.query.orderId || undefined,
+    };
+    return res.json(await invoiceService.listInvoices(req.auth, parsePaginationQuery(req.query), filters));
+  } catch (error) { return next(error); }
 });
 
 router.get('/inconsistencies', authorizeAccessPolicy('invoice.inconsistencies'), async (req, res, next) => {

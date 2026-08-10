@@ -1,5 +1,12 @@
 const { z } = require('zod');
 
+const transferMetadataSchema = z.object({
+  bank: z.string().trim().min(1).max(100),
+  reference: z.string().trim().min(1).max(255),
+  amount: z.number().positive(),
+  date: z.string().datetime(),
+});
+
 const orderItemSchema = z.object({
   productId: z.coerce.bigint(),
   quantity: z.number().positive(),
@@ -10,7 +17,7 @@ const orderItemSchema = z.object({
   approved: z.boolean().optional(),
 });
 
-const createOrderSchema = z.object({
+const baseOrderShape = z.object({
   warehouseId: z.coerce.bigint().optional().nullable(),
   companyId: z.coerce.bigint().optional(),
   clientId: z.coerce.bigint().optional().nullable(),
@@ -28,10 +35,21 @@ const createOrderSchema = z.object({
   otherCosts: z.number().min(0).optional(),
   transport: z.string().max(255).optional(),
   status: z.enum(['DRAFT', 'APPROVED', 'IN_PRODUCTION', 'DELIVERED', 'CANCELLED']).optional(),
+  paymentCondition: z.enum(['CASH', 'TRANSFER', 'CREDIT']).optional(),
+  transferMetadata: transferMetadataSchema.optional().nullable(),
   items: z.array(orderItemSchema).min(1),
 });
 
-const updateOrderSchema = createOrderSchema.partial();
+const createOrderSchema = baseOrderShape.superRefine((data, ctx) => {
+  if (data.paymentCondition === 'TRANSFER' && !data.transferMetadata) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['transferMetadata'],
+      message: 'Los datos de la transferencia son obligatorios cuando la condición de pago es TRANSFER',
+    });
+  }
+});
 
-module.exports = { createOrderSchema, updateOrderSchema };
+const updateOrderSchema = baseOrderShape.partial();
 
+module.exports = { createOrderSchema, updateOrderSchema, transferMetadataSchema };

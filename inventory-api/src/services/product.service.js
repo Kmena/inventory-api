@@ -112,6 +112,10 @@ function buildProductWriteData(payload, auth, existingProduct) {
     density: payload.density ?? existingProduct?.density ?? null,
     densityUnit: normalizeOptionalString(payload.densityUnit) ?? existingProduct?.densityUnit ?? null,
     isActive: payload.isActive ?? existingProduct?.isActive ?? true,
+    // inCatalog no se envia desde el formulario admin — sin este default
+    // Prisma usaria el @default(false) de la DB y el producto quedaria
+    // invisible para el agente de ventas
+    inCatalog: payload.inCatalog ?? existingProduct?.inCatalog ?? true,
     lotStrategy: payload.lotStrategy ?? existingProduct?.lotStrategy ?? 'TRACKED',
     kgConversionFactor: payload.kgConversionFactor
       ?? payload.conversionFactor

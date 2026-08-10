@@ -14,6 +14,9 @@
   const productsAdminView = rootShell.require('views.productsAdmin');
   const lotsAdminView = rootShell.require('views.lotsAdmin');
   const movementsAdminView = rootShell.require('views.movementsAdmin');
+  // TASK-012: billing admin view (client-payment-ledger)
+  const billingAdminView = rootShell.require('views.billingAdmin');
+  const approvalsAdminView = rootShell.require('views.approvalsAdmin');
 
   function normalizeHashRoute(hashValue) {
     return String(hashValue || '').replace(/^#/, '').trim();
@@ -86,6 +89,14 @@
 
     if (item.routeKey === 'movements') {
       return movementsAdminView;
+    }
+
+    if (item.routeKey === 'billing') {
+      return billingAdminView;
+    }
+
+    if (item.routeKey === 'approvals') {
+      return approvalsAdminView;
     }
 
     return inProcessView;

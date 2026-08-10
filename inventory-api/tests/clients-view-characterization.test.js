@@ -26,6 +26,8 @@ function createHarness(options = {}) {
   executeRootScript('views/clients-admin.helpers.js', context);
   executeRootScript('views/clients-admin.renderers.js', context);
   executeRootScript('views/clients-admin.state.js', context);
+  // clients-admin-store-dialog must be registered before clients-admin.js (RISK-005)
+  executeRootScript('views/clients-admin-store-dialog.js', context);
   executeRootScript('views/clients-admin.js', context);
   return browserWindow.RootShell;
 }
