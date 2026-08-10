@@ -5,6 +5,30 @@ const invoiceRepository = require('../repositories/invoice.repository');
 const paymentRepository = require('../repositories/payment.repository');
 const { getActorUserId } = require('./approval-baseline.service');
 
+const nodeEnv = process.env.NODE_ENV || 'production';
+
+/**
+ * Structured log helper for billing-trigger events.
+ * Follows the same JSON format used by the request logger.
+ * @param {'info'|'warn'|'error'} level
+ * @param {string} code
+ * @param {bigint|number|string|null|undefined} orderId
+ * @param {string} message
+ * @param {Error} [cause]
+ */
+function logBillingEvent(level, code, orderId, message, cause) {
+  const logFn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.info;
+  if (nodeEnv === 'development') {
+    logFn(`[billing-trigger] ${message}`, orderId != null ? `orderId=${orderId}` : '', cause || '');
+    return;
+  }
+  const payload = { level, environment: nodeEnv, code, orderId: orderId != null ? String(orderId) : null, message };
+  if (cause) {
+    payload.errorMessage = cause.message || String(cause);
+  }
+  logFn(JSON.stringify(payload));
+}
+
 /**
  * Generates a unique invoice number for the given orderId.
  * Primary format: INV-{orderId}. On collision: INV-{orderId}-{timestamp}.
@@ -68,14 +92,14 @@ async function executeBillingLogic(order, client, auth, db) {
 
   // Guard 2: no clientId
   if (!order.clientId) {
-    console.warn('[billing-trigger] Order %s has no clientId, skipping auto-billing', order.id);
+    logBillingEvent('warn', 'billing_trigger_skip_no_client', order.id, 'Order has no clientId, skipping auto-billing');
     return null;
   }
 
   // Guard 3: idempotency — skip if invoice already exists for this order
   const existing = await db.invoice.findFirst({ where: { orderId: order.id } });
   if (existing) {
-    console.info('[billing-trigger] Invoice already exists for order %s, skipping', order.id);
+    logBillingEvent('info', 'billing_trigger_skip_idempotent', order.id, 'Invoice already exists for order, skipping');
     return null;
   }
 
@@ -149,7 +173,7 @@ async function generateBillingOnDispatch(order, client, auth) {
   try {
     return await executeBillingLogic(order, client, auth, prisma);
   } catch (err) {
-    console.error('[billing-trigger] Failed for order %s: %o', order?.id, err);
+    logBillingEvent('error', 'billing_trigger_failed', order?.id, 'Billing trigger failed for order', err);
     return null;
   }
 }

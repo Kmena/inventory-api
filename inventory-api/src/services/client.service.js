@@ -46,17 +46,6 @@ function serializeClient(client) {
   return serializedClient;
 }
 
-async function listClients(auth, pagination = null) {
-  assertCompanyUser(auth);
-  const clients = await clientRepository.findCompanyClients(BigInt(auth.companyId), pagination);
-  if (pagination) {
-    const paginatedClients = /** @type {{ items: Array<any>, totalItems: number }} */ (clients);
-    return buildPaginatedResponse(paginatedClients.items.map(serializeClient), pagination, paginatedClients.totalItems);
-  }
-  const clientRows = /** @type {Array<any>} */ (clients);
-  return clientRows.map(serializeClient);
-}
-
 async function listCompanyClients(auth, pagination = null) {
   assertCompanyUser(auth);
   const clients = await clientRepository.findCompanyClients(BigInt(auth.companyId), pagination);
@@ -67,6 +56,9 @@ async function listCompanyClients(auth, pagination = null) {
   const clientRows = /** @type {Array<any>} */ (clients);
   return clientRows.map(serializeClient);
 }
+
+// listClients is an alias preserved for backward compatibility with the GET / route.
+const listClients = listCompanyClients;
 
 function validateClientDocumentPayload(payload) {
   const safeName = sanitizeClientDocumentFileName(payload.fileName);
