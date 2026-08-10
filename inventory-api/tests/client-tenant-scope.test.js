@@ -174,7 +174,7 @@ test('removeClient converts DELETE compatibility flow into soft delete', async (
 // ---------------------------------------------------------------------------
 
 test('getClientLedger rejects cross-tenant access (returns 404)', async () => {
-  const COMPANY_A = '101';
+  const _COMPANY_A = '101';
   const COMPANY_B = '202';
   const CLIENT_ID = '777';
 

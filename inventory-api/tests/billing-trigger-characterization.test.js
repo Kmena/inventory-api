@@ -153,7 +153,7 @@ test('executeBillingLogic returns null when invoice already exists for order (id
 
 test('executeBillingLogic creates Invoice and CASH Payment with PENDING_APPROVAL status', async () => {
   const captured = { invoiceArgs: null, paymentArgs: null };
-  const db = makeFakeDb({
+  const _db = makeFakeDb({
     invoice: {
       findFirst: async () => null,
       create: async (args) => {

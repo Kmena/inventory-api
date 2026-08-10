@@ -55,8 +55,8 @@ function renderSkeleton() {
 }
 
 function renderGoalsPage(goals) {
-  const h = AgentShell.require('helpers');
-  const navigate = AgentShell.require('navigate');
+  const _h = AgentShell.require('helpers');
+  const _navigate = AgentShell.require('navigate');
 
   return `
     <div class="agent-page">

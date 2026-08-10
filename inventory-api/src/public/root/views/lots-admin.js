@@ -2,7 +2,7 @@
   const rootShell = /** @type {any} */ (globalScope).RootShell;
   const inventoryApi = rootShell.require('inventoryApi');
   const productsApi = rootShell.require('productsApi');
-  const categoriesApi = rootShell.require('categoriesApi');
+  const _categoriesApi = rootShell.require('categoriesApi');
   const warehousesApi = rootShell.require('warehousesApi');
   const rootShellUi = rootShell.require('ui');
   const sessionAdapter = rootShell.require('sessionAdapter');

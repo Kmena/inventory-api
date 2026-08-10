@@ -52,6 +52,7 @@ module.exports = [
       'back_end/**',
       'front_end/**',
       'prisma/migrations/**',
+      'src/public/**/vendor/**',
       '*.log',
     ],
   },

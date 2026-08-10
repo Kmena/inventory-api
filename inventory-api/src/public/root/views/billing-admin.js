@@ -140,7 +140,7 @@
 
   async function mount(containerEl, session) {
     // ── Tab switching ──
-    let activeTab = 'receivables';
+    let _activeTab = 'receivables';
     const tabLoadedFlags = { receivables: false, pending: false, history: false };
 
     function showTab(tabName) {
@@ -151,7 +151,7 @@
         if (btn) btn.classList.toggle('active', isActive);
         if (panel) panel.classList.toggle('hidden', !isActive);
       });
-      activeTab = tabName;
+      _activeTab = tabName;
     }
 
     containerEl.querySelectorAll('.tab-button[data-tab]').forEach((btn) => {
@@ -386,7 +386,7 @@
     await loadReceivables();
   }
 
-  function render(session) {
+  function render(_session) {
     return renderShell();
   }
 

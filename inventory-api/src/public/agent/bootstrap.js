@@ -1,1 +1,2 @@
+/* global AgentApp */
 AgentApp.bootstrap();

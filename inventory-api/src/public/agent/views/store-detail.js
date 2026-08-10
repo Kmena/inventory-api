@@ -25,7 +25,7 @@ function renderSkeleton(storeName) {
     </div>`;
 }
 
-function renderError404(storeId) {
+function renderError404(_storeId) {
   return `
     <div class="agent-page">
       <div class="agent-error-banner">
