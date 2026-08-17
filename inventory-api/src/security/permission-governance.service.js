@@ -31,6 +31,14 @@ function listPlatformScopedPermissionCodes(permissionCodes = []) {
   return [...new Set(permissionCodes)].filter((permissionCode) => getPermissionMetadata(permissionCode)?.scope === 'platform');
 }
 
+function permissionRequiresJustification(permissionCode) {
+  return /** @type {{ requiresJustification?: boolean } | null} */ (getPermissionMetadata(permissionCode))?.requiresJustification === true;
+}
+
+function listJustificationRequiredPermissionCodes(permissionCodes = []) {
+  return [...new Set(permissionCodes)].filter((permissionCode) => permissionRequiresJustification(permissionCode));
+}
+
 function evaluateGovernanceOperation(operation, context = {}) {
   if (operation === 'company.create') {
     if (isGlobalRootActor(context.auth)) {
@@ -55,7 +63,7 @@ function evaluateGovernanceOperation(operation, context = {}) {
     };
   }
 
-  if (operation === 'role.company.create') {
+  if (operation === 'role.company.create' || operation === 'role.company.update') {
     const platformScopedPermissionCodes = listPlatformScopedPermissionCodes(context.permissionCodes);
     if (platformScopedPermissionCodes.length > 0) {
       return {
@@ -104,5 +112,7 @@ module.exports = {
   getGovernedOperation,
   getPermissionMetadata,
   listPlatformScopedPermissionCodes,
+  permissionRequiresJustification,
+  listJustificationRequiredPermissionCodes,
   evaluateGovernanceOperation,
 };

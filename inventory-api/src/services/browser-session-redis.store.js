@@ -55,6 +55,29 @@ function parseRedisResponse(buffer, offset = 0) {
     };
   }
 
+  if (prefix === '*') {
+    const itemCount = Number(line);
+    if (itemCount === -1) {
+      return { value: null, nextOffset };
+    }
+
+    let arrayOffset = nextOffset;
+    const values = [];
+    for (let index = 0; index < itemCount; index += 1) {
+      const parsedItem = parseRedisResponse(buffer, arrayOffset);
+      if (!parsedItem) {
+        return null;
+      }
+      values.push(parsedItem.value);
+      arrayOffset = parsedItem.nextOffset;
+    }
+
+    return {
+      value: values,
+      nextOffset: arrayOffset,
+    };
+  }
+
   if (prefix === '-') {
     const error = new Error(line);
     Object.assign(error, { code: 'redis_error' });
@@ -87,10 +110,15 @@ class BrowserSessionRedisStore {
     this.database = options.database || 0;
     this.connectTimeoutMs = options.connectTimeoutMs || 2000;
     this.keyPrefix = options.keyPrefix || 'inventory:browser-session:';
+    this.userKeyPrefix = options.userKeyPrefix || `${this.keyPrefix}user:`;
   }
 
   getKey(sessionId) {
     return `${this.keyPrefix}${sessionId}`;
+  }
+
+  getUserSessionsKey(userId) {
+    return `${this.userKeyPrefix}${userId}`;
   }
 
   async sendCommand(parts) {
@@ -190,6 +218,7 @@ class BrowserSessionRedisStore {
 
   async create(session) {
     const ttlSeconds = Math.max(1, Math.ceil((session.expiresAt - Date.now()) / 1000));
+    await this.sendCommand(['SADD', this.getUserSessionsKey(session.userId), session.sessionId]);
     await this.sendCommand([
       'SET',
       this.getKey(session.sessionId),
@@ -235,8 +264,47 @@ class BrowserSessionRedisStore {
       return false;
     }
 
+    const serializedSession = await this.sendCommand(['GET', this.getKey(sessionId)]);
+    if (!serializedSession) {
+      return false;
+    }
+
+    const parsedSession = JSON.parse(serializedSession);
     const deletedCount = await this.sendCommand(['DEL', this.getKey(sessionId)]);
+    await this.sendCommand(['SREM', this.getUserSessionsKey(parsedSession.userId), sessionId]);
     return Number(deletedCount) > 0;
+  }
+
+  async invalidateSessionsForUser(userId) {
+    if (!userId) {
+      return 0;
+    }
+
+    const normalizedUserId = String(userId);
+    const sessionIds = await this.sendCommand(['SMEMBERS', this.getUserSessionsKey(normalizedUserId)]);
+    if (!Array.isArray(sessionIds) || sessionIds.length === 0) {
+      return 0;
+    }
+
+    const deletedCount = await this.sendCommand([
+      'DEL',
+      ...sessionIds.map((sessionId) => this.getKey(sessionId)),
+    ]);
+    await this.sendCommand(['DEL', this.getUserSessionsKey(normalizedUserId)]);
+    return Number(deletedCount) || 0;
+  }
+
+  async invalidateSessionsForUsers(userIds) {
+    const normalizedUserIds = [...new Set((Array.isArray(userIds) ? userIds : [])
+      .filter((userId) => userId !== null && userId !== undefined && String(userId).trim() !== '')
+      .map((userId) => String(userId)))];
+
+    let invalidatedCount = 0;
+    for (const userId of normalizedUserIds) {
+      invalidatedCount += await this.invalidateSessionsForUser(userId);
+    }
+
+    return invalidatedCount;
   }
 
   async checkReadiness() {

@@ -5,6 +5,8 @@ const { getDefaultThrottleStore } = require('../lib/throttle-store');
 const LOOKUP_THROTTLE_WINDOW_MS = 60 * 1000;
 const GEOCODING_THROTTLE_MAX_REQUESTS = 30;
 const TAXPAYER_THROTTLE_MAX_REQUESTS = 20;
+const RFQ_PUBLIC_READ_THROTTLE_MAX_REQUESTS = 30;
+const RFQ_PUBLIC_SUBMIT_THROTTLE_MAX_REQUESTS = 10;
 
 const requestThrottleStore = getDefaultThrottleStore();
 
@@ -67,6 +69,8 @@ module.exports = {
   LOOKUP_THROTTLE_WINDOW_MS,
   GEOCODING_THROTTLE_MAX_REQUESTS,
   TAXPAYER_THROTTLE_MAX_REQUESTS,
+  RFQ_PUBLIC_READ_THROTTLE_MAX_REQUESTS,
+  RFQ_PUBLIC_SUBMIT_THROTTLE_MAX_REQUESTS,
   createRequestThrottle,
   resetRequestThrottleStateForTests,
 };

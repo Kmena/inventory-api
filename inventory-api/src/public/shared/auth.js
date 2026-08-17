@@ -49,8 +49,25 @@
     return validationMessage || data?.message || fallbackMessage;
   }
 
+  function resolveSameOriginUrl(url) {
+    if (typeof url !== 'string' || url.trim().length === 0) {
+      return url;
+    }
+
+    if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(url) || url.startsWith('//')) {
+      return url;
+    }
+
+    if (url.startsWith('/')) {
+      const origin = globalScope.location?.origin || '';
+      return origin ? `${origin}${url}` : url;
+    }
+
+    return url;
+  }
+
   async function fetchJson(session, url, options = {}) {
-    const response = await globalScope.fetch(url, {
+    const response = await globalScope.fetch(resolveSameOriginUrl(url), {
       ...options,
       credentials: options.credentials || 'same-origin',
       headers: buildHeaders(session, {
@@ -72,7 +89,7 @@
   }
 
   async function downloadProtectedFile(session, fileUrl, options = {}) {
-    const response = await globalScope.fetch(fileUrl, {
+    const response = await globalScope.fetch(resolveSameOriginUrl(fileUrl), {
       credentials: options.credentials || 'same-origin',
       headers: buildHeaders(session, { headers: options.headers }),
     });
@@ -98,7 +115,7 @@
   }
 
   async function bootstrapSession(options = {}) {
-    const response = await globalScope.fetch('/api/auth/me', {
+    const response = await globalScope.fetch(resolveSameOriginUrl('/api/auth/me'), {
       credentials: 'same-origin',
       headers: options.headers || {},
     });
@@ -117,7 +134,10 @@
 
   async function logout(session, options = {}) {
     try {
-      await globalScope.fetch('/api/auth/logout', {
+      const logoutEndpoint = '/api/auth/logout';
+      await globalScope.fetch('/api/auth/logout' === logoutEndpoint
+        ? resolveSameOriginUrl(logoutEndpoint)
+        : logoutEndpoint, {
         method: 'POST',
         credentials: 'same-origin',
         headers: buildHeaders(session, {

@@ -20,6 +20,7 @@ function requireFreshBrowserSessionService() {
 
 async function withFakeRedisServer(run) {
   const sessions = new Map();
+  const sets = new Map();
   const server = net.createServer((socket) => {
     let buffer = '';
 
@@ -31,7 +32,7 @@ async function withFakeRedisServer(run) {
           return;
         }
         buffer = parsed.rest;
-        socket.write(handleRedisCommand(sessions, parsed.parts));
+        socket.write(handleRedisCommand(sessions, sets, parsed.parts));
       }
     });
   });
@@ -41,7 +42,7 @@ async function withFakeRedisServer(run) {
   const redisUrl = `redis://127.0.0.1:${address.port}/0`;
 
   try {
-    return await run({ redisUrl, sessions });
+    return await run({ redisUrl, sessions, sets });
   } finally {
     await new Promise((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
@@ -85,7 +86,17 @@ function serializeBulkString(value) {
   return `$${Buffer.byteLength(value)}\r\n${value}\r\n`;
 }
 
-function handleRedisCommand(sessions, parts) {
+function serializeArray(values) {
+  return `*${values.length}\r\n${values.map((value) => serializeBulkString(value)).join('')}`;
+}
+
+function getRedisSet(sets, key) {
+  const currentSet = sets.get(key) || new Set();
+  sets.set(key, currentSet);
+  return currentSet;
+}
+
+function handleRedisCommand(sessions, sets, parts) {
   const [command, ...rest] = parts;
   const normalizedCommand = command.toUpperCase();
 
@@ -107,8 +118,44 @@ function handleRedisCommand(sessions, parts) {
     return serializeBulkString(sessions.get(rest[0]) || null);
   }
 
+  if (normalizedCommand === 'SADD') {
+    const [key, member] = rest;
+    const currentSet = getRedisSet(sets, key);
+    const existed = currentSet.has(member);
+    currentSet.add(member);
+    return `:${existed ? 0 : 1}\r\n`;
+  }
+
+  if (normalizedCommand === 'SREM') {
+    const [key, member] = rest;
+    const currentSet = sets.get(key);
+    if (!currentSet) {
+      return ':0\r\n';
+    }
+
+    const removed = currentSet.delete(member);
+    if (currentSet.size === 0) {
+      sets.delete(key);
+    }
+    return `:${removed ? 1 : 0}\r\n`;
+  }
+
+  if (normalizedCommand === 'SMEMBERS') {
+    return serializeArray([...(sets.get(rest[0]) || new Set())]);
+  }
+
   if (normalizedCommand === 'DEL') {
-    return `:${sessions.delete(rest[0]) ? 1 : 0}\r\n`;
+    let deletedCount = 0;
+    for (const key of rest) {
+      if (sessions.delete(key)) {
+        deletedCount += 1;
+        continue;
+      }
+      if (sets.delete(key)) {
+        deletedCount += 1;
+      }
+    }
+    return `:${deletedCount}\r\n`;
   }
 
   return '-ERR unsupported command\r\n';
@@ -176,6 +223,54 @@ test('browser session service invalidates Redis-backed sessions explicitly', asy
 
     assert.equal(await browserSessionService.invalidateBrowserSession(createdSession.sessionId), true);
     assert.equal(await browserSessionService.getBrowserSession(createdSession.sessionId), null);
+  }));
+});
+
+test('browser session service invalidates only targeted Redis-backed user sessions', async () => {
+  await withFakeRedisServer(({ redisUrl }) => withEnvironment({
+    NODE_ENV: 'development',
+    BROWSER_SESSION_STORE_MODE: 'redis',
+    REDIS_URL: redisUrl,
+  }, async () => {
+    const browserSessionService = requireFreshBrowserSessionService();
+    const userOneSessionA = await browserSessionService.createBrowserSession(81n);
+    const userOneSessionB = await browserSessionService.createBrowserSession(81n);
+    const userTwoSession = await browserSessionService.createBrowserSession(82n);
+
+    const invalidatedCount = await browserSessionService.invalidateBrowserSessionsForUser(81n);
+
+    assert.equal(invalidatedCount, 2);
+    assert.equal(await browserSessionService.getBrowserSession(userOneSessionA.sessionId), null);
+    assert.equal(await browserSessionService.getBrowserSession(userOneSessionB.sessionId), null);
+    assert.deepEqual(await browserSessionService.getBrowserSession(userTwoSession.sessionId), {
+      sessionId: userTwoSession.sessionId,
+      userId: '82',
+      expiresAt: userTwoSession.expiresAt,
+    });
+  }));
+});
+
+test('browser session service batch invalidation works for Redis-backed user sessions', async () => {
+  await withFakeRedisServer(({ redisUrl }) => withEnvironment({
+    NODE_ENV: 'development',
+    BROWSER_SESSION_STORE_MODE: 'redis',
+    REDIS_URL: redisUrl,
+  }, async () => {
+    const browserSessionService = requireFreshBrowserSessionService();
+    const userOneSession = await browserSessionService.createBrowserSession(91n);
+    const userTwoSession = await browserSessionService.createBrowserSession(92n);
+    const unaffectedSession = await browserSessionService.createBrowserSession(93n);
+
+    const invalidatedCount = await browserSessionService.invalidateBrowserSessionsForUsers([91n, '92', 91n, null, '']);
+
+    assert.equal(invalidatedCount, 2);
+    assert.equal(await browserSessionService.getBrowserSession(userOneSession.sessionId), null);
+    assert.equal(await browserSessionService.getBrowserSession(userTwoSession.sessionId), null);
+    assert.deepEqual(await browserSessionService.getBrowserSession(unaffectedSession.sessionId), {
+      sessionId: unaffectedSession.sessionId,
+      userId: '93',
+      expiresAt: unaffectedSession.expiresAt,
+    });
   }));
 });
 

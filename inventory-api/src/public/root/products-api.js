@@ -44,6 +44,10 @@
     });
   }
 
+  async function assignRecipeToProduct(session, productId, recipeId) {
+    return updateProduct(session, productId, { recipeId });
+  }
+
   async function deactivateProduct(session, productId) {
     return inventoryAuth.fetchJson(session, `/api/products/${encodeURIComponent(productId)}`, {
       method: 'DELETE',
@@ -52,6 +56,7 @@
   }
 
   rootShell.register('productsApi', {
+    assignRecipeToProduct,
     createProduct,
     deactivateProduct,
     getProduct,

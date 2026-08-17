@@ -13,6 +13,14 @@ const roleRouter = require('./routes/role.routes');
 const userRouter = require('./routes/user.routes');
 const clientRouter = require('./routes/client.routes');
 const productRouter = require('./routes/product.routes');
+const recipeRouter = require('./routes/recipe.routes');
+const productionRouter = require('./routes/production.routes');
+const procurementRouter = require('./routes/procurement.routes');
+const procurementRfqRouter = require('./routes/procurement-rfq.routes');
+const publicSupplierQuotationRouter = require('./routes/public-supplier-quotation.routes');
+const supplierRouter = require('./routes/supplier.routes');
+const receiptRouter = require('./routes/receipt.routes');
+const fiscalReferenceRouter = require('./routes/fiscal-reference.routes');
 const orderRouter = require('./routes/order.routes');
 const invoiceRouter = require('./routes/invoice.routes');
 const paymentRouter = require('./routes/payment.routes');
@@ -93,6 +101,24 @@ function selectContentSecurityPolicy(pathName) {
     ]);
   }
 
+  // Warehouse/QA SPA: permite blob: para thumbnails de fotos en evidencia de recepciones.
+  // No requiere `unsafe-inline`; los estilos vienen de `/styles.css`.
+  if (pathName.startsWith('/warehouse/')) {
+    return buildContentSecurityPolicy([
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self'",
+      "style-src 'self'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self'",
+      "media-src 'self' blob:",
+    ]);
+  }
+
   // Rutas de la SPA del agente: permiten tiles de OpenStreetMap.
   // Este bloque debe evaluarse antes de isDeprecatedLegacyHtmlPath
   // porque /agent/*.html también coincide con el patron legacy.
@@ -108,6 +134,22 @@ function selectContentSecurityPolicy(pathName) {
       "img-src 'self' data: https://*.tile.openstreetmap.org",
       "font-src 'self' data:",
       "connect-src 'self' https://*.tile.openstreetmap.org",
+    ]);
+  }
+
+  // Supplier quote public page: minimal CSP, no external resources.
+  if (pathName.startsWith('/supplier-quote/')) {
+    return buildContentSecurityPolicy([
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data:",
+      "font-src 'self' data:",
+      "connect-src 'self'",
     ]);
   }
 
@@ -175,6 +217,14 @@ app.use('/api/roles', ...mediumPayloadParsers, roleRouter);
 app.use('/api/users', ...mediumPayloadParsers, userRouter);
 app.use('/api/clients', ...mediumPayloadParsers, clientRouter);
 app.use('/api/products', ...mediumPayloadParsers, productRouter);
+app.use('/api/recipes', ...mediumPayloadParsers, recipeRouter);
+app.use('/api/production', ...mediumPayloadParsers, productionRouter);
+app.use('/api/procurement', ...mediumPayloadParsers, procurementRouter);
+app.use('/api/procurement', ...mediumPayloadParsers, procurementRfqRouter);
+app.use('/api/public/supplier-quotations', ...mediumPayloadParsers, publicSupplierQuotationRouter);
+app.use('/api/suppliers', ...mediumPayloadParsers, supplierRouter);
+app.use('/api/receipts', ...mediumPayloadParsers, receiptRouter);
+app.use('/api/fiscal-references', ...mediumPayloadParsers, fiscalReferenceRouter);
 app.use('/api/orders', ...mediumPayloadParsers, orderRouter);
 app.use('/api/invoices', ...mediumPayloadParsers, invoiceRouter);
 app.use('/api/payments', ...mediumPayloadParsers, paymentRouter);

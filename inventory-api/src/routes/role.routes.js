@@ -4,7 +4,7 @@ const authenticate = require('../middlewares/authenticate');
 const { authorizeAccessPolicy } = require('../security/access-policies');
 const validate = require('../middlewares/validate');
 const { parsePaginationQuery } = require('../lib/pagination');
-const { createCompanyRoleSchema } = require('../schemas/role.schema');
+const { createCompanyRoleSchema, updateCompanyRoleSchema } = require('../schemas/role.schema');
 const roleService = require('../services/role.service');
 
 const router = express.Router();
@@ -32,6 +32,15 @@ router.post('/company', authorizeAccessPolicy('role.company.create'), validate(c
   try {
     const role = await roleService.createCompanyRole(req.body, req.auth, req);
     return res.status(201).json(role);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.put('/company/:roleId', authorizeAccessPolicy('role.company.update'), validate(updateCompanyRoleSchema), async (req, res, next) => {
+  try {
+    const role = await roleService.updateCompanyRole(req.params.roleId, req.body, req.auth, req);
+    return res.json(role);
   } catch (error) {
     return next(error);
   }

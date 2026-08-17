@@ -22,9 +22,18 @@
     });
   }
 
+  async function updateRole(session, roleId, payload) {
+    return inventoryAuth.fetchJson(session, `/api/roles/company/${encodeURIComponent(roleId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudieron guardar los cambios del rol.',
+    });
+  }
+
   rootShell.register('rolesApi', {
     createRole,
     listPermissions,
     listRoles,
+    updateRole,
   });
 }(window));

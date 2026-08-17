@@ -22,6 +22,11 @@ function normalizeOptionalNumber(value) {
   return Number(value);
 }
 
+function normalizeOptionalInteger(value) {
+  if (value === undefined || value === null || value === '') return null;
+  return Number.parseInt(String(value), 10);
+}
+
 function normalizeCategoryName(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
@@ -35,6 +40,40 @@ function deriveProductType(categoryType) {
     default:
       return 'FINISHED_PRODUCT';
   }
+}
+
+function deriveInventoryTypeFromCategoryType(categoryType) {
+  switch (categoryType) {
+    case 'MP':
+      return 'RAW_MATERIAL';
+    case 'EM':
+      return 'PACKAGING';
+    default:
+      return 'FINISHED_GOOD';
+  }
+}
+
+function normalizeInventoryType(value) {
+  switch (normalizeOptionalString(value)) {
+    case 'RAW_MATERIAL':
+      return 'RAW_MATERIAL';
+    case 'PACKAGING':
+      return 'PACKAGING';
+    case 'WORK_IN_PROCESS':
+      return 'WORK_IN_PROCESS';
+    case 'FINISHED_GOOD':
+    case 'FINISHED_PRODUCT':
+      return 'FINISHED_GOOD';
+    default:
+      return null;
+  }
+}
+
+function deriveSourcingMethodFromInventoryType(inventoryType) {
+  if (inventoryType === 'RAW_MATERIAL' || inventoryType === 'PACKAGING') {
+    return 'PURCHASE_ONLY';
+  }
+  return 'PRODUCTION_OR_PURCHASE';
 }
 
 function deriveSellableKind(categoryType) {
@@ -55,6 +94,57 @@ function deriveTaxDefaults(taxExempt) {
   };
 }
 
+function buildNormalizedAllowedWarehouseIds(allowedWarehouseIds) {
+  if (!Array.isArray(allowedWarehouseIds)) {
+    return [];
+  }
+  return [...new Set(allowedWarehouseIds.map((warehouseId) => BigInt(warehouseId).toString()))].map((warehouseId) => BigInt(warehouseId));
+}
+
+function buildNormalizedAuthorizedSuppliers(authorizedSuppliers) {
+  if (!Array.isArray(authorizedSuppliers)) {
+    return [];
+  }
+
+  const supplierLinksById = new Map();
+  for (const supplierLink of authorizedSuppliers) {
+    const supplierId = BigInt(supplierLink.supplierId);
+    supplierLinksById.set(supplierId.toString(), {
+      supplierId,
+      isPreferred: supplierLink.isPreferred ?? false,
+      supplierSku: normalizeOptionalString(supplierLink.supplierSku),
+      leadTimeDays: normalizeOptionalInteger(supplierLink.leadTimeDays),
+      minimumOrderQuantity: normalizeOptionalNumber(supplierLink.minimumOrderQuantity),
+      notes: normalizeOptionalString(supplierLink.notes),
+    });
+  }
+
+  return [...supplierLinksById.values()];
+}
+
+async function ensureAllowedWarehousesBelongToCompany(companyId, allowedWarehouseIds, db) {
+  if (!allowedWarehouseIds.length) {
+    return;
+  }
+
+  const warehouses = await productRepository.findCompanyWarehousesByIds(companyId, allowedWarehouseIds, db);
+  if (warehouses.length !== allowedWarehouseIds.length) {
+    throw createHttpError(404, 'Una o mas bodegas autorizadas no pertenecen a la empresa', 'not_found');
+  }
+}
+
+async function ensureAuthorizedSuppliersBelongToCompany(companyId, authorizedSuppliers, db) {
+  if (!authorizedSuppliers.length) {
+    return;
+  }
+
+  const supplierIds = authorizedSuppliers.map((supplierLink) => supplierLink.supplierId);
+  const suppliers = await productRepository.findCompanySuppliersByIds(companyId, supplierIds, db);
+  if (suppliers.length !== supplierIds.length) {
+    throw createHttpError(404, 'Uno o mas proveedores autorizados no pertenecen a la empresa', 'not_found');
+  }
+}
+
 function buildImportedProductData(row, companyId, category, auth) {
   const code = normalizeOptionalString(row.code) ?? row.id.toString();
   const description = normalizeOptionalString(row.description);
@@ -63,14 +153,22 @@ function buildImportedProductData(row, companyId, category, auth) {
   const taxExempt = row.taxExempt ?? false;
   const taxDefaults = deriveTaxDefaults(taxExempt);
   const categoryType = category?.categoryType ?? 'PT';
+  const inventoryType = normalizeInventoryType(row.inventoryType)
+    ?? normalizeInventoryType(row.productType)
+    ?? deriveInventoryTypeFromCategoryType(categoryType);
+  const requiresLot = row.requiresLot ?? true;
 
   return {
     companyId,
     categoryId: category?.id ?? null,
     createdByUserId: auth?.sub ? BigInt(auth.sub) : null,
     code,
+    sku: normalizeOptionalString(row.sku),
+    barcode: normalizeOptionalString(row.barcode),
     name: row.name.trim(),
     description,
+    sourcingMethod: normalizeOptionalString(row.sourcingMethod) ?? deriveSourcingMethodFromInventoryType(inventoryType),
+    inventoryType,
     productType: normalizeOptionalString(row.productType) ?? deriveProductType(categoryType),
     sellableKind: normalizeOptionalString(row.sellableKind) ?? deriveSellableKind(categoryType),
     unit,
@@ -82,6 +180,10 @@ function buildImportedProductData(row, companyId, category, auth) {
     taxRate: normalizeOptionalNumber(row.taxRate) ?? taxDefaults.taxRate,
     density: normalizeOptionalNumber(row.density),
     densityUnit: normalizeOptionalString(row.densityUnit),
+    requiresLot,
+    requiresExpiration: row.requiresExpiration ?? false,
+    standardCost: normalizeOptionalNumber(row.standardCost),
+    realCost: normalizeOptionalNumber(row.realCost),
     isActive: row.isActive ?? true,
     lotStrategy: 'TRACKED',
     inCatalog: row.inCatalog ?? true,
@@ -98,11 +200,21 @@ function buildProductWriteData(payload, auth, existingProduct) {
   const taxExempt = payload.taxExempt ?? existingProduct?.taxExempt ?? false;
   const defaults = deriveTaxDefaults(taxExempt);
   const categoryType = payload.productType ? null : existingProduct?.category?.categoryType ?? 'PT';
+  const inventoryType = normalizeInventoryType(payload.inventoryType)
+    ?? normalizeInventoryType(payload.productType)
+    ?? normalizeInventoryType(existingProduct?.inventoryType)
+    ?? normalizeInventoryType(existingProduct?.productType)
+    ?? deriveInventoryTypeFromCategoryType(categoryType);
+  const requiresLot = payload.requiresLot ?? existingProduct?.requiresLot ?? ((payload.lotStrategy ?? existingProduct?.lotStrategy ?? 'TRACKED') === 'TRACKED');
 
   return {
     ...payload,
     companyId: payload.companyId ?? (auth?.companyId ? BigInt(auth.companyId) : existingProduct?.companyId),
     createdByUserId: payload.createdByUserId ?? existingProduct?.createdByUserId ?? (auth?.sub ? BigInt(auth.sub) : null),
+    sku: normalizeOptionalString(payload.sku) ?? existingProduct?.sku ?? null,
+    barcode: normalizeOptionalString(payload.barcode) ?? existingProduct?.barcode ?? null,
+    sourcingMethod: normalizeOptionalString(payload.sourcingMethod) ?? existingProduct?.sourcingMethod ?? deriveSourcingMethodFromInventoryType(inventoryType),
+    inventoryType,
     productType: payload.productType ?? existingProduct?.productType ?? deriveProductType(categoryType),
     sellableKind: payload.sellableKind ?? existingProduct?.sellableKind ?? deriveSellableKind(categoryType),
     cabysCode: normalizeOptionalString(payload.cabysCode) ?? existingProduct?.cabysCode ?? null,
@@ -111,6 +223,10 @@ function buildProductWriteData(payload, auth, existingProduct) {
     taxRate: payload.taxRate ?? existingProduct?.taxRate ?? defaults.taxRate,
     density: payload.density ?? existingProduct?.density ?? null,
     densityUnit: normalizeOptionalString(payload.densityUnit) ?? existingProduct?.densityUnit ?? null,
+    requiresLot,
+    requiresExpiration: payload.requiresExpiration ?? existingProduct?.requiresExpiration ?? false,
+    standardCost: payload.standardCost ?? existingProduct?.standardCost ?? null,
+    realCost: payload.realCost ?? existingProduct?.realCost ?? null,
     isActive: payload.isActive ?? existingProduct?.isActive ?? true,
     // inCatalog no se envia desde el formulario admin — sin este default
     // Prisma usaria el @default(false) de la DB y el producto quedaria
@@ -308,6 +424,8 @@ async function createProduct(payload, auth) {
   const scope = authScope(auth);
   const {
     initialLots = [],
+    allowedWarehouseIds,
+    authorizedSuppliers,
     quantity: _quantity,
     reservedQuantity: _reserved,
     companyId: _company,
@@ -318,7 +436,13 @@ async function createProduct(payload, auth) {
     throw createHttpError(403, 'Se requiere permiso de inventario para registrar existencias iniciales', 'forbidden');
   }
 
+  const normalizedAllowedWarehouseIds = buildNormalizedAllowedWarehouseIds(allowedWarehouseIds);
+  const normalizedAuthorizedSuppliers = buildNormalizedAuthorizedSuppliers(authorizedSuppliers);
+
   return productRepository.transaction(async (tx) => {
+    await ensureAllowedWarehousesBelongToCompany(scope.companyId, normalizedAllowedWarehouseIds, tx);
+    await ensureAuthorizedSuppliersBelongToCompany(scope.companyId, normalizedAuthorizedSuppliers, tx);
+
     const data = buildProductWriteData({
       ...productPayload,
       companyId: scope.companyId,
@@ -328,7 +452,19 @@ async function createProduct(payload, auth) {
     }, auth);
 
     const product = await tx.product.create({
-      data,
+      data: {
+        ...data,
+        ...(normalizedAllowedWarehouseIds.length > 0 ? {
+          allowedWarehouses: {
+            create: normalizedAllowedWarehouseIds.map((warehouseId) => ({ warehouseId })),
+          },
+        } : {}),
+        ...(normalizedAuthorizedSuppliers.length > 0 ? {
+          supplierLinks: {
+            create: normalizedAuthorizedSuppliers,
+          },
+        } : {}),
+      },
       include: productRepository.productInclude,
     });
 
@@ -355,17 +491,42 @@ async function createProduct(payload, auth) {
 async function updateProduct(id, payload, auth) {
   const scope = authScope(auth);
   const existingProduct = await getProduct(id, auth);
+  const hasAllowedWarehouseUpdate = Object.prototype.hasOwnProperty.call(payload, 'allowedWarehouseIds');
+  const hasAuthorizedSupplierUpdate = Object.prototype.hasOwnProperty.call(payload, 'authorizedSuppliers');
+  const normalizedAllowedWarehouseIds = buildNormalizedAllowedWarehouseIds(payload.allowedWarehouseIds);
+  const normalizedAuthorizedSuppliers = buildNormalizedAuthorizedSuppliers(payload.authorizedSuppliers);
 
   return productRepository.transaction(async (tx) => {
-    const data = buildProductWriteData(payload, auth, existingProduct);
+    if (hasAllowedWarehouseUpdate) {
+      await ensureAllowedWarehousesBelongToCompany(scope.companyId, normalizedAllowedWarehouseIds, tx);
+    }
+    if (hasAuthorizedSupplierUpdate) {
+      await ensureAuthorizedSuppliersBelongToCompany(scope.companyId, normalizedAuthorizedSuppliers, tx);
+    }
+
+    const {
+      allowedWarehouseIds: _allowedWarehouseIds,
+      authorizedSuppliers: _authorizedSuppliers,
+      companyId: _companyId,
+      ...productPayload
+    } = payload;
+    const data = buildProductWriteData(productPayload, auth, existingProduct);
     const product = await productRepository.updateProduct(id, scope.companyId, data, tx);
     if (!product) {
       throw createHttpError(404, 'Producto no encontrado', 'not_found');
     }
 
+    if (hasAllowedWarehouseUpdate) {
+      await productRepository.replaceProductAllowedWarehouses(product.id, normalizedAllowedWarehouseIds, tx);
+    }
+    if (hasAuthorizedSupplierUpdate) {
+      await productRepository.replaceProductSupplierLinks(product.id, normalizedAuthorizedSuppliers, tx);
+    }
+
     await syncGeneralPrice(tx, product.id, data.price, data.currency ?? product.currency);
 
-    return serializeProductForPermissions(product, auth);
+    const reloadedProduct = await productRepository.findProductById(id, scope.companyId, tx);
+    return serializeProductForPermissions(reloadedProduct, auth);
   });
 }
 

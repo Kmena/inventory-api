@@ -53,11 +53,65 @@
     }, {});
   }
 
+  var CATEGORY_LABELS = {
+    platform: 'Plataforma',
+    administration: 'Administracion',
+    clients: 'Clientes',
+    products: 'Articulos',
+    inventory: 'Inventario',
+    sales: 'Ventas y comercial',
+    collections: 'Cobranza',
+    warehouse: 'Bodega',
+    supply: 'Abastecimiento',
+    procurement: 'Compras',
+    production: 'Produccion',
+    quality: 'Calidad (QA)',
+    'billing-boundary': 'Facturacion',
+  };
+
+  var CATEGORY_ORDER = [
+    'administration', 'clients', 'products', 'inventory', 'warehouse',
+    'sales', 'collections', 'supply', 'procurement', 'production',
+    'quality', 'billing-boundary', 'platform',
+  ];
+
+  function getCategoryDisplayLabel(categoryKey) {
+    return CATEGORY_LABELS[categoryKey] || categoryKey || 'General';
+  }
+
+  function groupPermissionsByCategory(permissions) {
+    var groups = {};
+    for (var i = 0; i < permissions.length; i++) {
+      var key = permissions[i]?.moduleCategory || permissions[i]?.module || 'general';
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(permissions[i]);
+    }
+    return groups;
+  }
+
+  function sortedCategoryEntries(groups) {
+    var entries = Object.entries(groups);
+    entries.sort(function (a, b) {
+      var ai = CATEGORY_ORDER.indexOf(a[0]);
+      var bi = CATEGORY_ORDER.indexOf(b[0]);
+      if (ai === -1) { ai = 999; }
+      if (bi === -1) { bi = 999; }
+      return ai - bi;
+    });
+    return entries;
+  }
+
   rootShell.register('ui', {
     escapeHtml,
     formatDate,
+    getCategoryDisplayLabel,
+    groupPermissionsByCategory,
     groupPermissionsByModule,
     renderInlineMessage,
     renderStatusBadge,
+    sortedCategoryEntries,
+    CATEGORY_LABELS,
   });
 }(window));

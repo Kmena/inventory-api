@@ -277,7 +277,7 @@ test('listAssignableRoles returns paginated metadata when requested', async () =
       name: 'Admin local',
       companyId: 2n,
       isActive: true,
-      permissions: [{ code: 'users.view', isActive: true }],
+      permissions: [{ code: 'users.view', isActive: true, displayLabel: 'users.view' }],
     }],
     pagination: {
       page: 2,

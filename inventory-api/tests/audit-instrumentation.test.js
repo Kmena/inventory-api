@@ -360,7 +360,10 @@ test('userService.registerCompanyUser records an administrative user audit event
         createUser: async () => ({ id: 61n, companyId: 7n, roleId: 3n, username: 'worker', status: 'ACTIVE', passwordHash }),
       }],
       [roleRepository, {
-        findRoleById: async () => ({ id: 3n, code: 'sales', companyId: 7n, isActive: true }),
+        findAssignableRoleByIdForCompany: async () => ({ id: 3n, code: 'sales', companyId: 7n, isActive: true }),
+        findRoleById: async () => {
+          throw new Error('findRoleById should not be used when the scoped assignable lookup succeeds');
+        },
       }],
       [audit, {
         recordAuditEventIfAvailable: async (payload) => {

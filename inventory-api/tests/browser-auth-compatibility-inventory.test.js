@@ -29,7 +29,7 @@ test('browser auth token-bridge removal is enforced across the reduced supported
 
   assert.equal(require('node:fs').existsSync(path.join(__dirname, '..', 'src/public/root')), true, 'src/public/root should remain part of the supported public runtime');
 
-  // warehouse sigue retirado; agent fue promovido como SPA moderna (agent-spa spec)
-  assert.equal(require('node:fs').existsSync(path.join(__dirname, '..', 'src/public/warehouse')), false, 'src/public/warehouse should remain retired from the active public runtime');
+  // TASK-017: warehouse SPA promovida como SPA moderna soportada; agent sigue como SPA moderna (agent-spa spec)
+  assert.equal(require('node:fs').existsSync(path.join(__dirname, '..', 'src/public/warehouse')), true, 'src/public/warehouse should now exist as the supported warehouse/QA SPA (TASK-017)');
   assert.equal(require('node:fs').existsSync(path.join(__dirname, '..', 'src/public/agent')), true, 'src/public/agent should exist as the implemented modern agent SPA');
 });

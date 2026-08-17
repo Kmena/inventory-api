@@ -94,11 +94,21 @@ test('access policies preserve strict registry lookups and explicit actor-scope 
     ['company.root-companies.list', 'global-root'],
     ['role.company.create', 'company-admin'],
     ['role.company.list', 'company-admin'],
+    ['role.company.update', 'company-admin'],
   ]);
 
   assert.deepEqual(getAccessPolicy('product.import').permissions, ['products.import', 'products.manage']);
   assert.deepEqual(getAccessPolicy('inventory.lot-qa.update').permissions, ['inventory.qa.manage']);
   assert.deepEqual(getAccessPolicy('sales-route.company.goals.update').roles, ['admin', 'sales_supervisor']);
+  assert.deepEqual(getAccessPolicy('product.sourcing.manage').permissions, ['products.sourcing.manage']);
+  assert.deepEqual(getAccessPolicy('recipe.approve').permissions, ['recipes.approve']);
+  assert.deepEqual(getAccessPolicy('production.execute').permissions, ['production.execute']);
+  assert.deepEqual(getAccessPolicy('quality.inspect').permissions, ['quality.inspect', 'quality.override']);
+  assert.deepEqual(getAccessPolicy('procurement.manage').permissions, ['procurement.manage', 'procurement.approve']);
+  assert.deepEqual(getAccessPolicy('receipt.reverse').permissions, ['receipts.reverse']);
+  assert.deepEqual(getAccessPolicy('warehouse.workspace.access').permissions, ['warehouse.access']);
+  assert.deepEqual(getAccessPolicy('inventory.intake.override').permissions, ['inventory.intake.override']);
+  assert.deepEqual(getAccessPolicy('billing.handoff.view').permissions, ['billing.handoff.view', 'billing.handoff.create']);
 });
 
 test('authorizeAccessPolicy preserves global-root company listing semantics', async () => {
@@ -246,6 +256,33 @@ test('authorizeAccessPolicy preserves payment approval permission semantics', as
 
   const allowedError = await runGuard(guard, { role: 'custom-office', companyId: '7', permissions: ['collections.payments.approve'] });
   assert.equal(allowedError, undefined);
+});
+
+test('authorizeAccessPolicy rejects actors missing new supply/intake permissions and allows explicit permission holders', async () => {
+  const productionApproveGuard = authorizeAccessPolicy('production.approve');
+  const warehouseWorkspaceGuard = authorizeAccessPolicy('warehouse.workspace.access');
+  const receiptReverseGuard = authorizeAccessPolicy('receipt.reverse');
+
+  const deniedProductionApprove = await runGuard(productionApproveGuard, { role: 'admin', companyId: '7', permissions: ['production.create'] });
+  assert.equal(deniedProductionApprove?.statusCode, 403);
+  assert.equal(deniedProductionApprove?.code, 'forbidden');
+
+  const deniedWarehouseWorkspace = await runGuard(warehouseWorkspaceGuard, { role: 'warehouse', companyId: '7', permissions: ['inventory.view'] });
+  assert.equal(deniedWarehouseWorkspace?.statusCode, 403);
+  assert.equal(deniedWarehouseWorkspace?.code, 'forbidden');
+
+  const deniedReceiptReverse = await runGuard(receiptReverseGuard, { role: 'warehouse', companyId: '7', permissions: ['receipts.confirm'] });
+  assert.equal(deniedReceiptReverse?.statusCode, 403);
+  assert.equal(deniedReceiptReverse?.code, 'forbidden');
+
+  const allowedProductionApprove = await runGuard(productionApproveGuard, { role: 'production-manager', companyId: '7', permissions: ['production.approve'] });
+  assert.equal(allowedProductionApprove, undefined);
+
+  const allowedWarehouseWorkspace = await runGuard(warehouseWorkspaceGuard, { role: 'warehouse', companyId: '7', permissions: ['warehouse.access'] });
+  assert.equal(allowedWarehouseWorkspace, undefined);
+
+  const allowedReceiptReverse = await runGuard(receiptReverseGuard, { role: 'warehouse', companyId: '7', permissions: ['receipts.reverse'] });
+  assert.equal(allowedReceiptReverse, undefined);
 });
 
 test('authorizeAccessPolicy preserves admin/sales semantics for integration and client upload guards', async () => {

@@ -21,6 +21,20 @@ function readOptionalText(filePath) {
   return readText(filePath);
 }
 
+function assertAuditReflectsBoundedGovernance(audit) {
+  assert.match(
+    audit,
+    /intentionally partial coverage|partial OpenAPI|bounded runtime governance|focused post-implementation baseline audit|focused regression tests/i,
+  );
+}
+
+function assertAuditReflectsCanonicalDocsOwnership(audit) {
+  assert.match(
+    audit,
+    /canonical `docs\/\*\*` artifacts|canonical `docs\/\*\*` source of truth|canonical `docs\/\*\*` artifacts used by the new governance tests|documentation ownership map with clear canonical\/auxiliary\/historical separation|canonical docs under `docs\/\*\*`|`docs\/current-state\.md` describes implemented|`docs\/architecture\.md` describes active runtime architecture|bounded OpenAPI\/runtime artifacts under `docs\/\*\*`/i,
+  );
+}
+
 test('governed baseline docs stay aligned on the post-p34 bounded governance baseline', () => {
   const currentState = readText(currentStatePath);
   const architecture = readText(architecturePath);
@@ -32,7 +46,7 @@ test('governed baseline docs stay aligned on the post-p34 bounded governance bas
   }
 
   if (audit) {
-    assert.match(audit, /intentionally partial coverage|partial OpenAPI|bounded runtime governance/i);
+    assertAuditReflectsBoundedGovernance(audit);
   }
 
   assert.match(currentState, /bounded.*coverage|partial.*coverage/i);
@@ -40,11 +54,11 @@ test('governed baseline docs stay aligned on the post-p34 bounded governance bas
   assert.match(actionPlan, /partial OpenAPI\/typecheck coverage posture bounded|bounded governance/i);
 
   if (audit) {
-    assert.match(audit, /intentionally partial coverage|partial OpenAPI|bounded runtime governance/i);
+    assertAuditReflectsBoundedGovernance(audit);
   }
 });
 
-test('governed baseline docs preserve canonical ownership and no-update-flow truth', () => {
+test('governed baseline docs preserve canonical ownership and current company-role-update truth', () => {
   const currentState = readText(currentStatePath);
   const architecture = readText(architecturePath);
   const actionPlan = readText(actionPlanPath);
@@ -57,8 +71,10 @@ test('governed baseline docs preserve canonical ownership and no-update-flow tru
   assert.match(actionPlan, /reads hosted workflow truth from `\.\.\/\.github\/workflows\//);
 
   if (audit) {
-    assert.match(audit, /canonical `docs\/\*\*` artifacts|canonical `docs\/\*\*` source of truth|canonical `docs\/\*\*` artifacts used by the new governance tests/i);
+    assertAuditReflectsCanonicalDocsOwnership(audit);
   }
-  assert.match(architecture, /no runtime company-role update flow currently exists/i);
-  assert.match(actionPlan, /no runtime company-role update flow exists yet|once an actual update surface exists/i);
+
+  assert.match(currentState, /runtime company-role update flow now exists|PUT \/api\/roles\/company\/:roleId/i);
+  assert.match(architecture, /supported runtime company-role update flow now exists|runtime company-role update flow now exists/i);
+  assert.match(actionPlan, /runtime company-role update flow now exists|company-role list\/create\/update flows/i);
 });

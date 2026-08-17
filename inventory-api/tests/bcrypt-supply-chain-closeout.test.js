@@ -135,12 +135,18 @@ test('userService.registerCompanyUser still generates bcrypt hashes that validat
         },
       }],
       [roleRepository, {
-        findRoleById: async (roleId) => ({
-          id: roleId,
-          code: 'warehouse',
-          companyId: 7n,
-          isActive: true,
-        }),
+        findAssignableRoleByIdForCompany: async (roleId, companyId) => {
+          assert.equal(companyId, 7n);
+          return {
+            id: roleId,
+            code: 'warehouse',
+            companyId: 7n,
+            isActive: true,
+          };
+        },
+        findRoleById: async () => {
+          throw new Error('findRoleById should not be used when the scoped assignable lookup succeeds');
+        },
       }],
       [audit, {
         recordAuditEventIfAvailable: async () => {},

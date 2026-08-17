@@ -1,3 +1,6 @@
+process.env.NODE_ENV = 'test';
+process.env.BROWSER_SESSION_STORE_MODE = 'memory';
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 

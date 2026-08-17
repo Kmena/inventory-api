@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventori | Bodega y QA</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="warehouse-shell">
+
+  <!-- WCAG 2.4.1: skip-link -->
+  <a class="skip-link" href="#warehouse-main">Saltar al contenido principal</a>
+
+  <!-- Header fijo (56px) -->
+  <header id="warehouse-header"
+          class="warehouse-header"
+          aria-label="Encabezado de bodega y QA">
+    <div class="warehouse-header__brand">
+      <span class="brand-mark" aria-hidden="true">I</span>
+      <div class="warehouse-header__context">
+        <p class="warehouse-header__eyebrow">Bodega / QA</p>
+        <h1 id="warehouse-view-title" class="warehouse-header__title">Cargando...</h1>
+      </div>
+    </div>
+    <div id="warehouse-identity-slot"
+         class="warehouse-header__identity"
+         hidden></div>
+  </header>
+
+  <!-- Contenido principal (scroll) -->
+  <main id="warehouse-main" class="warehouse-main" tabindex="-1">
+    <p id="warehouse-status"
+       class="warehouse-status"
+       role="status"
+       aria-live="polite">Validando sesion...</p>
+    <section id="warehouse-view"
+             class="warehouse-view"
+             aria-live="polite"></section>
+  </main>
+
+  <!-- Bottom tab bar / Navigation rail -->
+  <nav id="warehouse-tab-bar"
+       class="warehouse-tab-bar"
+       aria-label="Navegacion principal de bodega"
+       hidden></nav>
+
+  <!-- Toast notifications -->
+  <div id="warehouse-toast-container"
+       class="warehouse-toast-container"
+       role="region"
+       aria-live="assertive"
+       aria-atomic="true"></div>
+
+  <script src="/shared/session.js"></script>
+  <script src="/shared/auth.js"></script>
+  <script src="app.js"></script>
+  <script src="state.js"></script>
+  <script src="captures.js"></script>
+  <script src="api/warehouse-api.js"></script>
+  <script src="views/receipts.js"></script>
+  <script src="views/inspections.js"></script>
+  <script src="views/production.js"></script>
+  <script src="views/recipe-consultation.js"></script>
+  <script src="bootstrap.js"></script>
+</body>
+</html>

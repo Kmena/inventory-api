@@ -54,7 +54,7 @@ function getHomeForSession(session) {
   }
 
   if (permissions.includes('warehouse.access')) {
-    return POST_LOGIN_TRANSITION_PATH;
+    return '/warehouse/';
   }
 
   return '/no-access.html';

@@ -1,6 +1,9 @@
 const { z } = require('zod');
 const { optionalLotDateSchema } = require('./lot-date.schema');
 
+const productSourcingMethodSchema = z.enum(['PRODUCTION_ONLY', 'PURCHASE_ONLY', 'PRODUCTION_OR_PURCHASE']);
+const productInventoryTypeSchema = z.enum(['RAW_MATERIAL', 'PACKAGING', 'WORK_IN_PROCESS', 'FINISHED_GOOD']);
+
 const initialLotSchema = z.object({
   warehouseId: z.coerce.bigint(),
   quantity: z.coerce.number().positive(),
@@ -15,6 +18,15 @@ const initialLotSchema = z.object({
   note: z.string().trim().max(500).optional().nullable(),
 });
 
+const authorizedSupplierSchema = z.object({
+  supplierId: z.coerce.bigint(),
+  isPreferred: z.boolean().optional(),
+  supplierSku: z.string().trim().max(100).optional().nullable(),
+  leadTimeDays: z.coerce.number().int().min(0).optional().nullable(),
+  minimumOrderQuantity: z.coerce.number().min(0).optional().nullable(),
+  notes: z.string().trim().max(500).optional().nullable(),
+});
+
 const productFieldsSchema = z.object({
   companyId: z.coerce.bigint().optional(),
   categoryId: z.coerce.bigint().optional().nullable(),
@@ -22,8 +34,12 @@ const productFieldsSchema = z.object({
   recipeId: z.coerce.bigint().optional().nullable(),
   createdByUserId: z.coerce.bigint().optional().nullable(),
   code: z.string().max(50).optional(),
+  sku: z.string().trim().max(100).optional().nullable(),
+  barcode: z.string().trim().max(100).optional().nullable(),
   name: z.string().min(2).max(255),
   description: z.string().max(2000).optional(),
+  sourcingMethod: productSourcingMethodSchema.optional().nullable(),
+  inventoryType: productInventoryTypeSchema.optional().nullable(),
   productType: z.string().max(50).optional(),
   sellableKind: z.string().max(50).optional(),
   unit: z.string().max(30).optional(),
@@ -37,6 +53,10 @@ const productFieldsSchema = z.object({
   taxRate: z.number().min(0).max(100).optional(),
   density: z.number().min(0).optional(),
   densityUnit: z.string().max(30).optional(),
+  requiresLot: z.boolean().optional(),
+  requiresExpiration: z.boolean().optional(),
+  standardCost: z.number().min(0).optional().nullable(),
+  realCost: z.number().min(0).optional().nullable(),
   isActive: z.boolean().optional(),
   lotStrategy: z.literal('TRACKED').optional(),
   inCatalog: z.boolean().optional(),
@@ -46,6 +66,8 @@ const productFieldsSchema = z.object({
   minStock: z.number().min(0).optional(),
   maxStock: z.number().min(0).optional(),
   standbyStock: z.number().min(0).optional(),
+  allowedWarehouseIds: z.array(z.coerce.bigint()).optional(),
+  authorizedSuppliers: z.array(authorizedSupplierSchema).optional(),
 });
 
 const createProductSchema = productFieldsSchema.extend({
@@ -73,11 +95,40 @@ const createProductSchema = productFieldsSchema.extend({
       message: 'Un producto nuevo no puede iniciar con cantidad reservada',
     });
   }
+  if (payload.allowedWarehouseIds && new Set(payload.allowedWarehouseIds.map(String)).size !== payload.allowedWarehouseIds.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['allowedWarehouseIds'],
+      message: 'Las bodegas autorizadas no pueden repetirse',
+    });
+  }
+  if (payload.authorizedSuppliers && new Set(payload.authorizedSuppliers.map((supplier) => String(supplier.supplierId))).size !== payload.authorizedSuppliers.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['authorizedSuppliers'],
+      message: 'Los proveedores autorizados no pueden repetirse',
+    });
+  }
 });
 
 const updateProductSchema = productFieldsSchema.partial().omit({
   quantity: true,
   reservedQuantity: true,
+}).superRefine((payload, context) => {
+  if (payload.allowedWarehouseIds && new Set(payload.allowedWarehouseIds.map(String)).size !== payload.allowedWarehouseIds.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['allowedWarehouseIds'],
+      message: 'Las bodegas autorizadas no pueden repetirse',
+    });
+  }
+  if (payload.authorizedSuppliers && new Set(payload.authorizedSuppliers.map((supplier) => String(supplier.supplierId))).size !== payload.authorizedSuppliers.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['authorizedSuppliers'],
+      message: 'Los proveedores autorizados no pueden repetirse',
+    });
+  }
 });
 
 const createCategorySchema = z.object({
@@ -99,8 +150,12 @@ const createSubcategorySchema = z.object({
 const importProductRowSchema = z.object({
   id: z.coerce.bigint(),
   code: z.string().max(50).optional().nullable(),
+  sku: z.string().trim().max(100).optional().nullable(),
+  barcode: z.string().trim().max(100).optional().nullable(),
   name: z.string().min(2).max(255),
   description: z.string().max(2000).optional().nullable(),
+  sourcingMethod: productSourcingMethodSchema.optional().nullable(),
+  inventoryType: productInventoryTypeSchema.optional().nullable(),
   productType: z.string().max(50).optional().nullable(),
   sellableKind: z.string().max(50).optional().nullable(),
   unit: z.string().max(30).optional().nullable(),
@@ -113,6 +168,10 @@ const importProductRowSchema = z.object({
   taxRate: z.coerce.number().min(0).max(100).optional().nullable(),
   density: z.coerce.number().min(0).optional().nullable(),
   densityUnit: z.string().max(30).optional().nullable(),
+  requiresLot: z.boolean().optional().nullable(),
+  requiresExpiration: z.boolean().optional().nullable(),
+  standardCost: z.coerce.number().min(0).optional().nullable(),
+  realCost: z.coerce.number().min(0).optional().nullable(),
   isActive: z.boolean().optional(),
   lotStrategy: z.literal('TRACKED').optional().nullable(),
   inCatalog: z.boolean().optional(),

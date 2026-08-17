@@ -50,7 +50,10 @@ test('public runtime validator phase 3 enforces the reduced supported public inv
   assert.match(validatorSource, /validateLoginRuntimeContracts/);
   assert.match(validatorSource, /validateMigrationRuntimeContracts/);
   assert.match(validatorSource, /legacy-public-runtime/);
+  assert.match(validatorSource, /warehouse\/index\.html/);
+  assert.match(validatorSource, /warehouse\/views\/receipts\.js/);
   assert.doesNotMatch(validatorSource, /relativePath: 'root\/dashboard\.js'/);
   assert.doesNotMatch(validatorSource, /relativePath: 'warehouse\/products\.js'/);
   assert.doesNotMatch(validatorSource, /relativePath: 'agent\/workspace\.js'/);
+  assert.doesNotMatch(validatorSource, /Retired public runtime directory is still exposed from src\/public: warehouse/);
 });

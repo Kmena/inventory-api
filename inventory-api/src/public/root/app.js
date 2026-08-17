@@ -35,7 +35,7 @@ let activeSidebarEntryId = null;
 const sidebarState = {
   collapsed: false,
   drawerOpen: false,
-  openGroups: new Set(['inventory-group', 'sales-group']),
+  openGroups: new Set(['inventory-group', 'sales-group', 'produccion-group', 'compras-group']),
 };
 
 function setStatus(message, tone = 'default') {

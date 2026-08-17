@@ -372,9 +372,22 @@ test('browser E2E: login shows a visible authentication error and restores the f
 
   await page.route(`${baseUrl}/api/auth/me`, async (route) => {
     await route.fulfill({
-      status: 401,
+      status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ error: 'unauthorized', message: 'Token no enviado' }),
+      body: JSON.stringify({
+        id: '21',
+        role: 'warehouse',
+        companyId: 'cmp-21',
+        permissions: ['warehouse.access'],
+        fullName: 'Bodega Demo',
+        username: 'warehouse-demo',
+      }),
+    });
+  });
+  await page.route(`${baseUrl}/api/auth/logout`, async (route) => {
+    await route.fulfill({
+      status: 204,
+      body: '',
     });
   });
   await page.route(`${baseUrl}/api/auth/login`, async (route) => {
@@ -417,7 +430,7 @@ test('browser E2E: root shell redirects invalid sessions back to login instead o
   assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');
 });
 
-test('browser E2E: an existing warehouse browser session now lands on the supported transition page and can close the session from there', async (t) => {
+test('browser E2E: an existing warehouse browser session now lands on /warehouse/ and can close the session from there', async (t) => {
   const { server, sockets, baseUrl } = await startServer();
   t.after(() => stopServer(server, sockets));
 
@@ -439,11 +452,10 @@ test('browser E2E: an existing warehouse browser session now lands on the suppor
   }));
 
   await page.goto(`${baseUrl}/`);
-  await page.waitForURL(`${baseUrl}/migration.html?mode=post-login-transition`);
-  await page.waitForSelector('#migration-title');
-  assert.match(await page.locator('#migration-title').textContent(), /Iniciaste sesion correctamente/);
-  assert.equal(await page.locator('#migration-status-note').isHidden(), true);
-  await page.getByRole('button', { name: 'Cerrar sesion' }).click();
+  await page.waitForURL(`${baseUrl}/warehouse/`);
+  await page.waitForSelector('#warehouse-view-title');
+  assert.match(await page.locator('#warehouse-view-title').textContent(), /Recibos por confirmar|Inspecciones QA|Ordenes en proceso|Consulta de receta/);
+  await page.getByRole('button', { name: 'Salir' }).click();
   await page.waitForURL(`${baseUrl}/`);
 
   assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');

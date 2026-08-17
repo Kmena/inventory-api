@@ -57,3 +57,8 @@ This document explains the current purpose, dependency boundary, and execution e
 When a test suite changes category or starts depending on different infrastructure, update this catalog in the same slice so the documented boundary stays accurate.
 
 This catalog is intentionally limited to the currently affected boundary and closely related suites; it is not yet a full repository-wide suite inventory.
+
+## Supplier-management browser coverage note
+- `tests/suppliers-view-characterization.test.js` is currently the focused DB-free characterization suite for the root-shell supplier workspace. It verifies helper sorting/filtering, KPI derivation, renderer escaping, add-product dialog search/filter markup, `filterAvailableProducts()` behavior, `renderFilteredProductOptions()` empty/result states, and the current edit-dialog sequencing behavior expected by the implemented supplier screen.
+- `tests/suppliers-view.e2e.js` is currently the focused DB-free Playwright suite for the same supplier workspace. It uses browser-session seeding plus route stubbing to verify the implemented `#proveedores` flows for list rendering, create, edit, filtered product assignment by name/SKU, and read-only action hiding without requiring a real application database.
+- Both supplier suites currently follow the repository convention where `*.e2e.js` files are executed outside the default aggregate `scripts/run-tests.js` discovery lane unless invoked explicitly.
