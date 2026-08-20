@@ -52,7 +52,7 @@
     `;
   }
 
-  async function mount(container, session, helpersBag) {
+  async function mount(container, session, _helpersBag) {
 
     const pageMessage = container.querySelector('#purchase-requests-page-message');
     const listSummary = container.querySelector('#purchase-requests-list-summary');

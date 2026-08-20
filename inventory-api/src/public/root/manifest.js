@@ -1,6 +1,8 @@
 (function attachRootShellManifest(globalScope) {
   const rootShell = /** @type {any} */ (globalScope).RootShell;
   const guards = rootShell.require('guards');
+  const isProcurementOrAdmin = (session) =>
+    guards.isCompanyAdmin(session) || guards.hasProcurementAccess(session);
 
   function createRouteItem({
     id,
@@ -94,7 +96,7 @@
     href: '/root/#products',
     implemented: true,
     activeMatchers: ['products'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'package',
     includeInRootNav: false,
@@ -107,7 +109,7 @@
     href: '/root/#lots',
     implemented: true,
     activeMatchers: ['lots'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'layers-3',
     includeInRootNav: false,
@@ -120,7 +122,7 @@
     href: '/root/#movements',
     implemented: true,
     activeMatchers: ['movements'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'arrow-left-right',
     includeInRootNav: false,
@@ -156,6 +158,19 @@
     includeInRootNav: false,
     dependencyTag: 'supply-inventory-entry',
   });
+  const productionPlannerItem = createRouteItem({
+    id: 'produccion-planificador',
+    label: 'Planificador de produccion',
+    routeKey: 'produccion_planificador',
+    href: '/root/#produccion_planificador',
+    implemented: true,
+    activeMatchers: ['produccion_planificador'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'gauge',
+    includeInRootNav: false,
+    dependencyTag: 'production-planner',
+  });
 
   // TASK-016: Supply/Procurement module — compras-group sub-entries (in procurement flow order)
   const suppliersAdminItem = createRouteItem({
@@ -165,7 +180,7 @@
     href: '/root/#proveedores',
     implemented: true,
     activeMatchers: ['proveedores'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'truck',
     includeInRootNav: false,
@@ -178,7 +193,7 @@
     href: '/root/#solicitudes_compra',
     implemented: true,
     activeMatchers: ['solicitudes_compra'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'file-plus',
     includeInRootNav: false,
@@ -191,7 +206,7 @@
     href: '/root/#cotizaciones',
     implemented: true,
     activeMatchers: ['cotizaciones'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'file-search',
     includeInRootNav: false,
@@ -204,7 +219,7 @@
     href: '/root/#seguimiento_cotizaciones',
     implemented: true,
     activeMatchers: ['seguimiento_cotizaciones'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'clipboard-list',
     includeInRootNav: false,
@@ -217,7 +232,7 @@
     href: '/root/#ordenes_compra',
     implemented: true,
     activeMatchers: ['ordenes_compra'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'file-check-2',
     includeInRootNav: false,
@@ -231,7 +246,7 @@
     href: '/root/#recepciones',
     implemented: true,
     activeMatchers: ['recepciones'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'package-check',
     includeInRootNav: false,
@@ -244,7 +259,7 @@
     href: '/root/#referencias_fiscales',
     implemented: true,
     activeMatchers: ['referencias_fiscales'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'landmark',
     includeInRootNav: false,
@@ -345,7 +360,20 @@
     dependencyTag: 'order-approvals',
   });
   const reportsItem = createAdminPendingEntry('reports', 'Reportes', 'bar-chart-3');
-  const usersItem = createAdminPendingEntry('users', 'Usuarios', 'user-cog');
+  const usersItem = createRouteItem({
+    id: 'users',
+    label: 'Usuarios',
+    routeKey: 'users',
+    href: '/root/#users',
+    implemented: true,
+    activeMatchers: ['users'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'user-cog',
+    includeInRootNav: false,
+    includeInLanding: true,
+    dependencyTag: 'users-admin-view',
+  });
   const settingsItem = createAdminPendingEntry('settings', 'Configuracion', 'settings');
 
   const rolesPermissionsItem = createRouteItem({
@@ -387,6 +415,7 @@
     productionItem,
     recipesAdminItem,
     productionOrdersAdminItem,
+    productionPlannerItem,
     agentsItem,
     routesItem,
     zonesItem,
@@ -427,14 +456,14 @@
     {
       id: 'operations',
       title: 'Operacion',
-      visibilityRule: guards.isCompanyAdmin,
+      visibilityRule: isProcurementOrAdmin,
       entries: [
         {
           type: 'group',
           id: 'inventory-group',
           label: 'Inventario',
           icon: 'boxes',
-          visibilityRule: guards.isCompanyAdmin,
+          visibilityRule: isProcurementOrAdmin,
           actorScope: 'company-admin',
           items: [
             { type: 'item', ...warehousesItem },
@@ -454,6 +483,7 @@
           items: [
             { type: 'item', ...recipesAdminItem },
             { type: 'item', ...productionOrdersAdminItem },
+            { type: 'item', ...productionPlannerItem },
           ],
         },
         {
@@ -476,7 +506,7 @@
           id: 'compras-group',
           label: 'Compras',
           icon: 'shopping-bag',
-          visibilityRule: guards.isCompanyAdmin,
+          visibilityRule: isProcurementOrAdmin,
           actorScope: 'company-admin',
           items: [
             { type: 'item', ...suppliersAdminItem },

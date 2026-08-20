@@ -30,6 +30,14 @@
       return 'company-admin';
     }
 
+    // procurement_operator: company-scoped user — must see the company-admin sidebar
+    if (
+      session?.user?.companyId &&
+      (session?.user?.permissions || []).includes('procurement.manage')
+    ) {
+      return 'company-admin';
+    }
+
     return 'unknown';
   }
 

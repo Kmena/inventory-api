@@ -174,6 +174,8 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 | GET | `/api/production/orders` | Sí | `authorizeAccessPolicy('production.view')` | Listar órdenes de producción | Paginado tenant-scoped |
 | POST | `/api/production/orders` | Sí | `authorizeAccessPolicy('production.create')` | Crear orden de producción | Valida guardrails de sourcing/receta y congela `recipeVersionSnapshot` |
 | GET | `/api/production/orders/:id` | Sí | `authorizeAccessPolicy('production.view')` | Obtener detalle de orden de producción | |
+| GET | `/api/production/orders/:id/material-requirements` | Sí | `authorizeAccessPolicy('production.view')` | Consultar requerimientos de materiales y faltantes de la orden | Devuelve `required/available/missing` usando la bodega origen de la orden |
+| GET | `/api/production/orders/:id/stages/:stageId/available-lots` | Sí | `authorizeAccessPolicy('production.execute')` | Consultar lotes sugeridos para una etapa | Ordena FEFO cuando aplica vencimiento y FIFO por `entryDate` cuando no; omite `internalLotNumber` |
 | POST | `/api/production/orders/:id/submit` | Sí | `authorizeAccessPolicy('production.create')` | Enviar orden a aprobación | Transición `DRAFT -> PENDING_APPROVAL` |
 | POST | `/api/production/orders/:id/approve` | Sí | `authorizeAccessPolicy('production.approve')` | Aprobar orden de producción | Revalida guardrails y mantiene snapshot congelado |
 | POST | `/api/production/orders/:id/start` | Sí | `authorizeAccessPolicy('production.execute')` | Iniciar orden de producción | Transición `APPROVED -> IN_PROGRESS` |
@@ -309,6 +311,8 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 | GET | `/api/procurement/requests/{id}` | `procurement-foundation-outside-current-openapi-baseline` |
 | GET | `/api/procurement/requests/{id}/comparison` | `procurement-comparison-outside-current-openapi-baseline` |
 | GET | `/api/production/orders/{id}/inspections` | `quality-inspection-list-outside-current-openapi-baseline` |
+| GET | `/api/production/orders/{id}/material-requirements` | `production-material-readout-outside-current-openapi-baseline` |
+| GET | `/api/production/orders/{id}/stages/{stageId}/available-lots` | `production-available-lots-outside-current-openapi-baseline` |
 | GET | `/api/products/{id}` | `product-detail-lifecycle-outside-current-openapi-baseline` |
 | GET | `/api/products/categories/company` | `product-category-admin-outside-current-openapi-baseline` |
 | GET | `/api/receipts/{id}/fiscal-references` | `fiscal-reference-outside-current-openapi-baseline` |

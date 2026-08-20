@@ -53,6 +53,10 @@ function getHomeForSession(session) {
     return POST_LOGIN_TRANSITION_PATH;
   }
 
+  if (permissions.includes('procurement.manage')) {
+    return ROOT_SHELL_PATH;
+  }
+
   if (permissions.includes('warehouse.access')) {
     return '/warehouse/';
   }

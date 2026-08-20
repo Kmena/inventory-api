@@ -46,6 +46,7 @@ function createRouterHarness() {
   browserWindow.RootShell.register('views.movementsAdmin', createView('movements-view'));
   browserWindow.RootShell.register('views.recipesAdmin', createView('recipes-view'));
   browserWindow.RootShell.register('views.productionOrdersAdmin', createView('production-orders-view'));
+  browserWindow.RootShell.register('views.productionPlanner', createView('production-planner-view'));
   // TASK-012: billing admin view stub
   browserWindow.RootShell.register('views.billingAdmin', createView('billing-view'));
   browserWindow.RootShell.register('views.approvalsAdmin', createView('approvals-view'));
@@ -58,6 +59,8 @@ function createRouterHarness() {
   // recepciones-fiscales-workspace stubs
   browserWindow.RootShell.register('views.receiptsAdmin', createView('receipts-view'));
   browserWindow.RootShell.register('views.fiscalRefsAdmin', createView('fiscal-refs-view'));
+  // users-admin-view stub
+  browserWindow.RootShell.register('views.usersAdmin', createView('users-view'));
 
   executeRootScript('router.js', context);
 
@@ -235,6 +238,21 @@ test('router resolves recepciones route to receipts admin view for company admin
 
   // Root users cannot access recepciones (company-admin scope)
   const rootResolution = router.resolveRoute('#recepciones', createRootSession());
+  assert.equal(rootResolution.allowed, false);
+  assert.equal(rootResolution.routeKey, 'home');
+});
+
+test('router resolves users route to users admin view for company admin actors', () => {
+  const router = createRouterHarness();
+  const session = createCompanyAdminSession();
+
+  const resolution = router.resolveRoute('#users', session);
+  assert.equal(resolution.allowed, true);
+  assert.equal(resolution.routeKey, 'users');
+  assert.equal(resolution.view.name, 'users-view');
+
+  // Root users cannot access users (company-admin scope)
+  const rootResolution = router.resolveRoute('#users', createRootSession());
   assert.equal(rootResolution.allowed, false);
   assert.equal(rootResolution.routeKey, 'home');
 });

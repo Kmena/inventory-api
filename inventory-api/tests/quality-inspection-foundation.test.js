@@ -302,6 +302,7 @@ test('checkMandatoryQaGatesForOrder passes when all mandatory stages have approv
     findLatestProductionStageExecutionForOrderStage: async () => ({
       id: 901n,
       productionOrderId: 501n,
+      qaOutOfTolerance: true,
     }),
     findApprovedInspectionForStageExecution: async () => ({
       id: 1001n,
@@ -338,7 +339,7 @@ test('checkMandatoryQaGatesForOrder fails when mandatory stage has no stage exec
   });
 });
 
-test('checkMandatoryQaGatesForOrder fails when mandatory stage has no approved inspection', async () => {
+test('checkMandatoryQaGatesForOrder fails when mandatory stage is out of tolerance and has no approved inspection', async () => {
   await withPatchedRepositories({
     findProductionOrderById: async () => ({
       id: 501n,
@@ -355,6 +356,7 @@ test('checkMandatoryQaGatesForOrder fails when mandatory stage has no approved i
     findLatestProductionStageExecutionForOrderStage: async () => ({
       id: 901n,
       productionOrderId: 501n,
+      qaOutOfTolerance: true,
     }),
     findApprovedInspectionForStageExecution: async () => null,
     findQualityInspectionsForStageExecution: async () => [],
@@ -362,7 +364,7 @@ test('checkMandatoryQaGatesForOrder fails when mandatory stage has no approved i
     const result = await qualityService.checkMandatoryQaGatesForOrder(501n, 7n);
     assert.equal(result.allMandatoryGatesPassed, false);
     assert.equal(result.pendingStages.length, 1);
-    assert.equal(result.pendingStages[0].reason, 'qa_inspection_missing');
+    assert.equal(result.pendingStages[0].reason, 'qa_out_of_tolerance_requires_approval');
   });
 });
 
@@ -383,6 +385,7 @@ test('checkMandatoryQaGatesForOrder reports rejected stages', async () => {
     findLatestProductionStageExecutionForOrderStage: async () => ({
       id: 901n,
       productionOrderId: 501n,
+      qaOutOfTolerance: true,
     }),
     findApprovedInspectionForStageExecution: async () => null,
     findQualityInspectionsForStageExecution: async () => [
@@ -393,6 +396,33 @@ test('checkMandatoryQaGatesForOrder reports rejected stages', async () => {
     assert.equal(result.allMandatoryGatesPassed, false);
     assert.equal(result.rejectedStages.length, 1);
     assert.equal(result.rejectedStages[0].reason, 'qa_rejected');
+  });
+});
+
+test('checkMandatoryQaGatesForOrder passes when mandatory stage execution stayed within tolerance without inspection', async () => {
+  await withPatchedRepositories({
+    findProductionOrderById: async () => ({
+      id: 501n,
+      companyId: 7n,
+      status: 'IN_PROGRESS',
+      recipeVersionSnapshot: {
+        recipeVersion: {
+          stages: [
+            { id: 101, stageOrder: 0, name: 'Mezcla', qaMandatory: true },
+          ],
+        },
+      },
+    }),
+    findLatestProductionStageExecutionForOrderStage: async () => ({
+      id: 901n,
+      productionOrderId: 501n,
+      qaOutOfTolerance: false,
+    }),
+  }, async () => {
+    const result = await qualityService.checkMandatoryQaGatesForOrder(501n, 7n);
+    assert.equal(result.allMandatoryGatesPassed, true);
+    assert.equal(result.pendingStages.length, 0);
+    assert.equal(result.rejectedStages.length, 0);
   });
 });
 

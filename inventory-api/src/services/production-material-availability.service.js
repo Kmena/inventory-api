@@ -1,0 +1,218 @@
+const { createHttpError } = require('../lib/errors');
+const productionRepository = require('../repositories/production.repository');
+const inventoryRepository = require('../repositories/inventory.repository');
+const productRepository = require('../repositories/product.repository');
+const { sortLotsByFefo } = require('./inventory-transaction-support.service');
+const { deriveLotUsability, lotDateKey } = require('./inventory-lot-policy.service');
+
+const DEFAULT_TOLERANCE_PERCENT = 5;
+
+function assertCompanyScope(auth) {
+  if (!auth?.companyId) {
+    throw createHttpError(403, 'El usuario debe pertenecer a una empresa', 'forbidden');
+  }
+
+  return {
+    companyId: BigInt(auth.companyId),
+  };
+}
+
+function number(value) {
+  return Number(value || 0);
+}
+
+async function getScopedOrder(orderId, auth) {
+  const scope = assertCompanyScope(auth);
+  const order = await productionRepository.findProductionOrderById(orderId, scope.companyId);
+
+  if (!order) {
+    throw createHttpError(404, 'Orden de producción no encontrada', 'not_found');
+  }
+
+  return { scope, order };
+}
+
+function compareByDateKey(leftValue, rightValue, fallback) {
+  const leftKey = lotDateKey(leftValue) || fallback;
+  const rightKey = lotDateKey(rightValue) || fallback;
+  return leftKey.localeCompare(rightKey);
+}
+
+function sortLotsForAvailability(items, requiresExpiration) {
+  if (requiresExpiration) {
+    return [...sortLotsByFefo(items)].sort((left, right) => {
+      const expirationCompare = compareByDateKey(
+        left.lot?.expirationDate,
+        right.lot?.expirationDate,
+        '9999-12-31',
+      );
+
+      if (expirationCompare !== 0) {
+        return expirationCompare;
+      }
+
+      const entryCompare = compareByDateKey(
+        left.lot?.entryDate,
+        right.lot?.entryDate,
+        '9999-12-31',
+      );
+
+      return entryCompare || Number(left.id - right.id);
+    });
+  }
+
+  return [...items].sort((left, right) => {
+    const entryCompare = compareByDateKey(
+      left.lot?.entryDate,
+      right.lot?.entryDate,
+      '9999-12-31',
+    );
+
+    return entryCompare || Number(left.id - right.id);
+  });
+}
+
+function buildSuggestedLots(sortedLots, requiredQuantity) {
+  let remaining = number(requiredQuantity);
+  const suggested = [];
+
+  for (const stock of sortedLots) {
+    if (remaining <= 0.000001) {
+      break;
+    }
+
+    const availableQuantity = Math.max(0, number(stock.quantity) - number(stock.reservedQuantity));
+    if (availableQuantity <= 0.000001) {
+      continue;
+    }
+
+    const quantity = Math.min(availableQuantity, remaining);
+    suggested.push({
+      lotId: stock.lotId,
+      quantity,
+    });
+    remaining -= quantity;
+  }
+
+  return suggested;
+}
+
+function getSnapshotStage(order, stageId) {
+  const stages = order?.recipeVersionSnapshot?.recipeVersion?.stages;
+  const stage = Array.isArray(stages)
+    ? stages.find((candidate) => String(candidate?.id) === String(stageId))
+    : null;
+
+  if (!stage) {
+    throw createHttpError(404, 'Etapa de producción no encontrada en el snapshot de la orden', 'not_found');
+  }
+
+  return stage;
+}
+
+async function getMaterialRequirementsWithAvailability(orderId, auth) {
+  const { scope, order } = await getScopedOrder(orderId, auth);
+  const requirements = await productionRepository.findMaterialRequirementsByOrderIdForCompany(order.id, scope.companyId);
+  const productIds = [...new Set(requirements.map((requirement) => requirement.productId).filter(Boolean))];
+  const warehouseStocks = await inventoryRepository.findWarehouseStocksByProductIds(
+    scope.companyId,
+    order.originWarehouseId,
+    productIds,
+  );
+
+  const availableByProductId = new Map(
+    warehouseStocks.map((stock) => [
+      String(stock.productId),
+      Math.max(0, number(stock.quantity) - number(stock.reservedQuantity)),
+    ]),
+  );
+
+  const items = requirements.map((requirement) => {
+    const required = number(requirement.requiredQuantity);
+    const available = availableByProductId.get(String(requirement.productId)) ?? 0;
+    const missing = Math.max(0, required - available);
+
+    return {
+      productId: requirement.productId,
+      unit: requirement.unit,
+      required,
+      available,
+      missing,
+    };
+  });
+
+  return {
+    orderId: order.id,
+    originWarehouseId: order.originWarehouseId,
+    quantity: number(order.quantity),
+    items,
+    hasShortage: items.some((item) => item.missing > 0.000001),
+  };
+}
+
+async function getAvailableLotsForStage(orderId, stageId, auth) {
+  const { scope, order } = await getScopedOrder(orderId, auth);
+  const stage = getSnapshotStage(order, stageId);
+  const stageInputs = Array.isArray(stage.stageInputs)
+    ? stage.stageInputs.filter((input) => input?.productId)
+    : [];
+  const uniqueProductIds = [...new Set(stageInputs.map((input) => BigInt(input.productId)))];
+  const products = uniqueProductIds.length > 0
+    ? await productRepository.findProductsByIds(uniqueProductIds, scope.companyId)
+    : [];
+  const productById = new Map(products.map((product) => [String(product.id), product]));
+
+  const productsWithLots = [];
+
+  for (const stageInput of stageInputs) {
+    const product = productById.get(String(stageInput.productId));
+    if (!product?.requiresLot) {
+      continue;
+    }
+
+    const requiredQuantity = number(stageInput.quantity) * number(order.quantity);
+    const reservableLotStocks = await inventoryRepository.findReservableLotStocks(
+      order.originWarehouseId,
+      product.id,
+    );
+    const sellableLotStocks = reservableLotStocks.filter((stock) => deriveLotUsability(stock.lot).sellable);
+    const sortedLots = sortLotsForAvailability(sellableLotStocks, Boolean(product.requiresExpiration));
+
+    productsWithLots.push({
+      productId: product.id,
+      productCode: product.code,
+      productName: product.name,
+      unit: stageInput.unit ?? product.unit,
+      requiredQuantity,
+      toleranceDefaultPercent: DEFAULT_TOLERANCE_PERCENT,
+      lots: sortedLots.map((stock) => ({
+        lotId: stock.lotId,
+        lotNumber: stock.lot?.lotNumber ?? stock.lot?.manufacturerLotNumber ?? null,
+        expirationDate: stock.lot?.expirationDate ?? null,
+        entryDate: stock.lot?.entryDate ?? null,
+        availableQuantity: Math.max(0, number(stock.quantity) - number(stock.reservedQuantity)),
+        reservedQuantity: number(stock.reservedQuantity),
+      })),
+      suggested: buildSuggestedLots(sortedLots, requiredQuantity),
+    });
+  }
+
+  return {
+    orderId: order.id,
+    stageId,
+    originWarehouseId: order.originWarehouseId,
+    products: productsWithLots,
+  };
+}
+
+module.exports = {
+  getMaterialRequirementsWithAvailability,
+  getAvailableLotsForStage,
+  __private__: {
+    DEFAULT_TOLERANCE_PERCENT,
+    sortLotsForAvailability,
+    buildSuggestedLots,
+    getSnapshotStage,
+    assertCompanyScope,
+  },
+};

@@ -14,8 +14,8 @@ const ROLE_BUNDLES = Object.freeze([
       'receipts.confirm',
       'recipes.operations.view',
     ]),
-    allowedAdditions: Object.freeze(['clients.view', 'quality.inspect']),
-    sensitiveAdditions: Object.freeze(['inventory.qa.manage', 'inventory.approve', 'receipts.reverse', 'inventory.intake.override']),
+    allowedAdditions: Object.freeze(['clients.view', 'quality.inspect', 'production.view', 'production.execute']),
+    sensitiveAdditions: Object.freeze(['inventory.qa.manage', 'inventory.approve', 'receipts.reverse', 'inventory.intake.override', 'production.complete']),
     forbiddenPermissions: Object.freeze(['companies.manage']),
   }),
   Object.freeze({
@@ -23,13 +23,16 @@ const ROLE_BUNDLES = Object.freeze([
     label: 'Operador de producción',
     status: 'proposed',
     basePermissionCodes: Object.freeze([
+      'warehouse.access',
       'production.view',
       'production.execute',
       'recipes.operations.view',
       'inventory.view',
+      'receipts.view',
+      'receipts.inspect',
     ]),
     allowedAdditions: Object.freeze(['quality.inspect']),
-    sensitiveAdditions: Object.freeze(['production.complete', 'production.override']),
+    sensitiveAdditions: Object.freeze(['production.complete', 'production.override', 'receipts.confirm']),
     forbiddenPermissions: Object.freeze(['companies.manage']),
   }),
   Object.freeze({

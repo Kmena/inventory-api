@@ -1,5 +1,110 @@
 # Tasks
 
+## TASK-102: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` Fase 2 / `TASK-007`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production material-availability read model / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after Fase 2 / `TASK-007` executed by `sdd-implementation-agent-e88e1e`
+**Reason:** After the approved `TASK-007` implementation added the production material-availability read model and two mounted production read endpoints, the canonical architecture-facing docs still described the production surface as if those runtime reads were pending.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that `src/services/production-material-availability.service.js` exists, that `GET /api/production/orders/:id/material-requirements` and `GET /api/production/orders/:id/stages/:stageId/available-lots` are active tenant-scoped runtime contracts, that material availability is derived from persisted `production_order_material_requirements` plus current origin-warehouse stock, and that available-lot suggestions use the frozen stage snapshot together with current tenant product `requiresLot` / `requiresExpiration` flags, sellable-lot filtering, FEFO/FIFO ordering, and omission of `internalLotNumber`.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after `TASK-007`, including the runtime-contract governance classification and supplied validation evidence, without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented code in `src/services/production-material-availability.service.js`, `src/routes/production.routes.js`, `src/repositories/production.repository.js`, `src/repositories/inventory.repository.js`, `src/repositories/product.repository.js`, `tests/production-material-availability.service.test.js`, `tests/production-routes-contract.test.js`, and the updated runtime governance artifacts, plus the supplied validation evidence from `sdd-implementation-agent-e88e1e`
+**Database impact:** None; this refresh documents reads over the already-implemented `production_order_material_requirements` persistence boundary and current inventory stock state
+**API impact:** None beyond documentation alignment to the already-mounted runtime contracts for `GET /api/production/orders/:id/material-requirements` and `GET /api/production/orders/:id/stages/:stageId/available-lots`
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the tenant-scoped production read contracts and data-exposure limits are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable post-`TASK-007` state, distinguish persisted planning requirements from current-stock-derived availability, capture the current dependency on live product `requiresLot` / `requiresExpiration` flags because those are not frozen in existing snapshots, and do not claim unimplemented execution-hardening work
+**Validation evidence:** User-supplied results report targeted service + route tests ✅, focused eslint ✅, `npm run typecheck` ✅, full test suite ✅, and `npm run build` ✅
+**Required tests:** Preserve `tests/production-material-availability.service.test.js`, `tests/production-routes-contract.test.js`, and `tests/runtime-contract-governance.test.js` coverage for the mounted read-model contract and runtime-governance classification
+**Migration considerations:** Keep this refresh documentation-only and explicit that the available-lots read currently depends on live tenant product flags because `requiresLot` / `requiresExpiration` are not frozen in the existing production-order snapshot
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state changes the read-model source, freezes those product flags into snapshots, or alters the mounted route contracts
+**Risk:** Low
+
+## TASK-101: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` Fase 2 / `TASK-006`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production planning QA snapshot hardening / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after Fase 2 / `TASK-006` executed by `sdd-implementation-agent-e88e1e`
+**Reason:** After the approved `TASK-006` implementation hardened production-order snapshot serialization, the canonical architecture docs still described planning snapshots only at the material-requirements level and did not record the formal QA-parameter normalization, legacy `parameterTolerances` retention rules, or the fact that the change reuses existing create/approve snapshot builders without altering routes or schema.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that snapshot creation lives in `src/services/production-planning.service.js`, that `buildRecipeVersionSnapshot(...)` explicitly normalizes stage `expectedParameters` to `{ name, unit, expectedValue, minTolerance, maxTolerance }`, omits empty `parameterTolerances`, preserves non-empty legacy `parameterTolerances` arrays for backward compatibility, and feeds the unchanged create/approve route contracts through `buildEnrichedSnapshot(...)` and `buildOrderSnapshotWithMaterialRequirements(...)`.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after `TASK-006`, keeping the update narrowly scoped to the planning-layer snapshot contract and the supplied validation evidence.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented code in `src/services/production-planning.service.js`, `src/services/production.service.js`, `tests/production-planning.service.test.js`, and `tests/production-service-foundation.test.js`, plus the supplied validation evidence from `sdd-implementation-agent-e88e1e`
+**Database impact:** None; this refresh documents that `TASK-006` changed snapshot serialization only and did not alter Prisma schema or migrations
+**API impact:** None; existing create/approve endpoints keep the same mounted route surface while their snapshot payloads now carry normalized QA parameter definitions
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the frozen QA snapshot contract is now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable post-`TASK-006` state, distinguish the normalized QA snapshot contract from still-pending execution-time QA tolerance enforcement, and do not claim any route or schema change
+**Validation evidence:** User-supplied results report targeted tests ✅, focused eslint ✅, `npm run typecheck` ✅, and `npm test -- --silent` ✅
+**Required tests:** Preserve `tests/production-planning.service.test.js` and `tests/production-service-foundation.test.js` coverage for snapshot normalization behavior
+**Migration considerations:** Keep this refresh documentation-only and additive; preserve that legacy non-empty `parameterTolerances` still appear in snapshots for backward compatibility
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state changes snapshot serialization or removes the legacy compatibility field
+**Risk:** Low
+
+## TASK-100: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` Fase 2 / `TASK-005` functional scope
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production planning hardening / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after Fase 2 / `TASK-005` functional scope executed by `sdd-implementation-agent-e88e1e`
+**Reason:** After the approved Fase 2 implementation materially changed production-order planning behavior, the canonical architecture docs still described planning as internal-only and did not reflect persisted material requirements, approval-time stock revalidation, advisory-lock-backed planning transactions, or request-aware stock-override audit correlation.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that migration `20260915001000_production_order_material_requirements` and Prisma model `ProductionOrderMaterialRequirement` are active repository truth; `production.repository.js` includes/persists `materialRequirements`; `production.service.js` now computes and persists planning requirements, enriches `recipeVersionSnapshot.materialRequirements`, revalidates stock on approval inside inventory transactions with advisory lock, and emits stock-override audit events when request context is available; `production.routes.js` now passes `req` into create/approve calls for audit correlation; and the repository has since advanced the originally later execution split by explicit user authorization so `src/services/production.service.js` is now a 585-line façade delegating execution/return/completion work to `src/services/production-execution.service.js` while preserving public API and `__private__` compatibility.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after the Fase 2 / `TASK-005` closure, explicitly recording that an originally later structural split was advanced by explicit user authorization only far enough to satisfy the approved `production.service.js <= 600 lines` acceptance, while also preserving that the remaining `TASK-008` execution-validation features were not implemented in this cycle.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented code in `prisma/migrations/20260915001000_production_order_material_requirements/migration.sql`, `prisma/schema.prisma`, `src/repositories/production.repository.js`, `src/services/production.service.js`, `src/services/production-planning.service.js`, `src/services/production-execution.service.js`, and `src/routes/production.routes.js`, plus the supplied validation evidence from `sdd-implementation-agent-e88e1e`
+**Database impact:** Documentation records additive migration `20260915001000_production_order_material_requirements` and active model `ProductionOrderMaterialRequirement`; no new schema change in this refresh
+**API impact:** None in this refresh beyond documenting the already-implemented runtime behavior change on existing create/approve production endpoints
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because approval-time stock enforcement and request-aware override auditing are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable post-closure state of Fase 2 / `TASK-005`, state that the `production.service.js <= 600 lines` acceptance is now satisfied through an explicitly user-authorized early split, and still distinguish that from the not-yet-implemented `TASK-008` execution-validation features
+**Validation evidence:** User-supplied results report targeted tests ✅, focused eslint ✅, `npm run typecheck` ✅, `npm run build` ✅, and `npm test -- --silent` ✅
+**Required tests:** Preserve the targeted Fase 2 production planning coverage together with the repository-wide green validation lane supplied for this cycle
+**Migration considerations:** Keep this refresh documentation-only and additive; record that the execution-service split is already implemented by explicit user authorization, but do not reinterpret the still-pending `TASK-008` validation enhancements as already delivered
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state changes the create/approve planning behavior or finally completes the deferred service split
+**Risk:** Low
+
+## TASK-099: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` Fase 2 / `TASK-004`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production planning foundation / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after Fase 2 / `TASK-004`
+**Reason:** After the approved planning extraction shipped, the canonical architecture docs still needed to reflect the new internal planning seam and FEFO helper extraction without overstating later create/approve behavior as already implemented.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that `production-planning.service.js` exists, `production.service.js` reuses the centralized snapshot builder, `sortLotsByFefo(...)` is a pure exported helper used by `reserveLots(...)`, and material-requirement persistence / active stock enforcement remain future work.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after `src/services/production-planning.service.js` was introduced and FEFO sorting was extracted.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented code in `src/services/production-planning.service.js`, `src/services/inventory-transaction-support.service.js`, `src/services/production.service.js`, plus focused tests
+**Database impact:** None in this refresh
+**API impact:** None; no public contract change documented
+**Container impact:** None
+**Security impact:** Low
+**Acceptance criteria:** Docs describe the new planning seam and FEFO extraction as current truth, explicitly preserve that create/approve runtime behavior is not yet changed, and note the unrelated governance-baseline test failure accurately.
+**Validation evidence:** User-supplied targeted tests ✅, focused eslint ✅, `npm run typecheck` ✅, `npm run build` ✅; repository-wide `npm test` still fails only in `tests/governance-baseline-sync-guardrails.test.js` due to `docs/audit/current-code-audit.md` wording drift
+**Required tests:** Preserve `tests/production-planning.service.test.js`, `tests/inventory-transaction-support.service.test.js`, and `tests/production-service-foundation.test.js`
+**Migration considerations:** Keep this refresh documentation-only and do not claim active stock enforcement or persisted material requirements before later tasks
+**Rollback or mitigation:** Revert wording if a later verified implementation changes the actual adoption level of the planning seam
+**Risk:** Low
+
+## TASK-098: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` Fase 1
+**Status:** Completed
+**Priority:** Low
+**Domain:** Recipe / production QA hardening / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; mandatory post-implementation documentation refresh requested by `sdd-implementation-agent-e88e1e` after Fase 1 (`TASK-001`, `TASK-002`, `TASK-003`)
+**Reason:** After the approved Fase 1 implementation shipped, the canonical architecture-facing docs still needed to reflect the active recipe-write invariants, the new additive production QA persistence fields, and the remaining stage-execution idempotency contradiction without overstating later phases as already implemented.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record the observable repository truth after Fase 1: recipe stage-input unit consistency is enforced in Zod, service, and DB layers; `qaMandatory` stages require formal numeric expected parameters; `RecipeStageInput.quantity` is explicitly documented as per-unit quantity on the existing column; additive `ProductionStageExecution.qaOutOfTolerance` / `overrideJustification` fields exist but are not yet consumed by runtime flows; and the `endedAt` / active-execution contradiction is explicitly tracked as remaining risk.
+**Implemented change:** Synchronized architecture-facing documentation to the actual repository state after `recipes-production-qa-execution-hardening` Fase 1 without changing production runtime contracts beyond the implemented backend hardening already completed in code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented Fase 1 code in `prisma/migrations/20260915000000_recipe_qa_and_stage_input_unit/migration.sql`, `prisma/schema.prisma`, `src/schemas/recipe.schema.js`, `src/services/recipe.service.js`, plus focused tests and spec documentation updated by `sdd-implementation-agent-e88e1e`
+**Database impact:** Documentation records additive migration `20260915000000_recipe_qa_and_stage_input_unit`; no new schema change in this refresh
+**API impact:** None; this refresh only documents the already-implemented recipe write-contract hardening
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because tenant-scoped validation boundaries and remaining production-QA runtime gaps are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable Fase 1 implementation, distinguish active recipe-write hardening from future production-execution hardening, and note the active-state/idempotency contradiction without claiming it is solved
+**Validation evidence:** User-supplied Fase 1 results report `npm run prisma:deploy` ✅, `npm run build` ✅, `npm run typecheck` ✅, `node --test tests/recipe-schema.test.js` ✅, `node --test tests/recipe-service-foundation.test.js` ✅, and `npm test -- --silent` ✅ (`1205` pass, `0` fail, `2` skipped); `npm run lint` remains red only because of unrelated pre-existing files outside this feature slice
+**Required tests:** Preserve `tests/recipe-schema.test.js`, `tests/recipe-service-foundation.test.js`, and the documented aggregate validation evidence for this implementation cycle
+**Migration considerations:** Keep the documented migration additive; do not claim a new `quantity_per_unit` column or fully implemented execution-QA tolerance behavior until later phases wire those runtime flows
+**Rollback or mitigation:** Revert documentation wording if a later verified implementation changes the actual recipe or production QA runtime behavior
+**Risk:** Low
+
 ## TASK-097: Refresh architecture-facing docs after supplier-management RFQ tracking layout cycle
 **Status:** Completed
 **Priority:** Low

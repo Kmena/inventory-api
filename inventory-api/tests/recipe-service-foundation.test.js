@@ -36,7 +36,7 @@ test('createRecipeVersion rejects stage-input product references outside the aut
       findRecipeById: async (recipeId, companyId) => ({ id: recipeId, companyId, versions: [] }),
     }],
     [productRepository, {
-      findProductsByIds: async () => [{ id: 11n }],
+      findProductsByIds: async () => [{ id: 11n, name: 'Base', unit: 'KG' }],
     }],
   ], async () => {
     await assert.rejects(
@@ -57,6 +57,42 @@ test('createRecipeVersion rejects stage-input product references outside the aut
       },
     );
   });
+});
+
+test('createRecipeVersion rejects stage input units that differ from the catalog product unit', async () => {
+  await withModuleStubs([
+    [recipeRepository, {
+      findRecipeById: async (recipeId, companyId) => ({ id: recipeId, companyId, versions: [] }),
+    }],
+    [productRepository, {
+      findProductsByIds: async () => [{ id: 11n, name: 'Base', unit: 'KG' }],
+    }],
+  ], async () => {
+    await assert.rejects(
+      () => recipeService.createRecipeVersion(33n, {
+        stages: [{
+          name: 'Preparacion',
+          stageInputs: [{ productId: 11n, name: 'Base', quantity: 5, unit: 'LB' }],
+        }],
+      }, auth),
+      (error) => {
+        assert.equal(error?.statusCode, 400);
+        assert.equal(error?.code, 'validation_error');
+        assert.match(error?.message || '', /debe coincidir con la unidad del producto/i);
+        assert.match(error?.message || '', /esperada: KG/i);
+        return true;
+      },
+    );
+  });
+});
+
+test('assertStageInputsUnitConsistency ignores descriptive stage inputs without productId', async () => {
+  await assert.doesNotReject(() => recipeService.assertStageInputsUnitConsistency({
+    stages: [{
+      name: 'Preparacion',
+      stageInputs: [{ name: 'Nota operativa', quantity: 1, unit: null }],
+    }],
+  }, 7n));
 });
 
 test('createRecipeVersion creates the next draft version with stages and derives ingredients from stage inputs', async () => {
@@ -117,7 +153,7 @@ test('createRecipeVersion creates the next draft version with stages and derives
       },
     }],
     [productRepository, {
-      findProductsByIds: async () => [{ id: 11n }],
+      findProductsByIds: async () => [{ id: 11n, name: 'Base', unit: 'KG' }],
     }],
   ], () => recipeService.createRecipeVersion(33n, {
     expectedYield: 100,

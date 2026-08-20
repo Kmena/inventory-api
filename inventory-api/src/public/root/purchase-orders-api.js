@@ -8,7 +8,15 @@
     });
   }
 
+  async function issueOrder(session, orderId) {
+    return inventoryAuth.fetchJson(session, `/api/procurement/orders/${encodeURIComponent(orderId)}/issue`, {
+      method: 'POST',
+      fallbackMessage: 'No se pudo emitir la orden de compra.',
+    });
+  }
+
   rootShell.register('purchaseOrdersApi', {
     listOrders,
+    issueOrder,
   });
 }(window));

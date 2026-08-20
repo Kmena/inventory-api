@@ -167,7 +167,7 @@
         summaryEl.textContent = `${quotations.length} proveedor(es) con respuesta · ordenados por precio total ascendente`;
         tableRegion.innerHTML = renderers.renderComparisonTable(quotations);
         bindSelectButtons();
-      } catch (error) {
+      } catch (_error) {
         section.hidden = true;
       }
     }

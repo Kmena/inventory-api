@@ -294,7 +294,7 @@ test('comparison section and dialogs are injected into DOM by mountComparisonSec
 });
 
 test('comparison renderers produce scannable comparison table and PO summary', () => {
-  const rootShell = createHarness();
+  const _rootShell = createHarness();
   const rootShellWithComparison = createViewHarness();
   const renderers = rootShellWithComparison.require('views.quotationsComparisonRenderers');
 

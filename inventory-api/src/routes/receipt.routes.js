@@ -28,6 +28,16 @@ router.post('/', authorizeAccessPolicy('receipt.inspect'), validate(createPurcha
   }
 });
 
+// IMPORTANT: This route MUST be declared BEFORE GET /:id
+// to prevent Express from interpreting 'purchase-orders' as a BigInt :id param.
+router.get('/purchase-orders', authorizeAccessPolicy('receipt.view'), async (req, res, next) => {
+  try {
+    return res.json(await receiptService.listPurchaseOrdersForReceipt(req.auth));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/:id', authorizeAccessPolicy('receipt.view'), async (req, res, next) => {
   try {
     return res.json(await receiptService.getPurchaseReceipt(parseBigIntId(req.params.id), req.auth));

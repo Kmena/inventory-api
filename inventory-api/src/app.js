@@ -44,7 +44,24 @@ const migrationDocumentPath = path.join(publicRootDirectory, 'migration.html');
 app.set('trust proxy', trustProxy);
 app.set('json replacer', (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
 
-function getFriendlyError(error) {
+const DB_UNREACHABLE_MESSAGE = 'No pudimos conectarnos a la base de datos. Intente de nuevo en unos momentos.';
+const DB_AUTH_FAILED_MESSAGE = 'El servicio no pudo conectarse a la base de datos. Intente de nuevo en unos momentos.';
+
+function extractDatabaseTarget(rawMessage) {
+  const match = /at\s+`([^`]+)`/i.exec(rawMessage || '');
+  return match ? match[1] : null;
+}
+
+function withDevHint(baseMessage, error, currentEnv) {
+  if (currentEnv === 'production') {
+    return baseMessage;
+  }
+  const target = extractDatabaseTarget(error?.message);
+  const targetHint = target ? ` en ${target}` : '';
+  return `${baseMessage} [dev] Base de datos no disponible${targetHint}. Revisa que los contenedores esten arriba (\`npm run dev:full\`).`;
+}
+
+function getFriendlyError(error, currentEnv = nodeEnv) {
   const rawMessage = error?.message || '';
   const lowerMessage = rawMessage.toLowerCase();
 
@@ -52,7 +69,7 @@ function getFriendlyError(error) {
     return {
       statusCode: 503,
       code: 'service_unavailable',
-      message: 'No pudimos conectarnos a la base de datos. Intente de nuevo en unos momentos.',
+      message: withDevHint(DB_UNREACHABLE_MESSAGE, error, currentEnv),
     };
   }
 
@@ -60,7 +77,7 @@ function getFriendlyError(error) {
     return {
       statusCode: 503,
       code: 'service_unavailable',
-      message: 'El servicio no pudo conectarse a la base de datos. Intente de nuevo en unos momentos.',
+      message: withDevHint(DB_AUTH_FAILED_MESSAGE, error, currentEnv),
     };
   }
 

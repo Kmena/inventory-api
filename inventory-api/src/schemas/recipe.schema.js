@@ -2,24 +2,48 @@ const { z } = require('zod');
 
 const optionalDateSchema = z.union([z.coerce.date(), z.null()]).optional();
 
+const qaParameterSchema = z.object({
+  name: z.string().trim().min(1, 'El nombre del parametro QA es obligatorio').max(120),
+  unit: z.string().trim().min(1, 'La unidad del parametro QA es obligatoria').max(40),
+  expectedValue: z.coerce.number(),
+  minTolerance: z.coerce.number().min(0, 'La tolerancia minima no puede ser negativa'),
+  maxTolerance: z.coerce.number().min(0, 'La tolerancia maxima no puede ser negativa'),
+}).strict();
+
 const recipeStageInputSchema = z.object({
   productId: z.coerce.bigint().optional().nullable(),
   name: z.string().trim().min(1).max(255),
   quantity: z.coerce.number().positive().optional().nullable(),
-  unit: z.string().trim().max(30).optional().nullable(),
+  unit: z.string().trim().min(1, 'La unidad es obligatoria cuando se selecciona un producto').max(30).optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),
-}).strict();
+}).strict().superRefine((stageInput, context) => {
+  if (stageInput.productId && !stageInput.unit) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['unit'],
+      message: 'La unidad es obligatoria cuando se selecciona un producto',
+    });
+  }
+});
 
 const recipeStageSchema = z.object({
   name: z.string().trim().min(1).max(255),
   instructions: z.string().trim().max(5000).optional().nullable(),
   responsibleRoleCode: z.string().trim().max(100).optional().nullable(),
-  expectedParameters: z.array(z.record(z.unknown())).optional().default([]),
+  expectedParameters: z.array(qaParameterSchema).optional().default([]),
   parameterTolerances: z.array(z.record(z.unknown())).optional().default([]),
   requiredEvidence: z.array(z.record(z.unknown())).optional().default([]),
-  qaMandatory: z.boolean().optional(),
+  qaMandatory: z.boolean().optional().default(false),
   stageInputs: z.array(recipeStageInputSchema).optional().default([]),
-}).strict();
+}).strict().superRefine((stage, context) => {
+  if (stage.qaMandatory && stage.expectedParameters.length === 0) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['expectedParameters'],
+      message: 'La etapa QA obligatoria requiere al menos un parametro esperado',
+    });
+  }
+});
 
 const recipeFieldsSchema = z.object({
   code: z.string().trim().min(1).max(50).optional().nullable(),
@@ -91,6 +115,7 @@ const approveRecipeVersionSchema = z.object({
 });
 
 module.exports = {
+  qaParameterSchema,
   createRecipeSchema,
   updateRecipeSchema,
   createRecipeVersionSchema,

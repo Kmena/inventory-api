@@ -149,6 +149,10 @@ async function checkMandatoryQaGatesForOrder(orderId, companyId) {
       continue;
     }
 
+    if (!stageExecution.qaOutOfTolerance) {
+      continue;
+    }
+
     const approvedInspection = await qualityRepository.findApprovedInspectionForStageExecution(stageExecution.id);
     if (!approvedInspection) {
       const allInspections = await qualityRepository.findQualityInspectionsForStageExecution(stageExecution.id);
@@ -157,7 +161,7 @@ async function checkMandatoryQaGatesForOrder(orderId, companyId) {
       if (hasRejection) {
         rejectedStages.push({ stageId: stage.id, stageName: stage.name, reason: 'qa_rejected' });
       } else {
-        pendingStages.push({ stageId: stage.id, stageName: stage.name, reason: 'qa_inspection_missing' });
+        pendingStages.push({ stageId: stage.id, stageName: stage.name, reason: 'qa_out_of_tolerance_requires_approval' });
       }
     }
   }

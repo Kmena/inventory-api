@@ -279,6 +279,17 @@ function listPurchaseOrders(companyId, db = prisma) {
   });
 }
 
+function issuePurchaseOrder(id, db = prisma) {
+  return db.purchaseOrder.update({
+    where: { id },
+    data: { status: 'ISSUED' },
+    include: {
+      supplier: true,
+      items: { include: { product: true } },
+    },
+  });
+}
+
 module.exports = {
   transaction,
   createAssistedPurchaseRequest,
@@ -300,4 +311,5 @@ module.exports = {
   createPurchaseOrder,
   findPurchaseOrderByIdForCompany,
   listPurchaseOrders,
+  issuePurchaseOrder,
 };

@@ -578,6 +578,19 @@ async function createPurchaseOrderFromSelection(purchaseRequestId, payload, auth
   return serializePurchaseOrder(purchaseOrder);
 }
 
+async function issuePurchaseOrder(orderId, auth) {
+  const scope = assertCompanyScope(auth);
+  const order = await procurementRepository.findPurchaseOrderByIdForCompany(BigInt(orderId), scope.companyId);
+  if (!order) {
+    throw createHttpError(404, 'Orden de compra no encontrada', 'not_found');
+  }
+  if (order.status !== 'DRAFT') {
+    throw createHttpError(409, 'Solo se pueden emitir órdenes en estado borrador', 'conflict');
+  }
+  const issued = await procurementRepository.issuePurchaseOrder(order.id);
+  return serializePurchaseOrder(issued);
+}
+
 module.exports = {
   createPurchaseRequest,
   createAssistedQuotationRequest,
@@ -592,6 +605,7 @@ module.exports = {
   approveSupplierSelection,
   createPurchaseOrderFromSelection,
   cancelPurchaseRequest,
+  issuePurchaseOrder,
   __private__: {
     calculateQuotationTotal,
     getProcurementApprovalThreshold,

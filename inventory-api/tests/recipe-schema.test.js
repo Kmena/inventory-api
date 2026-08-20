@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  qaParameterSchema,
   createRecipeSchema,
   createRecipeVersionSchema,
   updateRecipeVersionSchema,
@@ -21,7 +22,22 @@ test('createRecipeSchema accepts the additive recipe master fields', () => {
   assert.equal(result.data.name, 'Shampoo base');
 });
 
-test('createRecipeVersionSchema accepts stages with product-bearing inputs (ingredients derived, order automatic)', () => {
+test('qaParameterSchema accepts the approved numeric QA contract', () => {
+  const result = qaParameterSchema.safeParse({
+    name: 'pH',
+    unit: 'pH',
+    expectedValue: '7.0',
+    minTolerance: '0.5',
+    maxTolerance: '0.5',
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.expectedValue, 7);
+  assert.equal(result.data.minTolerance, 0.5);
+  assert.equal(result.data.maxTolerance, 0.5);
+});
+
+test('createRecipeVersionSchema accepts stages with product-bearing inputs and formal QA parameters', () => {
   const result = createRecipeVersionSchema.safeParse({
     expectedYield: 100,
     expectedWaste: 3,
@@ -30,8 +46,14 @@ test('createRecipeVersionSchema accepts stages with product-bearing inputs (ingr
       {
         name: 'Preparacion',
         qaMandatory: true,
-        expectedParameters: [{ key: 'temperature', value: '45C' }],
-        parameterTolerances: [{ key: 'temperature', min: 43, max: 47 }],
+        expectedParameters: [{
+          name: 'pH',
+          unit: 'pH',
+          expectedValue: 7,
+          minTolerance: 0.5,
+          maxTolerance: 0.5,
+        }],
+        parameterTolerances: [{ legacy: true }],
         requiredEvidence: [{ type: 'photo' }],
         stageInputs: [
           { productId: '11', name: 'Base liquida', quantity: 25.5, unit: 'KG' },
@@ -76,10 +98,68 @@ test('recipe version schemas reject invalid effective dates', () => {
   }).success, false);
 });
 
+test('createRecipeVersionSchema rejects stage inputs with productId and missing unit', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{
+      name: 'Preparacion',
+      stageInputs: [{ productId: '11', name: 'Base liquida', quantity: 25.5 }],
+    }],
+  });
+
+  assert.equal(result.success, false);
+  assert.match(result.error.issues[0].message, /unidad es obligatoria/i);
+});
+
+test('createRecipeVersionSchema allows descriptive stage inputs without productId and without unit', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{
+      name: 'Preparacion',
+      stageInputs: [{ name: 'Indicacion operativa', quantity: 1 }],
+    }],
+  });
+
+  assert.equal(result.success, true);
+});
+
+test('createRecipeVersionSchema rejects qaMandatory stages without expected parameters', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{
+      name: 'Preparacion',
+      qaMandatory: true,
+      expectedParameters: [],
+    }],
+  });
+
+  assert.equal(result.success, false);
+  assert.match(result.error.issues[0].message, /qa obligatoria requiere al menos un parametro esperado/i);
+});
+
+test('createRecipeVersionSchema rejects QA parameters with negative tolerances', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{
+      name: 'Preparacion',
+      qaMandatory: true,
+      expectedParameters: [{
+        name: 'pH',
+        unit: 'pH',
+        expectedValue: 7,
+        minTolerance: -0.1,
+        maxTolerance: 0.5,
+      }],
+    }],
+  });
+
+  assert.equal(result.success, false);
+  assert.match(result.error.issues[0].message, /tolerancia minima no puede ser negativa/i);
+});
+
 test('updateRecipeVersionSchema accepts partial stage updates without order fields', () => {
   const result = updateRecipeVersionSchema.safeParse({
     stages: [
-      { name: 'Mezcla', stageInputs: [{ name: 'Base', quantity: 10 }] },
+      {
+        name: 'Mezcla',
+        stageInputs: [{ name: 'Base', quantity: 10 }],
+      },
       { name: 'Envasado' },
     ],
   });

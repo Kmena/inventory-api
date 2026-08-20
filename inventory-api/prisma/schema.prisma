@@ -236,6 +236,7 @@ model Company {
   products         Product[]
   orders           Order[]
   productionOrders ProductionOrder[]
+  productionOrderMaterialRequirements ProductionOrderMaterialRequirement[]
   suppliers        Supplier[]
   companyConfig    CompanyConfig?
   fiscalConfig     CompanyFiscalConfig?
@@ -880,6 +881,7 @@ model Product {
   supplierLinks    ProductSupplier[]
   allowedWarehouses ProductAllowedWarehouse[]
   productionOrders ProductionOrder[] @relation("production_order_product")
+  productionOrderMaterialRequirements ProductionOrderMaterialRequirement[]
   productionItems  ProductionItem[]
   purchaseRequestItems PurchaseRequestItem[]
   supplierQuotationItems SupplierQuotationItem[]
@@ -1552,6 +1554,7 @@ model RecipeStageInput {
   recipeStageId BigInt       @map("recipe_stage_id")
   productId     BigInt?      @map("product_id")
   name          String
+  /// Cantidad de insumo por 1 unidad de producto terminado (base unitaria).
   quantity      Decimal?     @db.Decimal(14, 3)
   unit          String?
   sortOrder     Int          @default(0) @map("sort_order")
@@ -1601,6 +1604,7 @@ model ProductionOrder {
   destinationWarehouse   Warehouse?                @relation("production_order_destination_warehouse", fields: [destinationWarehouseId], references: [id])
   responsibleUser        User?                     @relation("production_order_responsible_user", fields: [responsibleUserId], references: [id])
   items                  ProductionItem[]
+  materialRequirements   ProductionOrderMaterialRequirement[]
   stageExecutions        ProductionStageExecution[]
   consumptions           ProductionConsumption[]
   wastes                 ProductionWaste[]
@@ -1610,6 +1614,26 @@ model ProductionOrder {
   @@index([companyId, status, plannedDate])
   @@index([companyId, productId, createdAt])
   @@map("production_orders")
+}
+
+model ProductionOrderMaterialRequirement {
+  id                  BigInt          @id @default(autoincrement())
+  companyId           BigInt          @map("company_id")
+  productionOrderId   BigInt          @map("production_order_id")
+  productId           BigInt          @map("product_id")
+  requiredQuantity    Decimal         @db.Decimal(14, 3) @map("required_quantity")
+  unit                String
+  availableAtCreation Decimal?        @db.Decimal(14, 3) @map("available_at_creation")
+  shortageAtCreation  Decimal?        @db.Decimal(14, 3) @map("shortage_at_creation")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  company             Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  productionOrder     ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  product             Product         @relation(fields: [productId], references: [id])
+
+  @@unique([productionOrderId, productId])
+  @@index([companyId, productionOrderId])
+  @@index([productId])
+  @@map("production_order_material_requirements")
 }
 
 model ProductionItem {
@@ -1637,10 +1661,12 @@ model ProductionStageExecution {
   responsibleUserId BigInt?            @map("responsible_user_id")
   startedAt         DateTime           @map("started_at")
   endedAt           DateTime           @map("ended_at")
-  actualParameters  Json?              @map("actual_parameters")
-  evidence          Json?
-  notes             String?
-  movementGroupId   String?            @map("movement_group_id")
+  actualParameters      Json?              @map("actual_parameters")
+  qaOutOfTolerance     Boolean            @default(false) @map("qa_out_of_tolerance")
+  overrideJustification String?           @map("override_justification")
+  evidence              Json?
+  notes                 String?
+  movementGroupId       String?            @map("movement_group_id")
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
   productionOrder   ProductionOrder    @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)

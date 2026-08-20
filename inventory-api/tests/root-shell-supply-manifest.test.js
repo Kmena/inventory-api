@@ -149,7 +149,7 @@ test('supply module items keep approved implementation split between production 
     'solicitudes_compra', 'ordenes_compra',
     'recepciones', 'referencias_fiscales',
   ];
-  const pendingProcurementRoutes = [];   // compras-group completamente implementado
+  const _pendingProcurementRoutes = [];   // compras-group completamente implementado
 
   for (const routeKey of implementedProductionRoutes) {
     const item = manifest.items.find((i) => i.routeKey === routeKey);

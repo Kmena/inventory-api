@@ -447,7 +447,7 @@ const ACCESS_POLICIES = Object.freeze({
   },
   'warehouse.company.list': {
     mode: 'permission',
-    permissions: ['inventory.view', 'inventory.manage'],
+    permissions: ['inventory.view', 'inventory.manage', 'warehouse.receive'],
     boundary: 'tenant-operational',
     transition: 'permission-governed',
   },

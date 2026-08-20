@@ -220,9 +220,10 @@ test('purchase-orders renderers renderOrderList returns empty state when no orde
 test('purchase-orders renderers renderOrderList renders an order row with data-order-id', () => {
   const shell = createOrdersHarness();
   const renderers = shell.require('views.purchaseOrdersAdminRenderers');
+  // Uses real PurchaseOrderStatus enum value: DRAFT
   const orders = [
     {
-      id: 77, status: 'PENDING',
+      id: 77, status: 'DRAFT',
       supplier: { name: 'Proveedor Alfa' },
       items: [{ quantity: 5, unitPrice: 1000, currency: 'CRC', product: { name: 'Sal', sku: 'S-001' } }],
       createdAt: '2026-08-01T00:00:00.000Z',
@@ -231,7 +232,7 @@ test('purchase-orders renderers renderOrderList renders an order row with data-o
   const html = renderers.renderOrderList(orders, null);
   assert.match(html, /data-order-id="77"/);
   assert.match(html, /OC #77/);
-  assert.match(html, /Pendiente/);
+  assert.match(html, /Borrador/);
   assert.match(html, /badge-warning/);
   assert.match(html, /Proveedor Alfa/);
 });
@@ -239,9 +240,10 @@ test('purchase-orders renderers renderOrderList renders an order row with data-o
 test('purchase-orders renderers renderOrderList marks selected order as active', () => {
   const shell = createOrdersHarness();
   const renderers = shell.require('views.purchaseOrdersAdminRenderers');
+  // Uses real PurchaseOrderStatus enum values: DRAFT, ISSUED
   const orders = [
-    { id: 1, status: 'PENDING', supplier: { name: 'A' }, items: [], createdAt: '2026-08-01T00:00:00.000Z' },
-    { id: 2, status: 'CONFIRMED', supplier: { name: 'B' }, items: [], createdAt: '2026-08-01T00:00:00.000Z' },
+    { id: 1, status: 'DRAFT', supplier: { name: 'A' }, items: [], createdAt: '2026-08-01T00:00:00.000Z' },
+    { id: 2, status: 'ISSUED', supplier: { name: 'B' }, items: [], createdAt: '2026-08-01T00:00:00.000Z' },
   ];
   const html = renderers.renderOrderList(orders, 2);
   assert.match(html, /rfq-tracking-sidebar-item--active/);
@@ -258,8 +260,9 @@ test('purchase-orders renderers renderOrderDetail returns default state when no 
 test('purchase-orders renderers renderOrderDetail renders order detail with product table and hacienda placeholder', () => {
   const shell = createOrdersHarness();
   const renderers = shell.require('views.purchaseOrdersAdminRenderers');
+  // Uses real PurchaseOrderStatus enum value: ISSUED
   const order = {
-    id: 88, status: 'CONFIRMED',
+    id: 88, status: 'ISSUED',
     supplier: { name: 'Proveedor Uno' },
     notes: 'Entrega rápida',
     createdAt: '2026-08-01T00:00:00.000Z',
@@ -269,7 +272,7 @@ test('purchase-orders renderers renderOrderDetail renders order detail with prod
   };
   const html = renderers.renderOrderDetail(order);
   assert.match(html, /Orden de compra #88/);
-  assert.match(html, /Confirmada/);
+  assert.match(html, /Emitida/);
   assert.match(html, /badge-info/);
   assert.match(html, /Proveedor Uno/);
   assert.match(html, /Az&#xFA;car|Azúcar/);
@@ -279,18 +282,19 @@ test('purchase-orders renderers renderOrderDetail renders order detail with prod
   assert.match(html, /Comprobante fiscal/);
 });
 
-test('purchase-orders renderers renderOrderDetail formats RECEIVED status correctly', () => {
+test('purchase-orders renderers renderOrderDetail formats CANCELLED status correctly', () => {
   const shell = createOrdersHarness();
   const renderers = shell.require('views.purchaseOrdersAdminRenderers');
+  // Uses real PurchaseOrderStatus enum value: CANCELLED
   const order = {
-    id: 99, status: 'RECEIVED',
+    id: 99, status: 'CANCELLED',
     supplier: { name: 'Proveedor Beta' },
     createdAt: '2026-08-01T00:00:00.000Z',
     items: [],
   };
   const html = renderers.renderOrderDetail(order);
-  assert.match(html, /Recibida/);
-  assert.match(html, /badge-success/);
+  assert.match(html, /Cancelada/);
+  assert.match(html, /badge-danger/);
 });
 
 // ─── Source structure guards ──────────────────────────────────────────────────

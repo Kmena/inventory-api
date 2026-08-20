@@ -57,6 +57,69 @@ function aggregateIngredientsFromStages(stages) {
     .sort((left, right) => String(left.productId).localeCompare(String(right.productId)));
 }
 
+function normalizeQaParameterDefinition(parameter) {
+  return {
+    name: parameter.name,
+    unit: parameter.unit,
+    expectedValue: parameter.expectedValue,
+    minTolerance: parameter.minTolerance,
+    maxTolerance: parameter.maxTolerance,
+  };
+}
+
+function normalizeStageInputUnit(unit) {
+  if (unit === null || unit === undefined) {
+    return null;
+  }
+
+  const normalizedUnit = String(unit).trim();
+  return normalizedUnit.length > 0 ? normalizedUnit : null;
+}
+
+async function assertStageInputsUnitConsistency(payload, companyId) {
+  const referencedProductIds = new Set();
+
+  for (const stage of payload.stages || []) {
+    for (const stageInput of stage.stageInputs || []) {
+      if (stageInput.productId) {
+        referencedProductIds.add(String(stageInput.productId));
+      }
+    }
+  }
+
+  if (referencedProductIds.size === 0) {
+    return;
+  }
+
+  const requestedProductIds = [...referencedProductIds].map((productId) => BigInt(productId));
+  const products = await productRepository.findProductsByIds(requestedProductIds, companyId);
+  const productsById = new Map(products.map((product) => [String(product.id), product]));
+
+  for (const stage of payload.stages || []) {
+    for (const stageInput of stage.stageInputs || []) {
+      if (!stageInput.productId) {
+        continue;
+      }
+
+      const product = productsById.get(String(stageInput.productId));
+      if (!product) {
+        continue;
+      }
+
+      const normalizedUnit = normalizeStageInputUnit(stageInput.unit);
+      if (normalizedUnit === product.unit) {
+        continue;
+      }
+
+      throw createHttpError(
+        400,
+        `La unidad del insumo "${stageInput.name}" debe coincidir con la unidad del producto "${product.name}" (esperada: ${product.unit})`,
+        'validation_error',
+      );
+    }
+  }
+}
+
 function toRecipeVersionCreateData(payload, scope, recipeId, versionNumber) {
   return {
     companyId: scope.companyId,
@@ -77,7 +140,7 @@ function toRecipeVersionCreateData(payload, scope, recipeId, versionNumber) {
         name: stage.name,
         instructions: stage.instructions ?? null,
         responsibleRoleCode: stage.responsibleRoleCode ?? null,
-        expectedParameters: stage.expectedParameters ?? [],
+        expectedParameters: (stage.expectedParameters ?? []).map(normalizeQaParameterDefinition),
         parameterTolerances: stage.parameterTolerances ?? [],
         requiredEvidence: stage.requiredEvidence ?? [],
         qaMandatory: stage.qaMandatory ?? false,
@@ -86,7 +149,7 @@ function toRecipeVersionCreateData(payload, scope, recipeId, versionNumber) {
             productId: stageInput.productId ?? null,
             name: stageInput.name,
             quantity: stageInput.quantity ?? null,
-            unit: stageInput.unit ?? null,
+            unit: normalizeStageInputUnit(stageInput.unit),
             sortOrder: inputIndex,
             notes: stageInput.notes ?? null,
           })),
@@ -163,7 +226,7 @@ function buildRecipeVersionUpdateData(payload) {
         name: stage.name,
         instructions: stage.instructions ?? null,
         responsibleRoleCode: stage.responsibleRoleCode ?? null,
-        expectedParameters: stage.expectedParameters ?? [],
+        expectedParameters: (stage.expectedParameters ?? []).map(normalizeQaParameterDefinition),
         parameterTolerances: stage.parameterTolerances ?? [],
         requiredEvidence: stage.requiredEvidence ?? [],
         qaMandatory: stage.qaMandatory ?? false,
@@ -172,7 +235,7 @@ function buildRecipeVersionUpdateData(payload) {
             productId: stageInput.productId ?? null,
             name: stageInput.name,
             quantity: stageInput.quantity ?? null,
-            unit: stageInput.unit ?? null,
+            unit: normalizeStageInputUnit(stageInput.unit),
             sortOrder: inputIndex,
             notes: stageInput.notes ?? null,
           })),
@@ -190,7 +253,7 @@ function serializeRecipeStageInput(stageInput) {
     productId: stageInput.productId,
     name: stageInput.name,
     quantity: stageInput.quantity,
-    unit: stageInput.unit,
+    unit: normalizeStageInputUnit(stageInput.unit),
     sortOrder: stageInput.sortOrder,
     notes: stageInput.notes,
     product: stageInput.product ? {
@@ -210,7 +273,7 @@ function serializeRecipeStage(stage) {
     name: stage.name,
     instructions: stage.instructions,
     responsibleRoleCode: stage.responsibleRoleCode,
-    expectedParameters: stage.expectedParameters ?? [],
+    expectedParameters: (stage.expectedParameters ?? []).map(normalizeQaParameterDefinition),
     parameterTolerances: stage.parameterTolerances ?? [],
     requiredEvidence: stage.requiredEvidence ?? [],
     qaMandatory: stage.qaMandatory,
@@ -353,6 +416,7 @@ async function createRecipeVersion(recipeId, payload, auth) {
   }
 
   await validateCompanyProductReferences(payload, scope.companyId);
+  await assertStageInputsUnitConsistency(payload, scope.companyId);
 
   const latestVersion = await recipeRepository.findLatestRecipeVersion(recipeId, scope.companyId);
   const versionNumber = (latestVersion?.versionNumber || 0) + 1;
@@ -375,6 +439,7 @@ async function updateRecipeVersion(recipeVersionId, payload, auth) {
   }
 
   await validateCompanyProductReferences(payload, scope.companyId);
+  await assertStageInputsUnitConsistency(payload, scope.companyId);
 
   const updatedVersion = await recipeRepository.updateRecipeVersion(
     recipeVersionId,
@@ -430,4 +495,5 @@ module.exports = {
   updateRecipeVersion,
   approveRecipeVersion,
   aggregateIngredientsFromStages,
+  assertStageInputsUnitConsistency,
 };

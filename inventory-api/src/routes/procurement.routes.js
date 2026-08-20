@@ -113,6 +113,14 @@ router.post('/requests/:id/purchase-orders', authorizeAccessPolicy('procurement.
   }
 });
 
+router.post('/orders/:id/issue', authorizeAccessPolicy('procurement.manage'), async (req, res, next) => {
+  try {
+    return res.json(await procurementService.issuePurchaseOrder(parseBigIntId(req.params.id), req.auth));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/orders', authorizeAccessPolicy('procurement.view'), async (req, res, next) => {
   try {
     return res.json(await procurementService.listPurchaseOrders(req.auth));

@@ -29,6 +29,7 @@ test('warehouse SPA directory and required files exist', () => {
     'bootstrap.js',
     'api/warehouse-api.js',
     'views/receipts.js',
+    'views/receive-from-po.js',
     'views/inspections.js',
     'views/production.js',
     'views/recipe-consultation.js',
@@ -69,6 +70,7 @@ test('warehouse index.html has required DOM structure for WCAG and SPA bootstrap
   assert.match(html, /<script src="captures\.js"><\/script>/);
   assert.match(html, /<script src="api\/warehouse-api\.js"><\/script>/);
   assert.match(html, /<script src="views\/receipts\.js"><\/script>/);
+  assert.match(html, /<script src="views\/receive-from-po\.js"><\/script>/);
   assert.match(html, /<script src="views\/production\.js"><\/script>/);
   assert.match(html, /<script src="views\/recipe-consultation\.js"><\/script>/);
   assert.match(html, /<script src="bootstrap\.js"><\/script>/);
@@ -149,11 +151,29 @@ test('captures.js revokes ObjectURLs to prevent memory leaks', () => {
 // Recipe consultation — read-only enforcement (FR-038)
 // -----------------------------------------------------------------------
 
-test('views/production.js shows explicit stub messaging for execute/inspect actions instead of silent no-op navigation', () => {
+test('views/production.js exposes real execute and complete functionality replacing stubs', () => {
   const source = readWarehouseFile('views/production.js');
-  assert.match(source, /ciclo posterior/);
-  assert.match(source, /captura detallada de ejecucion por etapa/);
-  assert.match(source, /captura guiada de inspeccion por etapa/);
+  // Real execution form elements
+  assert.match(source, /Ejecutar etapa/);
+  assert.match(source, /Completar etapa/);
+  assert.match(source, /quantityProcessed/);
+  assert.match(source, /executeProductionStage/);
+  // Real completion form
+  assert.match(source, /completeProductionOrder/);
+  assert.match(source, /outputQuantity/);
+  assert.match(source, /Completar orden/);
+  // Real start production button
+  assert.match(source, /startProductionOrder/);
+  assert.match(source, /Iniciar produccion/);
+  // Stage badges
+  assert.match(source, /STAGE_STATUS_BADGE/);
+  assert.match(source, /renderStageBadge/);
+  // QA inspection navigation preserved
+  assert.match(source, /wh-inspect-stage-btn/);
+  assert.match(source, /action.*inspect/);
+  // Inline forms for accessibility
+  assert.match(source, /aria-expanded/);
+  assert.match(source, /aria-controls/);
 });
 
 test('views/recipe-consultation.js renders frozen recipe as read-only (FR-038)', () => {
@@ -196,6 +216,217 @@ test('views/receipts.js disables confirm button during submission (no double-sub
 test('views/receipts.js documents that photo evidence remains local-only in this cycle', () => {
   const source = readWarehouseFile('views/receipts.js');
   assert.match(source, /aun no se cargan al servidor/);
+});
+
+// -----------------------------------------------------------------------
+// Step 2 — Inspection form (interactive)
+// -----------------------------------------------------------------------
+
+test('views/receipts.js Step 2 renders an interactive inspection form for pending items', () => {
+  const source = readWarehouseFile('views/receipts.js');
+  // Inputs per item
+  assert.match(source, /inspect-qty-accepted-/);
+  assert.match(source, /inspect-qty-rejected-/);
+  assert.match(source, /inspect-result-/);
+  assert.match(source, /inspect-observations-/);
+  // Save button per item
+  assert.match(source, /inspect-save-btn-/);
+  // Three enum results in the select options
+  assert.match(source, /value="ACCEPTED"/);
+  assert.match(source, /value="PARTIALLY_ACCEPTED"/);
+  assert.match(source, /value="REJECTED"/);
+});
+
+test('views/receipts.js Step 2 calls inspectReceiptItem with the expected payload shape', () => {
+  const source = readWarehouseFile('views/receipts.js');
+  assert.match(source, /api\.inspectReceiptItem\(/);
+  // Payload must include the four required fields
+  assert.match(source, /result:/);
+  assert.match(source, /quantityAccepted:/);
+  assert.match(source, /quantityRejected:/);
+  assert.match(source, /observations:/);
+});
+
+test('views/receipts.js Step 2 shows already-inspected items as read-only', () => {
+  const source = readWarehouseFile('views/receipts.js');
+  // The renderer must branch on prior inspections
+  assert.match(source, /item\.inspections/);
+  // Read-only branch should not emit save buttons or inputs for those items
+  assert.match(source, /hasInspection|isInspected|alreadyInspected/);
+});
+
+test('views/receipts.js Step 2 disables save button during submission (no double-submit)', () => {
+  const source = readWarehouseFile('views/receipts.js');
+  assert.match(source, /saveBtn\.disabled = true/);
+  assert.match(source, /Guardando\.\.\./);
+});
+
+test('views/receipts.js Step 2 gates advancing to Evidence until every item has an inspection', () => {
+  const source = readWarehouseFile('views/receipts.js');
+  assert.match(source, /allInspected/);
+});
+
+test('views/receipts.js Step 4 derives product name and inspection result from serialized shape (not phantom fields)', () => {
+  const source = readWarehouseFile('views/receipts.js');
+  // Step 4 summary must not read the ghost fields that never existed in the API payload
+  assert.doesNotMatch(source, /item\.acceptedQuantity/);
+  assert.doesNotMatch(source, /item\.inspectionResult/);
+  assert.doesNotMatch(source, /item\.productName \|\| item\.productId/);
+});
+
+// -----------------------------------------------------------------------
+// Inventory view — product list + per-product detail (lots by warehouse)
+// -----------------------------------------------------------------------
+
+test('views/inventory.js file exists and registers the views.inventory module', () => {
+  const inventoryPath = path.join(warehousePath, 'views', 'inventory.js');
+  assert.ok(fs.existsSync(inventoryPath), 'views/inventory.js must exist');
+  const source = fs.readFileSync(inventoryPath, 'utf8');
+  assert.match(source, /WarehouseShell\.register\(\s*['"]views\.inventory['"]/);
+  assert.match(source, /function render/);
+});
+
+test('warehouse index.html loads views/inventory.js before bootstrap.js', () => {
+  const html = readWarehouseFile('index.html');
+  assert.match(html, /<script src="views\/inventory\.js"><\/script>/);
+  const inventoryIdx = html.indexOf('views/inventory.js');
+  const bootstrapIdx = html.indexOf('bootstrap.js');
+  assert.ok(inventoryIdx < bootstrapIdx, 'inventory.js must be declared before bootstrap.js');
+});
+
+test('warehouse app.js routes the inventory tab to the real views.inventory module (not the stub)', () => {
+  const source = readWarehouseFile('app.js');
+  assert.match(source, /'inventory'\s*:\s*'views\.inventory'/);
+  assert.doesNotMatch(source, /views\.inventoryStub/);
+});
+
+test('warehouse recipe-consultation.js no longer registers the obsolete inventory stub (YAGNI cleanup)', () => {
+  const source = readWarehouseFile('views/recipe-consultation.js');
+  assert.doesNotMatch(source, /views\.inventoryStub/);
+});
+
+test('warehouse-api.js exposes listInventoryStocks that hits /api/inventory/stocks', () => {
+  const source = readWarehouseFile('api/warehouse-api.js');
+  assert.match(source, /listInventoryStocks/);
+  assert.match(source, /\/api\/inventory\/stocks/);
+});
+
+test('views/inventory.js renders a product table with name, code and total quantity columns', () => {
+  const source = readWarehouseFile('views/inventory.js');
+  // Table structure
+  assert.match(source, /<table/);
+  assert.match(source, /<th[^>]*>[^<]*Nombre/i);
+  assert.match(source, /<th[^>]*>[^<]*(Codigo|Código|C[oó]digo)/i);
+  assert.match(source, /<th[^>]*>[^<]*Cantidad/i);
+});
+
+test('views/inventory.js aggregates warehouse stocks by product for the total quantity column', () => {
+  const source = readWarehouseFile('views/inventory.js');
+  // Must reduce/sum across warehouses per product
+  assert.match(source, /productId/);
+  assert.match(source, /(reduce|Map|forEach)/);
+});
+
+test('views/inventory.js supports a product-detail sub-view when params.productId is provided', () => {
+  const source = readWarehouseFile('views/inventory.js');
+  assert.match(source, /params\.productId|params\?\.productId/);
+  // Detail must show lots grouped by warehouse
+  assert.match(source, /lots/);
+  assert.match(source, /warehouse/i);
+});
+
+test('views/inventory.js escapes user-facing strings (no XSS via product name/code)', () => {
+  const source = readWarehouseFile('views/inventory.js');
+  assert.match(source, /escapeHtml|WarehouseShell\.require\(['"]app['"]\)/);
+});
+
+// -----------------------------------------------------------------------
+// Production & Recipe views — must read serialized shape (product?.name)
+// -----------------------------------------------------------------------
+
+test('views/production.js reads order.product?.name (no phantom productName field)', () => {
+  const source = readWarehouseFile('views/production.js');
+  assert.doesNotMatch(source, /order\.productName/);
+});
+
+test('views/recipe-consultation.js reads product?.name for ingredients and order (no phantom fields)', () => {
+  const source = readWarehouseFile('views/recipe-consultation.js');
+  assert.doesNotMatch(source, /ing\.productName/);
+  assert.doesNotMatch(source, /order\.productName/);
+});
+
+// -----------------------------------------------------------------------
+// Production creation — new order form in #production?action=new
+// -----------------------------------------------------------------------
+
+test('views/production-new.js file exists and registers views.productionNew module', () => {
+  const p = path.join(warehousePath, 'views', 'production-new.js');
+  assert.ok(fs.existsSync(p), 'views/production-new.js must exist');
+  const source = fs.readFileSync(p, 'utf8');
+  assert.match(source, /WarehouseShell\.register\(\s*['"]views\.productionNew['"]/);
+  assert.match(source, /function render/);
+});
+
+test('warehouse index.html loads views/production-new.js before bootstrap.js', () => {
+  const html = readWarehouseFile('index.html');
+  assert.match(html, /<script src="views\/production-new\.js"><\/script>/);
+  const idx = html.indexOf('views/production-new.js');
+  const boot = html.indexOf('bootstrap.js');
+  assert.ok(idx < boot, 'production-new.js must load before bootstrap.js');
+});
+
+test('warehouse-api.js exposes createProductionOrder + listRecipes + listProducts + listCompanyUsers', () => {
+  const source = readWarehouseFile('api/warehouse-api.js');
+  assert.match(source, /createProductionOrder/);
+  assert.match(source, /listRecipes/);
+  assert.match(source, /listProducts/);
+  assert.match(source, /listCompanyUsers/);
+  // Endpoints
+  assert.match(source, /\/api\/production\/orders/);
+  assert.match(source, /\/api\/recipes/);
+  assert.match(source, /\/api\/products/);
+  assert.match(source, /\/api\/users\/company/);
+});
+
+test('state.js derives canCreateProduction flag from production.create permission', () => {
+  const source = readWarehouseFile('state.js');
+  assert.match(source, /canCreateProduction/);
+  assert.match(source, /production\.create/);
+});
+
+test('views/production.js delegates to views.productionNew when params.action === new', () => {
+  const source = readWarehouseFile('views/production.js');
+  assert.match(source, /params\.action\s*===\s*['"]new['"]/);
+  assert.match(source, /views\.productionNew/);
+});
+
+test('views/production.js exposes "Nueva orden" CTA gated by canCreateProduction', () => {
+  const source = readWarehouseFile('views/production.js');
+  assert.match(source, /canCreateProduction/);
+  assert.match(source, /Nueva orden/i);
+});
+
+test('views/production-new.js includes all required createProductionOrderSchema fields', () => {
+  const source = readWarehouseFile('views/production-new.js');
+  // Required per production.schema.js
+  const required = [
+    'productId', 'recipeVersionId', 'quantity',
+    'originWarehouseId', 'destinationWarehouseId',
+    'responsibleUserId', 'productionLotCode',
+  ];
+  for (const field of required) {
+    assert.match(source, new RegExp(field), `payload must include ${field}`);
+  }
+  // Must POST via the wrapper
+  assert.match(source, /createProductionOrder/);
+});
+
+test('views/production-new.js validates origin != destination warehouse before submit', () => {
+  const source = readWarehouseFile('views/production-new.js');
+  assert.match(source, /originWarehouseId/);
+  assert.match(source, /destinationWarehouseId/);
+  // some form of client-side comparison
+  assert.match(source, /(origin.*===\s*destination|origin.*==\s*destination|distinta)/i);
 });
 
 // -----------------------------------------------------------------------

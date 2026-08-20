@@ -24,6 +24,8 @@ test('production routes expose the approved foundational lifecycle endpoints', (
   assert.ok(getRouteLayer('/orders', 'get').length >= 2);
   assert.ok(getRouteLayer('/orders', 'post').length >= 3);
   assert.ok(getRouteLayer('/orders/:id', 'get').length >= 2);
+  assert.ok(getRouteLayer('/orders/:id/material-requirements', 'get').length >= 2);
+  assert.ok(getRouteLayer('/orders/:id/stages/:stageId/available-lots', 'get').length >= 2);
   assert.ok(getRouteLayer('/orders/:id/submit', 'post').length >= 2);
   assert.ok(getRouteLayer('/orders/:id/approve', 'post').length >= 3);
   assert.ok(getRouteLayer('/orders/:id/start', 'post').length >= 2);
@@ -34,6 +36,8 @@ test('production routes expose the approved foundational lifecycle endpoints', (
 
 test('production routes stay permission-governed through centralized access policies', async () => {
   const createGuard = getRouteLayer('/orders', 'post')[0].handle;
+  const materialRequirementsGuard = getRouteLayer('/orders/:id/material-requirements', 'get')[0].handle;
+  const availableLotsGuard = getRouteLayer('/orders/:id/stages/:stageId/available-lots', 'get')[0].handle;
   const approveGuard = getRouteLayer('/orders/:id/approve', 'post')[0].handle;
   const startGuard = getRouteLayer('/orders/:id/start', 'post')[0].handle;
   const executeStageGuard = getRouteLayer('/orders/:id/stages/:stageId/execute', 'post')[0].handle;
@@ -42,6 +46,12 @@ test('production routes stay permission-governed through centralized access poli
 
   const deniedCreate = await runGuard(createGuard, { role: 'warehouse', companyId: '7', permissions: ['production.view'] });
   assert.equal(deniedCreate?.statusCode, 403);
+
+  const deniedMaterialRequirements = await runGuard(materialRequirementsGuard, { role: 'warehouse', companyId: '7', permissions: ['inventory.view'] });
+  assert.equal(deniedMaterialRequirements?.statusCode, 403);
+
+  const deniedAvailableLots = await runGuard(availableLotsGuard, { role: 'warehouse', companyId: '7', permissions: ['production.view'] });
+  assert.equal(deniedAvailableLots?.statusCode, 403);
 
   const deniedApprove = await runGuard(approveGuard, { role: 'production-manager', companyId: '7', permissions: ['production.create'] });
   assert.equal(deniedApprove?.statusCode, 403);
@@ -60,6 +70,12 @@ test('production routes stay permission-governed through centralized access poli
 
   const allowedCreate = await runGuard(createGuard, { role: 'production-manager', companyId: '7', permissions: ['production.create'] });
   assert.equal(allowedCreate, undefined);
+
+  const allowedMaterialRequirements = await runGuard(materialRequirementsGuard, { role: 'production-manager', companyId: '7', permissions: ['production.view'] });
+  assert.equal(allowedMaterialRequirements, undefined);
+
+  const allowedAvailableLots = await runGuard(availableLotsGuard, { role: 'production-manager', companyId: '7', permissions: ['production.execute'] });
+  assert.equal(allowedAvailableLots, undefined);
 
   const allowedApprove = await runGuard(approveGuard, { role: 'production-manager', companyId: '7', permissions: ['production.approve'] });
   assert.equal(allowedApprove, undefined);

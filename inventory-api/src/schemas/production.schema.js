@@ -54,10 +54,24 @@ const productionStageMaterialSchema = z.object({
 
 const productionStageParameterSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  value: z.union([z.string().trim().min(1).max(500), z.coerce.number(), z.boolean(), z.null()]),
+  actualValue: z.coerce.number().optional(),
+  value: z.coerce.number().optional(),
   unit: z.string().trim().min(1).max(40).optional().nullable(),
   note: z.string().trim().max(500).optional().nullable(),
-}).strict();
+}).strict().transform((payload) => ({
+  name: payload.name,
+  actualValue: payload.actualValue ?? payload.value,
+  unit: payload.unit ?? null,
+  note: payload.note ?? null,
+})).superRefine((payload, context) => {
+  if (typeof payload.actualValue !== 'number' || Number.isNaN(payload.actualValue)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['actualValue'],
+      message: 'Cada parámetro QA debe incluir un valor numérico',
+    });
+  }
+});
 
 const productionStageEvidenceSchema = z.object({
   type: z.string().trim().min(1).max(80),
@@ -72,6 +86,7 @@ const productionStageExecutionSchema = z.object({
   evidence: z.array(productionStageEvidenceSchema).optional().default([]),
   consumptions: z.array(productionStageMaterialSchema).optional().default([]),
   waste: z.array(productionStageMaterialSchema).optional().default([]),
+  overrideJustification: z.string().trim().min(10).max(1000).optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),
 }).strict().superRefine((payload, context) => {
   if (payload.endedAt < payload.startedAt) {

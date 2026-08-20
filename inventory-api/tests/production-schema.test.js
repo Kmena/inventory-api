@@ -58,16 +58,29 @@ test('productionStageExecutionSchema accepts stage parameters, consumptions and 
   const result = productionStageExecutionSchema.safeParse({
     startedAt: '2026-08-14T08:00:00.000Z',
     endedAt: '2026-08-14T08:45:00.000Z',
-    actualParameters: [{ name: 'temperature', value: 45.5, unit: 'C' }],
+    actualParameters: [{ name: 'temperature', actualValue: 45.5, unit: 'C' }],
     evidence: [{ type: 'photo', reference: 'storage://stage-evidence-1.jpg' }],
     consumptions: [{ productId: '31', lotId: '91', quantity: 12.5, note: 'Consumo base líquida' }],
     waste: [{ productId: '31', lotId: '91', quantity: 0.5, note: 'Merma controlada' }],
+    overrideJustification: 'Override documentado para desviación controlada',
     notes: 'Ejecución de mezcla registrada',
   });
 
   assert.equal(result.success, true);
+  assert.equal(result.data.actualParameters[0].actualValue, 45.5);
   assert.equal(result.data.consumptions[0].productId, 31n);
   assert.equal(result.data.waste[0].lotId, 91n);
+});
+
+test('productionStageExecutionSchema accepts legacy value payloads by normalizing them to actualValue', () => {
+  const result = productionStageExecutionSchema.safeParse({
+    startedAt: '2026-08-14T08:00:00.000Z',
+    endedAt: '2026-08-14T08:45:00.000Z',
+    actualParameters: [{ name: 'temperature', value: 45.5, unit: 'C' }],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.actualParameters[0].actualValue, 45.5);
 });
 
 test('productionStageExecutionSchema rejects waste rows without lotId', () => {

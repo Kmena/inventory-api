@@ -28,7 +28,7 @@ function renderStageAccordion(stage, index) {
         <ul class="recipe-ingredients__list">
           ${ingredients.map((/** @type {any} */ ing) => `
             <li class="recipe-ingredients__item">
-              <span class="recipe-ingredients__name">${escapeHtml(ing.productName || ing.productId || '—')}</span>
+              <span class="recipe-ingredients__name">${escapeHtml(ing.product?.name || (ing.productId ? `Producto #${ing.productId}` : '—'))}</span>
               <span class="recipe-ingredients__qty">
                 ${escapeHtml(String(ing.quantity || '—'))} ${escapeHtml(ing.unit || '')}
                 ${ing.tolerance ? ` <em>(±${escapeHtml(String(ing.tolerance))}%)</em>` : ''}
@@ -141,7 +141,7 @@ function render(container, session, params) {
 
       const snapshot = order.frozenRecipeSnapshot || order.recipe || null;
       const stages = order.stages || snapshot?.stages || [];
-      const recipeName = snapshot?.name || order.productName || '—';
+      const recipeName = snapshot?.name || order.recipe?.name || order.product?.name || '—';
       const recipeVersion = snapshot?.versionLabel || snapshot?.version || '—';
       const frozenAt = order.createdAt ? new Date(order.createdAt).toLocaleDateString('es') : '—';
 
@@ -174,16 +174,4 @@ function render(container, session, params) {
 }
 
 WarehouseShell.register('views.recipeConsultation', { render });
-
-// Inventory stub view
-WarehouseShell.register('views.inventoryStub', {
-  render(container) {
-    container.innerHTML = `
-      <div class="warehouse-section">
-        <h2 class="warehouse-section__title">Inventario fisico</h2>
-        <p class="warehouse-message">Esta funcion estara disponible en una proxima version.</p>
-      </div>
-    `;
-  },
-});
 })();

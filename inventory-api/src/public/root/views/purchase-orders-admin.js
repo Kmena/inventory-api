@@ -52,7 +52,7 @@
     `;
   }
 
-  async function mount(container, session, helpersBag) {
+  async function mount(container, session, _helpersBag) {
 
     const pageMessage = container.querySelector('#purchase-orders-page-message');
     const listSummary = container.querySelector('#purchase-orders-list-summary');
@@ -108,6 +108,27 @@
 
     function renderDetail(order) {
       detailRegion.innerHTML = renderers.renderOrderDetail(order);
+      bindDetailActions(order);
+    }
+
+    function bindDetailActions(order) {
+      const issueBtn = detailRegion.querySelector('#po-issue-button');
+      if (!issueBtn) { return; }
+      issueBtn.addEventListener('click', async () => {
+        issueBtn.disabled = true;
+        issueBtn.textContent = 'Emitiendo...';
+        try {
+          await purchaseOrdersApi.issueOrder(session, order.id);
+          await loadOrders();
+        } catch (error) {
+          pageMessage.innerHTML = rootShellUi.renderInlineMessage(
+            error.message || 'No se pudo emitir la orden.',
+            'error',
+          );
+          issueBtn.disabled = false;
+          issueBtn.textContent = 'Emitir orden de compra';
+        }
+      });
     }
 
     refreshButton.addEventListener('click', loadOrders);

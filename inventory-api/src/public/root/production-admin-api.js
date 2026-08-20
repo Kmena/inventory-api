@@ -35,8 +35,17 @@
     });
   }
 
+  async function createProductionOrder(session, payload) {
+    return inventoryAuth.fetchJson(session, '/api/production/orders', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudo crear la orden de produccion.',
+    });
+  }
+
   rootShell.register('productionAdminApi', {
     buildServerListQuery,
+    createProductionOrder,
     getProductionOrder,
     listProductionOrders,
   });

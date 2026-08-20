@@ -178,8 +178,8 @@ async function resolveUniqueInternalLotNumber(tx, companyId, requestedNumber) {
   };
 }
 
-function sortFefo(items) {
-  return items.sort((left, right) => {
+function sortLotsByFefo(items) {
+  return [...items].sort((left, right) => {
     const a = lotDateKey(left.lot?.expirationDate) || '9999-12-31';
     const b = lotDateKey(right.lot?.expirationDate) || '9999-12-31';
     return a.localeCompare(b) || Number(left.id - right.id);
@@ -192,7 +192,7 @@ async function reserveLots(tx, context, quantity) {
     context.product.id,
     tx,
   );
-  const candidates = sortFefo(rawCandidates.filter((candidate) => deriveLotUsability(candidate.lot).sellable));
+  const candidates = sortLotsByFefo(rawCandidates.filter((candidate) => deriveLotUsability(candidate.lot).sellable));
 
   let remaining = quantity;
   const allocations = [];
@@ -254,6 +254,7 @@ module.exports = {
   changeLotStock,
   createMovement,
   resolveUniqueInternalLotNumber,
+  sortLotsByFefo,
   reserveLots,
   assertOrderHasOperationalWarehouse,
   getActiveAllocations,

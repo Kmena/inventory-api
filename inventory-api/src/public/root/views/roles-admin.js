@@ -229,26 +229,23 @@
     var editingRoleId = null;
     var currentUserRoleId = session?.user?.roleId ? String(session.user.roleId) : null;
     var confirmResolve = null;
+    /** @type {Set<string>} Source of truth for selected permission codes — survives search re-renders. */
+    var _selectedPermissionCodes = new Set();
 
     function isEditingOwnRole() {
       return editingRoleId && currentUserRoleId && editingRoleId.toString() === currentUserRoleId.toString();
     }
 
     function getSelectedPermissionCodes() {
-      var checked = Array.from(form.querySelectorAll('input[name="permissionCodes"]:checked'));
-      var disabled = Array.from(form.querySelectorAll('input[name="permissionCodes"]:disabled:checked'));
-      var allChecked = new Set(checked.map(function (i) { return i.value; }));
-      disabled.forEach(function (i) { allChecked.add(i.value); });
-      return Array.from(allChecked);
+      return Array.from(_selectedPermissionCodes);
     }
 
     function updateSelectionCount() {
-      selectionCount.textContent = getSelectedPermissionCodes().length + ' permisos seleccionados';
+      selectionCount.textContent = _selectedPermissionCodes.size + ' permisos seleccionados';
     }
 
     function renderPermissionsRegion() {
-      var selected = getSelectedPermissionCodes();
-      permissionsRegion.innerHTML = renderPermissions(availablePermissions, selected, searchInput.value, isEditingOwnRole());
+      permissionsRegion.innerHTML = renderPermissions(availablePermissions, getSelectedPermissionCodes(), searchInput.value, isEditingOwnRole());
       attachCategoryToggles();
       updateSelectionCount();
     }
@@ -282,11 +279,7 @@
       formMessage.innerHTML = '';
 
       var roleCodes = (role.permissions || []).map(function (p) { return p.code; });
-      var allCheckboxes = form.querySelectorAll('input[name="permissionCodes"]');
-      allCheckboxes.forEach(function (cb) {
-        cb.checked = roleCodes.includes(cb.value);
-        cb.disabled = false;
-      });
+      _selectedPermissionCodes = new Set(roleCodes);
 
       renderPermissionsRegion();
       rolesListRegion.innerHTML = renderRoles(availableRoles, editingRoleId);
@@ -303,6 +296,7 @@
       clearButton.textContent = 'Limpiar seleccion';
       form.reset();
       formMessage.innerHTML = '';
+      _selectedPermissionCodes = new Set();
       renderPermissionsRegion();
       rolesListRegion.innerHTML = renderRoles(availableRoles, null);
       attachEditButtons();
@@ -379,6 +373,11 @@
 
     form.addEventListener('change', function (event) {
       if (event.target instanceof globalScope.HTMLInputElement && event.target.name === 'permissionCodes') {
+        if (event.target.checked) {
+          _selectedPermissionCodes.add(event.target.value);
+        } else {
+          _selectedPermissionCodes.delete(event.target.value);
+        }
         updateSelectionCount();
       }
     });
@@ -392,9 +391,8 @@
         exitEditMode();
         return;
       }
-      var checkboxes = form.querySelectorAll('input[name="permissionCodes"]');
-      checkboxes.forEach(function (cb) { cb.checked = false; });
-      updateSelectionCount();
+      _selectedPermissionCodes = new Set();
+      renderPermissionsRegion();
     });
 
     form.addEventListener('submit', async function (event) {

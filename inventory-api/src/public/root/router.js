@@ -16,6 +16,7 @@
   const movementsAdminView = rootShell.require('views.movementsAdmin');
   const recipesAdminView = rootShell.require('views.recipesAdmin');
   const productionOrdersAdminView = rootShell.require('views.productionOrdersAdmin');
+  const productionPlannerView = rootShell.require('views.productionPlanner');
   // TASK-012: billing admin view (client-payment-ledger)
   const billingAdminView = rootShell.require('views.billingAdmin');
   const approvalsAdminView = rootShell.require('views.approvalsAdmin');
@@ -27,6 +28,8 @@
   // recepciones-fiscales-workspace views
   const receiptsAdminView = rootShell.require('views.receiptsAdmin');
   const fiscalRefsAdminView = rootShell.require('views.fiscalRefsAdmin');
+  // users-admin-view feature
+  const usersAdminView = rootShell.require('views.usersAdmin');
 
   function normalizeHashRoute(hashValue) {
     return String(hashValue || '').replace(/^#/, '').trim();
@@ -109,6 +112,10 @@
       return productionOrdersAdminView;
     }
 
+    if (item.routeKey === 'produccion_planificador') {
+      return productionPlannerView;
+    }
+
     if (item.routeKey === 'billing') {
       return billingAdminView;
     }
@@ -143,6 +150,10 @@
 
     if (item.routeKey === 'referencias_fiscales') {
       return fiscalRefsAdminView;
+    }
+
+    if (item.routeKey === 'users') {
+      return usersAdminView;
     }
 
     return inProcessView;

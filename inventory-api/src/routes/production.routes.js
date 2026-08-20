@@ -14,6 +14,7 @@ const {
 } = require('../schemas/production.schema');
 const { qualityInspectionSchema } = require('../schemas/quality.schema');
 const productionService = require('../services/production.service');
+const productionMaterialAvailabilityService = require('../services/production-material-availability.service');
 const qualityService = require('../services/quality.service');
 
 const router = express.Router();
@@ -29,7 +30,7 @@ router.get('/orders', authorizeAccessPolicy('production.view'), async (req, res,
 
 router.post('/orders', authorizeAccessPolicy('production.create'), validate(createProductionOrderSchema), async (req, res, next) => {
   try {
-    return res.status(201).json(await productionService.createProductionOrder(req.body, req.auth));
+    return res.status(201).json(await productionService.createProductionOrder(req.body, req.auth, req));
   } catch (error) {
     return next(error);
   }
@@ -38,6 +39,29 @@ router.post('/orders', authorizeAccessPolicy('production.create'), validate(crea
 router.get('/orders/:id', authorizeAccessPolicy('production.view'), async (req, res, next) => {
   try {
     return res.json(await productionService.getProductionOrder(parseBigIntId(req.params.id), req.auth));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/orders/:id/material-requirements', authorizeAccessPolicy('production.view'), async (req, res, next) => {
+  try {
+    return res.json(await productionMaterialAvailabilityService.getMaterialRequirementsWithAvailability(
+      parseBigIntId(req.params.id),
+      req.auth,
+    ));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/orders/:id/stages/:stageId/available-lots', authorizeAccessPolicy('production.execute'), async (req, res, next) => {
+  try {
+    return res.json(await productionMaterialAvailabilityService.getAvailableLotsForStage(
+      parseBigIntId(req.params.id),
+      parseBigIntId(req.params.stageId),
+      req.auth,
+    ));
   } catch (error) {
     return next(error);
   }
@@ -53,7 +77,7 @@ router.post('/orders/:id/submit', authorizeAccessPolicy('production.create'), as
 
 router.post('/orders/:id/approve', authorizeAccessPolicy('production.approve'), validate(productionApprovalSchema), async (req, res, next) => {
   try {
-    return res.json(await productionService.approveProductionOrder(parseBigIntId(req.params.id), req.body, req.auth));
+    return res.json(await productionService.approveProductionOrder(parseBigIntId(req.params.id), req.body, req.auth, req));
   } catch (error) {
     return next(error);
   }
@@ -74,6 +98,7 @@ router.post('/orders/:id/stages/:stageId/execute', authorizeAccessPolicy('produc
       parseBigIntId(req.params.stageId),
       req.body,
       req.auth,
+      req,
     ));
   } catch (error) {
     return next(error);

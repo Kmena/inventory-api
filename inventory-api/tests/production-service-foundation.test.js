@@ -6,6 +6,7 @@ const productionRepository = require('../src/repositories/production.repository'
 const recipeRepository = require('../src/repositories/recipe.repository');
 const inventoryRepository = require('../src/repositories/inventory.repository');
 const inventoryTransactionSupport = require('../src/services/inventory-transaction-support.service');
+const audit = require('../src/lib/audit');
 const productionService = require('../src/services/production.service');
 
 function withPatchedRepositories(overrides, callback) {
@@ -14,6 +15,8 @@ function withPatchedRepositories(overrides, callback) {
     findCompanyWarehousesByIds: productRepository.findCompanyWarehousesByIds,
     findActiveCompanyUserById: productionRepository.findActiveCompanyUserById,
     createProductionOrder: productionRepository.createProductionOrder,
+    createMaterialRequirements: productionRepository.createMaterialRequirements,
+    findMaterialRequirementsByOrderId: productionRepository.findMaterialRequirementsByOrderId,
     findProductionOrderById: productionRepository.findProductionOrderById,
     updateProductionOrder: productionRepository.updateProductionOrder,
     findRecipeVersionById: recipeRepository.findRecipeVersionById,
@@ -34,6 +37,7 @@ function withPatchedRepositories(overrides, callback) {
     findLatestProductionStageExecutionForOrderStage: productionRepository.findLatestProductionStageExecutionForOrderStage,
     syncProductionItemConsumedQuantity: productionRepository.syncProductionItemConsumedQuantity,
     getProductionItemAggregateState: productionRepository.getProductionItemAggregateState,
+    recordAuditEventSafelyIfAvailable: audit.recordAuditEventSafelyIfAvailable,
   };
 
   Object.assign(productRepository, {
@@ -43,6 +47,8 @@ function withPatchedRepositories(overrides, callback) {
   Object.assign(productionRepository, {
     findActiveCompanyUserById: overrides.findActiveCompanyUserById || originals.findActiveCompanyUserById,
     createProductionOrder: overrides.createProductionOrder || originals.createProductionOrder,
+    createMaterialRequirements: overrides.createMaterialRequirements || originals.createMaterialRequirements,
+    findMaterialRequirementsByOrderId: overrides.findMaterialRequirementsByOrderId || originals.findMaterialRequirementsByOrderId,
     findProductionOrderById: overrides.findProductionOrderById || originals.findProductionOrderById,
     updateProductionOrder: overrides.updateProductionOrder || originals.updateProductionOrder,
   });
@@ -61,6 +67,9 @@ function withPatchedRepositories(overrides, callback) {
     changeWarehouseStock: overrides.changeWarehouseStock || originals.changeWarehouseStock,
     changeLotStock: overrides.changeLotStock || originals.changeLotStock,
     createMovement: overrides.createMovement || originals.createMovement,
+  });
+  Object.assign(audit, {
+    recordAuditEventSafelyIfAvailable: overrides.recordAuditEventSafelyIfAvailable || originals.recordAuditEventSafelyIfAvailable,
   });
   Object.assign(productionRepository, {
     createProductionStageExecution: overrides.createProductionStageExecution || originals.createProductionStageExecution,
@@ -83,6 +92,8 @@ function withPatchedRepositories(overrides, callback) {
       Object.assign(productionRepository, {
         findActiveCompanyUserById: originals.findActiveCompanyUserById,
         createProductionOrder: originals.createProductionOrder,
+        createMaterialRequirements: originals.createMaterialRequirements,
+        findMaterialRequirementsByOrderId: originals.findMaterialRequirementsByOrderId,
         findProductionOrderById: originals.findProductionOrderById,
         updateProductionOrder: originals.updateProductionOrder,
       });
@@ -101,6 +112,9 @@ function withPatchedRepositories(overrides, callback) {
         changeWarehouseStock: originals.changeWarehouseStock,
         changeLotStock: originals.changeLotStock,
         createMovement: originals.createMovement,
+      });
+      Object.assign(audit, {
+        recordAuditEventSafelyIfAvailable: originals.recordAuditEventSafelyIfAvailable,
       });
       Object.assign(productionRepository, {
         createProductionStageExecution: originals.createProductionStageExecution,
@@ -179,6 +193,79 @@ function buildRecipeVersion(overrides = {}) {
       },
     ],
     ...overrides,
+  };
+}
+
+function buildPlanningRecipeVersion(overrides = {}) {
+  return buildRecipeVersion({
+    stages: [
+      {
+        id: 101n,
+        stageOrder: 0,
+        name: 'Pesaje',
+        instructions: 'Preparar materias primas',
+        responsibleRoleCode: 'PROD',
+        expectedParameters: [
+          {
+            name: 'Temperatura',
+            unit: 'C',
+            expectedValue: 45,
+            minTolerance: -2,
+            maxTolerance: 3,
+            ignoredLegacyField: 'do-not-copy',
+          },
+        ],
+        parameterTolerances: [],
+        requiredEvidence: [],
+        qaMandatory: false,
+        stageInputs: [
+          {
+            id: 301n,
+            productId: 31n,
+            name: 'Base liquida',
+            quantity: 1.25,
+            unit: 'KG',
+            sortOrder: 0,
+            notes: null,
+            product: { id: 31n, code: 'RM-31', name: 'Base liquida', unit: 'KG', isActive: true },
+          },
+          {
+            id: 302n,
+            productId: 32n,
+            name: 'Fragancia',
+            quantity: 0.25,
+            unit: 'L',
+            sortOrder: 1,
+            notes: null,
+            product: { id: 32n, code: 'RM-32', name: 'Fragancia', unit: 'L', isActive: true },
+          },
+        ],
+      },
+    ],
+    ...overrides,
+  });
+}
+
+function buildAuditRequestContext() {
+  return {
+    method: 'POST',
+    originalUrl: '/api/production/orders',
+    baseUrl: '/api/production',
+    route: { path: '/orders' },
+    auth: { companyId: '7', sub: '99', username: 'operador', role: 'production_supervisor' },
+    requestContext: {
+      requestId: 'req-production-stock-override',
+      method: 'POST',
+      path: '/api/production/orders',
+      ip: '127.0.0.1',
+      userAgent: 'node-test',
+      actor: {
+        userId: '99',
+        username: 'operador',
+        roleCode: 'production_supervisor',
+        companyId: '7',
+      },
+    },
   };
 }
 
@@ -278,6 +365,332 @@ test('createProductionOrder accepts justified override and stores a frozen recip
       'sourcing_method_not_production_capable',
       'recipe_version_not_approved',
     ]);
+  });
+});
+
+test('createProductionOrder persists material requirements and enriched snapshot when stock is sufficient', async () => {
+  let createdData = null;
+  const persistedRequirementRows = [];
+  const tx = {
+    warehouseStock: {
+      findMany: async () => ([
+        { productId: 31n, quantity: 500, reservedQuantity: 10 },
+        { productId: 32n, quantity: 100, reservedQuantity: 0 },
+      ]),
+    },
+  };
+
+  await withPatchedRepositories({
+    findProductById: async () => buildProduct({ sourcingMethod: 'PRODUCTION_ONLY' }),
+    findRecipeVersionById: async () => buildPlanningRecipeVersion(),
+    findCompanyWarehousesByIds: async () => [{ id: 5n }, { id: 8n }],
+    findActiveCompanyUserById: async () => ({ id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' }),
+    transaction: async (work) => work(tx),
+    acquireCompanyInventoryAdvisoryLock: async () => {},
+    createProductionOrder: async (data) => {
+      createdData = data;
+      return {
+        id: 501n,
+        companyId: 7n,
+        orderId: null,
+        productId: data.productId,
+        recipeId: data.recipeId,
+        recipeVersionId: data.recipeVersionId,
+        originWarehouseId: data.originWarehouseId,
+        destinationWarehouseId: data.destinationWarehouseId,
+        responsibleUserId: data.responsibleUserId,
+        quantity: data.quantity,
+        status: data.status,
+        priority: data.priority,
+        responsible: data.responsible,
+        productionLotCode: data.productionLotCode,
+        plannedDate: data.plannedDate,
+        productionDate: data.productionDate,
+        expirationDate: data.expirationDate,
+        submittedAt: null,
+        approvedAt: null,
+        startedAt: null,
+        cancelledAt: null,
+        overrideJustification: data.overrideJustification,
+        recipeVersionSnapshot: data.recipeVersionSnapshot,
+        createdAt: new Date('2026-08-20T10:00:00.000Z'),
+        updatedAt: new Date('2026-08-20T10:00:00.000Z'),
+        product: buildProduct({ sourcingMethod: 'PRODUCTION_ONLY' }),
+        recipe: buildPlanningRecipeVersion().recipe,
+        recipeVersion: { id: 21n, recipeId: 50n, versionNumber: 3, status: 'APPROVED', approvedAt: new Date('2026-08-13T09:00:00.000Z'), updatedAt: new Date('2026-08-13T09:00:00.000Z') },
+        originWarehouse: { id: 5n, code: 'RAW', name: 'Raw', warehouseType: 'RAW_MATERIAL', isActive: true },
+        destinationWarehouse: { id: 8n, code: 'FG', name: 'Finished', warehouseType: 'FINISHED_GOODS', isActive: true },
+        responsibleUser: { id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' },
+        items: [{ id: 1n, productionOrderId: 501n, productId: 11n, recipeId: 50n, plannedQuantity: 125.5, consumedQuantity: 0 }],
+        materialRequirements: [],
+      };
+    },
+    createMaterialRequirements: async (_orderId, rows) => {
+      persistedRequirementRows.push(...rows);
+      return { count: rows.length };
+    },
+  }, async () => {
+    const result = await productionService.createProductionOrder(validPayload, auth);
+
+    assert.equal(result.status, 'DRAFT');
+    assert.equal(createdData.recipeVersionSnapshot.recipeVersion.materialRequirements.length, 2);
+    assert.deepEqual(createdData.recipeVersionSnapshot.recipeVersion.materialRequirements, [
+      { productId: '31', requiredQuantity: 156.875, availableQuantity: 490, missingQuantity: 0, unit: 'KG' },
+      { productId: '32', requiredQuantity: 31.375, availableQuantity: 100, missingQuantity: 0, unit: 'L' },
+    ]);
+    assert.deepEqual(createdData.recipeVersionSnapshot.recipeVersion.stages[0].expectedParameters, [
+      {
+        name: 'Temperatura',
+        unit: 'C',
+        expectedValue: 45,
+        minTolerance: -2,
+        maxTolerance: 3,
+      },
+    ]);
+    assert.equal('ignoredLegacyField' in createdData.recipeVersionSnapshot.recipeVersion.stages[0].expectedParameters[0], false);
+    assert.equal('parameterTolerances' in createdData.recipeVersionSnapshot.recipeVersion.stages[0], false);
+    assert.deepEqual(persistedRequirementRows, [
+      { companyId: 7n, productionOrderId: 501n, productId: 31n, requiredQuantity: 156.875, unit: 'KG', availableAtCreation: 490, shortageAtCreation: 0 },
+      { companyId: 7n, productionOrderId: 501n, productId: 32n, requiredQuantity: 31.375, unit: 'L', availableAtCreation: 100, shortageAtCreation: 0 },
+    ]);
+  });
+});
+
+test('createProductionOrder rejects with 409 insufficient_stock when availability is not enough and no override is provided', async () => {
+  const tx = {
+    warehouseStock: {
+      findMany: async () => ([
+        { productId: 31n, quantity: 100, reservedQuantity: 0 },
+      ]),
+    },
+  };
+
+  await withPatchedRepositories({
+    findProductById: async () => buildProduct({ sourcingMethod: 'PRODUCTION_ONLY' }),
+    findRecipeVersionById: async () => buildPlanningRecipeVersion(),
+    findCompanyWarehousesByIds: async () => [{ id: 5n }, { id: 8n }],
+    findActiveCompanyUserById: async () => ({ id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' }),
+    transaction: async (work) => work(tx),
+    acquireCompanyInventoryAdvisoryLock: async () => {},
+  }, async () => {
+    await assert.rejects(
+      () => productionService.createProductionOrder(validPayload, auth),
+      (error) => {
+        assert.equal(error?.statusCode, 409);
+        assert.equal(error?.code, 'conflict');
+        assert.equal(error?.subCode, 'insufficient_stock');
+        assert.deepEqual(error?.missing, [
+          { productId: 31n, requiredQuantity: 156.875, availableQuantity: 100, missingQuantity: 56.875, unit: 'KG' },
+          { productId: 32n, requiredQuantity: 31.375, availableQuantity: 0, missingQuantity: 31.375, unit: 'L' },
+        ]);
+        return true;
+      },
+    );
+  });
+});
+
+test('createProductionOrder allows stock override with justification, persists requirements, and records an audit event', async () => {
+  const auditCalls = [];
+  const persistedRequirementRows = [];
+  const tx = {
+    warehouseStock: {
+      findMany: async () => ([]),
+    },
+  };
+
+  await withPatchedRepositories({
+    findProductById: async () => buildProduct({ sourcingMethod: 'PRODUCTION_ONLY' }),
+    findRecipeVersionById: async () => buildPlanningRecipeVersion(),
+    findCompanyWarehousesByIds: async () => [{ id: 5n }, { id: 8n }],
+    findActiveCompanyUserById: async () => ({ id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' }),
+    transaction: async (work) => work(tx),
+    acquireCompanyInventoryAdvisoryLock: async () => {},
+    createProductionOrder: async (data) => ({
+      id: 502n,
+      companyId: 7n,
+      orderId: null,
+      productId: data.productId,
+      recipeId: data.recipeId,
+      recipeVersionId: data.recipeVersionId,
+      originWarehouseId: data.originWarehouseId,
+      destinationWarehouseId: data.destinationWarehouseId,
+      responsibleUserId: data.responsibleUserId,
+      quantity: data.quantity,
+      status: data.status,
+      priority: data.priority,
+      responsible: data.responsible,
+      productionLotCode: data.productionLotCode,
+      plannedDate: data.plannedDate,
+      productionDate: data.productionDate,
+      expirationDate: data.expirationDate,
+      submittedAt: null,
+      approvedAt: null,
+      startedAt: null,
+      cancelledAt: null,
+      overrideJustification: data.overrideJustification,
+      recipeVersionSnapshot: data.recipeVersionSnapshot,
+      createdAt: new Date('2026-08-20T10:00:00.000Z'),
+      updatedAt: new Date('2026-08-20T10:00:00.000Z'),
+      product: buildProduct({ sourcingMethod: 'PRODUCTION_ONLY' }),
+      recipe: buildPlanningRecipeVersion().recipe,
+      recipeVersion: { id: 21n, recipeId: 50n, versionNumber: 3, status: 'APPROVED', approvedAt: new Date('2026-08-13T09:00:00.000Z'), updatedAt: new Date('2026-08-13T09:00:00.000Z') },
+      originWarehouse: { id: 5n, code: 'RAW', name: 'Raw', warehouseType: 'RAW_MATERIAL', isActive: true },
+      destinationWarehouse: { id: 8n, code: 'FG', name: 'Finished', warehouseType: 'FINISHED_GOODS', isActive: true },
+      responsibleUser: { id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' },
+      items: [],
+      materialRequirements: [],
+    }),
+    createMaterialRequirements: async (_orderId, rows) => {
+      persistedRequirementRows.push(...rows);
+      return { count: rows.length };
+    },
+    recordAuditEventSafelyIfAvailable: async (payload) => {
+      auditCalls.push(payload);
+      return { id: 1n };
+    },
+  }, async () => {
+    const result = await productionService.createProductionOrder({
+      ...validPayload,
+      overrideJustification: 'Autorizar producción piloto pese al faltante temporal de insumos críticos',
+    }, {
+      ...auth,
+      permissions: ['production.create', 'production.override'],
+    }, buildAuditRequestContext());
+
+    assert.equal(result.status, 'DRAFT');
+    assert.equal(persistedRequirementRows.length, 2);
+    assert.deepEqual(result.recipeVersionSnapshot.override.violationCodes, ['insufficient_stock']);
+    assert.equal(auditCalls.length, 1);
+    assert.equal(auditCalls[0].action, 'PRODUCTION_ORDER_OVERRIDE_STOCK');
+    assert.equal(auditCalls[0].reasonCode, 'insufficient_stock');
+  });
+});
+
+test('approveProductionOrder recomputes and persists material requirements when the order has none', async () => {
+  const persistedRequirementRows = [];
+  const tx = {
+    warehouseStock: {
+      findMany: async () => ([
+        { productId: 31n, quantity: 500, reservedQuantity: 10 },
+        { productId: 32n, quantity: 100, reservedQuantity: 0 },
+      ]),
+    },
+  };
+
+  await withPatchedRepositories({
+    transaction: async (work) => work(tx),
+    acquireCompanyInventoryAdvisoryLock: async () => {},
+    findProductionOrderById: async () => ({
+      id: 601n,
+      companyId: 7n,
+      productId: 11n,
+      recipeId: 50n,
+      recipeVersionId: 21n,
+      originWarehouseId: 5n,
+      destinationWarehouseId: 8n,
+      responsibleUserId: 34n,
+      quantity: 125.5,
+      status: 'PENDING_APPROVAL',
+      priority: 2,
+      overrideJustification: null,
+      recipeVersionSnapshot: productionService.__private__.buildRecipeVersionSnapshot(buildPlanningRecipeVersion(), null),
+      materialRequirements: [],
+    }),
+    findProductById: async () => buildProduct({ sourcingMethod: 'PRODUCTION_ONLY' }),
+    findRecipeVersionById: async () => buildPlanningRecipeVersion(),
+    createMaterialRequirements: async (_orderId, rows) => {
+      persistedRequirementRows.push(...rows);
+      return { count: rows.length };
+    },
+    updateProductionOrder: async (_id, _companyId, data) => ({
+      id: 601n,
+      companyId: 7n,
+      productId: 11n,
+      recipeId: 50n,
+      recipeVersionId: 21n,
+      originWarehouseId: 5n,
+      destinationWarehouseId: 8n,
+      responsibleUserId: 34n,
+      quantity: 125.5,
+      status: data.status,
+      priority: 2,
+      responsible: null,
+      productionLotCode: 'LOT-PROD-001',
+      plannedDate: null,
+      productionDate: null,
+      expirationDate: null,
+      submittedAt: new Date('2026-08-20T09:00:00.000Z'),
+      approvedAt: data.approvedAt,
+      startedAt: null,
+      cancelledAt: null,
+      overrideJustification: data.overrideJustification,
+      recipeVersionSnapshot: data.recipeVersionSnapshot,
+      createdAt: new Date('2026-08-20T08:00:00.000Z'),
+      updatedAt: new Date('2026-08-20T10:00:00.000Z'),
+      product: buildProduct({ sourcingMethod: 'PRODUCTION_ONLY' }),
+      recipe: buildPlanningRecipeVersion().recipe,
+      recipeVersion: { id: 21n, recipeId: 50n, versionNumber: 3, status: 'APPROVED', approvedAt: new Date('2026-08-13T09:00:00.000Z'), updatedAt: new Date('2026-08-13T09:00:00.000Z') },
+      originWarehouse: { id: 5n, code: 'RAW', name: 'Raw', warehouseType: 'RAW_MATERIAL', isActive: true },
+      destinationWarehouse: { id: 8n, code: 'FG', name: 'Finished', warehouseType: 'FINISHED_GOODS', isActive: true },
+      responsibleUser: { id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' },
+      items: [],
+      materialRequirements: persistedRequirementRows,
+    }),
+  }, async () => {
+    const result = await productionService.approveProductionOrder(601n, {}, { ...auth, permissions: ['production.approve'] });
+
+    assert.equal(result.status, 'APPROVED');
+    assert.equal(persistedRequirementRows.length, 2);
+    assert.deepEqual(result.recipeVersionSnapshot.recipeVersion.materialRequirements, [
+      { productId: '31', requiredQuantity: 156.875, availableQuantity: 490, missingQuantity: 0, unit: 'KG' },
+      { productId: '32', requiredQuantity: 31.375, availableQuantity: 100, missingQuantity: 0, unit: 'L' },
+    ]);
+  });
+});
+
+test('approveProductionOrder returns 409 when stock falls below persisted requirements before approval', async () => {
+  const tx = {
+    warehouseStock: {
+      findMany: async () => ([
+        { productId: 31n, quantity: 100, reservedQuantity: 0 },
+        { productId: 32n, quantity: 10, reservedQuantity: 0 },
+      ]),
+    },
+  };
+
+  await withPatchedRepositories({
+    transaction: async (work) => work(tx),
+    acquireCompanyInventoryAdvisoryLock: async () => {},
+    findProductionOrderById: async () => ({
+      id: 602n,
+      companyId: 7n,
+      productId: 11n,
+      recipeId: 50n,
+      recipeVersionId: 21n,
+      originWarehouseId: 5n,
+      destinationWarehouseId: 8n,
+      responsibleUserId: 34n,
+      quantity: 125.5,
+      status: 'PENDING_APPROVAL',
+      priority: 2,
+      overrideJustification: null,
+      recipeVersionSnapshot: productionService.__private__.buildRecipeVersionSnapshot(buildPlanningRecipeVersion(), null),
+      materialRequirements: [
+        { productId: 31n, requiredQuantity: 156.875, unit: 'KG' },
+        { productId: 32n, requiredQuantity: 31.375, unit: 'L' },
+      ],
+    }),
+    findProductById: async () => buildProduct({ sourcingMethod: 'PRODUCTION_ONLY' }),
+    findRecipeVersionById: async () => buildPlanningRecipeVersion(),
+  }, async () => {
+    await assert.rejects(
+      () => productionService.approveProductionOrder(602n, {}, { ...auth, permissions: ['production.approve'] }),
+      (error) => {
+        assert.equal(error?.statusCode, 409);
+        assert.equal(error?.subCode, 'insufficient_stock');
+        return true;
+      },
+    );
   });
 });
 

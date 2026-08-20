@@ -14,6 +14,8 @@ const productionStageExecutionInclude = /** @type {any} */ ({
   },
 });
 
+const productionOrderMaterialRequirementOrderBy = /** @type {any} */ ([{ id: 'asc' }]);
+
 const productionOrderInclude = /** @type {any} */ ({
   product: {
     select: {
@@ -76,6 +78,9 @@ const productionOrderInclude = /** @type {any} */ ({
   items: {
     orderBy: [{ id: 'asc' }],
   },
+  materialRequirements: {
+    orderBy: productionOrderMaterialRequirementOrderBy,
+  },
   stageExecutions: {
     orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
     include: productionStageExecutionInclude,
@@ -130,6 +135,60 @@ async function updateProductionOrder(id, companyId, data, db = prisma) {
   }
 
   return findProductionOrderById(id, companyId, db);
+}
+
+function createMaterialRequirements(orderId, rows, db = prisma) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return Promise.resolve({ count: 0 });
+  }
+
+  return db.productionOrderMaterialRequirement.createMany({
+    data: rows.map((row) => ({
+      ...row,
+      productionOrderId: row.productionOrderId ?? orderId,
+    })),
+  });
+}
+
+function findMaterialRequirementsByOrderId(productionOrderId, db = prisma) {
+  return db.productionOrderMaterialRequirement.findMany({
+    where: { productionOrderId },
+    orderBy: productionOrderMaterialRequirementOrderBy,
+    include: {
+      product: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          unit: true,
+          requiresLot: true,
+          requiresExpiration: true,
+        },
+      },
+    },
+  });
+}
+
+function findMaterialRequirementsByOrderIdForCompany(productionOrderId, companyId, db = prisma) {
+  return db.productionOrderMaterialRequirement.findMany({
+    where: {
+      productionOrderId,
+      productionOrder: { companyId },
+    },
+    orderBy: productionOrderMaterialRequirementOrderBy,
+    include: {
+      product: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          unit: true,
+          requiresLot: true,
+          requiresExpiration: true,
+        },
+      },
+    },
+  });
 }
 
 function createProductionStageExecution(data, db = prisma) {
@@ -241,6 +300,9 @@ module.exports = {
   findProductionOrderById,
   createProductionOrder,
   updateProductionOrder,
+  createMaterialRequirements,
+  findMaterialRequirementsByOrderId,
+  findMaterialRequirementsByOrderIdForCompany,
   createProductionStageExecution,
   createProductionConsumption,
   createProductionWaste,

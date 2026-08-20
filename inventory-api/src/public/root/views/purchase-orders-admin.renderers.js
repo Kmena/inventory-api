@@ -2,10 +2,15 @@
   const rootShell = /** @type {any} */ (globalScope).RootShell;
   const rootShellUi = rootShell.require('ui');
 
+  /**
+   * Maps PurchaseOrderStatus enum values (as defined in the Prisma schema)
+   * to human-readable labels and badge classes.
+   * Enum: DRAFT | ISSUED | CANCELLED
+   */
   const STATUS_MAP = {
-    PENDING: { label: 'Pendiente', badgeClass: 'badge badge-warning' },
-    CONFIRMED: { label: 'Confirmada', badgeClass: 'badge badge-info' },
-    RECEIVED: { label: 'Recibida', badgeClass: 'badge badge-success' },
+    DRAFT:     { label: 'Borrador',   badgeClass: 'badge badge-warning' },
+    ISSUED:    { label: 'Emitida',    badgeClass: 'badge badge-info' },
+    CANCELLED: { label: 'Cancelada',  badgeClass: 'badge badge-danger' },
   };
 
   function getStatusBadge(status) {
@@ -127,6 +132,10 @@
       ? `<p class="muted">${rootShellUi.escapeHtml(order.notes)}</p>`
       : '<p class="muted">Sin notas.</p>';
 
+    const issueButton = order.status === 'DRAFT'
+      ? `<button type="button" id="po-issue-button" class="" data-order-id="${rootShellUi.escapeHtml(String(order.id))}">Emitir orden de compra</button>`
+      : '';
+
     return `
       <div class="page-header">
         <div>
@@ -137,6 +146,7 @@
             <span> · ${date}</span>
           </p>
         </div>
+        ${issueButton ? `<div class="action-row">${issueButton}</div>` : ''}
       </div>
 
       <div class="stack-section">

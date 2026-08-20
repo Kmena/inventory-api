@@ -108,6 +108,25 @@ function updatePurchaseReceiptItemConfirmedLot(itemId, confirmedLotId, tx) {
   });
 }
 
+/**
+ * Lists purchase orders available to create a warehouse receipt.
+ * Only ISSUED orders are shown — DRAFT orders are still being prepared
+ * and CANCELLED orders are closed for business.
+ *
+ * @param {bigint} companyId
+ * @param {import('@prisma/client').PrismaClient} db
+ */
+function listPurchaseOrdersForReceipt(companyId, db = prisma) {
+  return db.purchaseOrder.findMany({
+    where: { companyId, status: 'ISSUED' },
+    include: {
+      supplier: true,
+      items: { include: { product: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 module.exports = {
   findPurchaseOrderByIdForCompany,
   findSupplierByIdForCompany,
@@ -121,4 +140,5 @@ module.exports = {
   findPurchaseReceiptByIdForCompanyInTransaction,
   updatePurchaseReceiptInTransaction,
   updatePurchaseReceiptItemConfirmedLot,
+  listPurchaseOrdersForReceipt,
 };

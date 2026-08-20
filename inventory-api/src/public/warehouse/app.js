@@ -65,10 +65,11 @@ if (!headerEl || !viewTitleEl || !statusEl || !viewEl || !tabBarEl || !identityS
 
 const VIEW_MODULE_KEYS = /** @type {Record<string, string>} */ ({
   'receipts':            'views.receipts',
+  'receive-from-po':     'views.receiveFromPo',
   'inspections':         'views.inspections',
   'production':          'views.production',
   'recipe-consultation': 'views.recipeConsultation',
-  'inventory':           'views.inventoryStub',
+  'inventory':           'views.inventory',
 });
 
 const TAB_DEFINITIONS = [
@@ -76,13 +77,20 @@ const TAB_DEFINITIONS = [
     view:       'receipts',
     label:      'Recepciones',
     icon:       '📦',
-    /** @param {string[]} p */ permission: (p) => p.includes('warehouse.receive') || p.includes('quality.inspect'),
+    /** @param {string[]} p */ permission: (p) => p.includes('receipts.inspect') || p.includes('quality.inspect') || p.includes('receipts.view'),
+  },
+  {
+    // Sub-view of Recepciones — not shown in tab bar, but guards hash routing via the same permission.
+    view:       'receive-from-po',
+    label:      'Nueva recepcion desde OC',
+    hidden:     true,
+    /** @param {string[]} p */ permission: (p) => p.includes('receipts.inspect'),
   },
   {
     view:       'production',
     label:      'Produccion',
     icon:       '🏭',
-    /** @param {string[]} p */ permission: (p) => p.includes('warehouse.receive') || p.includes('quality.inspect'),
+    /** @param {string[]} p */ permission: (p) => p.includes('production.execute') || p.includes('production.view') || p.includes('quality.inspect'),
   },
   {
     view:       'recipe-consultation',
@@ -94,13 +102,13 @@ const TAB_DEFINITIONS = [
     view:       'inventory',
     label:      'Inventario',
     icon:       '📊',
-    stub:       true,
     /** @param {string[]} p */ permission: (p) => p.includes('warehouse.receive'),
   },
 ];
 
 const VIEW_LABELS = /** @type {Record<string, string>} */ ({
   'receipts':            'Recepciones',
+  'receive-from-po':     'Nueva recepcion desde OC',
   'inspections':         'Inspecciones',
   'production':          'Produccion',
   'recipe-consultation': 'Recetas (solo lectura)',
@@ -185,6 +193,7 @@ function renderTabBar(session) {
   tabBarEl.innerHTML = '';
 
   for (const tab of TAB_DEFINITIONS) {
+    if (tab.hidden) { continue; }
     if (!tab.permission(permissions)) { continue; }
     const btn = document.createElement('button');
     btn.type = 'button';

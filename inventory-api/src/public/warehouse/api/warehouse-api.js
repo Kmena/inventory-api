@@ -76,6 +76,75 @@ function createProductionQAInspection(session, orderId, stageId, payload) {
 }
 
 // -----------------------------------------------------------------------
+// Purchase orders (for receipt workflow)
+// -----------------------------------------------------------------------
+
+function listPurchaseOrdersForReceipt(session) {
+  return safeFetch(session, '/api/receipts/purchase-orders');
+}
+
+function createReceipt(session, payload) {
+  return safeFetch(session, '/api/receipts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+function listWarehouses(session) {
+  return safeFetch(session, '/api/warehouses/company')
+    .then((result) => result?.items ?? result ?? []);
+}
+
+// -----------------------------------------------------------------------
+// Inventory (stocks + lot stocks)
+// -----------------------------------------------------------------------
+
+function listInventoryStocks(session) {
+  return safeFetch(session, '/api/inventory/stocks');
+}
+
+// -----------------------------------------------------------------------
+// Production order lifecycle
+// -----------------------------------------------------------------------
+
+function startProductionOrder(session, orderId) {
+  return safeFetch(session, `/api/production/orders/${orderId}/start`, { method: 'POST' });
+}
+
+function completeProductionOrder(session, orderId, payload) {
+  return safeFetch(session, `/api/production/orders/${orderId}/complete`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+function createProductionOrder(session, payload) {
+  return safeFetch(session, '/api/production/orders', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// -----------------------------------------------------------------------
+// Dropdown data sources (used by the production creation form)
+// -----------------------------------------------------------------------
+
+function listRecipes(session) {
+  return safeFetch(session, '/api/recipes')
+    .then((result) => result?.items ?? result ?? []);
+}
+
+function listProducts(session) {
+  return safeFetch(session, '/api/products')
+    .then((result) => result?.items ?? result ?? []);
+}
+
+function listCompanyUsers(session) {
+  return safeFetch(session, '/api/users/company')
+    .then((result) => result?.items ?? result ?? []);
+}
+
+// -----------------------------------------------------------------------
 // Register
 // -----------------------------------------------------------------------
 
@@ -89,5 +158,15 @@ WarehouseShell.register('warehouseApi', {
   getProductionOrder,
   executeProductionStage,
   createProductionQAInspection,
+  listPurchaseOrdersForReceipt,
+  createReceipt,
+  listWarehouses,
+  listInventoryStocks,
+  startProductionOrder,
+  completeProductionOrder,
+  createProductionOrder,
+  listRecipes,
+  listProducts,
+  listCompanyUsers,
 });
 })();

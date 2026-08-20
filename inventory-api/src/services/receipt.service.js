@@ -347,10 +347,16 @@ async function reversePurchaseReceipt(receiptId, auth) {
   return serializeReceipt(reversed);
 }
 
+async function listPurchaseOrdersForReceipt(auth) {
+  const scope = assertCompanyScope(auth);
+  return receiptRepository.listPurchaseOrdersForReceipt(scope.companyId);
+}
+
 module.exports = {
   createPurchaseReceipt,
   listPurchaseReceipts,
   getPurchaseReceipt,
+  listPurchaseOrdersForReceipt,
   inspectPurchaseReceiptItem,
   confirmPurchaseReceipt,
   reversePurchaseReceipt,
