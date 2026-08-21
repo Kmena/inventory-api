@@ -18,6 +18,7 @@ const auth = {
 };
 
 const originals = {
+  transaction: procurementRepository.transaction,
   findCompanyConfigByCompanyId: procurementRepository.findCompanyConfigByCompanyId,
   findSupplierByIdForCompany: procurementRepository.findSupplierByIdForCompany,
   findProductByIdForCompany: procurementRepository.findProductByIdForCompany,
@@ -41,6 +42,7 @@ const originals = {
 
 function patch(overrides) {
   Object.assign(procurementRepository, {
+    transaction: overrides.transaction || originals.transaction,
     findCompanyConfigByCompanyId: overrides.findCompanyConfigByCompanyId || originals.findCompanyConfigByCompanyId,
     findSupplierByIdForCompany: overrides.findSupplierByIdForCompany || originals.findSupplierByIdForCompany,
     findProductByIdForCompany: overrides.findProductByIdForCompany || originals.findProductByIdForCompany,

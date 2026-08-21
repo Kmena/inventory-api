@@ -323,6 +323,10 @@ test('createProductionOrder accepts justified override and stores a frozen recip
     findRecipeVersionById: async () => buildRecipeVersion({ status: 'DRAFT' }),
     findCompanyWarehousesByIds: async () => [{ id: 5n }, { id: 8n }],
     findActiveCompanyUserById: async () => ({ id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' }),
+    // stageInputs in buildRecipeVersion are empty so tx.warehouseStock is never called;
+    // nonetheless a no-op transaction mock is required to avoid hitting real Prisma.
+    transaction: async (fn) => fn(),
+    acquireCompanyInventoryAdvisoryLock: async () => {},
     createProductionOrder: async (data) => {
       createdData = data;
       return {
