@@ -74,9 +74,9 @@ function enrichPermissionWithMetadata(permission) {
     scope: metadata?.scope || 'tenant',
     sensitivity: metadata?.sensitivity || 'operational',
     metadataStatus: metadata ? 'complete' : 'missing',
-    permissionKind: metadata?.permissionKind || 'functional',
-    landingTarget: metadata?.landingTarget || null,
-    exclusiveGroup: metadata?.exclusiveGroup || null,
+    permissionKind: /** @type {{ permissionKind?: string } | null | undefined} */ (metadata)?.permissionKind || 'functional',
+    landingTarget: /** @type {{ landingTarget?: string } | null | undefined} */ (metadata)?.landingTarget || null,
+    exclusiveGroup: /** @type {{ exclusiveGroup?: string } | null | undefined} */ (metadata)?.exclusiveGroup || null,
   };
 }
 

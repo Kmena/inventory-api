@@ -65,7 +65,7 @@ const LANDING_PERMISSION_PRIORITY = Object.freeze({
  * @returns {boolean}
  */
 function isLandingPermission(code) {
-  const meta = getPermissionMetadata(code);
+  const meta = /** @type {{ permissionKind?: string } | null} */ (getPermissionMetadata(code));
   return meta?.permissionKind === 'landing';
 }
 
@@ -84,7 +84,7 @@ function listLandingPermissionCodes(permissionCodes = []) {
  */
 function getAllLandingPermissionCodes() {
   return PERMISSION_GOVERNANCE_POLICY.permissionMetadata
-    .filter((m) => m.permissionKind === 'landing')
+    .filter((m) => /** @type {{ permissionKind?: string }} */ (m).permissionKind === 'landing')
     .map((m) => m.code);
 }
 
@@ -114,7 +114,7 @@ function resolveLanding(permissionCodes = [], authOrUser = {}) {
   const landingCodes = listLandingPermissionCodes(permissionCodes);
   if (landingCodes.length === 1) {
     const code = landingCodes[0];
-    const meta = getPermissionMetadata(code);
+    const meta = /** @type {{ landingTarget?: string } | null} */ (getPermissionMetadata(code));
     const target = meta?.landingTarget || 'root';
     trace.push(`explicit-landing:${code}`);
     return { target, path: LANDING_TARGETS[target] || '/no-access.html', source: 'permission', permissionCode: code, trace };
@@ -128,7 +128,7 @@ function resolveLanding(permissionCodes = [], authOrUser = {}) {
       (a, b) => (LANDING_PERMISSION_PRIORITY[a] ?? 99) - (LANDING_PERMISSION_PRIORITY[b] ?? 99),
     );
     const code = sorted[0];
-    const meta = getPermissionMetadata(code);
+    const meta = /** @type {{ landingTarget?: string } | null} */ (getPermissionMetadata(code));
     const target = meta?.landingTarget || 'root';
     trace.push(`multiple-landings-resolved:${code}`);
     return { target, path: LANDING_TARGETS[target] || '/no-access.html', source: 'permission', permissionCode: code, trace };
