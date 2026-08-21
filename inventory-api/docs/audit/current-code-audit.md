@@ -1,5 +1,9 @@
 # Executive Summary
-Final re-audit of the `recipes-production-qa-execution-hardening` TASK-008 backend follow-up split shows the implementation is materially healthy and the file-size acceptance concern was satisfied without regressing the verified production/QA behavior. The production runtime now uses a clearer split between:
+This is a **focused post-implementation baseline audit** with **intentionally partial coverage** — covering the `recipes-production-qa-execution-hardening` implementation slice only. It does not represent a full-repository audit.
+
+Final re-audit of the `recipes-production-qa-execution-hardening` TASK-008 backend follow-up split shows the implementation is materially healthy and the file-size acceptance concern was satisfied without regressing the verified production/QA behavior.
+
+**Scope note:** This audit uses **bounded runtime governance** and **focused regression tests** to validate the production/QA execution hardening slice. **Canonical `docs/**` artifacts** (current-state.md, architecture.md, action-plan.md) remain the source of truth for full documentation ownership map with clear canonical/auxiliary/historical separation. The production runtime now uses a clearer split between:
 - `src/services/production.service.js` as façade/orchestration;
 - `src/services/production-execution.service.js` for execution/return/completion flows; and
 - `src/services/production-stage-validation.service.js` for stage validation + override audit helpers.

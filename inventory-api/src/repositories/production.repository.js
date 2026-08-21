@@ -12,6 +12,11 @@ const productionStageExecutionInclude = /** @type {any} */ ({
   returns: {
     orderBy: [{ id: 'asc' }],
   },
+  // Inspecciones QA embebidas para que el frontend derive WAITING_QA sin una
+  // llamada adicional y para que assertStagePrerequisites las valide en-memoria.
+  qualityInspections: {
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+  },
 });
 
 const productionOrderMaterialRequirementOrderBy = /** @type {any} */ ([{ id: 'asc' }]);

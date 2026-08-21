@@ -149,10 +149,9 @@ async function checkMandatoryQaGatesForOrder(orderId, companyId) {
       continue;
     }
 
-    if (!stageExecution.qaOutOfTolerance) {
-      continue;
-    }
-
+    // El gate QA se activa para toda etapa qaMandatory, no solo cuando hay
+    // desviacion de tolerancia. El inspector de calidad debe registrar su
+    // analisis y aprobarlo antes de que la orden pueda completarse.
     const approvedInspection = await qualityRepository.findApprovedInspectionForStageExecution(stageExecution.id);
     if (!approvedInspection) {
       const allInspections = await qualityRepository.findQualityInspectionsForStageExecution(stageExecution.id);
@@ -161,7 +160,7 @@ async function checkMandatoryQaGatesForOrder(orderId, companyId) {
       if (hasRejection) {
         rejectedStages.push({ stageId: stage.id, stageName: stage.name, reason: 'qa_rejected' });
       } else {
-        pendingStages.push({ stageId: stage.id, stageName: stage.name, reason: 'qa_out_of_tolerance_requires_approval' });
+        pendingStages.push({ stageId: stage.id, stageName: stage.name, reason: 'qa_analysis_required' });
       }
     }
   }

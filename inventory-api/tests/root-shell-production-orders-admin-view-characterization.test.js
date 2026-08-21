@@ -105,6 +105,102 @@ test('production orders state and renderers keep detail read-only and exclude wa
   assert.doesNotMatch(detailMarkup, /Ejecutar etapa/);
   assert.doesNotMatch(detailMarkup, /Inspeccionar/);
   assert.doesNotMatch(detailMarkup, /Completar/);
-  assert.doesNotMatch(detailMarkup, /Aprobar/);
+  // No approve button: status is IN_PROGRESS (not PENDING_APPROVAL)
+  assert.doesNotMatch(detailMarkup, /production-approve-btn/);
   assert.doesNotMatch(detailMarkup, /Cancelar/);
+});
+
+test('production-orders-admin renderOrderDetail shows approve button for PENDING_APPROVAL + canApproveProduction', () => {
+  const { browserWindow, context } = createBrowserContext();
+  executeRootScript('registry.js', context);
+  browserWindow.RootShell.register('ui', {
+    escapeHtml: (value) => String(value || ''),
+    formatDate: () => '01/01/2026',
+  });
+  executeRootScript(path.join('views', 'production-orders-admin.state.js'), context);
+  executeRootScript(path.join('views', 'production-orders-admin.renderers.js'), context);
+
+  const renderers = browserWindow.RootShell.require('views.productionOrdersAdminRenderers');
+
+  const pendingOrder = {
+    id: 20,
+    orderId: 'ORD-20',
+    productionLotCode: 'LOT-20',
+    status: 'PENDING_APPROVAL',
+    product: { id: 7, name: 'Producto A' },
+    recipe: { id: 5, name: 'Receta Base' },
+    recipeVersion: { id: 12, versionNumber: 2 },
+    stageExecutions: [],
+    recipeVersionSnapshot: { recipeVersion: { versionNumber: 2 } },
+  };
+
+  // Without canApproveProduction: no approve button
+  const detailNoApprove = renderers.renderOrderDetail(pendingOrder, { detailState: 'ready', canApproveProduction: false });
+  assert.doesNotMatch(detailNoApprove, /production-approve-btn/);
+
+  // With canApproveProduction AND PENDING_APPROVAL: approve button appears
+  const detailWithApprove = renderers.renderOrderDetail(pendingOrder, { detailState: 'ready', canApproveProduction: true });
+  assert.match(detailWithApprove, /production-approve-btn/);
+  assert.match(detailWithApprove, /Aprobar orden/);
+  assert.match(detailWithApprove, /data-order-id="20"/);
+  assert.doesNotMatch(detailWithApprove, /Vista read-only de supervision/);
+});
+
+test('production-orders-admin renderOrderDetail shows submit button for DRAFT + canSubmitProduction', () => {
+  const { browserWindow, context } = createBrowserContext();
+  executeRootScript('registry.js', context);
+  browserWindow.RootShell.register('ui', {
+    escapeHtml: (value) => String(value || ''),
+    formatDate: () => '01/01/2026',
+  });
+  executeRootScript(path.join('views', 'production-orders-admin.state.js'), context);
+  executeRootScript(path.join('views', 'production-orders-admin.renderers.js'), context);
+
+  const renderers = browserWindow.RootShell.require('views.productionOrdersAdminRenderers');
+
+  const draftOrder = {
+    id: 30,
+    orderId: 'ORD-30',
+    productionLotCode: 'LOT-30',
+    status: 'DRAFT',
+    product: { id: 7, name: 'Producto A' },
+    recipe: { id: 5, name: 'Receta Base' },
+    recipeVersion: { id: 12, versionNumber: 1 },
+    stageExecutions: [],
+    recipeVersionSnapshot: { recipeVersion: { versionNumber: 1 } },
+  };
+
+  // Without canSubmitProduction: no submit button, shows read-only context
+  const detailNoSubmit = renderers.renderOrderDetail(draftOrder, { detailState: 'ready', canSubmitProduction: false });
+  assert.doesNotMatch(detailNoSubmit, /production-submit-btn/);
+
+  // With canSubmitProduction AND DRAFT: submit button appears
+  const detailWithSubmit = renderers.renderOrderDetail(draftOrder, { detailState: 'ready', canSubmitProduction: true });
+  assert.match(detailWithSubmit, /production-submit-btn/);
+  assert.match(detailWithSubmit, /Enviar a aprobacion/);
+  assert.match(detailWithSubmit, /data-order-id="30"/);
+  assert.doesNotMatch(detailWithSubmit, /Vista read-only de supervision/);
+});
+
+test('production-orders-admin state includes PENDING_APPROVAL in STATUS_LABELS and metrics', () => {
+  const { browserWindow, context } = createBrowserContext();
+  executeRootScript('registry.js', context);
+  executeRootScript(path.join('views', 'production-orders-admin.state.js'), context);
+
+  const state = browserWindow.RootShell.require('views.productionOrdersAdminState');
+
+  const orders = [
+    { id: 1, status: 'PENDING_APPROVAL' },
+    { id: 2, status: 'PENDING_APPROVAL' },
+    { id: 3, status: 'APPROVED' },
+  ];
+
+  const metrics = state.buildOrderMetrics(orders);
+  assert.equal(metrics.pendingApprovalCount, 2);
+  assert.equal(metrics.approvedCount, 1);
+
+  // Badge for PENDING_APPROVAL should be a warning class
+  const badgeHtml = state.renderStatusBadge({ status: 'PENDING_APPROVAL' }, { escapeHtml: (v) => String(v) });
+  assert.match(badgeHtml, /badge-warning/);
+  assert.match(badgeHtml, /Pendiente de aprobaci/);
 });

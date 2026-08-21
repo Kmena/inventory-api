@@ -149,6 +149,14 @@
                 <article class="detail-item"><span>Merma esperada</span><strong>${rootShellUi.escapeHtml(version?.expectedWaste ?? 'No definida')}</strong></article>
               </div>
               ${version?.notes ? `<article class="detail-item"><span>Notas</span><strong>${rootShellUi.escapeHtml(version.notes)}</strong></article>` : ''}
+              <div class="action-row compact-action-row" style="margin-top:0.5rem">
+                <button class="secondary-button" type="button"
+                  data-view-stages="${rootShellUi.escapeHtml(String(version?.id || ''))}"
+                  data-version-label="v${rootShellUi.escapeHtml(String(version?.versionNumber || '?'))}"
+                  data-is-draft="${isDraft ? 'true' : 'false'}">
+                  🔬 Ver / Editar etapas
+                </button>
+              </div>
             </article>
           `;
         }).join('')}
@@ -226,12 +234,81 @@
       .join('');
   }
 
+  function renderStagesModalContent(version) {
+    const stages = version?.stages || [];
+    if (!stages.length) {
+      return '<p class="empty-state">Esta version no tiene etapas definidas.</p>';
+    }
+
+    return stages.map((stage, idx) => {
+      const inputs = stage?.stageInputs || [];
+      const params = stage?.expectedParameters || [];
+      return `
+        <details class="recipe-stage-detail" style="border:1px solid var(--border,#ddd);border-radius:8px;padding:0.75rem;margin-bottom:0.5rem" open="${idx === 0 ? 'true' : ''}">
+          <summary style="cursor:pointer;font-weight:600;list-style:none;display:flex;gap:0.5rem;align-items:center">
+            <span style="background:var(--color-primary-light,#e0e7ff);border-radius:50%;width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center;font-size:0.75rem">${rootShellUi.escapeHtml(String(stage.stageOrder != null ? stage.stageOrder + 1 : idx + 1))}</span>
+            ${rootShellUi.escapeHtml(stage.name || 'Sin nombre')}
+            ${stage.qaMandatory ? '<span class="badge" style="font-size:0.7rem">QA obligatorio</span>' : ''}
+          </summary>
+          <div style="margin-top:0.75rem">
+            ${stage.instructions ? `<p class="muted" style="margin-bottom:0.5rem">${rootShellUi.escapeHtml(stage.instructions)}</p>` : ''}
+            <strong style="font-size:0.85rem">Insumos de esta etapa</strong>
+            ${inputs.length ? `
+              <table style="width:100%;border-collapse:collapse;margin-top:0.25rem;font-size:0.875rem">
+                <thead><tr>
+                  <th style="text-align:left;padding:0.25rem 0.5rem;border-bottom:1px solid var(--border,#ddd)">Insumo</th>
+                  <th style="text-align:left;padding:0.25rem 0.5rem;border-bottom:1px solid var(--border,#ddd)">Producto</th>
+                  <th style="text-align:right;padding:0.25rem 0.5rem;border-bottom:1px solid var(--border,#ddd)">Cantidad</th>
+                  <th style="text-align:left;padding:0.25rem 0.5rem;border-bottom:1px solid var(--border,#ddd)">Unidad</th>
+                </tr></thead>
+                <tbody>
+                  ${inputs.map((si) => `
+                    <tr>
+                      <td style="padding:0.25rem 0.5rem">${rootShellUi.escapeHtml(si.name || '—')}</td>
+                      <td style="padding:0.25rem 0.5rem">${rootShellUi.escapeHtml(si.product?.name || si.product?.code || '—')}</td>
+                      <td style="padding:0.25rem 0.5rem;text-align:right">${rootShellUi.escapeHtml(si.quantity != null ? String(si.quantity) : '—')}</td>
+                      <td style="padding:0.25rem 0.5rem">${rootShellUi.escapeHtml(si.unit || '—')}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            ` : '<p class="muted" style="margin-top:0.25rem;font-size:0.85rem">Sin insumos definidos para esta etapa.</p>'}
+            ${params.length ? `
+              <strong style="font-size:0.85rem;display:block;margin-top:0.75rem">Parametros QA esperados</strong>
+              <table style="width:100%;border-collapse:collapse;margin-top:0.25rem;font-size:0.875rem">
+                <thead><tr>
+                  <th style="text-align:left;padding:0.25rem 0.5rem;border-bottom:1px solid var(--border,#ddd)">Parametro</th>
+                  <th style="text-align:left;padding:0.25rem 0.5rem;border-bottom:1px solid var(--border,#ddd)">Unidad</th>
+                  <th style="text-align:right;padding:0.25rem 0.5rem;border-bottom:1px solid var(--border,#ddd)">Valor esperado</th>
+                  <th style="text-align:right;padding:0.25rem 0.5rem;border-bottom:1px solid var(--border,#ddd)">Tol. min</th>
+                  <th style="text-align:right;padding:0.25rem 0.5rem;border-bottom:1px solid var(--border,#ddd)">Tol. max</th>
+                </tr></thead>
+                <tbody>
+                  ${params.map((p) => `
+                    <tr>
+                      <td style="padding:0.25rem 0.5rem">${rootShellUi.escapeHtml(p.name || '—')}</td>
+                      <td style="padding:0.25rem 0.5rem">${rootShellUi.escapeHtml(p.unit || '—')}</td>
+                      <td style="padding:0.25rem 0.5rem;text-align:right">${rootShellUi.escapeHtml(p.expectedValue != null ? String(p.expectedValue) : '—')}</td>
+                      <td style="padding:0.25rem 0.5rem;text-align:right">${rootShellUi.escapeHtml(p.minTolerance != null ? String(p.minTolerance) : '—')}</td>
+                      <td style="padding:0.25rem 0.5rem;text-align:right">${rootShellUi.escapeHtml(p.maxTolerance != null ? String(p.maxTolerance) : '—')}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            ` : ''}
+          </div>
+        </details>
+      `;
+    }).join('');
+  }
+
   rootShell.register('views.recipesAdminRenderers', {
     renderMetrics,
     renderProductAssignmentOptions,
     renderRecipeDetail,
     renderRecipeTypeOptions,
     renderRecipesList,
+    renderStagesModalContent,
     renderState,
   });
 }(window));

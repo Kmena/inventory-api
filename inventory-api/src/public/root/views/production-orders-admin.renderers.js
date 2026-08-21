@@ -16,6 +16,7 @@
     const metrics = productionOrdersState.buildOrderMetrics(orders);
     return [
       renderMetricCard('Borrador', metrics.draftCount),
+      renderMetricCard('Pend. aprobación', metrics.pendingApprovalCount),
       renderMetricCard('Aprobadas', metrics.approvedCount),
       renderMetricCard('En progreso', metrics.inProgressCount),
       renderMetricCard('QA Hold', metrics.qaHoldCount),
@@ -101,6 +102,51 @@
     `;
   }
 
+  function renderMaterialRequirements(order) {
+    const requirements = Array.isArray(order?.materialRequirements) ? order.materialRequirements : [];
+    if (!requirements.length) { return ''; }
+
+    return `
+      <article class="detail-item">
+        <span>Requerimientos de material</span>
+        <div class="table-wrapper products-table-wrapper" style="margin-top:0.5rem">
+          <table class="products-admin-table">
+            <thead><tr>
+              <th>Producto</th><th>Requerido</th><th>Unidad</th>
+              <th>Disponible al crear</th><th>Deficit al crear</th>
+            </tr></thead>
+            <tbody>
+              ${requirements.map((r) => `
+                <tr>
+                  <td>${rootShellUi.escapeHtml(String(r.productId))}</td>
+                  <td>${rootShellUi.escapeHtml(String(r.requiredQuantity ?? r.required ?? '?'))}</td>
+                  <td>${rootShellUi.escapeHtml(r.unit || '—')}</td>
+                  <td>${rootShellUi.escapeHtml(String(r.availableAtCreation ?? '—'))}</td>
+                  <td style="${Number(r.shortageAtCreation ?? 0) > 0 ? 'color:var(--color-danger,#c00)' : ''}">
+                    ${rootShellUi.escapeHtml(String(r.shortageAtCreation ?? '0'))}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderOverrideBlock(order) {
+    const snapshot = order?.recipeVersionSnapshot;
+    const overrideJustification = snapshot?.override?.justification || order?.overrideJustification || null;
+    if (!overrideJustification) { return ''; }
+
+    return `
+      <article class="detail-item" style="border-left:3px solid var(--color-warning,#b86000);padding-left:0.5rem">
+        <span>Override — Justificacion de desviacion</span>
+        <strong>${rootShellUi.escapeHtml(overrideJustification)}</strong>
+      </article>
+    `;
+  }
+
   function renderStageExecutions(stageExecutions) {
     if (!Array.isArray(stageExecutions) || !stageExecutions.length) {
       return '<p class="empty-state">No hay etapas registradas todavia en esta orden.</p>';
@@ -160,7 +206,26 @@
           </div>
         </div>
 
-        <article class="detail-item"><span>Contexto</span><strong>Vista read-only de supervision. La operacion diaria ocurre en /warehouse/.</strong></article>
+        ${order?.status === 'DRAFT' && options.canSubmitProduction
+          ? `<div class="action-row compact-action-row" style="margin-bottom:1rem">
+               <button type="button" class="secondary-button production-submit-btn"
+                       data-order-id="${rootShellUi.escapeHtml(String(order?.id || ''))}">📤 Enviar a aprobacion</button>
+               <p class="production-submit-error" style="color:var(--color-danger,#c00);font-size:0.85rem" hidden
+                  role="alert" aria-live="assertive"></p>
+             </div>`
+          : ''}
+        ${order?.status === 'PENDING_APPROVAL' && options.canApproveProduction
+          ? `<div class="action-row compact-action-row" style="margin-bottom:1rem">
+               <button type="button" class="primary-button production-approve-btn"
+                       data-order-id="${rootShellUi.escapeHtml(String(order?.id || ''))}"
+                       style="background:var(--color-success,#16A34A)">✓ Aprobar orden</button>
+               <p class="production-approve-error" style="color:var(--color-danger,#c00);font-size:0.85rem" hidden
+                  role="alert" aria-live="assertive"></p>
+             </div>`
+          : ''}
+        ${order?.status !== 'DRAFT' && order?.status !== 'PENDING_APPROVAL'
+          ? '<article class="detail-item"><span>Contexto</span><strong>Vista read-only de supervision. La operacion diaria ocurre en /warehouse/.</strong></article>'
+          : ''}
 
         <div class="detail-grid">
           <article class="detail-item"><span>Producto</span><strong>${rootShellUi.escapeHtml(order?.product?.name || 'Sin producto visible')}</strong></article>
@@ -177,6 +242,8 @@
           <article class="detail-item"><span>Cancelada</span><strong>${rootShellUi.escapeHtml(rootShellUi.formatDate(order?.cancelledAt))}</strong></article>
         </div>
 
+        ${renderMaterialRequirements(order)}
+        ${renderOverrideBlock(order)}
         <article class="detail-item"><span>Etapas registradas</span></article>
         ${renderStageExecutions(order?.stageExecutions || [])}
       </div>

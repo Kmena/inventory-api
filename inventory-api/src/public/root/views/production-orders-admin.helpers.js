@@ -33,6 +33,14 @@
     ]);
   }
 
+  function canSubmitProductionOrders(session, sessionAdapter) {
+    return sessionAdapter.hasPermission(session, 'production.create');
+  }
+
+  function canApproveProductionOrders(session, sessionAdapter) {
+    return sessionAdapter.hasPermission(session, 'production.approve');
+  }
+
   function createDefaultFilters() {
     return {
       searchTerm: '',
@@ -207,6 +215,8 @@
     applyClientSideFilters,
     buildListQuery,
     buildProductionOrdersListSummary,
+    canApproveProductionOrders,
+    canSubmitProductionOrders,
     canViewProductionOrders,
     createDefaultFilters,
     hasActiveFilters,

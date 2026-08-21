@@ -113,6 +113,8 @@ const productionCompletionSchema = z.object({
   lotCode: z.string().trim().min(1).max(100).optional().nullable(),
   expirationDate: optionalDateSchema,
   productionDate: optionalDateSchema,
+  /** Override de bodega destino; si se omite se usa la definida en la orden. */
+  destinationWarehouseId: z.coerce.bigint().optional().nullable(),
   note: z.string().trim().max(1000).optional().nullable(),
 }).strict();
 

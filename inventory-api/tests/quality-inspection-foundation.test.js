@@ -339,7 +339,9 @@ test('checkMandatoryQaGatesForOrder fails when mandatory stage has no stage exec
   });
 });
 
-test('checkMandatoryQaGatesForOrder fails when mandatory stage is out of tolerance and has no approved inspection', async () => {
+// Modelo nuevo: cualquier etapa qaMandatory requiere inspeccion aprobada,
+// no solo las que tuvieron qaOutOfTolerance. El reason code cambio a qa_analysis_required.
+test('checkMandatoryQaGatesForOrder fails when mandatory stage has no approved inspection (any case)', async () => {
   await withPatchedRepositories({
     findProductionOrderById: async () => ({
       id: 501n,
@@ -356,7 +358,7 @@ test('checkMandatoryQaGatesForOrder fails when mandatory stage is out of toleran
     findLatestProductionStageExecutionForOrderStage: async () => ({
       id: 901n,
       productionOrderId: 501n,
-      qaOutOfTolerance: true,
+      qaOutOfTolerance: false, // aunque este dentro de tolerancia, igual requiere inspeccion QA
     }),
     findApprovedInspectionForStageExecution: async () => null,
     findQualityInspectionsForStageExecution: async () => [],
@@ -364,7 +366,7 @@ test('checkMandatoryQaGatesForOrder fails when mandatory stage is out of toleran
     const result = await qualityService.checkMandatoryQaGatesForOrder(501n, 7n);
     assert.equal(result.allMandatoryGatesPassed, false);
     assert.equal(result.pendingStages.length, 1);
-    assert.equal(result.pendingStages[0].reason, 'qa_out_of_tolerance_requires_approval');
+    assert.equal(result.pendingStages[0].reason, 'qa_analysis_required');
   });
 });
 
@@ -399,7 +401,9 @@ test('checkMandatoryQaGatesForOrder reports rejected stages', async () => {
   });
 });
 
-test('checkMandatoryQaGatesForOrder passes when mandatory stage execution stayed within tolerance without inspection', async () => {
+// Modelo nuevo: estar dentro de tolerancia ya NO es suficiente para pasar el gate.
+// Siempre se requiere inspeccion aprobada en etapas qaMandatory.
+test('checkMandatoryQaGatesForOrder requires approved inspection even when within tolerance', async () => {
   await withPatchedRepositories({
     findProductionOrderById: async () => ({
       id: 501n,
@@ -416,13 +420,16 @@ test('checkMandatoryQaGatesForOrder passes when mandatory stage execution stayed
     findLatestProductionStageExecutionForOrderStage: async () => ({
       id: 901n,
       productionOrderId: 501n,
-      qaOutOfTolerance: false,
+      qaOutOfTolerance: false, // dentro de tolerancia
     }),
+    findApprovedInspectionForStageExecution: async () => null, // pero sin inspeccion aprobada
+    findQualityInspectionsForStageExecution: async () => [],
   }, async () => {
     const result = await qualityService.checkMandatoryQaGatesForOrder(501n, 7n);
-    assert.equal(result.allMandatoryGatesPassed, true);
-    assert.equal(result.pendingStages.length, 0);
-    assert.equal(result.rejectedStages.length, 0);
+    // Ahora FALLA aunque qaOutOfTolerance sea false: se requiere inspeccion QA
+    assert.equal(result.allMandatoryGatesPassed, false);
+    assert.equal(result.pendingStages.length, 1);
+    assert.equal(result.pendingStages[0].reason, 'qa_analysis_required');
   });
 });
 

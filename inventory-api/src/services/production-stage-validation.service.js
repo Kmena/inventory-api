@@ -54,6 +54,11 @@ function findCompletedExecutionForStage(order, stageId) {
   )) || null;
 }
 
+function executionHasApprovedQa(execution) {
+  const inspections = Array.isArray(execution?.qualityInspections) ? execution.qualityInspections : [];
+  return inspections.some((insp) => insp.result === 'APPROVED' || insp.result === 'CONDITIONALLY_ACCEPTED');
+}
+
 function assertStagePrerequisites(order, stageId) {
   const stages = [...(order?.recipeVersionSnapshot?.recipeVersion?.stages || [])]
     .sort((left, right) => Number(left?.stageOrder || 0) - Number(right?.stageOrder || 0));
@@ -68,12 +73,23 @@ function assertStagePrerequisites(order, stageId) {
       break;
     }
 
-    if (!findCompletedExecutionForStage(order, BigInt(priorStage.id))) {
+    const priorExecution = findCompletedExecutionForStage(order, BigInt(priorStage.id));
+    if (!priorExecution) {
       throw createSubcodedHttpError(
         409,
-        `Debe completar la etapa previa ${priorStage.name} antes de ejecutar ${currentStage.name}`,
+        `Debe completar la etapa previa "${priorStage.name}" antes de ejecutar "${currentStage.name}"`,
         'conflict',
         'stage_out_of_sequence',
+      );
+    }
+
+    // Gate QA: si la etapa anterior requiere analisis QA, este debe estar aprobado.
+    if (priorStage.qaMandatory && !executionHasApprovedQa(priorExecution)) {
+      throw createSubcodedHttpError(
+        409,
+        `La etapa "${priorStage.name}" requiere analisis QA aprobado antes de iniciar "${currentStage.name}"`,
+        'conflict',
+        'stage_qa_pending',
       );
     }
   }

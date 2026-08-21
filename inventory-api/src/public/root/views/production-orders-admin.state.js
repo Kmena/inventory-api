@@ -3,6 +3,7 @@
 
   const STATUS_LABELS = Object.freeze({
     DRAFT: 'Borrador',
+    PENDING_APPROVAL: 'Pendiente de aprobación',
     APPROVED: 'Aprobada',
     IN_PROGRESS: 'En progreso',
     WAITING_QA: 'Esperando QA',
@@ -28,6 +29,7 @@
     const items = orders || [];
     return {
       draftCount: items.filter((order) => order?.status === 'DRAFT').length,
+      pendingApprovalCount: items.filter((order) => order?.status === 'PENDING_APPROVAL').length,
       approvedCount: items.filter((order) => order?.status === 'APPROVED').length,
       inProgressCount: items.filter((order) => order?.status === 'IN_PROGRESS').length,
       qaHoldCount: items.filter((order) => order?.status === 'QA_HOLD' || order?.status === 'WAITING_QA').length,
@@ -87,7 +89,7 @@
     const status = order?.status;
     const label = STATUS_LABELS[status] || status || 'Sin estado';
     const isPositive = status === 'APPROVED' || status === 'COMPLETED';
-    const isWarning = status === 'DRAFT' || status === 'WAITING_QA' || status === 'QA_HOLD' || status === 'IN_PROGRESS';
+    const isWarning = status === 'DRAFT' || status === 'PENDING_APPROVAL' || status === 'WAITING_QA' || status === 'QA_HOLD' || status === 'IN_PROGRESS';
     const className = isPositive ? 'badge badge-success' : isWarning ? 'badge badge-warning' : 'badge';
     return `<span class="${className}">${rootShellUi.escapeHtml(label)}</span>`;
   }

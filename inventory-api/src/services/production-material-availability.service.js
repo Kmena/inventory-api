@@ -164,9 +164,13 @@ async function getAvailableLotsForStage(orderId, stageId, auth) {
 
   const productsWithLots = [];
 
+  // Todos los insumos de etapa requieren seleccion de lote. La politica es
+  // FEFO cuando el producto tiene vencimiento, FIFO cuando no. No se filtra
+  // por product.requiresLot porque en este sistema todo movimiento de insumo
+  // debe trazarse a un lote especifico.
   for (const stageInput of stageInputs) {
     const product = productById.get(String(stageInput.productId));
-    if (!product?.requiresLot) {
+    if (!product) {
       continue;
     }
 

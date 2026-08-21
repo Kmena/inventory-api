@@ -96,6 +96,8 @@
     }
 
     const canViewProductionOrders = productionOrdersHelpers.canViewProductionOrders(session, sessionAdapter);
+    const canSubmitProduction = productionOrdersHelpers.canSubmitProductionOrders(session, sessionAdapter);
+    const canApproveProduction = productionOrdersHelpers.canApproveProductionOrders(session, sessionAdapter);
 
     let ordersDataset = {
       items: [],
@@ -157,7 +159,9 @@
     }
 
     function renderDetail() {
-      detailRegion.innerHTML = productionOrdersRenderers.renderOrderDetail(getSelectedOrder(), { detailState });
+      detailRegion.innerHTML = productionOrdersRenderers.renderOrderDetail(
+        getSelectedOrder(), { detailState, canSubmitProduction, canApproveProduction },
+      );
       const selectedOrder = getSelectedOrder();
       detailSubtitle.textContent = selectedOrder
         ? `${selectedOrder.orderId || `ORD-${selectedOrder.id}`} · ${selectedOrder.product?.name || 'Sin producto'} · ${productionOrdersState.resolveVersionLabel(selectedOrder)}`
@@ -305,6 +309,41 @@
 
     refreshButton.addEventListener('click', async () => {
       await loadOrders(ordersDataset.pagination.page || 1);
+    });
+
+    detailRegion.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof globalScope.HTMLElement)) { return; }
+
+      const btn = target.closest('.production-submit-btn, .production-approve-btn');
+      if (!(btn instanceof globalScope.HTMLButtonElement)) { return; }
+
+      const orderId = btn.getAttribute('data-order-id');
+      if (!orderId) { return; }
+
+      const isSubmit = btn.classList.contains('production-submit-btn');
+      const errEl = btn.nextElementSibling;
+      const originalText = btn.textContent;
+
+      btn.disabled = true;
+      btn.textContent = isSubmit ? 'Enviando...' : 'Aprobando...';
+      if (errEl) { errEl.hidden = true; }
+
+      try {
+        if (isSubmit) {
+          await productionAdminApi.submitProductionOrder(session, orderId);
+        } else {
+          await productionAdminApi.approveProductionOrder(session, orderId, {});
+        }
+        await loadOrders(ordersDataset.pagination.page || 1);
+      } catch (error) {
+        btn.disabled = false;
+        btn.textContent = originalText;
+        if (errEl) {
+          errEl.textContent = error?.message || (isSubmit ? 'No se pudo enviar la orden.' : 'No se pudo aprobar la orden.');
+          errEl.hidden = false;
+        }
+      }
     });
 
     listRegion.addEventListener('click', async (event) => {

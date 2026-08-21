@@ -138,7 +138,10 @@ test('validateQaMeasurements rejects out-of-tolerance values without override', 
   );
 });
 
-test('executeProductionStage persists qaOutOfTolerance and enriched parameters when override is provided', async () => {
+// Modelo nuevo: el operador NO registra parametros QA en la ejecucion.
+// Los registra el inspector de calidad por separado via POST .../inspections.
+// qaOutOfTolerance siempre es false en la ejecucion del operador.
+test('executeProductionStage always persists qaOutOfTolerance=false (QA is a separate inspector step)', async () => {
   const createdExecutions = [];
 
   await withPatchedDependencies({
@@ -147,7 +150,7 @@ test('executeProductionStage persists qaOutOfTolerance and enriched parameters w
     findProductionOrderById: async () => buildOrder(),
     createProductionStageExecution: async (data) => {
       createdExecutions.push(data);
-      return { id: 901n, ...data, consumptions: [], wastes: [], returns: [], createdAt: new Date(), updatedAt: new Date() };
+      return { id: 901n, ...data, consumptions: [], wastes: [], returns: [], qualityInspections: [], createdAt: new Date(), updatedAt: new Date() };
     },
     findProductionStageExecutionById: async () => ({
       id: 901n,
@@ -156,15 +159,16 @@ test('executeProductionStage persists qaOutOfTolerance and enriched parameters w
       stageOrder: 0,
       stageName: 'Mezcla',
       responsibleUserId: 99n,
-      qaOutOfTolerance: true,
-      overrideJustification: 'Override QA documentado',
-      actualParameters: [{ name: 'pH', expectedValue: 7, actualValue: 8, unit: 'pH', minTolerance: 0.5, maxTolerance: 0.5, withinTolerance: false }],
+      qaOutOfTolerance: false,
+      overrideJustification: null,
+      actualParameters: null,
       evidence: [],
       notes: null,
       movementGroupId: 'group-1',
       consumptions: [],
       wastes: [],
       returns: [],
+      qualityInspections: [],
       startedAt: new Date('2026-08-20T08:00:00.000Z'),
       endedAt: new Date('2026-08-20T08:30:00.000Z'),
       createdAt: new Date(),
@@ -174,21 +178,17 @@ test('executeProductionStage persists qaOutOfTolerance and enriched parameters w
     const result = await productionExecutionService.executeProductionStage(501n, 101n, {
       startedAt: new Date('2026-08-20T08:00:00.000Z'),
       endedAt: new Date('2026-08-20T08:30:00.000Z'),
-      actualParameters: [{ name: 'pH', actualValue: 8, unit: 'pH' }],
       evidence: [],
       consumptions: [],
       waste: [],
-      overrideJustification: 'Override QA documentado',
     }, overrideAuth);
 
     assert.equal(createdExecutions.length, 1);
-    assert.equal(createdExecutions[0].qaOutOfTolerance, true);
-    assert.equal(createdExecutions[0].overrideJustification, 'Override QA documentado');
-    assert.deepEqual(createdExecutions[0].actualParameters, [
-      { name: 'pH', expectedValue: 7, actualValue: 8, unit: 'pH', minTolerance: 0.5, maxTolerance: 0.5, withinTolerance: false },
-    ]);
-    assert.equal(result.qaOutOfTolerance, true);
-    assert.equal(result.overrideJustification, 'Override QA documentado');
+    // El operador no lleva qaOutOfTolerance — eso lo determina el inspector QA
+    assert.equal(createdExecutions[0].qaOutOfTolerance, false);
+    assert.equal(createdExecutions[0].actualParameters, null);
+    assert.equal(result.qaOutOfTolerance, false);
+    assert.equal(result.qaApproved, false); // no hay inspecciones aun
   });
 });
 

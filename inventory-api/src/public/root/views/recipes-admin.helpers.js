@@ -84,8 +84,26 @@
     );
   }
 
+  /**
+   * Builds a patch for a stage-input row when the user selects a product.
+   * Returns `{ unit, unitReadonly }` to apply to the row's unit field.
+   */
+  function buildStageInputPatchFromProduct(product) {
+    if (!product || !product.unit) {
+      return { unit: '', unitReadonly: false };
+    }
+    return { unit: String(product.unit), unitReadonly: true };
+  }
+
+  /** Returns a blank QA parameter template for the editor. */
+  function buildDefaultQaParameter() {
+    return { name: '', unit: '', expectedValue: '', minTolerance: '0', maxTolerance: '0' };
+  }
+
   rootShell.register('views.recipesAdminHelpers', {
+    buildDefaultQaParameter,
     buildRecipeAssignmentPayload,
+    buildStageInputPatchFromProduct,
     canApproveRecipes,
     canAssignRecipesToProducts,
     canManageRecipes,

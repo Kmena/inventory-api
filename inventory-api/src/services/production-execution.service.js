@@ -37,7 +37,23 @@ function serializeProductionReturn(record) {
   };
 }
 
+const QA_APPROVED_RESULTS = new Set(['APPROVED', 'CONDITIONALLY_ACCEPTED']);
+
 function serializeStageExecution(execution) {
+  const qualityInspections = Array.isArray(execution.qualityInspections)
+    ? execution.qualityInspections.map((insp) => ({
+        id: insp.id,
+        result: insp.result,
+        observations: insp.observations,
+        correctiveAction: insp.correctiveAction,
+        actualResults: insp.actualResults,
+        expectedParameters: insp.expectedParameters,
+        inspectedAt: insp.inspectedAt,
+        inspectorUserId: insp.inspectorUserId,
+      }))
+    : [];
+  const qaApproved = qualityInspections.some((insp) => QA_APPROVED_RESULTS.has(insp.result));
+
   return {
     id: execution.id,
     productionOrderId: execution.productionOrderId,
@@ -60,6 +76,8 @@ function serializeStageExecution(execution) {
     returns: Array.isArray(execution.returns)
       ? execution.returns.map(serializeProductionReturn)
       : [],
+    qualityInspections,
+    qaApproved,
   };
 }
 
@@ -225,21 +243,16 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
 
     assertStagePrerequisites(order, stageId);
 
+    // El operador registra consumos y notas. Los parametros QA los registra
+    // por separado un inspector de calidad mediante POST .../inspections.
+    // La validacion de sobre-consumo si aplica al operador.
     const consumptionValidation = validateConsumptionAgainstRequirement(
       order,
       payload.consumptions ?? [],
       auth,
       payload.overrideJustification,
     );
-    const qaValidation = validateQaMeasurements(
-      snapshotStage,
-      payload.actualParameters ?? [],
-      auth,
-      payload.overrideJustification,
-    );
-    const overrideJustification = qaValidation.overrideJustification
-      ?? consumptionValidation.overrideJustification
-      ?? null;
+    const overrideJustification = consumptionValidation.overrideJustification ?? null;
     const movementGroupId = randomUUID();
     const createdStageExecution = await productionRepository.createProductionStageExecution({
       productionOrderId: order.id,
@@ -249,8 +262,8 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
       responsibleUserId: scope.userId,
       startedAt: payload.startedAt,
       endedAt: payload.endedAt,
-      actualParameters: toSnapshotValue(qaValidation.actualParameters),
-      qaOutOfTolerance: qaValidation.qaOutOfTolerance,
+      actualParameters: null,
+      qaOutOfTolerance: false,
       overrideJustification,
       evidence: toSnapshotValue(payload.evidence ?? []),
       notes: normalizeOptionalText(payload.notes),
@@ -303,10 +316,9 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
         overrideJustification,
         violationCodes: [
           ...(consumptionValidation.exceededProducts.length > 0 ? ['consumption_exceeds_requirement'] : []),
-          ...(qaValidation.qaOutOfTolerance ? ['qa_out_of_tolerance'] : []),
         ],
         exceededProducts: consumptionValidation.exceededProducts,
-        qaOutOfTolerance: qaValidation.qaOutOfTolerance,
+        qaOutOfTolerance: false,
       },
     };
   });
@@ -503,10 +515,13 @@ async function completeProductionOrder(id, payload, auth) {
       qaStatus: 'APPROVED',
     }, tx);
 
+    // El payload puede sobreescribir la bodega destino definida en la orden.
+    const effectiveDestinationWarehouseId = payload.destinationWarehouseId ?? order.destinationWarehouseId;
+
     const context = await inventoryTransactionSupport.getInventoryContext(
       tx,
       auth,
-      order.destinationWarehouseId,
+      effectiveDestinationWarehouseId,
       product.id,
     );
 

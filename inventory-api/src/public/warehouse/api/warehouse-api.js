@@ -54,11 +54,19 @@ function reverseReceipt(session, id) {
 // -----------------------------------------------------------------------
 
 function listActiveProductionOrders(session) {
-  return safeFetch(session, '/api/production/orders?status=IN_PROGRESS,WAITING_QA');
+  return safeFetch(session, '/api/production/orders?status=DRAFT,PENDING_APPROVAL,APPROVED,IN_PROGRESS,WAITING_QA');
 }
 
 function getProductionOrder(session, orderId) {
   return safeFetch(session, `/api/production/orders/${orderId}`);
+}
+
+function getMaterialRequirements(session, orderId) {
+  return safeFetch(session, `/api/production/orders/${orderId}/material-requirements`);
+}
+
+function getAvailableLotsForStage(session, orderId, stageId) {
+  return safeFetch(session, `/api/production/orders/${orderId}/stages/${stageId}/available-lots`);
 }
 
 function executeProductionStage(session, orderId, stageId, payload) {
@@ -106,6 +114,17 @@ function listInventoryStocks(session) {
 // -----------------------------------------------------------------------
 // Production order lifecycle
 // -----------------------------------------------------------------------
+
+function submitProductionOrder(session, orderId) {
+  return safeFetch(session, `/api/production/orders/${orderId}/submit`, { method: 'POST' });
+}
+
+function approveProductionOrder(session, orderId, payload = {}) {
+  return safeFetch(session, `/api/production/orders/${orderId}/approve`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
 
 function startProductionOrder(session, orderId) {
   return safeFetch(session, `/api/production/orders/${orderId}/start`, { method: 'POST' });
@@ -156,12 +175,16 @@ WarehouseShell.register('warehouseApi', {
   reverseReceipt,
   listActiveProductionOrders,
   getProductionOrder,
+  getMaterialRequirements,
+  getAvailableLotsForStage,
   executeProductionStage,
   createProductionQAInspection,
   listPurchaseOrdersForReceipt,
   createReceipt,
   listWarehouses,
   listInventoryStocks,
+  submitProductionOrder,
+  approveProductionOrder,
   startProductionOrder,
   completeProductionOrder,
   createProductionOrder,

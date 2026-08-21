@@ -127,6 +127,20 @@
         </form>
       </dialog>
 
+      <dialog id="recipes-stages-modal" class="modal-card products-modal-card" style="max-width:720px">
+        <div class="products-modal-header">
+          <div>
+            <h3 id="recipes-stages-modal-title">Etapas de la version</h3>
+            <p class="muted" id="recipes-stages-modal-subtitle"></p>
+          </div>
+          <button id="recipes-close-stages-modal" class="secondary-button" type="button">Cerrar</button>
+        </div>
+        <div id="recipes-stages-modal-body" style="overflow-y:auto;max-height:65vh"></div>
+        <div class="action-row products-modal-actions" id="recipes-stages-modal-footer">
+          <button id="recipes-stages-edit-btn" class="secondary-button" type="button" hidden>Abrir editor completo</button>
+        </div>
+      </dialog>
+
       <dialog id="recipes-assignment-dialog" class="modal-card">
         <form id="recipes-assignment-form" class="root-form" method="dialog" novalidate>
           <div class="page-header">
@@ -184,8 +198,14 @@
     const assignmentProductSelect = container.querySelector('#recipes-assignment-product');
     const closeAssignmentButton = container.querySelector('#recipes-close-assignment-button');
     const cancelAssignmentButton = container.querySelector('#recipes-cancel-assignment-button');
+    const stagesModal = container.querySelector('#recipes-stages-modal');
+    const stagesModalTitle = container.querySelector('#recipes-stages-modal-title');
+    const stagesModalSubtitle = container.querySelector('#recipes-stages-modal-subtitle');
+    const stagesModalBody = container.querySelector('#recipes-stages-modal-body');
+    const stagesModalEditBtn = container.querySelector('#recipes-stages-edit-btn');
+    const closeStagesModal = container.querySelector('#recipes-close-stages-modal');
 
-    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !detailSubtitle || !detailMessage || !detailRegion || !searchInput || !statusFilter || !typeFilter || !sharedFilter || !clearFiltersButton || !refreshButton || !openCreateButton || !recipeFormDialog || !recipeForm || !recipeFormMessage || !recipeFormTitle || !recipeFormNameInput || !closeRecipeFormButton || !cancelRecipeFormButton || !versionDialog || !versionForm || !versionMessage || !versionTitle || !stagesList || !addStageButton || !closeVersionButton || !cancelVersionButton || !assignmentDialog || !assignmentForm || !assignmentMessage || !assignmentProductSelect || !closeAssignmentButton || !cancelAssignmentButton) {
+    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !detailSubtitle || !detailMessage || !detailRegion || !searchInput || !statusFilter || !typeFilter || !sharedFilter || !clearFiltersButton || !refreshButton || !openCreateButton || !recipeFormDialog || !recipeForm || !recipeFormMessage || !recipeFormTitle || !recipeFormNameInput || !closeRecipeFormButton || !cancelRecipeFormButton || !versionDialog || !versionForm || !versionMessage || !versionTitle || !stagesList || !addStageButton || !closeVersionButton || !cancelVersionButton || !assignmentDialog || !assignmentForm || !assignmentMessage || !assignmentProductSelect || !closeAssignmentButton || !cancelAssignmentButton || !stagesModal || !stagesModalBody || !closeStagesModal) {
       return;
     }
 
@@ -407,29 +427,83 @@
         }).join('');
     }
 
+    function resolveProductUnit(productId) {
+      if (!productId) { return null; }
+      const found = products.find((p) => String(p.id) === String(productId));
+      return found?.unit || null;
+    }
+
     function addStageInputRow(inputsContainer, data) {
       const row = globalScope.document.createElement('div');
       row.className = 'products-form-grid stage-input-row';
       row.style.alignItems = 'end';
+      const existingUnit = data.unit || '';
+      const productUnit = resolveProductUnit(data.productId);
+      const effectiveUnit = productUnit || existingUnit;
+      const unitReadonly = Boolean(data.productId && productUnit);
       row.innerHTML = `
         <label><span>Producto</span><select class="si-product">${renderProductOptions(data.productId)}</select></label>
         <label><span>Nombre *</span><input class="si-name" type="text" value="${rootShellUi.escapeHtml(data.name || '')}" required /></label>
         <label><span>Cantidad</span><input class="si-quantity" type="number" min="0" step="0.001" value="${data.quantity || ''}" /></label>
-        <label><span>Unidad</span><input class="si-unit" type="text" value="${rootShellUi.escapeHtml(data.unit || '')}" placeholder="kg, L, unidad" /></label>
+        <label><span>Unidad</span><input class="si-unit" type="text" value="${rootShellUi.escapeHtml(effectiveUnit)}" placeholder="kg, L, unidad" ${unitReadonly ? 'readonly aria-readonly="true" title="Unidad heredada del producto"' : ''} /></label>
         <button type="button" class="secondary-button remove-stage-input-btn" title="Quitar insumo">✕</button>
       `;
+
+      // Unit inheritance: when product changes, update unit field
+      const productSelect = row.querySelector('.si-product');
+      const unitInput = row.querySelector('.si-unit');
+      productSelect.addEventListener('change', () => {
+        const unit = resolveProductUnit(productSelect.value);
+        if (unit) {
+          unitInput.value = unit;
+          unitInput.readOnly = true;
+          unitInput.setAttribute('aria-readonly', 'true');
+          unitInput.title = 'Unidad heredada del producto';
+        } else {
+          unitInput.readOnly = false;
+          unitInput.removeAttribute('aria-readonly');
+          unitInput.title = '';
+          if (!unitInput.value) { unitInput.value = ''; }
+        }
+      });
+
       inputsContainer.appendChild(row);
+    }
+
+    function addQaParameterRow(qaContainer, param) {
+      const row = globalScope.document.createElement('div');
+      row.className = 'products-form-grid qa-param-row';
+      row.style.alignItems = 'end';
+      row.innerHTML = `
+        <label><span>Nombre *</span><input class="qp-name" type="text" value="${rootShellUi.escapeHtml(param.name || '')}" required placeholder="pH, Temperatura" /></label>
+        <label><span>Unidad</span><input class="qp-unit" type="text" value="${rootShellUi.escapeHtml(param.unit || '')}" placeholder="pH, ºC, %" maxlength="40" /></label>
+        <label><span>Valor esperado *</span><input class="qp-expected" type="number" step="any" value="${param.expectedValue !== undefined ? param.expectedValue : ''}" required /></label>
+        <label><span>Tol. min (−)</span><input class="qp-min-tol" type="number" step="any" min="0" value="${param.minTolerance !== undefined ? param.minTolerance : '0'}" /></label>
+        <label><span>Tol. max (+)</span><input class="qp-max-tol" type="number" step="any" min="0" value="${param.maxTolerance !== undefined ? param.maxTolerance : '0'}" /></label>
+        <button type="button" class="secondary-button remove-qa-param-btn" title="Quitar parametro QA">✕</button>
+      `;
+      row.querySelector('.remove-qa-param-btn').addEventListener('click', () => {
+        row.remove();
+      });
+      qaContainer.appendChild(row);
     }
 
     function addStageSection(data) {
       const section = globalScope.document.createElement('div');
       section.className = 'stage-section';
       section.style.cssText = 'border:1px solid var(--border, #ddd); border-radius:8px; padding:1rem; margin-bottom:0.75rem;';
+      const qaMandatory = Boolean(data.qaMandatory);
       section.innerHTML = `
         <div class="products-form-grid">
           <label><span>Nombre de etapa *</span><input class="stage-name" type="text" required value="${rootShellUi.escapeHtml(data.name || '')}" /></label>
-          <label class="products-checkbox-label"><input class="stage-qa" type="checkbox" ${data.qaMandatory ? 'checked' : ''} /><span>QA obligatorio</span></label>
+          <label class="products-checkbox-label"><input class="stage-qa" type="checkbox" ${qaMandatory ? 'checked' : ''} /><span>QA obligatorio</span></label>
           <label class="products-field-full"><span>Instrucciones</span><textarea class="stage-instructions" rows="2">${rootShellUi.escapeHtml(data.instructions || '')}</textarea></label>
+        </div>
+        <div class="stage-qa-params" style="margin-top:0.75rem;${qaMandatory ? '' : 'display:none'}">
+          <p class="muted" style="margin:0 0 0.5rem"><strong>Parametros QA esperados</strong></p>
+          <div class="qa-params-list stack-section"></div>
+          <p class="qa-params-empty-msg" style="color:var(--color-danger,#c00);font-size:0.85rem;display:none">Debes definir al menos un parametro esperado.</p>
+          <button type="button" class="secondary-button add-qa-param-btn" style="margin-top:0.25rem">+ Añadir parametro</button>
         </div>
         <div style="margin-top:0.75rem">
           <p class="muted" style="margin:0 0 0.5rem"><strong>Insumos de esta etapa</strong></p>
@@ -440,17 +514,61 @@
       `;
       stagesList.appendChild(section);
 
+      const qaCheckbox = section.querySelector('.stage-qa');
+      const qaParamsBlock = section.querySelector('.stage-qa-params');
+      const qaParamsList = section.querySelector('.qa-params-list');
+      const qaEmptyMsg = section.querySelector('.qa-params-empty-msg');
+      const addQaBtn = section.querySelector('.add-qa-param-btn');
+
+      // Toggle QA block on checkbox change
+      qaCheckbox.addEventListener('change', () => {
+        qaParamsBlock.style.display = qaCheckbox.checked ? '' : 'none';
+      });
+
+      addQaBtn.addEventListener('click', () => {
+        addQaParameterRow(qaParamsList, recipesHelpers.buildDefaultQaParameter());
+        if (qaEmptyMsg) { qaEmptyMsg.style.display = 'none'; }
+      });
+
+      // Load existing QA params
+      (data.expectedParameters || []).forEach((param) => addQaParameterRow(qaParamsList, param));
+
       const inputsContainer = section.querySelector('.stage-inputs-list');
       (data.stageInputs || []).forEach((si) => addStageInputRow(inputsContainer, si));
+    }
+
+    function collectQaParams(section) {
+      return Array.from(section.querySelectorAll('.qa-param-row')).map((row) => ({
+        name: row.querySelector('.qp-name').value.trim(),
+        unit: row.querySelector('.qp-unit').value.trim() || undefined,
+        expectedValue: Number(row.querySelector('.qp-expected').value),
+        minTolerance: Number(row.querySelector('.qp-min-tol').value || '0'),
+        maxTolerance: Number(row.querySelector('.qp-max-tol').value || '0'),
+      })).filter((p) => p.name);
+    }
+
+    function validateQaParamsInline(section) {
+      const qaMandatory = section.querySelector('.stage-qa')?.checked;
+      if (!qaMandatory) { return true; }
+      const params = collectQaParams(section);
+      const emptyMsg = section.querySelector('.qa-params-empty-msg');
+      if (params.length === 0) {
+        if (emptyMsg) { emptyMsg.style.display = ''; }
+        return false;
+      }
+      if (emptyMsg) { emptyMsg.style.display = 'none'; }
+      return true;
     }
 
     function collectStages() {
       return Array.from(stagesList.querySelectorAll('.stage-section')).map((section) => {
         const inputRows = section.querySelectorAll('.stage-input-row');
+        const qaMandatory = section.querySelector('.stage-qa').checked;
         return {
           name: section.querySelector('.stage-name').value.trim(),
           instructions: section.querySelector('.stage-instructions').value.trim() || undefined,
-          qaMandatory: section.querySelector('.stage-qa').checked,
+          qaMandatory,
+          expectedParameters: qaMandatory ? collectQaParams(section) : [],
           stageInputs: Array.from(inputRows).map((row) => ({
             productId: Number(row.querySelector('.si-product').value) || undefined,
             name: row.querySelector('.si-name').value.trim(),
@@ -511,6 +629,7 @@
         name: stage.name,
         instructions: stage.instructions,
         qaMandatory: Boolean(stage.qaMandatory),
+        expectedParameters: Array.isArray(stage.expectedParameters) ? stage.expectedParameters : [],
         stageInputs: (stage.stageInputs || []).map((si) => ({
           productId: si.productId,
           name: si.name,
@@ -554,6 +673,15 @@
 
       if (!stages.length) {
         throw new Error('Agrega al menos una etapa.');
+      }
+
+      // QA inline validation: enforce at least 1 parameter when qaMandatory
+      let qaValid = true;
+      stagesList.querySelectorAll('.stage-section').forEach((section) => {
+        if (!validateQaParamsInline(section)) { qaValid = false; }
+      });
+      if (!qaValid) {
+        throw new Error('Una etapa con QA obligatorio requiere al menos un parametro esperado.');
       }
 
       const rawValues = {
@@ -759,9 +887,7 @@
       const approveVersionButton = target instanceof HTMLElement ? target.closest('[data-approve-recipe-version]') : null;
       if (approveVersionButton instanceof globalScope.HTMLButtonElement) {
         const versionId = approveVersionButton.getAttribute('data-approve-recipe-version');
-        if (!versionId) {
-          return;
-        }
+        if (!versionId) { return; }
 
         try {
           await recipesApi.approveRecipeVersion(session, versionId, {});
@@ -771,8 +897,37 @@
         } catch (error) {
           detailMessage.innerHTML = rootShellUi.renderInlineMessage(error?.message || 'No se pudo aprobar la version.', 'error');
         }
+        return;
+      }
+
+      const viewStagesButton = target instanceof HTMLElement ? target.closest('[data-view-stages]') : null;
+      if (viewStagesButton instanceof globalScope.HTMLButtonElement) {
+        const versionId = viewStagesButton.getAttribute('data-view-stages');
+        const versionLabel = viewStagesButton.getAttribute('data-version-label') || 'version';
+        const isDraft = viewStagesButton.getAttribute('data-is-draft') === 'true';
+        const version = getSelectedRecipeVersions().find((v) => String(v?.id) === String(versionId));
+        if (!version) { return; }
+
+        stagesModalTitle.textContent = `Etapas · ${versionLabel}`;
+        stagesModalSubtitle.textContent = isDraft
+          ? 'Borrador — puedes editar desde "Abrir editor completo".'
+          : 'Version aprobada — solo lectura.';
+        stagesModalBody.innerHTML = recipesRenderers.renderStagesModalContent(version);
+
+        if (stagesModalEditBtn) {
+          stagesModalEditBtn.hidden = !isDraft || !permissions.canManageRecipes;
+          stagesModalEditBtn.onclick = () => {
+            setDialogVisibility(stagesModal, false);
+            openEditVersionDialog(versionId);
+          };
+        }
+
+        setDialogVisibility(stagesModal, true);
+        return;
       }
     });
+
+    closeStagesModal.addEventListener('click', () => setDialogVisibility(stagesModal, false));
 
     await loadData({ preserveSelection: false });
   }

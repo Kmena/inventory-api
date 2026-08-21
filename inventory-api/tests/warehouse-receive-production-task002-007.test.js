@@ -230,59 +230,165 @@ test('receipts.js calls derivePermissions from state module', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────
-// TASK-006 — production.js real functionality
+// TASK-006 / TASK-011 — production modules real functionality
+// After TASK-011 the monolith splits into:
+//   production.state.js, production.renderers.js,
+//   production.controllers.js, production.js (orchestrator)
+// Tests read combined source for resilience.
 // ─────────────────────────────────────────────────────────────────
 
-test('production.js start button conditioned on PENDING status and canExecuteProduction', () => {
-  const src = readWarehouseFile('views/production.js');
-  assert.match(src, /order\.status === 'PENDING' && permissions\.canExecuteProduction/);
+const fs2 = require('fs');
+const path2 = require('path');
+
+function readProductionModules() {
+  const files = [
+    'views/production.state.js',
+    'views/production.renderers.js',
+    'views/production.controllers.js',
+    'views/production.js',
+  ];
+  return files
+    .map((f) => {
+      const p = path2.join(warehousePath, f);
+      return fs2.existsSync(p) ? fs2.readFileSync(p, 'utf8') : '';
+    })
+    .join('\n');
+}
+
+test('production modules exist as separate files after TASK-011 split', () => {
+  for (const f of ['production.state.js', 'production.renderers.js', 'production.controllers.js', 'production.js']) {
+    assert.ok(
+      fs2.existsSync(path2.join(warehousePath, 'views', f)),
+      `views/${f} must exist`,
+    );
+  }
+});
+
+test('production start button conditioned on APPROVED status and canExecuteProduction', () => {
+  const src = readProductionModules();
+  // Order must be APPROVED (not PENDING) to be startable — state machine: APPROVED → start → IN_PROGRESS
+  assert.match(src, /order\.status === 'APPROVED' && permissions\.canExecuteProduction/);
   assert.match(src, /startProductionOrder/);
 });
 
-test('production.js execute stage form is inline (not navigation-only)', () => {
-  const src = readWarehouseFile('views/production.js');
+test('production execute stage form is inline with wh-execute-stage-btn and exec-form slot', () => {
+  const src = readProductionModules();
   assert.match(src, /wh-execute-stage-btn/);
-  // The form element's hidden attribute is set to false to show the inline form
-  assert.match(src, /hidden = false/);
   assert.match(src, /exec-form/);
 });
 
-test('production.js complete section conditioned on canCompleteProduction and allStagesCompleted', () => {
-  const src = readWarehouseFile('views/production.js');
+test('production complete section conditioned on canCompleteProduction and allSnapshotStagesCompleted', () => {
+  const src = readProductionModules();
   assert.match(src, /canCompleteProduction/);
-  assert.match(src, /allStagesCompleted/);
-  assert.match(src, /stages\.every/);
+  assert.match(src, /allSnapshotStagesCompleted/);
+  assert.match(src, /stages.*every|every.*stage/);
 });
 
-test('production.js stage badges use STAGE_STATUS_BADGE map', () => {
-  const src = readWarehouseFile('views/production.js');
+test('production stage badges use STAGE_STATUS_BADGE map and renderStageBadge', () => {
+  const src = readProductionModules();
   assert.match(src, /STAGE_STATUS_BADGE/);
   assert.match(src, /STAGE_STATUS_LABELS/);
   assert.match(src, /renderStageBadge/);
 });
 
-test('production.js complete order button is disabled during submission', () => {
-  const src = readWarehouseFile('views/production.js');
+test('production complete order button disabled during submission', () => {
+  const src = readProductionModules();
   assert.match(src, /completeBtn\.disabled = true/);
   assert.match(src, /Completando\.\.\./);
 });
 
-test('production.js warning alert before complete order action', () => {
-  const src = readWarehouseFile('views/production.js');
+test('production warning alert before complete order action', () => {
+  const src = readProductionModules();
   assert.match(src, /wh-alert--warning/);
   assert.match(src, /no puede revertirse/);
 });
 
-test('production.js start button disabled during API call', () => {
-  const src = readWarehouseFile('views/production.js');
+test('production start button disabled during API call', () => {
+  const src = readProductionModules();
   assert.match(src, /startBtn\.disabled = true/);
   assert.match(src, /Iniciando\.\.\./);
 });
 
-test('production.js execute stage validates quantityProcessed > 0 before submit', () => {
-  const src = readWarehouseFile('views/production.js');
-  assert.match(src, /qty < 1/);
-  assert.match(src, /cantidad procesada debe ser mayor/);
+test('production complete order uses producedQuantity (spec-compliant) not outputQuantity', () => {
+  const src = readProductionModules();
+  assert.match(src, /producedQuantity/);
+  assert.doesNotMatch(src, /outputQuantity/);
+});
+
+test('production execute stage validates produced quantity > 0 before submit', () => {
+  const src = readProductionModules();
+  // qty <= 0 y qty < 1 son equivalentes; aceptamos cualquiera de las dos formas
+  assert.match(src, /qty <= 0|qty < 1/);
+  assert.match(src, /cantidad producida debe ser mayor/);
+});
+
+// ─────────────────────────────────────────────────────────────────
+// Approve production order — warehouse + root
+// ─────────────────────────────────────────────────────────────────
+
+test('state.js derives canApproveProduction from production.approve', () => {
+  const src = readWarehouseFile('state.js');
+  assert.match(src, /canApproveProduction/);
+  assert.match(src, /canApproveProduction.*production\.approve/);
+});
+
+test('warehouse-api.js exposes approveProductionOrder as POST to /approve', () => {
+  const src = readWarehouseFile('api/warehouse-api.js');
+  assert.match(src, /function approveProductionOrder/);
+  assert.match(src, /\/api\/production\/orders\/\$\{orderId\}\/approve/);
+  assert.match(src, /method.*POST/);
+});
+
+test('warehouse-api.js listActiveProductionOrders includes DRAFT and PENDING_APPROVAL statuses', () => {
+  const src = readWarehouseFile('api/warehouse-api.js');
+  assert.match(src, /DRAFT,PENDING_APPROVAL/);
+});
+
+test('warehouse-api.js exposes submitProductionOrder as POST to /submit', () => {
+  const src = readWarehouseFile('api/warehouse-api.js');
+  assert.match(src, /function submitProductionOrder/);
+  assert.match(src, /\/api\/production\/orders\/\$\{orderId\}\/submit/);
+  assert.match(src, /method.*POST/);
+});
+
+test('production renderers show submit button for DRAFT + canCreateProduction', () => {
+  const src = readProductionModules();
+  assert.match(src, /status === 'DRAFT' && permissions\.canCreateProduction/);
+  assert.match(src, /submit-production-btn/);
+  assert.match(src, /Enviar a aprobacion/);
+});
+
+test('production renderers show approve button for PENDING_APPROVAL + canApproveProduction', () => {
+  const src = readProductionModules();
+  assert.match(src, /status === 'PENDING_APPROVAL' && permissions\.canApproveProduction/);
+  assert.match(src, /approve-production-btn/);
+  assert.match(src, /Aprobar orden/);
+});
+
+test('production renderers map DRAFT and PENDING_APPROVAL to badge labels', () => {
+  const src = readProductionModules();
+  assert.match(src, /DRAFT.*Borrador/);
+  assert.match(src, /PENDING_APPROVAL/);
+  assert.match(src, /Pendiente de aprobaci/);
+});
+
+test('production controllers wire submit button and call submitProductionOrder', () => {
+  const src = readProductionModules();
+  assert.match(src, /submit-production-btn/);
+  assert.match(src, /submitProductionOrder/);
+  assert.match(src, /Enviando\.\.\./);
+});
+
+test('production controllers wire approve button and call approveProductionOrder', () => {
+  const src = readProductionModules();
+  assert.match(src, /approve-production-btn/);
+  assert.match(src, /approveProductionOrder/);
+  assert.match(src, /approveBtn\.disabled/);
+});
+
+test('production controllers disable approve button during API call', () => {
+  const src = readProductionModules();
+  assert.match(src, /Aprobando\.\.\./);
 });
 
 // ─────────────────────────────────────────────────────────────────

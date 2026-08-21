@@ -123,9 +123,14 @@ test('getAvailableLotsForStage returns FEFO suggestions and does not expose inte
     findProductionOrderById: async () => buildOrder(),
     findProductsByIds: async () => ([
       { id: 31n, code: 'RM-31', name: 'Base liquida', unit: 'KG', requiresLot: true, requiresExpiration: true },
+      // requiresLot:false ya no excluye al producto — todos los insumos requieren lote en este sistema.
+      // El mock devuelve lotes distintos segun productId para simular el comportamiento real.
       { id: 32n, code: 'RM-32', name: 'Fragancia', unit: 'L', requiresLot: false, requiresExpiration: false },
     ]),
-    findReservableLotStocks: async () => ([
+    findReservableLotStocks: async (_warehouseId, productId) => {
+      // Solo producto 31 tiene lotes; producto 32 no tiene stock en bodega.
+      if (String(productId) !== '31') { return []; }
+      return ([
       {
         id: 502n,
         lotId: 1002n,
@@ -177,20 +182,32 @@ test('getAvailableLotsForStage returns FEFO suggestions and does not expose inte
           qaStatus: 'APPROVED',
         },
       },
-    ]),
+      ]);
+    },
   }, async () => {
     const result = await availabilityService.getAvailableLotsForStage(17n, 42n, auth);
 
-    assert.equal(result.products.length, 1);
-    assert.deepEqual(result.products[0].suggested, [
+    // Ambos insumos se incluyen porque la politica es: todo insumo requiere lote.
+    assert.equal(result.products.length, 2);
+
+    // Producto 31 (Base liquida) — tiene lotes disponibles, FEFO por vencimiento.
+    const baseLiquida = result.products.find((p) => String(p.productId) === '31');
+    assert.ok(baseLiquida, 'Base liquida debe estar en el resultado');
+    assert.deepEqual(baseLiquida.suggested, [
       { lotId: 1001n, quantity: 8 },
       { lotId: 1002n, quantity: 12 },
     ]);
-    assert.deepEqual(result.products[0].lots.map((lot) => lot.lotId), [1001n, 1002n]);
-    assert.equal(result.products[0].lots[0].lotNumber, 'L-001');
-    assert.equal('internalLotNumber' in result.products[0].lots[0], false);
-    assert.equal(result.products[0].requiredQuantity, 20);
-    assert.equal(result.products[0].toleranceDefaultPercent, 5);
+    assert.deepEqual(baseLiquida.lots.map((lot) => lot.lotId), [1001n, 1002n]);
+    assert.equal(baseLiquida.lots[0].lotNumber, 'L-001');
+    assert.equal('internalLotNumber' in baseLiquida.lots[0], false);
+    assert.equal(baseLiquida.requiredQuantity, 20);
+    assert.equal(baseLiquida.toleranceDefaultPercent, 5);
+
+    // Producto 32 (Fragancia) — no tiene stock en bodega, lotes vacio.
+    const fragancia = result.products.find((p) => String(p.productId) === '32');
+    assert.ok(fragancia, 'Fragancia debe estar en el resultado aunque requiresLot sea false');
+    assert.equal(fragancia.lots.length, 0);
+    assert.equal(fragancia.requiredQuantity, 10); // quantity:1 * order.quantity:10
   });
 });
 

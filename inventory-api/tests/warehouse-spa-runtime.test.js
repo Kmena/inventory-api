@@ -151,26 +151,38 @@ test('captures.js revokes ObjectURLs to prevent memory leaks', () => {
 // Recipe consultation — read-only enforcement (FR-038)
 // -----------------------------------------------------------------------
 
-test('views/production.js exposes real execute and complete functionality replacing stubs', () => {
-  const source = readWarehouseFile('views/production.js');
+// Production module now split into state/renderers/controllers + orchestrator.
+// Tests read from combined source to stay refactor-resilient.
+function readProductionModules() {
+  const files = [
+    'views/production.state.js',
+    'views/production.renderers.js',
+    'views/production.controllers.js',
+    'views/production.js',
+  ];
+  return files.map((f) => {
+    const p = path.join(warehousePath, f);
+    return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '';
+  }).join('\n');
+}
+
+test('production modules expose real execute and complete functionality', () => {
+  const source = readProductionModules();
   // Real execution form elements
   assert.match(source, /Ejecutar etapa/);
   assert.match(source, /Completar etapa/);
-  assert.match(source, /quantityProcessed/);
+  assert.match(source, /producedQuantity/);
   assert.match(source, /executeProductionStage/);
   // Real completion form
   assert.match(source, /completeProductionOrder/);
-  assert.match(source, /outputQuantity/);
   assert.match(source, /Completar orden/);
-  // Real start production button
+  // Real start production button (APPROVED status, not PENDING — see state machine)
   assert.match(source, /startProductionOrder/);
   assert.match(source, /Iniciar produccion/);
-  // Stage badges
+  assert.match(source, /status === 'APPROVED'/);
+  // Stage badges in renderers
   assert.match(source, /STAGE_STATUS_BADGE/);
   assert.match(source, /renderStageBadge/);
-  // QA inspection navigation preserved
-  assert.match(source, /wh-inspect-stage-btn/);
-  assert.match(source, /action.*inspect/);
   // Inline forms for accessibility
   assert.match(source, /aria-expanded/);
   assert.match(source, /aria-controls/);

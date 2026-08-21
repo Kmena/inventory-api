@@ -43,10 +43,35 @@
     });
   }
 
+  async function submitProductionOrder(session, productionOrderId) {
+    return inventoryAuth.fetchJson(
+      session,
+      `/api/production/orders/${encodeURIComponent(productionOrderId)}/submit`,
+      {
+        method: 'POST',
+        fallbackMessage: 'No se pudo enviar la orden a aprobacion.',
+      },
+    );
+  }
+
+  async function approveProductionOrder(session, productionOrderId, payload = {}) {
+    return inventoryAuth.fetchJson(
+      session,
+      `/api/production/orders/${encodeURIComponent(productionOrderId)}/approve`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        fallbackMessage: 'No se pudo aprobar la orden de produccion.',
+      },
+    );
+  }
+
   rootShell.register('productionAdminApi', {
+    approveProductionOrder,
     buildServerListQuery,
     createProductionOrder,
     getProductionOrder,
     listProductionOrders,
+    submitProductionOrder,
   });
 }(window));

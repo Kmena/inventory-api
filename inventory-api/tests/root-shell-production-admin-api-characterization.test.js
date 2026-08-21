@@ -59,6 +59,85 @@ test('productionAdminApi calls only approved read-oriented production endpoints'
   assert.equal(calls[1].options.fallbackMessage, 'No se pudo cargar el detalle de la orden de produccion.');
 });
 
+test('productionAdminApi.approveProductionOrder calls POST /api/production/orders/:id/approve', async () => {
+  const calls = [];
+  const { browserWindow, context } = createBrowserContext(async (session, url, options = {}) => {
+    calls.push({ session, url, options });
+    return { ok: true };
+  });
+
+  executeRootScript('registry.js', context);
+  executeRootScript('production-admin-api.js', context);
+
+  const productionAdminApi = browserWindow.RootShell.require('productionAdminApi');
+  const session = { user: { id: 1 } };
+
+  await productionAdminApi.approveProductionOrder(session, 42, {});
+
+  assert.equal(calls[0].url, '/api/production/orders/42/approve');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.fallbackMessage, 'No se pudo aprobar la orden de produccion.');
+});
+
+test('productionAdminApi.submitProductionOrder calls POST /api/production/orders/:id/submit', async () => {
+  const calls = [];
+  const { browserWindow, context } = createBrowserContext(async (session, url, options = {}) => {
+    calls.push({ session, url, options });
+    return { ok: true };
+  });
+
+  executeRootScript('registry.js', context);
+  executeRootScript('production-admin-api.js', context);
+
+  const productionAdminApi = browserWindow.RootShell.require('productionAdminApi');
+  const session = { user: { id: 1 } };
+
+  await productionAdminApi.submitProductionOrder(session, 7);
+
+  assert.equal(calls[0].url, '/api/production/orders/7/submit');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.fallbackMessage, 'No se pudo enviar la orden a aprobacion.');
+});
+
+test('production-orders-admin helpers expose canApproveProductionOrders', () => {
+  const { browserWindow, context } = createBrowserContext();
+
+  executeRootScript('registry.js', context);
+  executeRootScript(path.join('views', 'production-orders-admin.helpers.js'), context);
+
+  const helpers = browserWindow.RootShell.require('views.productionOrdersAdminHelpers');
+  const sessionAdapter = {
+    hasPermission(session, permission) {
+      return session.user.permissions.includes(permission);
+    },
+  };
+
+  const withApprove = { user: { permissions: ['production.approve'] } };
+  const withoutApprove = { user: { permissions: ['production.view'] } };
+
+  assert.equal(helpers.canApproveProductionOrders(withApprove, sessionAdapter), true);
+  assert.equal(helpers.canApproveProductionOrders(withoutApprove, sessionAdapter), false);
+});
+
+test('production-orders-admin helpers expose canSubmitProductionOrders', () => {
+  const { browserWindow, context } = createBrowserContext();
+  executeRootScript('registry.js', context);
+  executeRootScript(path.join('views', 'production-orders-admin.helpers.js'), context);
+
+  const helpers = browserWindow.RootShell.require('views.productionOrdersAdminHelpers');
+  const sessionAdapter = {
+    hasPermission(session, permission) {
+      return session.user.permissions.includes(permission);
+    },
+  };
+
+  const withCreate = { user: { permissions: ['production.create'] } };
+  const withoutCreate = { user: { permissions: ['production.view'] } };
+
+  assert.equal(helpers.canSubmitProductionOrders(withCreate, sessionAdapter), true);
+  assert.equal(helpers.canSubmitProductionOrders(withoutCreate, sessionAdapter), false);
+});
+
 test('production orders helpers keep unsupported filters explicitly client-side', () => {
   const { browserWindow, context } = createBrowserContext();
 
