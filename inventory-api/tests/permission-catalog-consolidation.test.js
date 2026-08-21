@@ -78,7 +78,7 @@ test('role.company.update governance denies platform-scoped permissions the same
 
   const updateAllowed = evaluateGovernanceOperation('role.company.update', {
     auth: { role: 'admin', companyId: '7' },
-    permissionCodes: ['inventory.manage'],
+    permissionCodes: ['root.access', 'inventory.manage'],
   });
   assert.equal(updateAllowed.decision, 'allow');
 });

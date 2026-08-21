@@ -54,6 +54,7 @@
   }
 
   var CATEGORY_LABELS = {
+    landing: 'Acceso principal',
     platform: 'Plataforma',
     administration: 'Administracion',
     clients: 'Clientes',
@@ -70,6 +71,7 @@
   };
 
   var CATEGORY_ORDER = [
+    'landing',
     'administration', 'clients', 'products', 'inventory', 'warehouse',
     'sales', 'collections', 'supply', 'procurement', 'production',
     'quality', 'billing-boundary', 'platform',

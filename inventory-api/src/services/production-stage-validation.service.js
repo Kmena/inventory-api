@@ -3,7 +3,13 @@ const audit = require('../lib/audit');
 const { permissionRequiresJustification } = require('../security/permission-governance.service');
 
 const OVERRIDE_PERMISSION_CODE = 'production.override';
-const CONSUMPTION_TOLERANCE_PERCENT = 0.05;
+/**
+ * Fallback tolerance used when the company-level value cannot be read.
+ * Expressed as a raw percentage (5.00 = 5%). The actual fractional multiplier
+ * is computed inside validateConsumptionAgainstRequirement.
+ * DEC-002: Authoritative value lives in companies.production_consumption_tolerance_percent.
+ */
+const CONSUMPTION_TOLERANCE_PERCENT_FALLBACK = 5.00;
 const STAGE_OVERRIDE_AUDIT_ACTION = 'PRODUCTION_STAGE_EXECUTION_OVERRIDE';
 
 function normalizeOptionalText(value) {
@@ -117,11 +123,28 @@ function sumEntriesByProductId(entries) {
   }, new Map());
 }
 
-function validateConsumptionAgainstRequirement(order, entries, auth, overrideJustification) {
+/**
+ * Validates that stage consumptions do not exceed the allowed tolerance.
+ *
+ * @param {any} order
+ * @param {any[]} entries
+ * @param {any} auth
+ * @param {string|null|undefined} overrideJustification
+ * @param {number} [tolerancePercent] - Percentage from DB (e.g. 5.00 = 5%).
+ *   When omitted, falls back to CONSUMPTION_TOLERANCE_PERCENT_FALLBACK.
+ *   DEC-002: authoritative value comes from companies.production_consumption_tolerance_percent.
+ */
+function validateConsumptionAgainstRequirement(order, entries, auth, overrideJustification, tolerancePercent) {
+  // Convert percentage to fractional multiplier (5.00 → 0.05)
+  const effectiveTolerancePct = (typeof tolerancePercent === 'number' && Number.isFinite(tolerancePercent) && tolerancePercent >= 0)
+    ? tolerancePercent
+    : CONSUMPTION_TOLERANCE_PERCENT_FALLBACK;
+  const toleranceFraction = effectiveTolerancePct / 100;
+
   const requirements = getOrderMaterialRequirements(order);
   if (requirements.length === 0 || !Array.isArray(entries) || entries.length === 0) {
     return {
-      tolerancePercent: CONSUMPTION_TOLERANCE_PERCENT,
+      tolerancePercent: effectiveTolerancePct,
       exceededProducts: [],
       overrideJustification: null,
     };
@@ -138,7 +161,7 @@ function validateConsumptionAgainstRequirement(order, entries, auth, overrideJus
 
     const requiredQuantity = Number(requirement.requiredQuantity || 0);
     const consumedQuantity = consumedByProductId.get(productIdKey) || 0;
-    const allowedQuantity = requiredQuantity * (1 + CONSUMPTION_TOLERANCE_PERCENT);
+    const allowedQuantity = requiredQuantity * (1 + toleranceFraction);
 
     if (consumedQuantity > allowedQuantity + 0.000001) {
       exceededProducts.push({
@@ -153,7 +176,7 @@ function validateConsumptionAgainstRequirement(order, entries, auth, overrideJus
 
   if (exceededProducts.length === 0) {
     return {
-      tolerancePercent: CONSUMPTION_TOLERANCE_PERCENT,
+      tolerancePercent: effectiveTolerancePct,
       exceededProducts: [],
       overrideJustification: null,
     };
@@ -167,7 +190,7 @@ function validateConsumptionAgainstRequirement(order, entries, auth, overrideJus
   );
 
   return {
-    tolerancePercent: CONSUMPTION_TOLERANCE_PERCENT,
+    tolerancePercent: effectiveTolerancePct,
     exceededProducts,
     overrideJustification: justification,
   };
@@ -293,5 +316,7 @@ module.exports = {
   validateConsumptionAgainstRequirement,
   validateQaMeasurements,
   recordStageOverrideAuditEvent,
-  CONSUMPTION_TOLERANCE_PERCENT,
+  /** @deprecated Use companies.production_consumption_tolerance_percent via company.repository */
+  CONSUMPTION_TOLERANCE_PERCENT: CONSUMPTION_TOLERANCE_PERCENT_FALLBACK,
+  CONSUMPTION_TOLERANCE_PERCENT_FALLBACK,
 };

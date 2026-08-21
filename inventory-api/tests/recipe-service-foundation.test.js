@@ -232,6 +232,27 @@ test('approveRecipeVersion records approval metadata and marks the version immut
   assert.equal(result.approvedByUser.username, 'admin');
 });
 
+// TASK-010 / DEC-005: Idempotencia por guarda natural — no Idempotency-Key header.
+// approveRecipeVersion retorna 409 si la versión ya está APPROVED.
+// La segunda llamada es fácilmente detectable por el cliente (409 conflict).
+test('approveRecipeVersion returns 409 when version is already APPROVED (natural idempotency guard) (TASK-010)', async () => {
+  await withModuleStubs([
+    [recipeRepository, {
+      findRecipeVersionById: async () => ({ id: 91n, companyId: 7n, status: 'APPROVED' }),
+    }],
+  ], async () => {
+    await assert.rejects(
+      () => recipeService.approveRecipeVersion(91n, {}, auth),
+      (error) => {
+        assert.equal(error?.statusCode, 409, 'Must return 409 for already-approved version');
+        assert.equal(error?.code, 'conflict');
+        // No Idempotency-Key logic — guard is natural (status check before DB write)
+        return true;
+      },
+    );
+  });
+});
+
 test('updateRecipeVersion rejects in-place mutation of an approved version', async () => {
   await withModuleStubs([
     [recipeRepository, {

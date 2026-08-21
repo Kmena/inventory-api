@@ -93,6 +93,42 @@ test('qualityInspectionSchema rejects unexpected fields', () => {
   assert.ok(!result.success);
 });
 
+// TASK-005 / DEC-001: QA formal solo acepta parámetros numéricos.
+// z.coerce.number() convierte strings numéricos y rechaza non-numeric strings.
+test('qualityInspectionSchema coerces numeric string values in actualResults (TASK-005)', () => {
+  const result = qualityInspectionSchema.safeParse({
+    result: 'APPROVED',
+    actualResults: [{ name: 'pH', value: '7.5', unit: 'pH' }],
+  });
+  assert.ok(result.success, `Must coerce string '7.5' to 7.5: ${JSON.stringify(result.error?.issues)}`);
+  assert.strictEqual(result.data.actualResults[0].value, 7.5);
+});
+
+test('qualityInspectionSchema rejects non-numeric string values in actualResults (TASK-005)', () => {
+  const result = qualityInspectionSchema.safeParse({
+    result: 'APPROVED',
+    actualResults: [{ name: 'pH', value: 'alto', unit: 'pH' }],
+  });
+  assert.ok(!result.success, 'Non-numeric string must be rejected');
+});
+
+test('qualityInspectionSchema coerces numeric string values in expectedParameters (TASK-005)', () => {
+  const result = qualityInspectionSchema.safeParse({
+    result: 'APPROVED',
+    expectedParameters: [{ name: 'viscosidad', value: '42.5', unit: 'cP' }],
+  });
+  assert.ok(result.success, `Must coerce string '42.5' to 42.5: ${JSON.stringify(result.error?.issues)}`);
+  assert.strictEqual(result.data.expectedParameters[0].value, 42.5);
+});
+
+test('qualityInspectionSchema rejects non-numeric string values in expectedParameters (TASK-005)', () => {
+  const result = qualityInspectionSchema.safeParse({
+    result: 'APPROVED',
+    expectedParameters: [{ name: 'pH', value: 'N/A', unit: 'pH' }],
+  });
+  assert.ok(!result.success, 'Non-numeric string must be rejected in expectedParameters');
+});
+
 test('QUALITY_INSPECTION_RESULTS exports the expected enum values', () => {
   assert.deepStrictEqual(QUALITY_INSPECTION_RESULTS, ['APPROVED', 'CONDITIONALLY_ACCEPTED', 'REJECTED']);
 });
@@ -279,6 +315,26 @@ test('listInspectionsForOrder rejects non-existent order', async () => {
       () => qualityService.listInspectionsForOrder(999n, auth),
       (error) => error?.statusCode === 404 && error?.code === 'not_found',
     );
+  });
+});
+
+// TASK-007: multi-tenant scope — findQualityInspectionsForOrder must receive companyId
+test('listInspectionsForOrder passes companyId to repository for multi-tenant isolation (TASK-007)', async () => {
+  const repositoryCalls = [];
+
+  await withPatchedRepositories({
+    findProductionOrderById: async () => ({ id: 501n, companyId: 7n, status: 'IN_PROGRESS' }),
+    findQualityInspectionsForOrder: async (orderId, companyId) => {
+      repositoryCalls.push({ orderId, companyId });
+      return [];
+    },
+  }, async () => {
+    await qualityService.listInspectionsForOrder(501n, auth);
+
+    assert.equal(repositoryCalls.length, 1);
+    assert.equal(repositoryCalls[0].orderId, 501n);
+    assert.equal(repositoryCalls[0].companyId, 7n,
+      'companyId must be passed to repository for multi-tenant enforcement');
   });
 });
 

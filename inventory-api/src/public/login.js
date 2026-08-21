@@ -18,6 +18,8 @@ function readStoredSession() {
   return inventorySession.read();
 }
 
+// ── Legacy heuristics (DEC-007: kept as fallback during transition) ──
+
 function hasOperationalAgentPermissions(permissions) {
   return permissions.includes('sales.routes.view.own')
     && permissions.includes('sales.orders.create')
@@ -33,7 +35,7 @@ function isOperationalAgentSession(session) {
   return roleCode === 'sales_agent' || hasOperationalAgentPermissions(permissions);
 }
 
-function getHomeForSession(session) {
+function getLegacyHomeForSession(session) {
   const roleCode = session?.user?.role?.code;
   const permissions = session?.user?.permissions || [];
 
@@ -50,7 +52,7 @@ function getHomeForSession(session) {
   }
 
   if (roleCode === 'sales_supervisor') {
-    return POST_LOGIN_TRANSITION_PATH;
+    return ROOT_SHELL_PATH;
   }
 
   if (permissions.includes('procurement.manage')) {
@@ -62,6 +64,19 @@ function getHomeForSession(session) {
   }
 
   return '/no-access.html';
+}
+
+// ── Primary landing resolution ──────────────────────────────────────
+
+function getHomeForSession(session) {
+  // 1. Explicit landing from backend (TASK-003)
+  const landingPath = session?.user?.landing?.path;
+  if (landingPath && typeof landingPath === 'string' && landingPath !== '/no-access.html') {
+    return landingPath;
+  }
+
+  // 2. Legacy fallback (DEC-007: temporary — removed after backfill)
+  return getLegacyHomeForSession(session);
 }
 
 function getFriendlyLoginMessage(statusCode, fallbackMessage) {

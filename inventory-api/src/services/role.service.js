@@ -4,7 +4,12 @@ const roleRepository = require('../repositories/role.repository');
 const userRepository = require('../repositories/user.repository');
 const audit = require('../lib/audit');
 const browserSessionService = require('./browser-session.service');
-const { evaluateGovernanceOperation, getPermissionMetadata } = require('../security/permission-governance.service');
+const {
+  evaluateGovernanceOperation,
+  getPermissionMetadata,
+  isLandingPermission,
+  resolveLanding,
+} = require('../security/permission-governance.service');
 
 function assertCompanyAdmin(auth) {
   if (!auth.companyId) {
@@ -13,21 +18,34 @@ function assertCompanyAdmin(auth) {
 }
 
 function serializeRole(role) {
+  const allPermissions = role.rolePermissions
+    ?.filter((item) => item.isEnabled && item.permission?.isActive)
+    .map((item) => {
+      const meta = getPermissionMetadata(item.permission.code);
+      return {
+        ...item.permission,
+        displayLabel: meta?.uiLabel || item.permission.code,
+      };
+    }) || [];
+
+  const landingPermission = allPermissions.find((p) => isLandingPermission(p.code)) || null;
+  const operationalPermissions = allPermissions.filter((p) => !isLandingPermission(p.code));
+
+  const permissionCodes = allPermissions.map((p) => p.code);
+  const roleCode = role.code || null;
+  const companyId = role.companyId ? role.companyId.toString() : null;
+  const landing = resolveLanding(permissionCodes, { role: roleCode, companyId });
+
   return {
     id: role.id,
     code: role.code,
     name: role.name,
     companyId: role.companyId,
     isActive: role.isActive,
-    permissions: role.rolePermissions
-      ?.filter((item) => item.isEnabled && item.permission?.isActive)
-      .map((item) => {
-        const meta = getPermissionMetadata(item.permission.code);
-        return {
-          ...item.permission,
-          displayLabel: meta?.uiLabel || item.permission.code,
-        };
-      }) || [],
+    permissions: allPermissions,
+    landingPermission: landingPermission ? { code: landingPermission.code, displayLabel: landingPermission.displayLabel } : null,
+    operationalPermissions,
+    landing,
   };
 }
 
@@ -56,6 +74,9 @@ function enrichPermissionWithMetadata(permission) {
     scope: metadata?.scope || 'tenant',
     sensitivity: metadata?.sensitivity || 'operational',
     metadataStatus: metadata ? 'complete' : 'missing',
+    permissionKind: metadata?.permissionKind || 'functional',
+    landingTarget: metadata?.landingTarget || null,
+    exclusiveGroup: metadata?.exclusiveGroup || null,
   };
 }
 

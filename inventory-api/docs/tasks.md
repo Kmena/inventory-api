@@ -1,5 +1,47 @@
 # Tasks
 
+## TASK-104: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` warehouse UI `TASK-011` + `TASK-012`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Warehouse production browser runtime / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after warehouse UI `TASK-011` + `TASK-012` executed by `sdd-implementation-agent-5c0604`
+**Reason:** After the approved warehouse production execution hardening shipped, the canonical architecture-facing docs still described the warehouse production UI too generically and still referenced older execute-stage form details instead of the implemented modular split, inline QA capture, shared override flow, and updated validation baseline with known unrelated repository failures.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that `src/public/warehouse/views/production.js` remains a thin orchestrator while `production.state.js`, `production.renderers.js`, and `production.controllers.js` own the active production-detail behavior; the current warehouse execute-stage form now includes inline numeric QA capture for `qaMandatory` snapshot stages, shares the `overrideJustification` client flow between QA out-of-tolerance and lot over-consumption warning paths, and derives `WAITING_QA` with the same `qaOutOfTolerance` semantics expected by the backend completion gate.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after warehouse UI `TASK-011` + `TASK-012`, including the current validation evidence (`node --test tests/warehouse-spa-runtime.test.js` ✅, targeted eslint ✅, `npm run build` ✅, with unrelated pre-existing `typecheck` and full `npm test` failures still outstanding) and the note that manual browser validation remains pending.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented browser/runtime code in `src/public/warehouse/views/production.state.js`, `src/public/warehouse/views/production.renderers.js`, `src/public/warehouse/views/production.controllers.js`, `src/public/warehouse/views/production.js`, `src/public/warehouse/index.html`, updated characterization coverage in `tests/warehouse-spa-runtime.test.js`, and the supplied validation evidence from `sdd-implementation-agent-5c0604`
+**Database impact:** None; this refresh documents warehouse UI behavior only
+**API impact:** None; the current `/api/production/**` contract remains unchanged
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the active warehouse QA/override gating behavior and known validation debt are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable post-implementation warehouse production split, inline QA capture, shared override flow, `WAITING_QA` gating semantics, current targeted validation evidence, and the fact that manual browser validation is still pending
+**Validation evidence:** User-supplied results report `node --test tests/warehouse-spa-runtime.test.js` ✅, targeted eslint for `src/public/warehouse/views/production.state.js`, `src/public/warehouse/views/production.renderers.js`, `src/public/warehouse/views/production.controllers.js`, and `tests/warehouse-spa-runtime.test.js` ✅, `npm run build` ✅, `npm run typecheck` ❌ because of pre-existing unrelated landing typing failures, and full `npm test` ❌ because of pre-existing governance-baseline/documentation drift failures
+**Required tests:** Preserve `tests/warehouse-spa-runtime.test.js`; keep the warehouse runtime contract coverage aligned with the production module split and inline QA/override flow language
+**Migration considerations:** Keep this refresh documentation-only and additive; do not reinterpret the warehouse modular split as a backend production contract change
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state changes the warehouse production runtime contract, module split, or validation baseline again
+**Risk:** Low
+
+## TASK-103: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` `TASK-010`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Root recipes admin browser runtime / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after `TASK-010` executed by `sdd-implementation-agent-5c0604`
+**Reason:** After the approved root recipes-admin hardening shipped, the canonical architecture-facing docs still described the `#recetas` browser module too generically and did not record the new renderer-owned workspace markup seam, the dedicated registered version-editor seam, or the updated validation baseline with unrelated repository-wide typecheck debt outside this feature.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that `src/public/root/views/recipes-admin.renderers.js` owns static workspace markup through `renderWorkspace()`, `src/public/root/views/recipes-admin.version-editor.js` owns dynamic stage and QA editor behavior through the registered `views.recipesAdminVersionEditor` seam, `src/public/root/index.html` and `src/public/root/runtime-contract.js` treat that seam as part of the approved loader contract, and the current validation evidence for this cycle is aligned with the repository truth.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after `recipes-production-qa-execution-hardening` `TASK-010`, including the line-count compliance note (`recipes-admin.js=569`) and the supplied validation evidence, without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented browser/runtime code in `src/public/root/views/recipes-admin.renderers.js`, `src/public/root/views/recipes-admin.version-editor.js`, `src/public/root/views/recipes-admin.js`, `src/public/root/index.html`, `src/public/root/runtime-contract.js`, the updated characterization coverage in `tests/root-shell-recipes-admin-view-characterization.test.js` and `tests/root-shell-modularity-governance.test.js`, and the supplied validation evidence from `sdd-implementation-agent-5c0604`
+**Database impact:** None; this refresh documents browser-runtime modularity and validation only
+**API impact:** None; `/api/recipes/**` and related product assignment contracts remain unchanged
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the supported loader contract and bounded validation truth are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable post-`TASK-010` root recipes-admin structure, distinguish the implemented renderer/version-editor seam split from any future deeper decomposition, record the current line-count compliance fact, and preserve that `npm run typecheck` is still failing only for unrelated permission-metadata typing outside this feature scope
+**Validation evidence:** User-supplied results report `node --test tests/root-shell-recipes-admin-view-characterization.test.js tests/root-shell-modularity-governance.test.js` ✅, targeted eslint ✅, `npm run build` ✅, `npm test -- --silent` ✅, and `npm run typecheck` still red only for unrelated permission-metadata typing outside this feature
+**Required tests:** Preserve `tests/root-shell-recipes-admin-view-characterization.test.js` and `tests/root-shell-modularity-governance.test.js` coverage for the recipes-admin seam split and approved loader/runtime contract
+**Migration considerations:** Keep this refresh documentation-only and additive; do not reinterpret the UI hardening as a backend recipe/production contract change
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state changes the recipes-admin loader contract, seam registration, or validation baseline again
+**Risk:** Low
+
 ## TASK-102: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` Fase 2 / `TASK-007`
 **Status:** Completed
 **Priority:** Low

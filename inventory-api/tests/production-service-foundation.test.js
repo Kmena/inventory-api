@@ -7,6 +7,7 @@ const recipeRepository = require('../src/repositories/recipe.repository');
 const inventoryRepository = require('../src/repositories/inventory.repository');
 const inventoryTransactionSupport = require('../src/services/inventory-transaction-support.service');
 const audit = require('../src/lib/audit');
+const companyRepository = require('../src/repositories/company.repository');
 const productionService = require('../src/services/production.service');
 
 function withPatchedRepositories(overrides, callback) {
@@ -38,6 +39,9 @@ function withPatchedRepositories(overrides, callback) {
     syncProductionItemConsumedQuantity: productionRepository.syncProductionItemConsumedQuantity,
     getProductionItemAggregateState: productionRepository.getProductionItemAggregateState,
     recordAuditEventSafelyIfAvailable: audit.recordAuditEventSafelyIfAvailable,
+    // DEC-002: tolerance now read from DB; stub it in unit tests to avoid
+    // hitting the real DB column before migration is applied.
+    getProductionConsumptionTolerance: companyRepository.getProductionConsumptionTolerance,
   };
 
   Object.assign(productRepository, {
@@ -80,6 +84,11 @@ function withPatchedRepositories(overrides, callback) {
     findLatestProductionStageExecutionForOrderStage: overrides.findLatestProductionStageExecutionForOrderStage || originals.findLatestProductionStageExecutionForOrderStage,
     syncProductionItemConsumedQuantity: overrides.syncProductionItemConsumedQuantity || originals.syncProductionItemConsumedQuantity,
     getProductionItemAggregateState: overrides.getProductionItemAggregateState || originals.getProductionItemAggregateState,
+  });
+  // DEC-002: always stub tolerance to avoid hitting the real DB column in unit tests.
+  Object.assign(companyRepository, {
+    getProductionConsumptionTolerance: overrides.getProductionConsumptionTolerance
+      || (async () => 5.00),
   });
 
   return Promise.resolve()
@@ -125,6 +134,9 @@ function withPatchedRepositories(overrides, callback) {
         findLatestProductionStageExecutionForOrderStage: originals.findLatestProductionStageExecutionForOrderStage,
         syncProductionItemConsumedQuantity: originals.syncProductionItemConsumedQuantity,
         getProductionItemAggregateState: originals.getProductionItemAggregateState,
+      });
+      Object.assign(companyRepository, {
+        getProductionConsumptionTolerance: originals.getProductionConsumptionTolerance,
       });
     });
 }

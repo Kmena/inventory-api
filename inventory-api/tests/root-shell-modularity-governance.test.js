@@ -141,6 +141,7 @@ test('sensitive root-shell modules keep isolated characterization coverage and e
   const recipesAdminHelpersSource = readRootFile(path.join('views', 'recipes-admin.helpers.js'));
   const recipesAdminRenderersSource = readRootFile(path.join('views', 'recipes-admin.renderers.js'));
   const recipesAdminStateSource = readRootFile(path.join('views', 'recipes-admin.state.js'));
+  const recipesAdminVersionEditorSource = readRootFile(path.join('views', 'recipes-admin.version-editor.js'));
   const recipesAdminSource = readRootFile(path.join('views', 'recipes-admin.js'));
   const productionOrdersAdminHelpersSource = readRootFile(path.join('views', 'production-orders-admin.helpers.js'));
   const productionOrdersAdminStateSource = readRootFile(path.join('views', 'production-orders-admin.state.js'));
@@ -153,11 +154,13 @@ test('sensitive root-shell modules keep isolated characterization coverage and e
   assert.match(recipesAdminHelpersSource, /rootShell\.register\('views\.recipesAdminHelpers'/);
   assert.match(recipesAdminRenderersSource, /rootShell\.register\('views\.recipesAdminRenderers'/);
   assert.match(recipesAdminStateSource, /rootShell\.register\('views\.recipesAdminState'/);
+  assert.match(recipesAdminVersionEditorSource, /rootShell\.register\('views\.recipesAdminVersionEditor'/);
   assert.match(recipesAdminSource, /rootShell\.require\('recipesApi'\)/);
   assert.match(recipesAdminSource, /rootShell\.require\('productsApi'\)/);
   assert.match(recipesAdminSource, /rootShell\.require\('views\.recipesAdminHelpers'\)/);
   assert.match(recipesAdminSource, /rootShell\.require\('views\.recipesAdminRenderers'\)/);
   assert.match(recipesAdminSource, /rootShell\.require\('views\.recipesAdminState'\)/);
+  assert.match(recipesAdminSource, /rootShell\.require\('views\.recipesAdminVersionEditor'\)/);
   assert.match(recipesAdminSource, /async function mount\(/);
   assert.match(recipesAdminSource, /function render\(\)/);
   assert.match(recipesAdminSource, /rootShell\.register\('views\.recipesAdmin'/);

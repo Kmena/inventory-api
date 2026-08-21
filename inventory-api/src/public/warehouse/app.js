@@ -275,6 +275,29 @@ function clearStatus() {
 // Bootstrap
 // -----------------------------------------------------------------------
 
+/**
+ * Primary gate: session.user.landing.target === 'warehouse' (DEC-009, TASK-004).
+ * Legacy fallback (DEC-007): warehouse.access in permissions, only when
+ * session.user.landing is absent (pre-migration sessions from before TASK-003).
+ * A user whose landing is explicitly resolved to any other target (e.g. root)
+ * is blocked even if warehouse.access is present in their permissions array.
+ * @param {any} session
+ * @returns {boolean}
+ */
+function hasWarehouseShellAccess(session) {
+  const landing = session?.user?.landing;
+
+  // Primary: explicit landing serialized by the backend
+  if (landing !== null && landing !== undefined) {
+    return landing.target === 'warehouse';
+  }
+
+  // Legacy fallback: only for sessions without any landing field at all
+  // (users who logged in before TASK-003 was deployed — DEC-007 transition)
+  const permissions = session?.user?.permissions || [];
+  return permissions.includes('warehouse.access');
+}
+
 async function bootstrap() {
   setStatus('Validando sesion...');
 
@@ -291,8 +314,7 @@ async function bootstrap() {
     return;
   }
 
-  const permissions = session?.user?.permissions || [];
-  if (!permissions.includes('warehouse.access')) {
+  if (!hasWarehouseShellAccess(session)) {
     window.location.replace(NO_ACCESS_PATH);
     return;
   }

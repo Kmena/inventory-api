@@ -4,6 +4,7 @@ const { createHttpError } = require('../lib/errors');
 const productRepository = require('../repositories/product.repository');
 const productionRepository = require('../repositories/production.repository');
 const inventoryRepository = require('../repositories/inventory.repository');
+const companyRepository = require('../repositories/company.repository');
 const inventoryTransactionSupport = require('./inventory-transaction-support.service');
 const qualityService = require('./quality.service');
 const productionPlanningService = require('./production-planning.service');
@@ -222,6 +223,10 @@ async function reduceStageInventory(tx, auth, order, stageExecution, stageName, 
 async function executeProductionStage(id, stageId, payload, auth, req = null) {
   const scope = assertOperationalScope(auth);
 
+  // Read company tolerance BEFORE the transaction to avoid holding the advisory lock
+  // longer than necessary. DEC-002: authoritative value from companies table.
+  const companyTolerancePercent = await companyRepository.getProductionConsumptionTolerance(scope.companyId);
+
   const executionResult = await inventoryRepository.transaction(async (tx) => {
     await inventoryRepository.acquireCompanyInventoryAdvisoryLock(scope.companyId, tx);
 
@@ -245,12 +250,13 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
 
     // El operador registra consumos y notas. Los parametros QA los registra
     // por separado un inspector de calidad mediante POST .../inspections.
-    // La validacion de sobre-consumo si aplica al operador.
+    // La validacion de sobre-consumo usa la tolerancia configurada en la empresa (DEC-002).
     const consumptionValidation = validateConsumptionAgainstRequirement(
       order,
       payload.consumptions ?? [],
       auth,
       payload.overrideJustification,
+      companyTolerancePercent,
     );
     const overrideJustification = consumptionValidation.overrideJustification ?? null;
     const movementGroupId = randomUUID();

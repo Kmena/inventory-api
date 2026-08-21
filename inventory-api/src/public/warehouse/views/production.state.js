@@ -15,6 +15,7 @@ const WarehouseShell = /** @type {any} */ (window).WarehouseShell;
 function qaIsCleared(snapshotStage, execution) {
   if (!snapshotStage?.qaMandatory) { return true; }
   if (!execution) { return false; }
+  if (!execution.qaOutOfTolerance) { return true; }
   const inspections = Array.isArray(execution.qualityInspections) ? execution.qualityInspections : [];
   return inspections.some((i) => i.result === 'APPROVED' || i.result === 'CONDITIONALLY_ACCEPTED');
 }
@@ -33,7 +34,7 @@ function deriveStageStatus(order, snapshotStage) {
     (ex) => String(ex.recipeStageId) === stageId && ex.endedAt,
   );
   if (finished) {
-    // Si requiere QA y aun no hay inspeccion aprobada -> WAITING_QA
+    // Si la ejecucion QA quedó fuera de tolerancia y aun no hay aprobación posterior -> WAITING_QA
     if (!qaIsCleared(snapshotStage, finished)) { return 'WAITING_QA'; }
     return 'COMPLETED';
   }

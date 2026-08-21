@@ -1,7 +1,17 @@
 const { ROLE_BUNDLES } = require('./role-bundles.config');
 
 const PERMISSION_METADATA = Object.freeze([
+  // ── Landing permissions ────────────────────────────────────────────
+  // permissionKind: 'landing' — determina el shell principal del rol.
+  // exclusiveGroup: 'primary-landing' — solo uno por rol tenant.
+  Object.freeze({ code: 'root.access', category: 'landing', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Acceso al panel administrativo', notes: 'Shell principal: /root/ — panel de empresa', permissionKind: 'landing', landingTarget: 'root', exclusiveGroup: 'primary-landing' }),
+  Object.freeze({ code: 'warehouse.access', category: 'landing', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Acceso al espacio operativo de bodega', notes: 'Shell principal: /warehouse/ — SPA operativo de bodega/producción/QA', permissionKind: 'landing', landingTarget: 'warehouse', exclusiveGroup: 'primary-landing' }),
+  Object.freeze({ code: 'agent.access', category: 'landing', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Acceso al espacio de agente comercial', notes: 'Shell principal: /agent/ — SPA operativo de ventas', permissionKind: 'landing', landingTarget: 'agent', exclusiveGroup: 'primary-landing' }),
+
+  // ── Platform permissions ───────────────────────────────────────────
   Object.freeze({ code: 'companies.manage', category: 'platform', sensitivity: 'sensitive', scope: 'platform', uiLabel: 'Administrar compañías', notes: 'Solo plataforma' }),
+
+  // ── Administrative permissions ─────────────────────────────────────
   Object.freeze({ code: 'users.manage', category: 'administration', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Administrar usuarios', notes: 'Capacidad administrativa sensible' }),
   Object.freeze({ code: 'settings.manage', category: 'administration', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Administrar configuración', notes: 'Capacidad administrativa sensible' }),
   Object.freeze({ code: 'clients.manage', category: 'clients', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Gestionar clientes', notes: 'Crear, editar y actualizar clientes' }),
@@ -24,7 +34,7 @@ const PERMISSION_METADATA = Object.freeze([
   Object.freeze({ code: 'collections.view.all', category: 'collections', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Ver cobros del equipo', notes: 'Ver cobros del equipo comercial' }),
   Object.freeze({ code: 'inventory.qa.manage', category: 'inventory', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Gestionar QA de inventario', notes: 'Capacidad excepcional de inventario' }),
   Object.freeze({ code: 'inventory.approve', category: 'inventory', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Aprobar inventario', notes: 'Capacidad excepcional de inventario' }),
-  Object.freeze({ code: 'warehouse.access', category: 'warehouse', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Acceder al espacio operativo de bodega', notes: 'Acceso base al SPA operativo de bodega/QA' }),
+  // warehouse.access ya está declarado arriba como landing permission
   Object.freeze({ code: 'warehouse.receive', category: 'warehouse', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Ejecutar recepciones de bodega', notes: 'Habilita las pestañas de Recepciones e Inventario en el SPA operativo de bodega' }),
   Object.freeze({ code: 'products.sourcing.view', category: 'supply', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Ver clasificación de abastecimiento', notes: 'Consulta de sourcing e inventario del producto' }),
   Object.freeze({ code: 'products.sourcing.manage', category: 'supply', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Gestionar clasificación de abastecimiento', notes: 'Configura sourcing, costos, bodegas y metadatos físicos del producto' }),
@@ -88,6 +98,22 @@ const COMBINATION_RULES = Object.freeze([
     appliesTo: Object.freeze(['role.company.create', 'role.company.update']),
     status: 'approved',
     restrictedScope: 'platform',
+  }),
+  Object.freeze({
+    ruleId: 'landing-primary-singleton',
+    description: 'Un rol tenant solo puede tener un permiso de landing (exclusiveGroup: primary-landing)',
+    severity: 'deny',
+    appliesTo: Object.freeze(['role.company.create', 'role.company.update']),
+    status: 'approved',
+    exclusiveGroup: 'primary-landing',
+  }),
+  Object.freeze({
+    ruleId: 'landing-required-for-tenant-role',
+    description: 'Todo rol de empresa activo debe tener exactamente un permiso de landing',
+    severity: 'deny',
+    appliesTo: Object.freeze(['role.company.create', 'role.company.update']),
+    status: 'approved',
+    exclusiveGroup: 'primary-landing',
   }),
 ]);
 

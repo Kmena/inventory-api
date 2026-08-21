@@ -128,7 +128,7 @@ test('company creation governance allows only global root and company-role creat
   });
   const warned = evaluateGovernanceOperation('role.company.create', {
     auth: { role: 'admin', companyId: '7' },
-    permissionCodes: ['inventory.manage'],
+    permissionCodes: ['root.access', 'inventory.manage'],
   });
 
   assert.equal(allowed.decision, 'allow');

@@ -97,6 +97,39 @@ test('warehouse app.js validates warehouse.access permission before bootstrappin
   assert.doesNotMatch(source, /bootstrapSession\(inventorySession\)/);
 });
 
+// DEC-009 / AC-004 / AC-006 — warehouse bootstrap uses landing.target as primary
+test('warehouse app.js uses session.user.landing.target === warehouse as primary bootstrap gate (DEC-009)', () => {
+  const source = readWarehouseFile('app.js');
+  // Must check landing.target explicitly as PRIMARY gate
+  assert.match(source, /landing\.target\s*===\s*['"]warehouse['"]/);
+  // Must export hasWarehouseShellAccess or equivalent named check function
+  assert.match(source, /hasWarehouseShellAccess/);
+  // Legacy fallback to warehouse.access only for sessions without landing
+  assert.match(source, /warehouse\.access/);
+  // Must NOT use permissions.includes('warehouse.access') as the SOLE/outer bootstrap gate
+  // (the old single-line check — now replaced by hasWarehouseShellAccess)
+  assert.doesNotMatch(source, /if\s*\(!permissions\.includes\(['"]warehouse\.access['"]\)\)/);
+});
+
+test('warehouse app.js blocks users whose landing.target is not warehouse (admin with root landing)', () => {
+  const source = readWarehouseFile('app.js');
+  // The guard function must return the result of comparing landing.target to 'warehouse'
+  // when landing IS present — admin with landing.target='root' is blocked.
+  assert.match(source, /return landing\.target\s*===\s*['"]warehouse['"]/);
+  // When landing is absent (null or undefined), falls back to warehouse.access permission
+  assert.match(source, /landing\s*!==\s*null\s*&&\s*landing\s*!==\s*undefined/);
+  // Fallback to warehouse.access permission only when landing is absent
+  assert.match(source, /permissions\.includes\(['"]warehouse\.access['"]\)/);
+});
+
+test('warehouse app.js hasWarehouseShellAccess rejects non-warehouse landing even with warehouse.access in permissions', () => {
+  const source = readWarehouseFile('app.js');
+  // Must export or define hasWarehouseShellAccess — documented as the named gate
+  assert.match(source, /function hasWarehouseShellAccess\(session\)/);
+  // Must call it in bootstrap
+  assert.match(source, /hasWarehouseShellAccess\(session\)/);
+});
+
 test('warehouse app.js implements hash-based routing with permission guard', () => {
   const source = readWarehouseFile('app.js');
   assert.match(source, /parseHashRoute/);
@@ -171,9 +204,13 @@ test('production modules expose real execute and complete functionality', () => 
   // Real execution form elements
   assert.match(source, /Ejecutar etapa/);
   assert.match(source, /Completar etapa/);
-  assert.match(source, /producedQuantity/);
   assert.match(source, /executeProductionStage/);
+  assert.match(source, /actualParameters/);
+  assert.match(source, /overrideJustification/);
+  assert.match(source, /QA de etapa/);
+  assert.match(source, /Dentro de rango|Fuera de rango/);
   // Real completion form
+  assert.match(source, /producedQuantity/);
   assert.match(source, /completeProductionOrder/);
   assert.match(source, /Completar orden/);
   // Real start production button (APPROVED status, not PENDING — see state machine)
@@ -186,6 +223,13 @@ test('production modules expose real execute and complete functionality', () => 
   // Inline forms for accessibility
   assert.match(source, /aria-expanded/);
   assert.match(source, /aria-controls/);
+});
+
+test('production modules keep blocked-stage and waiting-QA messaging explicit', () => {
+  const source = readProductionModules();
+  assert.match(source, /Complete la etapa anterior primero/);
+  assert.match(source, /fuera de tolerancia/i);
+  assert.match(source, /QA debe aprobar/i);
 });
 
 test('views/recipe-consultation.js renders frozen recipe as read-only (FR-038)', () => {
@@ -456,6 +500,20 @@ test('api/warehouse-api.js exposes confirmReceipt endpoint', () => {
   const source = readWarehouseFile('api/warehouse-api.js');
   assert.match(source, /confirmReceipt/);
   assert.match(source, /\/api\/receipts\/\$\{id\}\/confirm/);
+});
+
+test('api/warehouse-api.js exposes getMaterialRequirements on the approved production endpoint', () => {
+  const source = readWarehouseFile('api/warehouse-api.js');
+  assert.match(source, /function getMaterialRequirements\(session, orderId\)/);
+  assert.match(source, /\/api\/production\/orders\/\$\{orderId\}\/material-requirements/);
+  assert.match(source, /WarehouseShell\.register\([\s\S]*getMaterialRequirements/);
+});
+
+test('api/warehouse-api.js exposes getAvailableLotsForStage on the approved production endpoint', () => {
+  const source = readWarehouseFile('api/warehouse-api.js');
+  assert.match(source, /function getAvailableLotsForStage\(session, orderId, stageId\)/);
+  assert.match(source, /\/api\/production\/orders\/\$\{orderId\}\/stages\/\$\{stageId\}\/available-lots/);
+  assert.match(source, /WarehouseShell\.register\([\s\S]*getAvailableLotsForStage/);
 });
 
 test('api/warehouse-api.js uses the approved receipt-inspection and production-QA routes', () => {

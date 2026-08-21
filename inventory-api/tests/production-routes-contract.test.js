@@ -32,6 +32,11 @@ test('production routes expose the approved foundational lifecycle endpoints', (
   assert.ok(getRouteLayer('/orders/:id/stages/:stageId/execute', 'post').length >= 3);
   assert.ok(getRouteLayer('/orders/:id/stages/:stageId/returns', 'post').length >= 3);
   assert.ok(getRouteLayer('/orders/:id/cancel', 'post').length >= 2);
+  // TASK-009: QA per-stage endpoint must exist
+  assert.ok(getRouteLayer('/orders/:id/stages/:stageId/inspections', 'post').length >= 3,
+    'POST /orders/:id/stages/:stageId/inspections must exist and be governed');
+  assert.ok(getRouteLayer('/orders/:id/inspections', 'get').length >= 2,
+    'GET /orders/:id/inspections must exist and be governed');
 });
 
 test('production routes stay permission-governed through centralized access policies', async () => {
@@ -91,4 +96,30 @@ test('production routes stay permission-governed through centralized access poli
 
   const allowedCancel = await runGuard(cancelGuard, { role: 'production-manager', companyId: '7', permissions: ['production.cancel'] });
   assert.equal(allowedCancel, undefined);
+});
+
+// TASK-009 backend: QA per-stage endpoint restricted to quality.inspect
+test('production routes restrict QA inspection endpoints to quality.inspect and quality.view (TASK-009)', async () => {
+  const inspectionsPostGuard = getRouteLayer('/orders/:id/stages/:stageId/inspections', 'post')[0].handle;
+  const inspectionsGetGuard = getRouteLayer('/orders/:id/inspections', 'get')[0].handle;
+
+  // Deny: production.execute does NOT grant QA inspection access
+  const deniedInspection = await runGuard(inspectionsPostGuard, { role: 'warehouse', companyId: '7', permissions: ['production.execute'] });
+  assert.equal(deniedInspection?.statusCode, 403,
+    'production.execute must not grant access to QA inspection endpoint');
+
+  // Deny: quality.view does NOT grant write access
+  const deniedInspectionGet = await runGuard(inspectionsGetGuard, { role: 'quality', companyId: '7', permissions: ['production.execute'] });
+  assert.equal(deniedInspectionGet?.statusCode, 403,
+    'production.execute must not grant access to GET inspections endpoint');
+
+  // Allow: quality.inspect grants write access
+  const allowedInspection = await runGuard(inspectionsPostGuard, { role: 'quality', companyId: '7', permissions: ['quality.inspect'] });
+  assert.equal(allowedInspection, undefined,
+    'quality.inspect must grant access to QA inspection endpoint');
+
+  // Allow: quality.view grants read access
+  const allowedInspectionGet = await runGuard(inspectionsGetGuard, { role: 'quality', companyId: '7', permissions: ['quality.view'] });
+  assert.equal(allowedInspectionGet, undefined,
+    'quality.view must grant read access to GET inspections endpoint');
 });

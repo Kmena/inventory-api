@@ -256,16 +256,74 @@ function renderQaAnalysisForm(snapshotStage, stageId) {
     </section>`;
 }
 
+function renderInlineQaCapture(snapshotStage) {
+  if (!snapshotStage?.qaMandatory) {
+    return '';
+  }
+
+  const expectedParameters = Array.isArray(snapshotStage.expectedParameters)
+    ? snapshotStage.expectedParameters
+    : [];
+
+  if (!expectedParameters.length) {
+    return `<section class="wh-step-section" aria-label="QA de etapa">
+      <h4 class="wh-step-section__title">🔬 QA de etapa</h4>
+      <p class="wh-caption">Esta etapa requiere QA, pero no hay parámetros congelados en el snapshot.</p>
+    </section>`;
+  }
+
+  const rows = expectedParameters.map((param) => `
+    <div class="exec-qa-row"
+         data-param-name="${escapeHtml(param.name)}"
+         data-expected-value="${escapeHtml(String(param.expectedValue ?? ''))}"
+         data-min-tolerance="${escapeHtml(String(param.minTolerance ?? 0))}"
+         data-max-tolerance="${escapeHtml(String(param.maxTolerance ?? 0))}"
+         data-param-unit="${escapeHtml(param.unit || '')}"
+         style="display:grid;grid-template-columns:minmax(180px,1.5fr) minmax(140px,1fr) minmax(140px,1fr) auto;gap:0.5rem;align-items:end;margin-bottom:0.5rem">
+      <div>
+        <strong>${escapeHtml(param.name)}</strong>
+        <p class="wh-caption" style="margin:0.15rem 0 0 0">
+          Esperado: ${escapeHtml(String(param.expectedValue ?? '?'))} ${escapeHtml(param.unit || '')}
+          · Tolerancia -${escapeHtml(String(param.minTolerance ?? 0))} / +${escapeHtml(String(param.maxTolerance ?? 0))}
+        </p>
+      </div>
+      <label>
+        <span>Valor real *</span>
+        <input type="number" step="any" class="exec-qa-actual" aria-label="Valor real de ${escapeHtml(param.name)}" />
+      </label>
+      <label>
+        <span>Unidad</span>
+        <input type="text" class="exec-qa-unit" value="${escapeHtml(param.unit || '')}" aria-label="Unidad de ${escapeHtml(param.name)}" />
+      </label>
+      <span class="exec-qa-badge wh-caption" aria-live="polite"></span>
+    </div>
+  `).join('');
+
+  return `<section class="wh-step-section" aria-label="QA de etapa">
+    <h4 class="wh-step-section__title">🔬 QA de etapa</h4>
+    <p class="wh-caption" style="margin-bottom:0.75rem">Registra los parámetros numéricos esperados antes de completar la etapa.</p>
+    <div class="exec-qa-rows">${rows}</div>
+  </section>`;
+}
+
 function renderExecuteStageForm(order, snapshotStage, stageId, lotPickerHtml) {
   const formId = `exec-form-${escapeHtml(String(stageId))}`;
-  // startedAt y endedAt se capturan automaticamente por el controller.
-  // Los parametros QA los registra el inspector de calidad por separado.
+  const qaHtml = renderInlineQaCapture(snapshotStage);
   return `<section class="wh-step-section" id="${formId}"
                    aria-label="Formulario de ejecucion de etapa">
     <h4 class="wh-step-section__title">Ejecutar: ${escapeHtml(snapshotStage?.name || 'Etapa')}</h4>
     <input type="hidden" class="exec-started-at" />
     <input type="hidden" class="exec-ended-at" />
     ${lotPickerHtml}
+    ${qaHtml}
+    <div class="exec-override-block" hidden>
+      <label class="products-field-full" for="exec-override-${escapeHtml(String(stageId))}">
+        <span>Justificación del desvío *</span>
+        <textarea id="exec-override-${escapeHtml(String(stageId))}" class="exec-override-justification" rows="3" minlength="10"
+                  placeholder="Explica la causa del desvío y por qué la etapa puede continuar..."></textarea>
+      </label>
+      <p class="exec-override-help wh-caption" style="color:var(--color-warning,#b86000)"></p>
+    </div>
     <div class="field">
       <label for="exec-notes-${escapeHtml(String(stageId))}">Notas (opcional)</label>
       <textarea id="exec-notes-${escapeHtml(String(stageId))}" class="exec-notes" rows="2"
@@ -278,6 +336,7 @@ function renderExecuteStageForm(order, snapshotStage, stageId, lotPickerHtml) {
               data-order-id="${escapeHtml(String(order.id))}"
               data-stage-id="${escapeHtml(String(stageId))}">Completar etapa ✓</button>
     </div>
+    <p class="exec-warning wh-caption" hidden aria-live="polite"></p>
     <p class="exec-error wh-error-msg" hidden role="alert" aria-live="assertive"></p>
   </section>`;
 }
@@ -403,11 +462,11 @@ function renderStageItem(order, vm, permissions) {
 
   let blockedMsg = '';
   if (status === 'BLOCKED') {
-    blockedMsg = '<p class="wh-caption" style="color:var(--color-danger,#c00)">⛔ Completa (y aprueba QA de) la etapa anterior primero.</p>';
+    blockedMsg = '<p class="wh-caption" style="color:var(--color-danger,#c00)">⛔ Complete la etapa anterior primero.</p>';
   }
   if (isWaitingQa) {
     blockedMsg = `<p class="wh-caption" style="color:var(--color-warning,#b86000)">
-      🔬 Esperando analisis de calidad. La siguiente etapa esta bloqueada hasta que QA apruebe.
+      🔬 La ejecución quedó fuera de tolerancia. QA debe aprobar antes de liberar la siguiente etapa.
     </p>`;
   }
 
@@ -422,7 +481,7 @@ function renderStageItem(order, vm, permissions) {
     <h3 class="wh-item-card__name">
       ${escapeHtml(stage?.name || `Etapa ${stage?.stageOrder ?? ''}`)}
     </h3>
-    ${stage?.qaMandatory ? '<p class="wh-qa-required-badge">🔬 Requiere analisis QA</p>' : ''}
+    ${stage?.qaMandatory ? '<p class="wh-qa-required-badge">🔬 QA requerido</p>' : ''}
     <p class="wh-item-card__meta">Estado: ${renderStageBadge(status)}</p>
     ${executionSummary}
     ${qaInspectionSummary}

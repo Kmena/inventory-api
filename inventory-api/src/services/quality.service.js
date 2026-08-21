@@ -115,7 +115,8 @@ async function listInspectionsForOrder(orderId, auth) {
     throw createHttpError(404, 'Orden de producción no encontrada', 'not_found');
   }
 
-  const inspections = await qualityRepository.findQualityInspectionsForOrder(order.id);
+  // TASK-007: pass companyId to repository for multi-tenant enforcement at DB level.
+  const inspections = await qualityRepository.findQualityInspectionsForOrder(order.id, scope.companyId);
   return inspections.map(serializeQualityInspection);
 }
 

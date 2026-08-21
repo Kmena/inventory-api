@@ -4,9 +4,22 @@ function createQualityInspection(data, db = prisma) {
   return db.qualityInspection.create({ data });
 }
 
-function findQualityInspectionsForOrder(productionOrderId, db = prisma) {
+/**
+ * Returns all quality inspections for a production order, scoped to the given company.
+ * The companyId filter is enforced via the productionOrder relation to prevent
+ * cross-tenant data leakage (TASK-007 multi-tenant hardening).
+ *
+ * @param {bigint} productionOrderId
+ * @param {bigint} companyId - Used to confirm the order belongs to this company.
+ * @param {import('@prisma/client').PrismaClient} [db]
+ */
+function findQualityInspectionsForOrder(productionOrderId, companyId, db = prisma) {
   return db.qualityInspection.findMany({
-    where: { productionOrderId },
+    where: {
+      productionOrderId,
+      // Multi-tenant guard: verify the order belongs to the authenticated company.
+      productionOrder: { companyId },
+    },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   });
 }

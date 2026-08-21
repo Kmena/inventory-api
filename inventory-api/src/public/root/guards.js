@@ -17,7 +17,17 @@
     );
   }
 
+  function hasExplicitRootLanding(session) {
+    return session?.user?.landing?.target === 'root';
+  }
+
   function isEligibleRootShellSession(session) {
+    // Primary: explicit landing (TASK-004)
+    if (hasExplicitRootLanding(session)) {
+      return true;
+    }
+
+    // Legacy fallback (DEC-007: kept during transition before backfill)
     return isRootUser(session) || isCompanyAdmin(session) || hasProcurementAccess(session);
   }
 
@@ -43,6 +53,7 @@
 
   rootShell.register('guards', {
     canAccessRoute,
+    hasExplicitRootLanding,
     hasProcurementAccess,
     isCompanyAdmin,
     isEligibleRootShellSession,

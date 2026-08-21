@@ -22,15 +22,21 @@
   }
 
   function getActorType(session) {
+    // Platform root global
     if (session?.user?.role?.code === 'root' && !session?.user?.companyId) {
       return 'root';
     }
 
+    // Explicit root landing (TASK-004)
+    if (session?.user?.landing?.target === 'root' && session?.user?.companyId) {
+      return 'company-admin';
+    }
+
+    // Legacy fallback (DEC-007)
     if (session?.user?.role?.code === 'admin' && session?.user?.companyId) {
       return 'company-admin';
     }
 
-    // procurement_operator: company-scoped user — must see the company-admin sidebar
     if (
       session?.user?.companyId &&
       (session?.user?.permissions || []).includes('procurement.manage')

@@ -32,7 +32,12 @@
               </div>\
             </fieldset>\
             <fieldset class="root-form__section">\
-              <legend>Seleccion de permisos</legend>\
+              <legend>Acceso principal / landing</legend>\
+              <p class="muted">Selecciona el acceso principal del rol. Determina a cual panel seran redirigidos los usuarios al iniciar sesion. Solo se puede seleccionar uno.</p>\
+              <div id="roles-landing-region" class="root-landing-group"></div>\
+            </fieldset>\
+            <fieldset class="root-form__section">\
+              <legend>Seleccion de permisos operativos</legend>\
               <label class="root-form-grid__full"><span>Buscar permiso</span><input id="roles-permission-search" type="search" placeholder="Buscar por nombre, descripcion o codigo" /></label>\
               <p id="roles-selection-count" class="muted" aria-live="polite">0 permisos seleccionados</p>\
               <div id="roles-permissions-region" class="root-permission-groups"></div>\
@@ -108,9 +113,42 @@
     '</label>';
   }
 
+  var LANDING_SHELL_LABELS = {
+    'root.access': 'Panel administrativo (/root/)',
+    'warehouse.access': 'Espacio operativo de bodega (/warehouse/)',
+    'agent.access': 'Espacio de agente comercial (/agent/)',
+  };
+
+  function renderLandingSection(permissions, selectedLandingCode) {
+    var landingPerms = permissions.filter(function (p) {
+      return p.permissionKind === 'landing';
+    });
+
+    if (!landingPerms.length) {
+      return '<p class="empty-state">No hay permisos de acceso principal disponibles.</p>';
+    }
+
+    return landingPerms.map(function (p) {
+      var isChecked = p.code === selectedLandingCode;
+      var label = p.displayLabel || p.code;
+      var shellLabel = LANDING_SHELL_LABELS[p.code] || '';
+
+      return '<label class="permission-option permission-option--landing">' +
+        '<input type="radio" name="landingPermission" value="' + rootShellUi.escapeHtml(p.code) + '"' + (isChecked ? ' checked' : '') + ' />' +
+        '<span>' +
+          '<strong class="permission-option__label">' + rootShellUi.escapeHtml(label) + '</strong>' +
+          (shellLabel ? '<small class="permission-option__desc">' + rootShellUi.escapeHtml(shellLabel) + '</small>' : '') +
+          '<small class="permission-option__code">' + rootShellUi.escapeHtml(p.code) + '</small>' +
+        '</span>' +
+      '</label>';
+    }).join('');
+  }
+
   function renderPermissions(permissions, selectedCodes, searchTerm, editingOwnRole) {
     var normalizedSearch = String(searchTerm || '').trim().toLowerCase();
-    var filtered = permissions.filter(function (p) {
+    // Exclude landing permissions from the operational grid — they have their own section
+    var nonLanding = permissions.filter(function (p) { return p.permissionKind !== 'landing'; });
+    var filtered = nonLanding.filter(function (p) {
       if (!normalizedSearch) { return true; }
       return [p.displayLabel, p.businessDescription, p.moduleCategory, p.code, p.module, p.action]
         .filter(Boolean)
@@ -166,11 +204,18 @@
       if (isGlobal) { cardClass += ' role-card--readonly'; }
       if (isEditing) { cardClass += ' role-card--editing'; }
 
-      var permTags = (role.permissions || []).slice(0, 6).map(function (p) {
+      var landingBadge = '';
+      if (role.landingPermission) {
+        var shellName = LANDING_SHELL_LABELS[role.landingPermission.code] || role.landingPermission.displayLabel || role.landingPermission.code;
+        landingBadge = '<span class="badge badge-info">' + rootShellUi.escapeHtml(shellName) + '</span>';
+      }
+
+      var operationalPerms = (role.operationalPermissions || role.permissions || []);
+      var permTags = operationalPerms.slice(0, 6).map(function (p) {
         var label = p.displayLabel || p.code;
         return '<span>' + rootShellUi.escapeHtml(label) + '</span>';
       }).join('');
-      var extraCount = (role.permissions || []).length - 6;
+      var extraCount = operationalPerms.length - 6;
       if (extraCount > 0) {
         permTags += '<span>+' + extraCount + ' mas</span>';
       }
@@ -193,7 +238,8 @@
             (isGlobal ? '<span class="badge badge-info">Solo lectura</span>' : '') +
           '</div>' +
         '</div>' +
-        '<p class="muted">' + rootShellUi.escapeHtml(String(role.permissions?.length || 0)) + ' permisos asignados</p>' +
+        (landingBadge ? '<p class="muted">Acceso principal: ' + landingBadge + '</p>' : '') +
+        '<p class="muted">' + rootShellUi.escapeHtml(String(operationalPerms.length || 0)) + ' permisos operativos</p>' +
         '<div class="permission-tags">' + (permTags || '<span>Sin permisos</span>') + '</div>' +
         actionsHtml +
       '</article>';
@@ -208,6 +254,7 @@
     var formTitle = container.querySelector('#roles-form-title');
     var formSubtitle = container.querySelector('#roles-form-subtitle');
     var editBanner = container.querySelector('#roles-edit-banner');
+    var landingRegion = container.querySelector('#roles-landing-region');
     var permissionsRegion = container.querySelector('#roles-permissions-region');
     var searchInput = container.querySelector('#roles-permission-search');
     var selectionCount = container.querySelector('#roles-selection-count');
@@ -220,7 +267,7 @@
     var confirmYes = container.querySelector('#roles-confirm-yes');
     var confirmNo = container.querySelector('#roles-confirm-no');
 
-    if (!form || !formMessage || !permissionsRegion || !searchInput || !selectionCount || !rolesListRegion || !rolesListMessage || !submitButton || !clearButton) {
+    if (!form || !formMessage || !landingRegion || !permissionsRegion || !searchInput || !selectionCount || !rolesListRegion || !rolesListMessage || !submitButton || !clearButton) {
       return;
     }
 
@@ -229,7 +276,9 @@
     var editingRoleId = null;
     var currentUserRoleId = session?.user?.roleId ? String(session.user.roleId) : null;
     var confirmResolve = null;
-    /** @type {Set<string>} Source of truth for selected permission codes — survives search re-renders. */
+    /** @type {string|null} Selected landing permission code */
+    var _selectedLandingCode = null;
+    /** @type {Set<string>} Source of truth for selected operational permission codes — survives search re-renders. */
     var _selectedPermissionCodes = new Set();
 
     function isEditingOwnRole() {
@@ -240,11 +289,24 @@
       return Array.from(_selectedPermissionCodes);
     }
 
+    function getAllSelectedPermissionCodes() {
+      var codes = getSelectedPermissionCodes();
+      if (_selectedLandingCode) {
+        codes.unshift(_selectedLandingCode);
+      }
+      return codes;
+    }
+
     function updateSelectionCount() {
       selectionCount.textContent = _selectedPermissionCodes.size + ' permisos seleccionados';
     }
 
+    function renderLandingRegion() {
+      landingRegion.innerHTML = renderLandingSection(availablePermissions, _selectedLandingCode);
+    }
+
     function renderPermissionsRegion() {
+      renderLandingRegion();
       permissionsRegion.innerHTML = renderPermissions(availablePermissions, getSelectedPermissionCodes(), searchInput.value, isEditingOwnRole());
       attachCategoryToggles();
       updateSelectionCount();
@@ -278,8 +340,10 @@
       if (nameInput) { nameInput.value = role.name || ''; }
       formMessage.innerHTML = '';
 
-      var roleCodes = (role.permissions || []).map(function (p) { return p.code; });
-      _selectedPermissionCodes = new Set(roleCodes);
+      // Separate landing from operational codes
+      _selectedLandingCode = role.landingPermission ? role.landingPermission.code : null;
+      var opCodes = (role.operationalPermissions || role.permissions || []).map(function (p) { return p.code; });
+      _selectedPermissionCodes = new Set(opCodes);
 
       renderPermissionsRegion();
       rolesListRegion.innerHTML = renderRoles(availableRoles, editingRoleId);
@@ -296,6 +360,7 @@
       clearButton.textContent = 'Limpiar seleccion';
       form.reset();
       formMessage.innerHTML = '';
+      _selectedLandingCode = null;
       _selectedPermissionCodes = new Set();
       renderPermissionsRegion();
       rolesListRegion.innerHTML = renderRoles(availableRoles, null);
@@ -372,6 +437,9 @@
     }
 
     form.addEventListener('change', function (event) {
+      if (event.target instanceof globalScope.HTMLInputElement && event.target.name === 'landingPermission') {
+        _selectedLandingCode = event.target.value || null;
+      }
       if (event.target instanceof globalScope.HTMLInputElement && event.target.name === 'permissionCodes') {
         if (event.target.checked) {
           _selectedPermissionCodes.add(event.target.value);
@@ -391,6 +459,7 @@
         exitEditMode();
         return;
       }
+      _selectedLandingCode = null;
       _selectedPermissionCodes = new Set();
       renderPermissionsRegion();
     });
@@ -399,13 +468,18 @@
       event.preventDefault();
       formMessage.innerHTML = '';
 
-      var selectedCodes = getSelectedPermissionCodes();
       if (!form.reportValidity()) {
         formMessage.innerHTML = rootShellUi.renderInlineMessage('Revisa los campos obligatorios antes de continuar.', 'error');
         return;
       }
 
-      if (!selectedCodes.length) {
+      if (!_selectedLandingCode) {
+        formMessage.innerHTML = rootShellUi.renderInlineMessage('Selecciona un acceso principal (landing) para el rol.', 'error');
+        return;
+      }
+
+      var selectedCodes = getAllSelectedPermissionCodes();
+      if (selectedCodes.length < 1) {
         formMessage.innerHTML = rootShellUi.renderInlineMessage('Selecciona al menos un permiso.', 'error');
         return;
       }

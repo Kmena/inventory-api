@@ -205,6 +205,7 @@ test('role updates invalidate only impacted browser sessions so subsequent affec
           companyId: 1n,
           isActive: true,
           rolePermissions: [
+            { isEnabled: true, permission: { code: 'root.access', isActive: true } },
             { isEnabled: true, permission: { code: 'inventory.manage', isActive: true } },
           ],
         }),
@@ -212,6 +213,7 @@ test('role updates invalidate only impacted browser sessions so subsequent affec
           throw new Error('findRoleById should not be used when the company-scoped lookup succeeds');
         },
         findActivePermissions: async () => [
+          { code: 'root.access' },
           { code: 'inventory.manage' },
           { code: 'sales.manage' },
         ],
@@ -222,6 +224,7 @@ test('role updates invalidate only impacted browser sessions so subsequent affec
           companyId: 1n,
           isActive: true,
           rolePermissions: [
+            { isEnabled: true, permission: { code: 'root.access', isActive: true } },
             { isEnabled: true, permission: { code: 'sales.manage', isActive: true } },
           ],
         }),
@@ -267,7 +270,7 @@ test('role updates invalidate only impacted browser sessions so subsequent affec
     () => withHttpServer(async (baseUrl) => {
       await roleService.updateCompanyRole(
         '10',
-        { permissionCodes: ['sales.manage'] },
+        { permissionCodes: ['root.access', 'sales.manage'] },
         { companyId: '1', roleId: '99' },
         createRequestForRoleUpdate(),
       );

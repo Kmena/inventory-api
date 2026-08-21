@@ -26,17 +26,41 @@ function updateLotTotals(container) {
       if (lotId && qty > 0) { total += qty; }
     });
 
+    const tolerancePct = Number(block.dataset.tolerancePct ?? 5) / 100;
+    const allowedMax = required > 0 ? required * (1 + tolerancePct) : Infinity;
+    const overLimit = required > 0 && total > allowedMax + 0.0001;
+    const underRequired = required > 0 && total + 0.0001 < required;
+    block.dataset.overLimit = overLimit ? 'true' : 'false';
+    block.dataset.underRequired = underRequired ? 'true' : 'false';
+
     const display = block.querySelector('.lot-total-display');
     if (display) {
-      const tolerancePct = Number(block.dataset.tolerancePct ?? 5) / 100;
-      const allowedMax = required > 0 ? required * (1 + tolerancePct) : Infinity;
-      const overLimit = required > 0 && total > allowedMax + 0.0001;
       const unit = block.dataset.unit || '';
-      display.textContent = `Total: ${total} ${unit}`;
+      const difference = Math.abs(total - required);
+      let suffix = '';
+      if (underRequired) {
+        suffix = ` · Pendiente: ${difference} ${unit}`;
+      } else if (required > 0 && total > required + 0.0001) {
+        suffix = ` · Excedente: ${difference} ${unit}`;
+      }
+      display.textContent = `Total: ${total} ${unit}${suffix}`;
       display.style.color = overLimit ? 'var(--color-danger,#c00)' : 'var(--color-success,green)';
+    }
 
-      const excessMsg = block.querySelector('.lot-excess-msg');
-      if (excessMsg) { excessMsg.style.display = overLimit ? '' : 'none'; }
+    const excessMsg = block.querySelector('.lot-excess-msg');
+    if (excessMsg) {
+      if (overLimit) {
+        excessMsg.textContent = '⚠ Consumo excede tolerancia. Se requerirá justificación.';
+        excessMsg.style.display = '';
+      } else if (underRequired) {
+        excessMsg.textContent = '⚠ Falta cantidad por asignar para cubrir el requerido.';
+        excessMsg.style.display = '';
+      } else if (required > 0 && total > required + 0.0001) {
+        excessMsg.textContent = '⚠ Cantidad mayor al requerido. Revisa antes de confirmar.';
+        excessMsg.style.display = '';
+      } else {
+        excessMsg.style.display = 'none';
+      }
     }
   });
 }
@@ -77,13 +101,15 @@ function addLotRowToBlock(block) {
   if (removeBtn) {
     removeBtn.addEventListener('click', () => {
       row.remove();
-      updateLotTotals(block.closest('section, form, [class]') || block);
+      const owner = block.closest('section, form, [class]') || block;
+      updateLotTotals(owner);
+      syncExecutionOverrideState(owner);
     });
   }
   const qty = row.querySelector('.lot-qty');
   const sel = row.querySelector('.lot-select');
-  if (qty) { qty.addEventListener('input', () => updateLotTotals(block.closest('section, form, [class]') || block)); }
-  if (sel) { sel.addEventListener('change', () => updateLotTotals(block.closest('section, form, [class]') || block)); }
+  if (qty) { qty.addEventListener('input', () => { const owner = block.closest('section, form, [class]') || block; updateLotTotals(owner); syncExecutionOverrideState(owner); }); }
+  if (sel) { sel.addEventListener('change', () => { const owner = block.closest('section, form, [class]') || block; updateLotTotals(owner); syncExecutionOverrideState(owner); }); }
 
   rowsContainer.appendChild(row);
 }
@@ -92,14 +118,15 @@ function attachLotPickerHandlers(container) {
   container.querySelectorAll('.lot-picker-block').forEach((block) => {
     // Wire existing rows
     block.querySelectorAll('.lot-select, .lot-qty').forEach((input) => {
-      input.addEventListener('change', () => updateLotTotals(container));
-      input.addEventListener('input', () => updateLotTotals(container));
+      input.addEventListener('change', () => { updateLotTotals(container); syncExecutionOverrideState(container); });
+      input.addEventListener('input', () => { updateLotTotals(container); syncExecutionOverrideState(container); });
     });
     // Wire remove buttons on initial rows
     block.querySelectorAll('.remove-lot-row-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         btn.closest('.lot-row')?.remove();
         updateLotTotals(container);
+        syncExecutionOverrideState(container);
       });
     });
     // Wire add-lot-row button
@@ -108,10 +135,12 @@ function attachLotPickerHandlers(container) {
       addBtn.addEventListener('click', () => {
         addLotRowToBlock(block);
         updateLotTotals(container);
+        syncExecutionOverrideState(container);
       });
     }
   });
   updateLotTotals(container);
+  syncExecutionOverrideState(container);
 }
 
 // -----------------------------------------------------------------------
@@ -143,6 +172,105 @@ function evaluateQaResultBadge(row, expectedParams) {
 // Collect execution payload from the inline form
 // -----------------------------------------------------------------------
 
+function evaluateInlineExecutionQa(formContainer) {
+  let hasOutOfTolerance = false;
+  let hasMissingQaValue = false;
+
+  formContainer.querySelectorAll('.exec-qa-row').forEach((row) => {
+    const input = row.querySelector('.exec-qa-actual');
+    const badge = row.querySelector('.exec-qa-badge');
+    const rawValue = input?.value ?? '';
+
+    if (!rawValue) {
+      row.dataset.withinTolerance = '';
+      if (badge) {
+        badge.textContent = 'Pendiente';
+        badge.style.color = 'var(--color-text-muted,#666)';
+      }
+      hasMissingQaValue = true;
+      return;
+    }
+
+    const actualValue = Number(rawValue);
+    const expectedValue = Number(row.dataset.expectedValue ?? 0);
+    const minTolerance = Number(row.dataset.minTolerance ?? 0);
+    const maxTolerance = Number(row.dataset.maxTolerance ?? 0);
+    const withinTolerance = !Number.isNaN(actualValue)
+      && actualValue >= expectedValue - minTolerance
+      && actualValue <= expectedValue + maxTolerance;
+
+    row.dataset.withinTolerance = withinTolerance ? 'true' : 'false';
+    if (!withinTolerance) {
+      hasOutOfTolerance = true;
+    }
+
+    if (badge) {
+      badge.textContent = withinTolerance ? '✓ Dentro de rango' : '⚠ Fuera de rango';
+      badge.style.color = withinTolerance ? 'var(--color-success,green)' : 'var(--color-warning,#b86000)';
+    }
+  });
+
+  return { hasMissingQaValue, hasOutOfTolerance };
+}
+
+function syncExecutionOverrideState(formContainer) {
+  const overrideBlock = formContainer.querySelector('.exec-override-block');
+  const overrideInput = formContainer.querySelector('.exec-override-justification');
+  const overrideHelp = formContainer.querySelector('.exec-override-help');
+  const warningEl = formContainer.querySelector('.exec-warning');
+  const submitBtn = formContainer.querySelector('.exec-submit-btn');
+
+  const qaState = evaluateInlineExecutionQa(formContainer);
+  const lotBlocks = Array.from(formContainer.querySelectorAll('.lot-picker-block'));
+  const hasOverLimitLots = lotBlocks.some((block) => block.dataset.overLimit === 'true');
+  const hasUnderRequiredLots = lotBlocks.some((block) => block.dataset.underRequired === 'true');
+  const needsOverride = qaState.hasOutOfTolerance || hasOverLimitLots;
+  const overrideValue = overrideInput?.value?.trim() || '';
+  const hasValidOverride = overrideValue.length >= 10;
+
+  if (overrideBlock) {
+    overrideBlock.hidden = !needsOverride;
+  }
+  if (overrideInput) {
+    overrideInput.required = needsOverride;
+  }
+  if (overrideHelp) {
+    const reasons = [];
+    if (qaState.hasOutOfTolerance) {
+      reasons.push('uno o más parámetros QA están fuera de tolerancia');
+    }
+    if (hasOverLimitLots) {
+      reasons.push('el consumo excede la tolerancia permitida');
+    }
+    overrideHelp.textContent = reasons.length
+      ? `Se requiere justificación porque ${reasons.join(' y ')}.`
+      : '';
+  }
+  if (warningEl) {
+    if (needsOverride && !hasValidOverride) {
+      warningEl.textContent = 'Agrega una justificación de al menos 10 caracteres para continuar.';
+      warningEl.hidden = false;
+    } else if (hasUnderRequiredLots) {
+      warningEl.textContent = 'Revisa los lotes: aún falta cantidad por asignar en uno o más insumos.';
+      warningEl.hidden = false;
+    } else {
+      warningEl.hidden = true;
+      warningEl.textContent = '';
+    }
+  }
+  if (submitBtn) {
+    submitBtn.disabled = Boolean(needsOverride && !hasValidOverride);
+  }
+
+  return {
+    hasMissingQaValue: qaState.hasMissingQaValue,
+    hasOutOfTolerance: qaState.hasOutOfTolerance,
+    hasOverLimitLots,
+    needsOverride,
+    hasValidOverride,
+  };
+}
+
 function collectExecutionPayload(formContainer) {
   const startedAtEl = formContainer.querySelector('.exec-started-at');
   const endedAtEl = formContainer.querySelector('.exec-ended-at');
@@ -162,17 +290,40 @@ function collectExecutionPayload(formContainer) {
     block.querySelectorAll('.lot-row').forEach((row) => {
       const lotId = row.querySelector('.lot-select')?.value;
       const qty = Number(row.querySelector('.lot-qty')?.value || 0);
+      if (qty > 0 && !lotId) {
+        throw new Error('Selecciona un lote para cada cantidad capturada.');
+      }
       if (lotId && qty > 0) {
         consumptions.push({ productId: Number(productId), lotId: Number(lotId), quantity: qty });
       }
     });
   });
 
+  const actualParameters = [];
+  formContainer.querySelectorAll('.exec-qa-row').forEach((row) => {
+    const actualInput = row.querySelector('.exec-qa-actual');
+    const unitInput = row.querySelector('.exec-qa-unit');
+    const rawActualValue = actualInput?.value ?? '';
+    if (!rawActualValue) {
+      throw new Error('Debes completar todos los parámetros QA requeridos.');
+    }
+
+    actualParameters.push({
+      name: row.dataset.paramName,
+      actualValue: Number(rawActualValue),
+      unit: unitInput?.value?.trim() || row.dataset.paramUnit || undefined,
+    });
+  });
+
+  const overrideJustification = formContainer.querySelector('.exec-override-justification')?.value?.trim() || undefined;
+
   return {
     startedAt,
     endedAt,
     consumptions,
     waste: [],
+    actualParameters,
+    overrideJustification,
     notes: notesEl?.value?.trim() || undefined,
   };
 }
@@ -340,6 +491,15 @@ async function attachExecuteStageHandlers(container, session, order, snapshotSta
   // Wire lot picker live validation
   attachLotPickerHandlers(slot);
 
+  slot.querySelectorAll('.exec-qa-actual, .exec-qa-unit').forEach((input) => {
+    input.addEventListener('input', () => syncExecutionOverrideState(slot));
+    input.addEventListener('change', () => syncExecutionOverrideState(slot));
+  });
+  slot.querySelector('.exec-override-justification')?.addEventListener('input', () => {
+    syncExecutionOverrideState(slot);
+  });
+  syncExecutionOverrideState(slot);
+
   // Cancel button
   slot.querySelector('.exec-cancel-btn')?.addEventListener('click', () => {
     slot.innerHTML = '';
@@ -360,6 +520,16 @@ async function attachExecuteStageHandlers(container, session, order, snapshotSta
     if (endedEl2) { endedEl2.value = new Date().toISOString(); }
 
     try {
+      const executionState = syncExecutionOverrideState(slot);
+      if (executionState.hasMissingQaValue) {
+        throw new Error('Debes completar todos los parámetros QA requeridos.');
+      }
+      if (executionState.needsOverride && !executionState.hasValidOverride) {
+        const overrideInput = slot.querySelector('.exec-override-justification');
+        overrideInput?.focus();
+        throw new Error('Agrega una justificación de al menos 10 caracteres para continuar.');
+      }
+
       const payload = collectExecutionPayload(slot);
       if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Completando...'; }
       if (errEl) { errEl.hidden = true; }
@@ -555,5 +725,7 @@ WarehouseShell.register('views.productionControllers', {
   attachOrderListHandlers,
   attachQaAnalysisHandlers,
   collectExecutionPayload,
+  evaluateInlineExecutionQa,
+  syncExecutionOverrideState,
 });
 })();

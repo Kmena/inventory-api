@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const productionRepository = require('../src/repositories/production.repository');
 const inventoryRepository = require('../src/repositories/inventory.repository');
+const { __private__ } = require('../src/services/production-material-availability.service');
 const productRepository = require('../src/repositories/product.repository');
 const availabilityService = require('../src/services/production-material-availability.service');
 
@@ -274,4 +275,88 @@ test('getAvailableLotsForStage returns 404 when the stage is absent from the ord
       (error) => error?.statusCode === 404 && error?.code === 'not_found',
     );
   });
+});
+
+// ─── TASK-006 / DEC-003: FEFO cuando hay vencimiento, FIFO cuando no ────────
+// Tests directos sobre sortLotsForAvailability para verificar la política de lotes.
+
+function makeLotStock(id, lotId, expirationDate, entryDate) {
+  return {
+    id: BigInt(id),
+    lotId: BigInt(lotId),
+    quantity: 10,
+    reservedQuantity: 0,
+    lot: {
+      id: BigInt(lotId),
+      expirationDate: expirationDate ? new Date(expirationDate) : null,
+      entryDate: new Date(entryDate),
+      status: 'AVAILABLE',
+      qaStatus: 'APPROVED',
+    },
+  };
+}
+
+test('sortLotsForAvailability sorts lots with expirationDate by expirationDate ASC (FEFO) (TASK-006)', () => {
+  const { sortLotsForAvailability } = __private__;
+
+  const lots = [
+    makeLotStock(3, 1003, '2026-12-01', '2026-01-03'), // expires last
+    makeLotStock(1, 1001, '2026-06-01', '2026-01-01'), // expires first
+    makeLotStock(2, 1002, '2026-09-15', '2026-01-02'), // expires middle
+  ];
+
+  const sorted = sortLotsForAvailability(lots);
+  assert.deepEqual(
+    sorted.map((s) => s.lotId),
+    [1001n, 1002n, 1003n],
+    'Lots with expiration dates must be sorted FEFO (expirationDate ASC)',
+  );
+});
+
+test('sortLotsForAvailability sorts lots without expirationDate by entryDate ASC (FIFO) (TASK-006)', () => {
+  const { sortLotsForAvailability } = __private__;
+
+  const lots = [
+    makeLotStock(3, 1003, null, '2026-01-20'), // entered last
+    makeLotStock(1, 1001, null, '2026-01-05'), // entered first
+    makeLotStock(2, 1002, null, '2026-01-10'), // entered middle
+  ];
+
+  const sorted = sortLotsForAvailability(lots);
+  assert.deepEqual(
+    sorted.map((s) => s.lotId),
+    [1001n, 1002n, 1003n],
+    'Lots without expiration dates must be sorted FIFO (entryDate ASC)',
+  );
+});
+
+test('sortLotsForAvailability puts lots WITH expirationDate before lots WITHOUT (TASK-006)', () => {
+  const { sortLotsForAvailability } = __private__;
+
+  const lots = [
+    makeLotStock(2, 1002, null, '2026-01-01'),         // no expiry — entered first
+    makeLotStock(1, 1001, '2026-12-31', '2026-06-01'), // has expiry
+  ];
+
+  const sorted = sortLotsForAvailability(lots);
+  // Lot with expiration date should come FIRST (more urgent)
+  assert.equal(sorted[0].lotId, 1001n, 'Lot with expirationDate must come before lot without');
+  assert.equal(sorted[1].lotId, 1002n);
+});
+
+test('sortLotsForAvailability does not mutate the input array (TASK-006)', () => {
+  const { sortLotsForAvailability } = __private__;
+
+  const lots = [
+    makeLotStock(2, 1002, '2026-09-15', '2026-01-02'),
+    makeLotStock(1, 1001, '2026-06-01', '2026-01-01'),
+  ];
+  const original = [...lots];
+
+  sortLotsForAvailability(lots);
+  assert.deepEqual(
+    lots.map((l) => l.lotId),
+    original.map((l) => l.lotId),
+    'Input array must not be mutated',
+  );
 });

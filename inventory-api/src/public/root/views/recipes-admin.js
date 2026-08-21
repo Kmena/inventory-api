@@ -7,158 +7,10 @@
   const recipesHelpers = rootShell.require('views.recipesAdminHelpers');
   const recipesRenderers = rootShell.require('views.recipesAdminRenderers');
   const recipesState = rootShell.require('views.recipesAdminState');
-
-  // Dynamic version form helpers are defined below in mount().
+  const recipesVersionEditorModule = rootShell.require('views.recipesAdminVersionEditor');
 
   function render() {
-    return `
-      <section class="root-hero" aria-labelledby="root-view-title">
-        <p class="eyebrow">Produccion</p>
-        <h2 id="root-view-title">Recetas</h2>
-        <p class="muted">Administra recetas, versiones y su relacion con productos sin mezclar flujos operativos de warehouse.</p>
-      </section>
-
-      <section class="routes-page products-page recipes-admin" id="recipes-page">
-        <div id="recipes-metrics" class="commercial-metrics" aria-live="polite"></div>
-        <div id="recipes-page-message" aria-live="polite"></div>
-
-        <article class="card root-card warehouses-workspace">
-          <div class="page-header warehouses-header">
-            <div>
-              <h3>Catalogo administrativo de recetas</h3>
-              <p id="recipes-list-summary" class="muted">Consulta recetas activas, abre su detalle y administra versiones y asignaciones segun tus permisos.</p>
-            </div>
-            <div class="action-row compact-action-row recipes-header-actions">
-              <button id="recipes-refresh-button" class="secondary-button" type="button">Actualizar</button>
-              <button id="recipes-open-create-button" type="button">Nueva receta</button>
-            </div>
-          </div>
-
-          <div class="client-command-bar products-filter-grid">
-            <label class="client-search-field products-search-field"><span>Buscar</span><input id="recipes-search-input" type="search" placeholder="Codigo, nombre o tipo" /></label>
-            <label><span>Estado</span><select id="recipes-status-filter"><option value="">Todos</option><option value="active">Activas</option><option value="inactive">Inactivas</option></select></label>
-            <label><span>Tipo</span><select id="recipes-type-filter"><option value="">Todos</option></select></label>
-            <label><span>Compartida</span><select id="recipes-shared-filter"><option value="">Todas</option><option value="yes">Solo compartidas</option><option value="no">No compartidas</option></select></label>
-            <button id="recipes-clear-filters-button" class="secondary-button" type="button">Limpiar filtros</button>
-          </div>
-
-          <div class="products-workspace-grid">
-            <div>
-              <div id="recipes-list-region" aria-live="polite"></div>
-            </div>
-            <aside class="card root-card products-detail-card" aria-labelledby="recipes-detail-title">
-              <div class="page-header">
-                <div>
-                  <h3 id="recipes-detail-title">Detalle de receta</h3>
-                  <p id="recipes-detail-subtitle" class="muted">Selecciona una receta del listado para revisar versiones y productos asociados.</p>
-                </div>
-              </div>
-              <div id="recipes-detail-message" aria-live="polite"></div>
-              <div id="recipes-detail-region"></div>
-            </aside>
-          </div>
-        </article>
-      </section>
-
-      <dialog id="recipes-form-dialog" class="modal-card products-modal-card">
-        <form id="recipes-form" class="root-form" method="dialog" novalidate>
-          <div class="products-modal-header">
-            <div>
-              <h3 id="recipes-form-title">Nueva receta</h3>
-              <p class="muted">Registra una receta administrativa desde root.</p>
-            </div>
-            <button id="recipes-close-form-button" class="secondary-button" type="button">Cerrar</button>
-          </div>
-          <div id="recipes-form-message" aria-live="polite"></div>
-          <fieldset class="root-form__section">
-            <legend>Datos principales</legend>
-            <div class="products-form-grid">
-              <label class="products-field-wide"><span>Nombre *</span><input id="recipes-form-name" name="name" type="text" required minlength="2" maxlength="255" /></label>
-              <label><span>Codigo</span><input name="code" type="text" maxlength="50" /></label>
-              <label><span>Tipo</span><input name="recipeType" type="text" maxlength="100" placeholder="BASE, ACABADO..." /></label>
-              <label class="products-field-full products-checkbox-label">
-                <input id="recipes-form-active" name="isActive" type="checkbox" checked />
-                <span>Receta activa</span>
-                <span class="products-field-hint">Las recetas inactivas siguen visibles en root para consulta administrativa.</span>
-              </label>
-            </div>
-          </fieldset>
-          <div class="action-row products-modal-actions">
-            <button id="recipes-form-submit-button" type="submit">Guardar receta</button>
-            <button id="recipes-cancel-form-button" class="secondary-button" type="button">Cancelar</button>
-          </div>
-        </form>
-      </dialog>
-
-      <dialog id="recipes-version-dialog" class="modal-card products-modal-card">
-        <form id="recipes-version-form" class="root-form" method="dialog" novalidate>
-          <div class="products-modal-header">
-            <div>
-              <h3 id="recipes-version-title">Nueva version borrador</h3>
-              <p class="muted">Usa arreglos JSON validos para ingredientes y etapas. Las versiones aprobadas son inmutables.</p>
-            </div>
-            <button id="recipes-close-version-button" class="secondary-button" type="button">Cerrar</button>
-          </div>
-          <div id="recipes-version-message" aria-live="polite"></div>
-          <fieldset class="root-form__section">
-            <legend>Configuracion principal</legend>
-            <div class="products-form-grid">
-              <label><span>Vigencia desde</span><input name="effectiveFrom" type="date" /></label>
-              <label><span>Vigencia hasta</span><input name="effectiveTo" type="date" /></label>
-              <label><span>Rendimiento esperado</span><input name="expectedYield" type="number" min="0" step="0.01" /></label>
-              <label><span>Merma esperada</span><input name="expectedWaste" type="number" min="0" step="0.01" /></label>
-              <label><span>Tolerancia rendimiento %</span><input name="yieldTolerancePercent" type="number" min="0" max="100" step="0.01" /></label>
-              <label><span>Tolerancia merma %</span><input name="wasteTolerancePercent" type="number" min="0" max="100" step="0.01" /></label>
-              <label class="products-field-full"><span>Instrucciones</span><textarea name="instructions" rows="4" maxlength="5000"></textarea></label>
-              <label class="products-field-full"><span>Notas</span><textarea name="notes" rows="3" maxlength="2000"></textarea></label>
-            </div>
-          </fieldset>
-          <fieldset class="root-form__section">
-            <legend>Etapas de produccion</legend>
-            <p class="muted">Define las etapas en orden con sus insumos. El BOM general se calcula automaticamente.</p>
-            <div id="recipes-version-stages-list" class="stack-section"></div>
-            <button type="button" id="recipes-version-add-stage" class="secondary-button">+ Agregar etapa</button>
-            </div>
-          </fieldset>
-          <div class="action-row products-modal-actions">
-            <button id="recipes-version-submit-button" type="submit">Guardar version</button>
-            <button id="recipes-cancel-version-button" class="secondary-button" type="button">Cancelar</button>
-          </div>
-        </form>
-      </dialog>
-
-      <dialog id="recipes-stages-modal" class="modal-card products-modal-card" style="max-width:720px">
-        <div class="products-modal-header">
-          <div>
-            <h3 id="recipes-stages-modal-title">Etapas de la version</h3>
-            <p class="muted" id="recipes-stages-modal-subtitle"></p>
-          </div>
-          <button id="recipes-close-stages-modal" class="secondary-button" type="button">Cerrar</button>
-        </div>
-        <div id="recipes-stages-modal-body" style="overflow-y:auto;max-height:65vh"></div>
-        <div class="action-row products-modal-actions" id="recipes-stages-modal-footer">
-          <button id="recipes-stages-edit-btn" class="secondary-button" type="button" hidden>Abrir editor completo</button>
-        </div>
-      </dialog>
-
-      <dialog id="recipes-assignment-dialog" class="modal-card">
-        <form id="recipes-assignment-form" class="root-form" method="dialog" novalidate>
-          <div class="page-header">
-            <div>
-              <h3>Asignar receta a producto</h3>
-              <p class="muted">La receta puede compartirse entre varios productos. La version aplicable por producto seguira visible como no definida explicitamente cuando el modelo no la exponga.</p>
-            </div>
-            <button id="recipes-close-assignment-button" class="secondary-button" type="button">Cerrar</button>
-          </div>
-          <div id="recipes-assignment-message" aria-live="polite"></div>
-          <label><span>Producto</span><select id="recipes-assignment-product" name="productId" required><option value="">Selecciona un producto</option></select></label>
-          <div class="action-row">
-            <button id="recipes-assignment-submit-button" type="submit">Guardar asignacion</button>
-            <button id="recipes-cancel-assignment-button" class="secondary-button" type="button">Cancelar</button>
-          </div>
-        </form>
-      </dialog>
-    `;
+    return recipesRenderers.renderWorkspace();
   }
 
   async function mount(container, session, helpers = {}) {
@@ -228,6 +80,24 @@
     let activeTab = 'summary';
     let editingVersionId = null;
     let recipeBeingAssigned = null;
+
+    const recipesVersionEditor = recipesVersionEditorModule.createVersionEditor({
+      getProducts: () => products,
+      getSelectedRecipeVersions,
+      getEditingVersionId: () => editingVersionId,
+      setEditingVersionId: (value) => {
+        editingVersionId = value;
+      },
+      recipesHelpers,
+      recipesState,
+      rootShellUi,
+      setDialogVisibility,
+      stagesList,
+      versionDialog,
+      versionForm,
+      versionMessage,
+      versionTitle,
+    });
 
     function setDialogVisibility(dialog, shouldOpen) {
       if (!(dialog instanceof globalScope.HTMLDialogElement)) {
@@ -416,230 +286,16 @@
       }
     }
 
-    // ── Dynamic version form helpers ──
-
-    function renderProductOptions(selectedId) {
-      return '<option value="">Selecciona producto</option>' +
-        products.map((p) => {
-          const selected = String(p.id) === String(selectedId) ? ' selected' : '';
-          const label = rootShellUi.escapeHtml(`${p.name || 'Producto'}${p.code ? ' · ' + p.code : ''}`);
-          return `<option value="${rootShellUi.escapeHtml(String(p.id))}"${selected}>${label}</option>`;
-        }).join('');
-    }
-
-    function resolveProductUnit(productId) {
-      if (!productId) { return null; }
-      const found = products.find((p) => String(p.id) === String(productId));
-      return found?.unit || null;
-    }
-
-    function addStageInputRow(inputsContainer, data) {
-      const row = globalScope.document.createElement('div');
-      row.className = 'products-form-grid stage-input-row';
-      row.style.alignItems = 'end';
-      const existingUnit = data.unit || '';
-      const productUnit = resolveProductUnit(data.productId);
-      const effectiveUnit = productUnit || existingUnit;
-      const unitReadonly = Boolean(data.productId && productUnit);
-      row.innerHTML = `
-        <label><span>Producto</span><select class="si-product">${renderProductOptions(data.productId)}</select></label>
-        <label><span>Nombre *</span><input class="si-name" type="text" value="${rootShellUi.escapeHtml(data.name || '')}" required /></label>
-        <label><span>Cantidad</span><input class="si-quantity" type="number" min="0" step="0.001" value="${data.quantity || ''}" /></label>
-        <label><span>Unidad</span><input class="si-unit" type="text" value="${rootShellUi.escapeHtml(effectiveUnit)}" placeholder="kg, L, unidad" ${unitReadonly ? 'readonly aria-readonly="true" title="Unidad heredada del producto"' : ''} /></label>
-        <button type="button" class="secondary-button remove-stage-input-btn" title="Quitar insumo">✕</button>
-      `;
-
-      // Unit inheritance: when product changes, update unit field
-      const productSelect = row.querySelector('.si-product');
-      const unitInput = row.querySelector('.si-unit');
-      productSelect.addEventListener('change', () => {
-        const unit = resolveProductUnit(productSelect.value);
-        if (unit) {
-          unitInput.value = unit;
-          unitInput.readOnly = true;
-          unitInput.setAttribute('aria-readonly', 'true');
-          unitInput.title = 'Unidad heredada del producto';
-        } else {
-          unitInput.readOnly = false;
-          unitInput.removeAttribute('aria-readonly');
-          unitInput.title = '';
-          if (!unitInput.value) { unitInput.value = ''; }
-        }
-      });
-
-      inputsContainer.appendChild(row);
-    }
-
-    function addQaParameterRow(qaContainer, param) {
-      const row = globalScope.document.createElement('div');
-      row.className = 'products-form-grid qa-param-row';
-      row.style.alignItems = 'end';
-      row.innerHTML = `
-        <label><span>Nombre *</span><input class="qp-name" type="text" value="${rootShellUi.escapeHtml(param.name || '')}" required placeholder="pH, Temperatura" /></label>
-        <label><span>Unidad</span><input class="qp-unit" type="text" value="${rootShellUi.escapeHtml(param.unit || '')}" placeholder="pH, ºC, %" maxlength="40" /></label>
-        <label><span>Valor esperado *</span><input class="qp-expected" type="number" step="any" value="${param.expectedValue !== undefined ? param.expectedValue : ''}" required /></label>
-        <label><span>Tol. min (−)</span><input class="qp-min-tol" type="number" step="any" min="0" value="${param.minTolerance !== undefined ? param.minTolerance : '0'}" /></label>
-        <label><span>Tol. max (+)</span><input class="qp-max-tol" type="number" step="any" min="0" value="${param.maxTolerance !== undefined ? param.maxTolerance : '0'}" /></label>
-        <button type="button" class="secondary-button remove-qa-param-btn" title="Quitar parametro QA">✕</button>
-      `;
-      row.querySelector('.remove-qa-param-btn').addEventListener('click', () => {
-        row.remove();
-      });
-      qaContainer.appendChild(row);
-    }
-
-    function addStageSection(data) {
-      const section = globalScope.document.createElement('div');
-      section.className = 'stage-section';
-      section.style.cssText = 'border:1px solid var(--border, #ddd); border-radius:8px; padding:1rem; margin-bottom:0.75rem;';
-      const qaMandatory = Boolean(data.qaMandatory);
-      section.innerHTML = `
-        <div class="products-form-grid">
-          <label><span>Nombre de etapa *</span><input class="stage-name" type="text" required value="${rootShellUi.escapeHtml(data.name || '')}" /></label>
-          <label class="products-checkbox-label"><input class="stage-qa" type="checkbox" ${qaMandatory ? 'checked' : ''} /><span>QA obligatorio</span></label>
-          <label class="products-field-full"><span>Instrucciones</span><textarea class="stage-instructions" rows="2">${rootShellUi.escapeHtml(data.instructions || '')}</textarea></label>
-        </div>
-        <div class="stage-qa-params" style="margin-top:0.75rem;${qaMandatory ? '' : 'display:none'}">
-          <p class="muted" style="margin:0 0 0.5rem"><strong>Parametros QA esperados</strong></p>
-          <div class="qa-params-list stack-section"></div>
-          <p class="qa-params-empty-msg" style="color:var(--color-danger,#c00);font-size:0.85rem;display:none">Debes definir al menos un parametro esperado.</p>
-          <button type="button" class="secondary-button add-qa-param-btn" style="margin-top:0.25rem">+ Añadir parametro</button>
-        </div>
-        <div style="margin-top:0.75rem">
-          <p class="muted" style="margin:0 0 0.5rem"><strong>Insumos de esta etapa</strong></p>
-          <div class="stage-inputs-list stack-section"></div>
-          <button type="button" class="secondary-button add-stage-input-btn" style="margin-top:0.25rem">+ Agregar insumo</button>
-        </div>
-        <button type="button" class="secondary-button remove-stage-btn" style="margin-top:0.5rem">Quitar etapa</button>
-      `;
-      stagesList.appendChild(section);
-
-      const qaCheckbox = section.querySelector('.stage-qa');
-      const qaParamsBlock = section.querySelector('.stage-qa-params');
-      const qaParamsList = section.querySelector('.qa-params-list');
-      const qaEmptyMsg = section.querySelector('.qa-params-empty-msg');
-      const addQaBtn = section.querySelector('.add-qa-param-btn');
-
-      // Toggle QA block on checkbox change
-      qaCheckbox.addEventListener('change', () => {
-        qaParamsBlock.style.display = qaCheckbox.checked ? '' : 'none';
-      });
-
-      addQaBtn.addEventListener('click', () => {
-        addQaParameterRow(qaParamsList, recipesHelpers.buildDefaultQaParameter());
-        if (qaEmptyMsg) { qaEmptyMsg.style.display = 'none'; }
-      });
-
-      // Load existing QA params
-      (data.expectedParameters || []).forEach((param) => addQaParameterRow(qaParamsList, param));
-
-      const inputsContainer = section.querySelector('.stage-inputs-list');
-      (data.stageInputs || []).forEach((si) => addStageInputRow(inputsContainer, si));
-    }
-
-    function collectQaParams(section) {
-      return Array.from(section.querySelectorAll('.qa-param-row')).map((row) => ({
-        name: row.querySelector('.qp-name').value.trim(),
-        unit: row.querySelector('.qp-unit').value.trim() || undefined,
-        expectedValue: Number(row.querySelector('.qp-expected').value),
-        minTolerance: Number(row.querySelector('.qp-min-tol').value || '0'),
-        maxTolerance: Number(row.querySelector('.qp-max-tol').value || '0'),
-      })).filter((p) => p.name);
-    }
-
-    function validateQaParamsInline(section) {
-      const qaMandatory = section.querySelector('.stage-qa')?.checked;
-      if (!qaMandatory) { return true; }
-      const params = collectQaParams(section);
-      const emptyMsg = section.querySelector('.qa-params-empty-msg');
-      if (params.length === 0) {
-        if (emptyMsg) { emptyMsg.style.display = ''; }
-        return false;
-      }
-      if (emptyMsg) { emptyMsg.style.display = 'none'; }
-      return true;
-    }
-
-    function collectStages() {
-      return Array.from(stagesList.querySelectorAll('.stage-section')).map((section) => {
-        const inputRows = section.querySelectorAll('.stage-input-row');
-        const qaMandatory = section.querySelector('.stage-qa').checked;
-        return {
-          name: section.querySelector('.stage-name').value.trim(),
-          instructions: section.querySelector('.stage-instructions').value.trim() || undefined,
-          qaMandatory,
-          expectedParameters: qaMandatory ? collectQaParams(section) : [],
-          stageInputs: Array.from(inputRows).map((row) => ({
-            productId: Number(row.querySelector('.si-product').value) || undefined,
-            name: row.querySelector('.si-name').value.trim(),
-            quantity: Number(row.querySelector('.si-quantity').value) || undefined,
-            unit: row.querySelector('.si-unit').value.trim() || undefined,
-          })).filter((si) => si.name),
-        };
-      }).filter((s) => s.name);
-    }
-
-    // ── Form lifecycle ──
-
     function resetRecipeForm() {
       recipeForm.reset();
       recipeFormTitle.textContent = 'Nueva receta';
       recipeFormMessage.innerHTML = '';
     }
 
-    function resetVersionForm() {
-      versionForm.reset();
-      versionTitle.textContent = editingVersionId ? 'Editar version borrador' : 'Nueva version borrador';
-      versionMessage.innerHTML = '';
-      stagesList.innerHTML = '';
-    }
-
     function openCreateRecipeDialog() {
       resetRecipeForm();
       setDialogVisibility(recipeFormDialog, true);
       recipeFormNameInput.focus();
-    }
-
-    function openCreateVersionDialog() {
-      editingVersionId = null;
-      resetVersionForm();
-      addStageSection({ name: '', stageInputs: [] });
-      setDialogVisibility(versionDialog, true);
-    }
-
-    function openEditVersionDialog(versionId) {
-      const version = getSelectedRecipeVersions().find((entry) => String(entry?.id) === String(versionId));
-      if (!version) {
-        return;
-      }
-
-      editingVersionId = version.id;
-      resetVersionForm();
-      versionTitle.textContent = 'Editar version borrador';
-      versionForm.elements.namedItem('effectiveFrom').value = version.effectiveFrom ? String(version.effectiveFrom).slice(0, 10) : '';
-      versionForm.elements.namedItem('effectiveTo').value = version.effectiveTo ? String(version.effectiveTo).slice(0, 10) : '';
-      versionForm.elements.namedItem('expectedYield').value = version.expectedYield ?? '';
-      versionForm.elements.namedItem('expectedWaste').value = version.expectedWaste ?? '';
-      versionForm.elements.namedItem('yieldTolerancePercent').value = version.yieldTolerancePercent ?? '';
-      versionForm.elements.namedItem('wasteTolerancePercent').value = version.wasteTolerancePercent ?? '';
-      versionForm.elements.namedItem('instructions').value = version.instructions || '';
-      versionForm.elements.namedItem('notes').value = version.notes || '';
-
-      (version.stages || []).forEach((stage) => addStageSection({
-        name: stage.name,
-        instructions: stage.instructions,
-        qaMandatory: Boolean(stage.qaMandatory),
-        expectedParameters: Array.isArray(stage.expectedParameters) ? stage.expectedParameters : [],
-        stageInputs: (stage.stageInputs || []).map((si) => ({
-          productId: si.productId,
-          name: si.name,
-          quantity: si.quantity,
-          unit: si.unit,
-        })),
-      }));
-      if (!version.stages?.length) addStageSection({ name: '', stageInputs: [] });
-
-      setDialogVisibility(versionDialog, true);
     }
 
     function openAssignmentDialog() {
@@ -666,37 +322,6 @@
         recipeType: String(formData.get('recipeType') || '').trim() || undefined,
         isActive: formData.get('isActive') === 'on',
       };
-    }
-
-    function buildVersionPayload(formData) {
-      const stages = collectStages();
-
-      if (!stages.length) {
-        throw new Error('Agrega al menos una etapa.');
-      }
-
-      // QA inline validation: enforce at least 1 parameter when qaMandatory
-      let qaValid = true;
-      stagesList.querySelectorAll('.stage-section').forEach((section) => {
-        if (!validateQaParamsInline(section)) { qaValid = false; }
-      });
-      if (!qaValid) {
-        throw new Error('Una etapa con QA obligatorio requiere al menos un parametro esperado.');
-      }
-
-      const rawValues = {
-        effectiveFrom: parseOptionalDate(formData.get('effectiveFrom')),
-        effectiveTo: parseOptionalDate(formData.get('effectiveTo')),
-        expectedYield: parseOptionalNumber(formData.get('expectedYield')),
-        expectedWaste: parseOptionalNumber(formData.get('expectedWaste')),
-        yieldTolerancePercent: parseOptionalNumber(formData.get('yieldTolerancePercent')),
-        wasteTolerancePercent: parseOptionalNumber(formData.get('wasteTolerancePercent')),
-        instructions: String(formData.get('instructions') || '').trim() || undefined,
-        notes: String(formData.get('notes') || '').trim() || undefined,
-        stages,
-      };
-
-      return recipesState.serializeVersionPayloadFromForm(rawValues);
     }
 
     syncActionVisibility();
@@ -751,7 +376,7 @@
     closeVersionButton.addEventListener('click', () => setDialogVisibility(versionDialog, false));
     cancelVersionButton.addEventListener('click', () => setDialogVisibility(versionDialog, false));
 
-    addStageButton.addEventListener('click', () => addStageSection({ name: '', stageInputs: [] }));
+    addStageButton.addEventListener('click', () => recipesVersionEditor.addStageSection({ name: '', stageInputs: [] }));
 
     versionDialog.addEventListener('click', (event) => {
       const target = event.target;
@@ -770,7 +395,7 @@
       }
       if (target.classList.contains('add-stage-input-btn')) {
         const inputsContainer = target.closest('.stage-section')?.querySelector('.stage-inputs-list');
-        if (inputsContainer) addStageInputRow(inputsContainer, {});
+        if (inputsContainer) recipesVersionEditor.addStageInputRow(inputsContainer, {});
       }
     });
     closeAssignmentButton.addEventListener('click', () => setDialogVisibility(assignmentDialog, false));
@@ -799,7 +424,11 @@
 
       let payload;
       try {
-        payload = buildVersionPayload(new globalScope.FormData(versionForm));
+        payload = recipesVersionEditor.buildVersionPayload(
+          new globalScope.FormData(versionForm),
+          parseOptionalDate,
+          parseOptionalNumber,
+        );
       } catch (error) {
         versionMessage.innerHTML = rootShellUi.renderInlineMessage(error.message, 'error');
         return;
@@ -865,7 +494,7 @@
 
       const createVersionButton = target instanceof HTMLElement ? target.closest('#recipes-open-create-version-button') : null;
       if (createVersionButton instanceof globalScope.HTMLButtonElement) {
-        openCreateVersionDialog();
+        recipesVersionEditor.openCreateVersionDialog();
         return;
       }
 
@@ -879,7 +508,7 @@
       if (editVersionButton instanceof globalScope.HTMLButtonElement) {
         const versionId = editVersionButton.getAttribute('data-edit-recipe-version');
         if (versionId) {
-          openEditVersionDialog(versionId);
+          recipesVersionEditor.openEditVersionDialog(versionId);
         }
         return;
       }
@@ -918,7 +547,7 @@
           stagesModalEditBtn.hidden = !isDraft || !permissions.canManageRecipes;
           stagesModalEditBtn.onclick = () => {
             setDialogVisibility(stagesModal, false);
-            openEditVersionDialog(versionId);
+            recipesVersionEditor.openEditVersionDialog(versionId);
           };
         }
 

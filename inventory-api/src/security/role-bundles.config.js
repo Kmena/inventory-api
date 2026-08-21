@@ -3,6 +3,7 @@ const ROLE_BUNDLES = Object.freeze([
     id: 'warehouse_operator',
     label: 'Operador de bodega',
     status: 'proposed',
+    landing: 'warehouse.access',
     basePermissionCodes: Object.freeze([
       'warehouse.access',
       'products.view',
@@ -22,6 +23,7 @@ const ROLE_BUNDLES = Object.freeze([
     id: 'production_operator',
     label: 'Operador de producción',
     status: 'proposed',
+    landing: 'warehouse.access',
     basePermissionCodes: Object.freeze([
       'warehouse.access',
       'production.view',
@@ -39,6 +41,7 @@ const ROLE_BUNDLES = Object.freeze([
     id: 'qa_inspector',
     label: 'Inspector de calidad',
     status: 'proposed',
+    landing: 'warehouse.access',
     basePermissionCodes: Object.freeze([
       'warehouse.access',
       'quality.view',
@@ -55,7 +58,9 @@ const ROLE_BUNDLES = Object.freeze([
     id: 'procurement_operator',
     label: 'Operador de abastecimiento',
     status: 'proposed',
+    landing: 'root.access',
     basePermissionCodes: Object.freeze([
+      'root.access',
       'procurement.view',
       'procurement.manage',
       'suppliers.view',
@@ -72,7 +77,9 @@ const ROLE_BUNDLES = Object.freeze([
     id: 'sales_agent',
     label: 'Agente comercial',
     status: 'proposed',
+    landing: 'agent.access',
     basePermissionCodes: Object.freeze([
+      'agent.access',
       'clients.view',
       'sales.orders.create',
       'sales.routes.view.own',
@@ -92,7 +99,9 @@ const ROLE_BUNDLES = Object.freeze([
     id: 'sales_supervisor',
     label: 'Supervisor comercial',
     status: 'proposed',
+    landing: 'root.access',
     basePermissionCodes: Object.freeze([
+      'root.access',
       'clients.view',
       'clients.view.all',
       'clients.manage',
@@ -117,7 +126,9 @@ const ROLE_BUNDLES = Object.freeze([
     id: 'company_admin',
     label: 'Administrador de empresa',
     status: 'proposed',
+    landing: 'root.access',
     basePermissionCodes: Object.freeze([
+      'root.access',
       'users.manage',
       'settings.manage',
       'recipes.view',
@@ -140,6 +151,7 @@ const ROLE_BUNDLES = Object.freeze([
     id: 'platform_root',
     label: 'Root de plataforma',
     status: 'proposed',
+    landing: null, // Excepción gobernada: root global usa regla platform inmutable
     basePermissionCodes: Object.freeze(['companies.manage']),
     allowedAdditions: Object.freeze([]),
     sensitiveAdditions: Object.freeze(['companies.manage']),

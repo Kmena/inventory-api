@@ -212,6 +212,8 @@ model Company {
   email         String?
   address       String?
   isActive      Boolean       @default(true) @map("is_active")
+  /// Porcentaje de tolerancia de sobre-consumo de materias primas en producción. Default: 5.00%.
+  productionConsumptionTolerancePercent Decimal @default(5.00) @map("production_consumption_tolerance_percent") @db.Decimal(5, 2)
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
   users         User[]

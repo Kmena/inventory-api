@@ -6,6 +6,7 @@ const { createHttpError } = require('../lib/errors');
 const audit = require('../lib/audit');
 const { attachAuthenticatedActor } = require('../lib/request-context');
 const browserSessionService = require('./browser-session.service');
+const { resolveLanding } = require('../security/permission-governance.service');
 
 function mapPermissions(role) {
   return role?.rolePermissions
@@ -14,11 +15,17 @@ function mapPermissions(role) {
 }
 
 function buildSerializedUser(user) {
+  const permissions = mapPermissions(user.role);
+  const roleCode = user.role?.code || null;
+  const companyId = user.companyId ? user.companyId.toString() : null;
+
+  const landing = resolveLanding(permissions, { role: roleCode, companyId });
+
   return {
     id: user.id.toString(),
     fullName: user.fullName,
     username: user.username,
-    companyId: user.companyId ? user.companyId.toString() : null,
+    companyId,
     status: user.status,
     role: user.role
       ? {
@@ -32,7 +39,8 @@ function buildSerializedUser(user) {
         id: user.company.id ? user.company.id.toString() : undefined,
       }
       : null,
-    permissions: mapPermissions(user.role),
+    permissions,
+    landing,
   };
 }
 

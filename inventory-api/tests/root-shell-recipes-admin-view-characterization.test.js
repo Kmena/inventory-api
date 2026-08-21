@@ -33,8 +33,9 @@ test('recipesAdmin render exposes administrative workspace instead of introducto
   browserWindow.RootShell.register('ui', { escapeHtml: (v) => String(v || ''), formatDate: () => '01/01/2026', renderInlineMessage: () => '', renderStatusBadge: () => '' });
   browserWindow.RootShell.register('sessionAdapter', {});
   browserWindow.RootShell.register('views.recipesAdminHelpers', {});
-  browserWindow.RootShell.register('views.recipesAdminRenderers', {});
+  browserWindow.RootShell.register('views.recipesAdminRenderers', { renderWorkspace: () => '<section>Catalogo administrativo de recetas<div id="recipes-list-region"></div><div id="recipes-detail-region"></div>Nueva recetaAsignar receta a producto</section>' });
   browserWindow.RootShell.register('views.recipesAdminState', {});
+  browserWindow.RootShell.register('views.recipesAdminVersionEditor', {});
 
   executeRootScript(path.join('views', 'recipes-admin.js'), context);
 
@@ -95,4 +96,13 @@ test('recipes admin state and renderers keep shared-recipe and version-ambiguity
   assert.match(detailMarkup, /Compartida por 2 productos/);
   assert.match(detailMarkup, /No definida explicitamente/);
   assert.match(detailMarkup, /Asignar a producto/);
+});
+
+test('recipes admin version editor module remains registered as dedicated task-010 split seam', () => {
+  const source = readRootFile(path.join('views', 'recipes-admin.version-editor.js'));
+
+  assert.match(source, /rootShell\.register\('views\.recipesAdminVersionEditor'/);
+  assert.match(source, /buildStageInputPatchFromProduct/);
+  assert.match(source, /Debes definir al menos un parametro esperado/);
+  assert.match(source, /expectedParameters/);
 });

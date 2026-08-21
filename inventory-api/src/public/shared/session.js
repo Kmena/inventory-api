@@ -34,6 +34,15 @@
       ? user.permissions.filter((permission) => typeof permission === 'string' && permission.trim())
       : [];
 
+    const landing = user.landing && typeof user.landing === 'object'
+      ? {
+        target: typeof user.landing.target === 'string' ? user.landing.target : null,
+        path: typeof user.landing.path === 'string' ? user.landing.path : null,
+        source: typeof user.landing.source === 'string' ? user.landing.source : null,
+        permissionCode: typeof user.landing.permissionCode === 'string' ? user.landing.permissionCode : null,
+      }
+      : null;
+
     return {
       id: typeof user.id === 'string' ? user.id : null,
       fullName: typeof user.fullName === 'string' ? user.fullName : '',
@@ -43,6 +52,7 @@
         code: typeof user.role?.code === 'string' ? user.role.code : null,
       },
       permissions,
+      landing,
     };
   }
 

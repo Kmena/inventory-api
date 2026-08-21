@@ -160,6 +160,30 @@ async function registerRootCompanyBootstrap(payload, options = {}, db = prisma) 
   });
 }
 
+/**
+ * Returns the production consumption tolerance percent for a given company.
+ * This replaces the hardcoded CONSUMPTION_TOLERANCE_PERCENT = 0.05 constant
+ * (DEC-002: tolerancia persistida en companies).
+ *
+ * @param {bigint} companyId
+ * @param {import('@prisma/client').PrismaClient} [db]
+ * @returns {Promise<number>} Tolerance as a percentage (e.g. 5.00 means 5%)
+ */
+async function getProductionConsumptionTolerance(companyId, db = prisma) {
+  const company = await db.company.findUnique({
+    where: { id: companyId },
+    select: { productionConsumptionTolerancePercent: true },
+  });
+
+  const rawValue = company?.productionConsumptionTolerancePercent;
+  if (rawValue === null || rawValue === undefined) {
+    return 5.00;
+  }
+
+  const numericValue = Number(rawValue);
+  return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : 5.00;
+}
+
 module.exports = {
   defaultClientClassifications,
   findUserByUsername,
@@ -169,4 +193,5 @@ module.exports = {
   updateCompanyStatus,
   findCompanyExecutiveDashboard,
   registerRootCompanyBootstrap,
+  getProductionConsumptionTolerance,
 };

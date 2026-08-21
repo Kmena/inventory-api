@@ -5,6 +5,7 @@ const productionExecutionService = require('../src/services/production-execution
 const productionRepository = require('../src/repositories/production.repository');
 const inventoryRepository = require('../src/repositories/inventory.repository');
 const inventoryTransactionSupport = require('../src/services/inventory-transaction-support.service');
+const companyRepository = require('../src/repositories/company.repository');
 
 const { __private__ } = productionExecutionService;
 
@@ -59,6 +60,9 @@ function withPatchedDependencies(overrides, callback) {
     changeWarehouseStock: inventoryTransactionSupport.changeWarehouseStock,
     changeLotStock: inventoryTransactionSupport.changeLotStock,
     createMovement: inventoryTransactionSupport.createMovement,
+    // DEC-002: getProductionConsumptionTolerance is now called before the transaction;
+    // unit tests must stub this to avoid hitting the real DB column (migration not yet applied).
+    getProductionConsumptionTolerance: companyRepository.getProductionConsumptionTolerance,
   };
 
   Object.assign(inventoryRepository, {
@@ -81,6 +85,11 @@ function withPatchedDependencies(overrides, callback) {
     changeWarehouseStock: overrides.changeWarehouseStock || originals.changeWarehouseStock,
     changeLotStock: overrides.changeLotStock || originals.changeLotStock,
     createMovement: overrides.createMovement || originals.createMovement,
+  });
+  // Stub the company repository's tolerance function with a default 5% unless overridden.
+  Object.assign(companyRepository, {
+    getProductionConsumptionTolerance: overrides.getProductionConsumptionTolerance
+      || (async () => 5.00),
   });
 
   return Promise.resolve()
@@ -107,6 +116,9 @@ function withPatchedDependencies(overrides, callback) {
         changeLotStock: originals.changeLotStock,
         createMovement: originals.createMovement,
       });
+      Object.assign(companyRepository, {
+        getProductionConsumptionTolerance: originals.getProductionConsumptionTolerance,
+      });
     });
 }
 
@@ -119,6 +131,52 @@ test('assertStagePrerequisites rejects stage execution when a previous stage is 
   );
 });
 
+// TASK-008: QA gate — blocks next stage when previous stage has qaMandatory and no approved QA
+test('assertStagePrerequisites blocks next stage when previous stage has qaMandatory and no approved QA (TASK-008)', () => {
+  const order = buildOrder({
+    // Stage 101 (Mezcla) has qaMandatory: true but no approved QA inspection
+    stageExecutions: [
+      {
+        id: 901n,
+        recipeStageId: 101n,
+        stageOrder: 0,
+        stageName: 'Mezcla',
+        endedAt: new Date('2026-08-20T08:30:00.000Z'),
+        qualityInspections: [], // no inspections
+      },
+    ],
+  });
+
+  assert.throws(
+    () => __private__.assertStagePrerequisites(order, 102n),
+    (error) => error?.statusCode === 409 && error?.subCode === 'stage_qa_pending',
+    'Must block next stage when previous qaMandatory stage has no approved QA',
+  );
+});
+
+test('assertStagePrerequisites allows next stage when previous qaMandatory stage has approved QA (TASK-008)', () => {
+  const order = buildOrder({
+    stageExecutions: [
+      {
+        id: 901n,
+        recipeStageId: 101n,
+        stageOrder: 0,
+        stageName: 'Mezcla',
+        endedAt: new Date('2026-08-20T08:30:00.000Z'),
+        qualityInspections: [
+          { id: 1001n, result: 'APPROVED' }, // approved QA
+        ],
+      },
+    ],
+  });
+
+  // Should NOT throw — previous stage has approved QA
+  assert.doesNotThrow(
+    () => __private__.assertStagePrerequisites(order, 102n),
+    'Must allow next stage when previous stage has approved QA inspection',
+  );
+});
+
 test('validateConsumptionAgainstRequirement rejects over-consumption without override permission', () => {
   const order = buildOrder();
 
@@ -126,6 +184,97 @@ test('validateConsumptionAgainstRequirement rejects over-consumption without ove
     () => __private__.validateConsumptionAgainstRequirement(order, [{ productId: 31n, quantity: 10.6 }], auth, null),
     (error) => error?.statusCode === 409 && error?.subCode === 'consumption_exceeds_requirement',
   );
+});
+
+// TASK-014: tolerancia configurable por empresa leída desde BD
+test('validateConsumptionAgainstRequirement uses company tolerancePercent from DB (TASK-014)', () => {
+  const order = buildOrder();
+
+  // Con tolerancia 2% (más estricta que el default 5%), 10.21 debe fallar
+  assert.throws(
+    () => __private__.validateConsumptionAgainstRequirement(order, [{ productId: 31n, quantity: 10.21 }], auth, null, 2.0),
+    (error) => error?.statusCode === 409 && error?.subCode === 'consumption_exceeds_requirement',
+    'With 2% tolerance, 10.21 on requirement of 10 must be rejected',
+  );
+
+  // Con tolerancia 10% (más permisiva), 10.9 debe pasar sin override
+  const result = __private__.validateConsumptionAgainstRequirement(
+    order,
+    [{ productId: 31n, quantity: 10.9 }],
+    auth,
+    null,
+    10.0, // 10% tolerance: allows up to 11.0
+  );
+  assert.equal(result.exceededProducts.length, 0, 'With 10% tolerance, 10.9 must be accepted');
+  assert.equal(result.tolerancePercent, 10.0);
+});
+
+test('validateConsumptionAgainstRequirement falls back to 5% when tolerancePercent is undefined (TASK-014)', () => {
+  const order = buildOrder();
+
+  // 10.5 + epsilon barely exceeds 5% tolerance (allowed is 10.5)
+  const resultWithDefault = __private__.validateConsumptionAgainstRequirement(
+    order,
+    [{ productId: 31n, quantity: 10.4 }], // within 5% → ok
+    auth,
+    null,
+    undefined, // no tolerancePercent → fallback to 5%
+  );
+  assert.equal(resultWithDefault.tolerancePercent, 5.00, 'Must fallback to 5.00% when tolerancePercent is undefined');
+  assert.equal(resultWithDefault.exceededProducts.length, 0);
+});
+
+test('executeProductionStage reads tolerance from companyRepository before transaction (TASK-014)', async () => {
+  const toleranceCalls = [];
+  const createdExecutions = [];
+
+  await withPatchedDependencies({
+    getProductionConsumptionTolerance: async (companyId) => {
+      toleranceCalls.push(companyId);
+      return 3.00; // custom 3% tolerance
+    },
+    transaction: async (work) => work({}),
+    acquireCompanyInventoryAdvisoryLock: async () => {},
+    findProductionOrderById: async () => buildOrder(),
+    createProductionStageExecution: async (data) => {
+      createdExecutions.push(data);
+      return { id: 903n, ...data, consumptions: [], wastes: [], returns: [], qualityInspections: [], createdAt: new Date(), updatedAt: new Date() };
+    },
+    findProductionStageExecutionById: async () => ({
+      id: 903n,
+      productionOrderId: 501n,
+      recipeStageId: 101n,
+      stageOrder: 0,
+      stageName: 'Mezcla',
+      responsibleUserId: 99n,
+      qaOutOfTolerance: false,
+      overrideJustification: null,
+      actualParameters: null,
+      evidence: [],
+      notes: null,
+      movementGroupId: 'group-tolerance',
+      consumptions: [],
+      wastes: [],
+      returns: [],
+      qualityInspections: [],
+      startedAt: new Date('2026-08-20T08:00:00.000Z'),
+      endedAt: new Date('2026-08-20T08:30:00.000Z'),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }),
+  }, async () => {
+    await productionExecutionService.executeProductionStage(501n, 101n, {
+      startedAt: new Date('2026-08-20T08:00:00.000Z'),
+      endedAt: new Date('2026-08-20T08:30:00.000Z'),
+      evidence: [],
+      consumptions: [],
+      waste: [],
+    }, overrideAuth);
+
+    // Repository must be called once before the transaction
+    assert.equal(toleranceCalls.length, 1, 'getProductionConsumptionTolerance must be called once');
+    assert.equal(toleranceCalls[0], 7n, 'Must be called with companyId from auth');
+  });
 });
 
 test('validateQaMeasurements rejects out-of-tolerance values without override', () => {

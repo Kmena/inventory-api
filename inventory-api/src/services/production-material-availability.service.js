@@ -38,37 +38,43 @@ function compareByDateKey(leftValue, rightValue, fallback) {
   return leftKey.localeCompare(rightKey);
 }
 
-function sortLotsForAvailability(items, requiresExpiration) {
-  if (requiresExpiration) {
-    return [...sortLotsByFefo(items)].sort((left, right) => {
-      const expirationCompare = compareByDateKey(
-        left.lot?.expirationDate,
-        right.lot?.expirationDate,
-        '9999-12-31',
-      );
-
-      if (expirationCompare !== 0) {
-        return expirationCompare;
-      }
-
-      const entryCompare = compareByDateKey(
-        left.lot?.entryDate,
-        right.lot?.entryDate,
-        '9999-12-31',
-      );
-
-      return entryCompare || Number(left.id - right.id);
-    });
-  }
-
+/**
+ * Sorts warehouse lot stocks using FEFO/FIFO policy per DEC-003:
+ * - Lots WITH expirationDate → sorted by expirationDate ASC (FEFO), then entryDate ASC
+ * - Lots WITHOUT expirationDate → sorted by entryDate ASC (FIFO)
+ * - Mixed sets: lots with expiration come before lots without expiration.
+ *
+ * The decision is made per-lot based on the lot's actual expirationDate field,
+ * not on the product's requiresExpiration flag.
+ *
+ * @param {Array<{id?: bigint, lot?: {expirationDate?: Date|null, entryDate?: Date|null}}>} items
+ * @returns {Array}
+ */
+function sortLotsForAvailability(items) {
   return [...items].sort((left, right) => {
-    const entryCompare = compareByDateKey(
-      left.lot?.entryDate,
-      right.lot?.entryDate,
-      '9999-12-31',
-    );
+    const leftExpiry = left.lot?.expirationDate ?? null;
+    const rightExpiry = right.lot?.expirationDate ?? null;
 
-    return entryCompare || Number(left.id - right.id);
+    const leftHasExpiry = leftExpiry !== null && leftExpiry !== undefined;
+    const rightHasExpiry = rightExpiry !== null && rightExpiry !== undefined;
+
+    // Both have expiration date → FEFO: compare by expirationDate ASC, then entryDate ASC
+    if (leftHasExpiry && rightHasExpiry) {
+      const expirationCompare = compareByDateKey(leftExpiry, rightExpiry, '9999-12-31');
+      if (expirationCompare !== 0) return expirationCompare;
+      return compareByDateKey(left.lot?.entryDate, right.lot?.entryDate, '9999-12-31')
+        || Number(left.id - right.id);
+    }
+
+    // Only left has expiration → left is more urgent, comes first
+    if (leftHasExpiry && !rightHasExpiry) return -1;
+
+    // Only right has expiration → right is more urgent, comes first
+    if (!leftHasExpiry && rightHasExpiry) return 1;
+
+    // Neither has expiration → FIFO: compare by entryDate ASC
+    return compareByDateKey(left.lot?.entryDate, right.lot?.entryDate, '9999-12-31')
+      || Number(left.id - right.id);
   });
 }
 
@@ -180,7 +186,8 @@ async function getAvailableLotsForStage(orderId, stageId, auth) {
       product.id,
     );
     const sellableLotStocks = reservableLotStocks.filter((stock) => deriveLotUsability(stock.lot).sellable);
-    const sortedLots = sortLotsForAvailability(sellableLotStocks, Boolean(product.requiresExpiration));
+    // DEC-003: FEFO cuando hay vencimiento, FIFO cuando no — decisión por lote.
+    const sortedLots = sortLotsForAvailability(sellableLotStocks);
 
     productsWithLots.push({
       productId: product.id,

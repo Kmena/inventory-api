@@ -57,6 +57,7 @@ function createCompanyRole(overrides = {}) {
     companyId: 1n,
     isActive: true,
     rolePermissions: [
+      { isEnabled: true, permission: { code: 'root.access', isActive: true } },
       { isEnabled: true, permission: { code: 'inventory.manage', isActive: true } },
       { isEnabled: true, permission: { code: 'inventory.view', isActive: true } },
     ],
@@ -76,6 +77,7 @@ test('updateCompanyRole updates permissions for a valid company role and invalid
           throw new Error('findRoleById should not be used for company-owned success lookup');
         },
         findActivePermissions: async () => [
+          { code: 'root.access' },
           { code: 'inventory.manage' },
           { code: 'inventory.view' },
           { code: 'sales.manage' },
@@ -85,6 +87,7 @@ test('updateCompanyRole updates permissions for a valid company role and invalid
           return {
             ...createCompanyRole(),
             rolePermissions: [
+              { isEnabled: true, permission: { code: 'root.access', isActive: true } },
               { isEnabled: true, permission: { code: 'inventory.manage', isActive: true } },
               { isEnabled: true, permission: { code: 'sales.manage', isActive: true } },
             ],
@@ -111,14 +114,14 @@ test('updateCompanyRole updates permissions for a valid company role and invalid
     async () => {
       const result = await roleService.updateCompanyRole(
         '10',
-        { permissionCodes: ['inventory.manage', 'sales.manage'] },
+        { permissionCodes: ['root.access', 'inventory.manage', 'sales.manage'] },
         { companyId: '1', roleId: '99' },
         createRequest(),
       );
 
       assert.equal(result.name, 'Operaciones');
-      assert.equal(result.permissions.length, 2);
-      assert.deepEqual(updatedArgs.permissionCodes, ['inventory.manage', 'sales.manage']);
+      assert.equal(result.permissions.length, 3);
+      assert.deepEqual(updatedArgs.permissionCodes, ['root.access', 'inventory.manage', 'sales.manage']);
       assert.deepEqual(invalidationArgs.userIds, [71n, 72n]);
       assert.equal(invalidationArgs.options.reasonCode, 'role_permission_change');
       assert.equal(invalidationArgs.options.metadata.roleId, '10');
@@ -284,6 +287,7 @@ test('updateCompanyRole prevents self-lockout by blocking removal of administrat
           throw new Error('findRoleById should not be used when company-scoped role exists');
         },
         findActivePermissions: async () => [
+          { code: 'root.access' },
           { code: 'inventory.manage' },
           { code: 'settings.manage' },
         ],
@@ -293,7 +297,7 @@ test('updateCompanyRole prevents self-lockout by blocking removal of administrat
       await assert.rejects(
         () => roleService.updateCompanyRole(
           '50',
-          { permissionCodes: ['inventory.manage'] },
+          { permissionCodes: ['root.access', 'inventory.manage'] },
           { companyId: '1', roleId: '50' },
         ),
         (error) => {
@@ -316,6 +320,7 @@ test('updateCompanyRole allows editing own role when protected permissions are k
           throw new Error('findRoleById should not be used when company-scoped role exists');
         },
         findActivePermissions: async () => [
+          { code: 'root.access' },
           { code: 'inventory.manage' },
           { code: 'settings.manage' },
           { code: 'users.manage' },
@@ -323,6 +328,7 @@ test('updateCompanyRole allows editing own role when protected permissions are k
         updateCompanyRolePermissions: async () => ({
           ...createCompanyRole({ id: 50n }),
           rolePermissions: [
+            { isEnabled: true, permission: { code: 'root.access', isActive: true } },
             { isEnabled: true, permission: { code: 'settings.manage', isActive: true } },
             { isEnabled: true, permission: { code: 'users.manage', isActive: true } },
             { isEnabled: true, permission: { code: 'inventory.manage', isActive: true } },
@@ -346,11 +352,11 @@ test('updateCompanyRole allows editing own role when protected permissions are k
     async () => {
       const result = await roleService.updateCompanyRole(
         '50',
-        { permissionCodes: ['settings.manage', 'users.manage', 'inventory.manage'] },
+        { permissionCodes: ['root.access', 'settings.manage', 'users.manage', 'inventory.manage'] },
         { companyId: '1', roleId: '50' },
         createRequest(),
       );
-      assert.equal(result.permissions.length, 3);
+      assert.equal(result.permissions.length, 4);
     },
   );
 });
@@ -365,10 +371,11 @@ test('updateCompanyRole skips targeted invalidation when no active users are ass
         findRoleById: async () => {
           throw new Error('findRoleById should not be used when company-scoped role exists');
         },
-        findActivePermissions: async () => [{ code: 'inventory.manage' }],
+        findActivePermissions: async () => [{ code: 'root.access' }, { code: 'inventory.manage' }],
         updateCompanyRolePermissions: async () => ({
           ...createCompanyRole(),
           rolePermissions: [
+            { isEnabled: true, permission: { code: 'root.access', isActive: true } },
             { isEnabled: true, permission: { code: 'inventory.manage', isActive: true } },
           ],
         }),
@@ -389,11 +396,11 @@ test('updateCompanyRole skips targeted invalidation when no active users are ass
     async () => {
       const result = await roleService.updateCompanyRole(
         '10',
-        { permissionCodes: ['inventory.manage'] },
+        { permissionCodes: ['root.access', 'inventory.manage'] },
         { companyId: '1', roleId: '99' },
         createRequest(),
       );
-      assert.equal(result.permissions.length, 1);
+      assert.equal(result.permissions.length, 2);
       assert.equal(invalidationCallCount, 0);
     },
   );
@@ -409,12 +416,13 @@ test('updateCompanyRole returns store-unavailable semantics when role persistenc
         findRoleById: async () => {
           throw new Error('findRoleById should not be used when company-scoped role exists');
         },
-        findActivePermissions: async () => [{ code: 'inventory.manage' }],
+        findActivePermissions: async () => [{ code: 'root.access' }, { code: 'inventory.manage' }],
         updateCompanyRolePermissions: async () => {
           persistenceCompleted = true;
           return {
             ...createCompanyRole(),
             rolePermissions: [
+              { isEnabled: true, permission: { code: 'root.access', isActive: true } },
               { isEnabled: true, permission: { code: 'inventory.manage', isActive: true } },
             ],
           };
@@ -439,7 +447,7 @@ test('updateCompanyRole returns store-unavailable semantics when role persistenc
       await assert.rejects(
         () => roleService.updateCompanyRole(
           '10',
-          { permissionCodes: ['inventory.manage'] },
+          { permissionCodes: ['root.access', 'inventory.manage'] },
           { companyId: '1', roleId: '99' },
           createRequest(),
         ),
@@ -464,12 +472,13 @@ test('updateCompanyRole deduplicates permission codes', async () => {
         findRoleById: async () => {
           throw new Error('findRoleById should not be used when company-scoped role exists');
         },
-        findActivePermissions: async () => [{ code: 'inventory.manage' }],
+        findActivePermissions: async () => [{ code: 'root.access' }, { code: 'inventory.manage' }],
         updateCompanyRolePermissions: async (args) => {
           updatedArgs = args;
           return {
             ...createCompanyRole(),
             rolePermissions: [
+              { isEnabled: true, permission: { code: 'root.access', isActive: true } },
               { isEnabled: true, permission: { code: 'inventory.manage', isActive: true } },
             ],
           };
@@ -485,11 +494,11 @@ test('updateCompanyRole deduplicates permission codes', async () => {
     async () => {
       await roleService.updateCompanyRole(
         '10',
-        { permissionCodes: ['inventory.manage', 'inventory.manage', 'inventory.manage'] },
+        { permissionCodes: ['root.access', 'inventory.manage', 'inventory.manage', 'inventory.manage'] },
         { companyId: '1', roleId: '99' },
         createRequest(),
       );
-      assert.deepEqual(updatedArgs.permissionCodes, ['inventory.manage']);
+      assert.deepEqual(updatedArgs.permissionCodes, ['root.access', 'inventory.manage']);
     },
   );
 });
