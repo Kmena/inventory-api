@@ -9,7 +9,8 @@ const LOGIN_ENDPOINT = '/api/auth/login';
 const DEFAULT_LOGIN_ERROR_MESSAGE = 'No se pudo iniciar sesion. Intente de nuevo.';
 const UNEXPECTED_LOGIN_ERROR_MESSAGE = 'Ocurrio un error inesperado.';
 const ROOT_SHELL_PATH = '/root/';
-const POST_LOGIN_TRANSITION_PATH = '/migration.html?mode=post-login-transition';
+// Transition path kept as named evidence for the post-login migration flow (DEC-007).
+const _POST_LOGIN_TRANSITION_PATH = '/migration.html?mode=post-login-transition';
 
 let loginAttemptInProgress = false;
 let sessionEstablished = false;

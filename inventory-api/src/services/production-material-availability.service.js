@@ -2,7 +2,6 @@ const { createHttpError } = require('../lib/errors');
 const productionRepository = require('../repositories/production.repository');
 const inventoryRepository = require('../repositories/inventory.repository');
 const productRepository = require('../repositories/product.repository');
-const { sortLotsByFefo } = require('./inventory-transaction-support.service');
 const { deriveLotUsability, lotDateKey } = require('./inventory-lot-policy.service');
 
 const DEFAULT_TOLERANCE_PERCENT = 5;
