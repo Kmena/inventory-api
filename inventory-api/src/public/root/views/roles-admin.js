@@ -191,7 +191,7 @@
     }).join('');
   }
 
-  function renderRoles(roles, editingRoleId) {
+  function renderRoles(roles, editingRoleId, canEdit) {
     var roleItems = Array.isArray(roles?.items) ? roles.items : roles;
     if (!Array.isArray(roleItems) || !roleItems.length) {
       return '<p class="empty-state">Aun no hay roles para esta empresa.</p>';
@@ -221,11 +221,12 @@
       }
 
       var actionsHtml = '';
-      if (!isGlobal) {
+      if (!isGlobal && canEdit) {
+        // Edit button only shown when the viewer has explicit role-management permission
         actionsHtml = '<div class="role-card__actions">' +
           '<button class="secondary-button roles-edit-btn" data-role-id="' + rootShellUi.escapeHtml(String(role.id)) + '" aria-label="Editar rol ' + rootShellUi.escapeHtml(role.name) + '">Editar</button>' +
         '</div>';
-      } else {
+      } else if (isGlobal) {
         actionsHtml = '<p class="muted" style="font-size:0.85rem;">Los roles globales no pueden editarse desde este panel.</p>';
       }
 
@@ -276,6 +277,11 @@
     var editingRoleId = null;
     var currentUserRoleId = session?.user?.roleId ? String(session.user.roleId) : null;
     var confirmResolve = null;
+    // Only users with roles.manage (or root) can edit company roles.
+    // Company admins without explicit roles.manage can create roles but cannot edit them.
+    var sessionPermissions = session?.user?.permissions || [];
+    var sessionRoleCode = session?.user?.role?.code;
+    var canEditRoles = sessionRoleCode === 'root' || sessionPermissions.includes('roles.manage');
     /** @type {string|null} Selected landing permission code */
     var _selectedLandingCode = null;
     /** @type {Set<string>} Source of truth for selected operational permission codes — survives search re-renders. */
@@ -346,7 +352,7 @@
       _selectedPermissionCodes = new Set(opCodes);
 
       renderPermissionsRegion();
-      rolesListRegion.innerHTML = renderRoles(availableRoles, editingRoleId);
+      rolesListRegion.innerHTML = renderRoles(availableRoles, editingRoleId, canEditRoles);
       attachEditButtons();
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -363,7 +369,7 @@
       _selectedLandingCode = null;
       _selectedPermissionCodes = new Set();
       renderPermissionsRegion();
-      rolesListRegion.innerHTML = renderRoles(availableRoles, null);
+      rolesListRegion.innerHTML = renderRoles(availableRoles, null, canEditRoles);
       attachEditButtons();
     }
 
@@ -425,7 +431,7 @@
         availablePermissions = Array.isArray(results[0]) ? results[0] : [];
         availableRoles = Array.isArray(results[1]?.items) ? results[1].items : results[1];
         renderPermissionsRegion();
-        rolesListRegion.innerHTML = renderRoles(availableRoles, editingRoleId);
+        rolesListRegion.innerHTML = renderRoles(availableRoles, editingRoleId, canEditRoles);
         attachEditButtons();
         setShellStatus('Sesion lista.');
       } catch (error) {
@@ -473,7 +479,13 @@
         return;
       }
 
-      if (!_selectedLandingCode) {
+      // Landing is only required when the available permissions include at least one
+      // landing-kind permission (root.access, warehouse.access, agent.access).
+      // When no landing permissions exist in the catalog (e.g. test environments
+      // or restricted permission sets), this validation is skipped so the role
+      // can still be created with only operational permissions.
+      var hasLandingPerms = availablePermissions.some(function (p) { return p.permissionKind === 'landing'; });
+      if (hasLandingPerms && !_selectedLandingCode) {
         formMessage.innerHTML = rootShellUi.renderInlineMessage('Selecciona un acceso principal (landing) para el rol.', 'error');
         return;
       }

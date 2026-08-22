@@ -182,24 +182,20 @@ function redirectToSessionHome(session) {
 
 async function restoreExistingSession() {
   const loginReasonMessage = getLoginReasonMessage();
+  // Only trust the stored session when there is no explicit reason to re-authenticate
+  // (e.g. session-expired forces the user to log in again).
   const shouldTrustStoredSession = !loginReasonMessage || loginReasonMessage === 'Sesion cerrada correctamente.';
   const existingSession = shouldTrustStoredSession ? readStoredSession() : null;
   if (existingSession?.user) {
     redirectToSessionHome(existingSession);
     return;
   }
-
-  try {
-    const bootstrappedSession = await inventoryAuth.bootstrapSession();
-    if (bootstrappedSession?.user) {
-      sessionEstablished = true;
-      redirectToSessionHome(bootstrappedSession);
-    }
-  } catch (_error) {
-    if (!loginAttemptInProgress && !sessionEstablished) {
-      inventorySession.clear();
-    }
-  }
+  // State cookie is the authoritative session source on the login page.
+  // We do NOT call bootstrapSession() here because:
+  //  - The login page is the starting point; users who lack a state cookie must log in.
+  //  - Calling /api/auth/me from the login page can cause unexpected redirects when
+  //    a server-side session exists but the browser state was intentionally cleared.
+  // All subsequent navigations within authenticated shells will validate with the API.
 }
 
 const loginReasonMessage = getLoginReasonMessage();

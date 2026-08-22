@@ -107,11 +107,11 @@ const TAB_DEFINITIONS = [
 ];
 
 const VIEW_LABELS = /** @type {Record<string, string>} */ ({
-  'receipts':            'Recepciones',
+  'receipts':            'Recibos por confirmar',
   'receive-from-po':     'Nueva recepcion desde OC',
-  'inspections':         'Inspecciones',
-  'production':          'Produccion',
-  'recipe-consultation': 'Recetas (solo lectura)',
+  'inspections':         'Inspecciones QA',
+  'production':          'Ordenes en proceso',
+  'recipe-consultation': 'Consulta de receta',
   'inventory':           'Inventario',
 });
 
@@ -229,8 +229,11 @@ function renderIdentity(session) {
   const logoutBtn = document.getElementById('warehouse-logout-button');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
-      inventoryAuth.fetchJson(session, '/api/auth/logout', { method: 'POST' })
-        .catch(() => { /* ignore logout errors */ })
+      // Use raw fetch instead of fetchJson to avoid double-redirect:
+      // fetchJson would call handleUnauthorized() on 401 (redirect #1),
+      // while the finally block would also redirect (redirect #2 → ERR_ABORTED).
+      fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+        .catch(() => { /* ignore network errors — always redirect */ })
         .finally(() => { inventorySession.clearAndRedirectToLogin(); });
     });
   }
@@ -301,12 +304,18 @@ function hasWarehouseShellAccess(session) {
 async function bootstrap() {
   setStatus('Validando sesion...');
 
-  let session = null;
-  try {
-    session = await inventoryAuth.bootstrapSession();
-  } catch (_err) {
-    window.location.replace(LOGIN_PATH);
-    return;
+  // Prefer state cookie for initial render — avoids redirecting to login when
+  // /api/auth/me returns 401 but a valid browser-state cookie still exists
+  // (e.g. right after being redirected here from the login page, TASK-009).
+  let session = inventorySession.read();
+
+  if (!session) {
+    try {
+      session = await inventoryAuth.bootstrapSession();
+    } catch (_err) {
+      window.location.replace(LOGIN_PATH);
+      return;
+    }
   }
 
   if (!session) {
