@@ -74,6 +74,19 @@ function assertStagePrerequisites(order, stageId) {
     return;
   }
 
+  // DEC-016 / AC-016: guard against idempotent re-execution of the same stage.
+  // Since ended_at is NOT NULL in current schema, any existing execution for this stage
+  // represents a completed run. Reject to prevent double-consumption of materials.
+  const existingExecution = findCompletedExecutionForStage(order, BigInt(stageId));
+  if (existingExecution) {
+    throw createSubcodedHttpError(
+      409,
+      `La etapa ya fue ejecutada (ejecucion ${existingExecution.id}). No se puede ejecutar dos veces la misma etapa.`,
+      'conflict',
+      'stage_execution_in_progress',
+    );
+  }
+
   for (const priorStage of stages) {
     if (Number(priorStage?.stageOrder || 0) >= Number(currentStage.stageOrder || 0)) {
       break;

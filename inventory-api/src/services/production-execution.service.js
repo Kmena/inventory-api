@@ -223,8 +223,7 @@ async function reduceStageInventory(tx, auth, order, stageExecution, stageName, 
 async function executeProductionStage(id, stageId, payload, auth, req = null) {
   const scope = assertOperationalScope(auth);
 
-  // Read company tolerance BEFORE the transaction to avoid holding the advisory lock
-  // longer than necessary. DEC-002: authoritative value from companies table.
+  // DEC-002: read company tolerance before entering the advisory lock transaction.
   const companyTolerancePercent = await companyRepository.getProductionConsumptionTolerance(scope.companyId);
 
   const executionResult = await inventoryRepository.transaction(async (tx) => {
@@ -596,7 +595,5 @@ module.exports = {
     reduceStageInventory,
     serializeProductionReturn,
     serializeStageExecution,
-    reconcileProductionOrderAggregates,
-    completeProductionOrder,
   },
 };

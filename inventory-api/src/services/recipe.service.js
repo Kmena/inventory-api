@@ -454,6 +454,34 @@ async function updateRecipeVersion(recipeVersionId, payload, auth) {
   return serializeRecipeVersion(updatedVersion);
 }
 
+/**
+ * BR-011: a recipe version may only be approved when every stage input that
+ * exists in the version has a productId bound to the company catalogue.
+ * Descriptive stage inputs (no productId) are allowed in DRAFT but block approval.
+ * Reference: er_mvp_prd.md:3196-3197 and decisions.md DEC-006.
+ */
+function assertAllStageInputsHaveProductId(version) {
+  const stages = Array.isArray(version.stages) ? version.stages : [];
+  let missingCount = 0;
+
+  for (const stage of stages) {
+    const inputs = Array.isArray(stage.stageInputs) ? stage.stageInputs : [];
+    for (const input of inputs) {
+      if (!input.productId) {
+        missingCount += 1;
+      }
+    }
+  }
+
+  if (missingCount > 0) {
+    throw createHttpError(
+      400,
+      `Toda materia prima debe estar registrada en el catalogo; hay ${missingCount} insumo${missingCount === 1 ? '' : 's'} sin producto asociado`,
+      'validation_error',
+    );
+  }
+}
+
 async function approveRecipeVersion(recipeVersionId, payload, auth) {
   const scope = assertCompanyScope(auth);
   const currentVersion = await recipeRepository.findRecipeVersionById(recipeVersionId, scope.companyId);
@@ -463,6 +491,9 @@ async function approveRecipeVersion(recipeVersionId, payload, auth) {
   if (currentVersion.status === 'APPROVED') {
     throw createHttpError(409, 'La version ya fue aprobada', 'conflict');
   }
+
+  // BR-011 / AC-015: reject if any stageInput lacks a productId.
+  assertAllStageInputsHaveProductId(currentVersion);
 
   const approvalData = {
     status: 'APPROVED',
@@ -496,4 +527,7 @@ module.exports = {
   approveRecipeVersion,
   aggregateIngredientsFromStages,
   assertStageInputsUnitConsistency,
+  __private__: {
+    assertAllStageInputsHaveProductId,
+  },
 };

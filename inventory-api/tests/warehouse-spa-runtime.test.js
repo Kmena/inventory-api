@@ -184,12 +184,13 @@ test('captures.js revokes ObjectURLs to prevent memory leaks', () => {
 // Recipe consultation — read-only enforcement (FR-038)
 // -----------------------------------------------------------------------
 
-// Production module now split into state/renderers/controllers + orchestrator.
+// Production module now split into state/renderers/controllers/exec-helpers + orchestrator.
 // Tests read from combined source to stay refactor-resilient.
 function readProductionModules() {
   const files = [
     'views/production.state.js',
     'views/production.renderers.js',
+    'views/production.exec-helpers.js',
     'views/production.controllers.js',
     'views/production.js',
   ];

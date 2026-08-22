@@ -244,6 +244,7 @@ function readProductionModules() {
   const files = [
     'views/production.state.js',
     'views/production.renderers.js',
+    'views/production.exec-helpers.js',
     'views/production.controllers.js',
     'views/production.js',
   ];
@@ -256,7 +257,7 @@ function readProductionModules() {
 }
 
 test('production modules exist as separate files after TASK-011 split', () => {
-  for (const f of ['production.state.js', 'production.renderers.js', 'production.controllers.js', 'production.js']) {
+  for (const f of ['production.state.js', 'production.renderers.js', 'production.exec-helpers.js', 'production.controllers.js', 'production.js']) {
     assert.ok(
       fs2.existsSync(path2.join(warehousePath, 'views', f)),
       `views/${f} must exist`,
