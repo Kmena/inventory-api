@@ -161,6 +161,9 @@ function attachQaCaptureHandlers(container) {
     input.addEventListener('input', () => h.syncExecutionOverrideState(container));
     input.addEventListener('change', () => h.syncExecutionOverrideState(container));
   });
+  container.querySelector('.exec-override-justification')?.addEventListener('input', () => {
+    h.syncExecutionOverrideState(container);
+  });
   h.syncExecutionOverrideState(container);
 }
 
@@ -284,15 +287,7 @@ async function attachExecuteStageHandlers(container, session, order, snapshotSta
   if (startedEl) { startedEl.value = new Date().toISOString(); }
 
   attachLotPickerHandlers(slot);
-
-  slot.querySelectorAll('.exec-qa-actual, .exec-qa-unit').forEach((input) => {
-    input.addEventListener('input', () => h.syncExecutionOverrideState(slot));
-    input.addEventListener('change', () => h.syncExecutionOverrideState(slot));
-  });
-  slot.querySelector('.exec-override-justification')?.addEventListener('input', () => {
-    h.syncExecutionOverrideState(slot);
-  });
-  h.syncExecutionOverrideState(slot);
+  attachQaCaptureHandlers(slot);
 
   slot.querySelector('.exec-cancel-btn')?.addEventListener('click', () => {
     slot.innerHTML = '';
