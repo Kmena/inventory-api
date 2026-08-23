@@ -45,11 +45,25 @@ const sessionTtlMs = parseDurationToMilliseconds(process.env.BROWSER_SESSION_TTL
 const browserSessionStoreContainer = createBrowserSessionStore();
 
 function buildSessionStoreUnavailableHttpError(action) {
+  if (action === 'issue') {
+    return createHttpError(
+      503,
+      'No se pudo iniciar la sesion browser en este momento. Intente de nuevo en unos momentos.',
+      'service_unavailable',
+    );
+  }
+
+  if (action === 'invalidate') {
+    return createHttpError(
+      503,
+      'No se pudo invalidar la sesion browser en este momento. Intente de nuevo en unos momentos.',
+      'service_unavailable',
+    );
+  }
+
   return createHttpError(
     503,
-    action === 'issue'
-      ? 'No se pudo iniciar la sesion browser en este momento. Intente de nuevo en unos momentos.'
-      : 'No se pudo validar la sesion browser en este momento. Intente de nuevo en unos momentos.',
+    'No se pudo validar la sesion browser en este momento. Intente de nuevo en unos momentos.',
     'service_unavailable',
   );
 }
@@ -132,9 +146,10 @@ async function invalidateBrowserSession(sessionId, options = {}) {
       resourceType: 'session',
       resourceId: sessionId || null,
       outcome: invalidated ? 'SUCCESS' : 'REJECTED',
-      reasonCode: invalidated ? null : 'session_not_found',
+      reasonCode: invalidated ? (options.reasonCode || null) : 'session_not_found',
       metadata: {
         storeMode: browserSessionStoreContainer.mode,
+        ...(options.metadata || {}),
       },
     });
     return invalidated;
@@ -143,7 +158,66 @@ async function invalidateBrowserSession(sessionId, options = {}) {
       sessionId,
       message: error?.message || 'unknown_error',
     });
-    wrapStoreUnavailableError(error, 'validate');
+    wrapStoreUnavailableError(error, 'invalidate');
+  }
+}
+
+async function invalidateBrowserSessionsForUser(userId, options = {}) {
+  try {
+    const invalidatedCount = await browserSessionStoreContainer.store.invalidateSessionsForUser(userId);
+    await audit.recordAuditEventSafelyIfAvailable({
+      req: options.req,
+      action: 'auth.browser_session.invalidate',
+      resourceType: 'user',
+      resourceId: userId ? userId.toString() : null,
+      outcome: invalidatedCount > 0 ? 'SUCCESS' : 'REJECTED',
+      reasonCode: invalidatedCount > 0 ? (options.reasonCode || null) : 'session_not_found',
+      metadata: {
+        storeMode: browserSessionStoreContainer.mode,
+        invalidatedCount,
+        scope: 'user',
+        ...(options.metadata || {}),
+      },
+    });
+    return invalidatedCount;
+  } catch (error) {
+    await recordStoreAuditEventSafely(options.req, 'invalidate', {
+      userId: userId ? userId.toString() : null,
+      scope: 'user',
+      message: error?.message || 'unknown_error',
+    });
+    wrapStoreUnavailableError(error, 'invalidate');
+  }
+}
+
+async function invalidateBrowserSessionsForUsers(userIds, options = {}) {
+  const normalizedUserIds = (Array.isArray(userIds) ? userIds : [])
+    .filter((userId) => userId !== null && userId !== undefined && String(userId).trim() !== '');
+
+  try {
+    const invalidatedCount = await browserSessionStoreContainer.store.invalidateSessionsForUsers(normalizedUserIds);
+    await audit.recordAuditEventSafelyIfAvailable({
+      req: options.req,
+      action: 'auth.browser_session.invalidate',
+      resourceType: 'session_store',
+      outcome: invalidatedCount > 0 ? 'SUCCESS' : 'REJECTED',
+      reasonCode: invalidatedCount > 0 ? (options.reasonCode || null) : 'session_not_found',
+      metadata: {
+        storeMode: browserSessionStoreContainer.mode,
+        invalidatedCount,
+        scope: 'users',
+        affectedUserIds: normalizedUserIds.map((userId) => userId.toString()),
+        ...(options.metadata || {}),
+      },
+    });
+    return invalidatedCount;
+  } catch (error) {
+    await recordStoreAuditEventSafely(options.req, 'invalidate', {
+      scope: 'users',
+      affectedUserIds: normalizedUserIds.map((userId) => userId.toString()),
+      message: error?.message || 'unknown_error',
+    });
+    wrapStoreUnavailableError(error, 'invalidate');
   }
 }
 
@@ -169,6 +243,8 @@ module.exports = {
   createBrowserSession,
   getBrowserSession,
   invalidateBrowserSession,
+  invalidateBrowserSessionsForUser,
+  invalidateBrowserSessionsForUsers,
   resetBrowserSessionStateForTests,
   parseDurationToMilliseconds,
   resolveBrowserSessionStoreMode,

@@ -1,6 +1,8 @@
 (function attachRootShellManifest(globalScope) {
   const rootShell = /** @type {any} */ (globalScope).RootShell;
   const guards = rootShell.require('guards');
+  const isProcurementOrAdmin = (session) =>
+    guards.isCompanyAdmin(session) || guards.hasProcurementAccess(session);
 
   function createRouteItem({
     id,
@@ -94,7 +96,7 @@
     href: '/root/#products',
     implemented: true,
     activeMatchers: ['products'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'package',
     includeInRootNav: false,
@@ -107,7 +109,7 @@
     href: '/root/#lots',
     implemented: true,
     activeMatchers: ['lots'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'layers-3',
     includeInRootNav: false,
@@ -120,13 +122,150 @@
     href: '/root/#movements',
     implemented: true,
     activeMatchers: ['movements'],
-    visibilityRule: guards.isCompanyAdmin,
+    visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'arrow-left-right',
     includeInRootNav: false,
     dependencyTag: 'inventory-admin-views',
   });
+  // Legacy standalone — kept for routing backward-compat (sidebar replaced by produccion-group)
   const productionItem = createAdminPendingEntry('production', 'Produccion', 'factory');
+
+  // TASK-016: Supply/Procurement module — produccion-group sub-entries
+  const recipesAdminItem = createRouteItem({
+    id: 'recetas',
+    label: 'Recetas',
+    routeKey: 'recetas',
+    href: '/root/#recetas',
+    implemented: true,
+    activeMatchers: ['recetas'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'flask-conical',
+    includeInRootNav: false,
+    dependencyTag: 'supply-inventory-entry',
+  });
+  const productionOrdersAdminItem = createRouteItem({
+    id: 'produccion-ordenes',
+    label: 'Ordenes de produccion',
+    routeKey: 'produccion_ordenes',
+    href: '/root/#produccion_ordenes',
+    implemented: true,
+    activeMatchers: ['produccion_ordenes'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'clipboard-list',
+    includeInRootNav: false,
+    dependencyTag: 'supply-inventory-entry',
+  });
+  const productionPlannerItem = createRouteItem({
+    id: 'produccion-planificador',
+    label: 'Planificador de produccion',
+    routeKey: 'produccion_planificador',
+    href: '/root/#produccion_planificador',
+    implemented: true,
+    activeMatchers: ['produccion_planificador'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'gauge',
+    includeInRootNav: false,
+    dependencyTag: 'production-planner',
+  });
+
+  // TASK-016: Supply/Procurement module — compras-group sub-entries (in procurement flow order)
+  const suppliersAdminItem = createRouteItem({
+    id: 'proveedores',
+    label: 'Proveedores',
+    routeKey: 'proveedores',
+    href: '/root/#proveedores',
+    implemented: true,
+    activeMatchers: ['proveedores'],
+    visibilityRule: isProcurementOrAdmin,
+    actorScope: 'company-admin',
+    icon: 'truck',
+    includeInRootNav: false,
+    dependencyTag: 'supply-inventory-entry',
+  });
+  const purchaseRequestsAdminItem = createRouteItem({
+    id: 'solicitudes-compra',
+    label: 'Solicitudes de compra',
+    routeKey: 'solicitudes_compra',
+    href: '/root/#solicitudes_compra',
+    implemented: true,
+    activeMatchers: ['solicitudes_compra'],
+    visibilityRule: isProcurementOrAdmin,
+    actorScope: 'company-admin',
+    icon: 'file-plus',
+    includeInRootNav: false,
+    dependencyTag: 'purchase-orders-workspace',
+  });
+  const quotationsAdminItem = createRouteItem({
+    id: 'cotizaciones',
+    label: 'Cotizaciones',
+    routeKey: 'cotizaciones',
+    href: '/root/#cotizaciones',
+    implemented: true,
+    activeMatchers: ['cotizaciones'],
+    visibilityRule: isProcurementOrAdmin,
+    actorScope: 'company-admin',
+    icon: 'file-search',
+    includeInRootNav: false,
+    dependencyTag: 'supply-inventory-entry',
+  });
+  const rfqTrackingAdminItem = createRouteItem({
+    id: 'seguimiento-cotizaciones',
+    label: 'Seguimiento de cotizaciones',
+    routeKey: 'seguimiento_cotizaciones',
+    href: '/root/#seguimiento_cotizaciones',
+    implemented: true,
+    activeMatchers: ['seguimiento_cotizaciones'],
+    visibilityRule: isProcurementOrAdmin,
+    actorScope: 'company-admin',
+    icon: 'clipboard-list',
+    includeInRootNav: false,
+    dependencyTag: 'supplier-rfq-requests',
+  });
+  const purchaseOrdersAdminItem = createRouteItem({
+    id: 'ordenes-compra',
+    label: 'Ordenes de compra',
+    routeKey: 'ordenes_compra',
+    href: '/root/#ordenes_compra',
+    implemented: true,
+    activeMatchers: ['ordenes_compra'],
+    visibilityRule: isProcurementOrAdmin,
+    actorScope: 'company-admin',
+    icon: 'file-check-2',
+    includeInRootNav: false,
+    dependencyTag: 'purchase-orders-workspace',
+  });
+  // recepciones-fiscales-workspace: promoted to implemented
+  const receiptsAdminItem = createRouteItem({
+    id: 'recepciones',
+    label: 'Recepciones',
+    routeKey: 'recepciones',
+    href: '/root/#recepciones',
+    implemented: true,
+    activeMatchers: ['recepciones'],
+    visibilityRule: isProcurementOrAdmin,
+    actorScope: 'company-admin',
+    icon: 'package-check',
+    includeInRootNav: false,
+    dependencyTag: 'recepciones-fiscales-workspace',
+  });
+  const fiscalRefsAdminItem = createRouteItem({
+    id: 'referencias-fiscales',
+    label: 'Ref. Fiscales',
+    routeKey: 'referencias_fiscales',
+    href: '/root/#referencias_fiscales',
+    implemented: true,
+    activeMatchers: ['referencias_fiscales'],
+    visibilityRule: isProcurementOrAdmin,
+    actorScope: 'company-admin',
+    icon: 'landmark',
+    includeInRootNav: false,
+    dependencyTag: 'recepciones-fiscales-workspace',
+  });
+
   const agentsItem = createRouteItem({
     id: 'agents',
     label: 'Agentes',
@@ -221,7 +360,20 @@
     dependencyTag: 'order-approvals',
   });
   const reportsItem = createAdminPendingEntry('reports', 'Reportes', 'bar-chart-3');
-  const usersItem = createAdminPendingEntry('users', 'Usuarios', 'user-cog');
+  const usersItem = createRouteItem({
+    id: 'users',
+    label: 'Usuarios',
+    routeKey: 'users',
+    href: '/root/#users',
+    implemented: true,
+    activeMatchers: ['users'],
+    visibilityRule: guards.isCompanyAdmin,
+    actorScope: 'company-admin',
+    icon: 'user-cog',
+    includeInRootNav: false,
+    includeInLanding: true,
+    dependencyTag: 'users-admin-view',
+  });
   const settingsItem = createAdminPendingEntry('settings', 'Configuracion', 'settings');
 
   const rolesPermissionsItem = createRouteItem({
@@ -259,12 +411,24 @@
     productsItem,
     lotsItem,
     movementsItem,
+    // Legacy standalone kept for routing backward-compat (replaced in sidebar by produccion-group)
     productionItem,
+    recipesAdminItem,
+    productionOrdersAdminItem,
+    productionPlannerItem,
     agentsItem,
     routesItem,
     zonesItem,
     clientsItem,
+    // Legacy standalone kept for routing backward-compat (replaced in sidebar by compras-group)
     purchasesItem,
+    suppliersAdminItem,
+    purchaseRequestsAdminItem,
+    quotationsAdminItem,
+    rfqTrackingAdminItem,
+    purchaseOrdersAdminItem,
+    receiptsAdminItem,
+    fiscalRefsAdminItem,
     warehousesItem,
     billingItem,
     approvalsItem,
@@ -292,14 +456,14 @@
     {
       id: 'operations',
       title: 'Operacion',
-      visibilityRule: guards.isCompanyAdmin,
+      visibilityRule: isProcurementOrAdmin,
       entries: [
         {
           type: 'group',
           id: 'inventory-group',
           label: 'Inventario',
           icon: 'boxes',
-          visibilityRule: guards.isCompanyAdmin,
+          visibilityRule: isProcurementOrAdmin,
           actorScope: 'company-admin',
           items: [
             { type: 'item', ...warehousesItem },
@@ -308,7 +472,20 @@
             { type: 'item', ...movementsItem },
           ],
         },
-        { type: 'item', ...productionItem },
+        // TASK-016: produccion-group (replaces standalone productionItem in sidebar)
+        {
+          type: 'group',
+          id: 'produccion-group',
+          label: 'Produccion',
+          icon: 'factory',
+          visibilityRule: guards.isCompanyAdmin,
+          actorScope: 'company-admin',
+          items: [
+            { type: 'item', ...recipesAdminItem },
+            { type: 'item', ...productionOrdersAdminItem },
+            { type: 'item', ...productionPlannerItem },
+          ],
+        },
         {
           type: 'group',
           id: 'sales-group',
@@ -323,7 +500,24 @@
             { type: 'item', ...clientsItem },
           ],
         },
-        { type: 'item', ...purchasesItem },
+        // TASK-016: compras-group (replaces standalone purchasesItem in sidebar)
+        {
+          type: 'group',
+          id: 'compras-group',
+          label: 'Compras',
+          icon: 'shopping-bag',
+          visibilityRule: isProcurementOrAdmin,
+          actorScope: 'company-admin',
+          items: [
+            { type: 'item', ...suppliersAdminItem },
+            { type: 'item', ...purchaseRequestsAdminItem },
+            { type: 'item', ...quotationsAdminItem },
+            { type: 'item', ...rfqTrackingAdminItem },
+            { type: 'item', ...purchaseOrdersAdminItem },
+            { type: 'item', ...receiptsAdminItem },
+            { type: 'item', ...fiscalRefsAdminItem },
+          ],
+        },
       ],
     },
     {

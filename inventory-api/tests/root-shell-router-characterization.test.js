@@ -44,9 +44,23 @@ function createRouterHarness() {
   browserWindow.RootShell.register('views.productsAdmin', createView('products-view'));
   browserWindow.RootShell.register('views.lotsAdmin', createView('lots-view'));
   browserWindow.RootShell.register('views.movementsAdmin', createView('movements-view'));
+  browserWindow.RootShell.register('views.recipesAdmin', createView('recipes-view'));
+  browserWindow.RootShell.register('views.productionOrdersAdmin', createView('production-orders-view'));
+  browserWindow.RootShell.register('views.productionPlanner', createView('production-planner-view'));
   // TASK-012: billing admin view stub
   browserWindow.RootShell.register('views.billingAdmin', createView('billing-view'));
   browserWindow.RootShell.register('views.approvalsAdmin', createView('approvals-view'));
+  browserWindow.RootShell.register('views.suppliersAdmin', createView('suppliers-view'));
+  browserWindow.RootShell.register('views.quotationsAdmin', createView('quotations-view'));
+  browserWindow.RootShell.register('views.rfqTrackingAdmin', createView('rfq-tracking-view'));
+  browserWindow.RootShell.register('views.quotationsComparison', createView('quotations-comparison-view'));
+  browserWindow.RootShell.register('views.purchaseRequestsAdmin', createView('purchase-requests-view'));
+  browserWindow.RootShell.register('views.purchaseOrdersAdmin', createView('purchase-orders-view'));
+  // recepciones-fiscales-workspace stubs
+  browserWindow.RootShell.register('views.receiptsAdmin', createView('receipts-view'));
+  browserWindow.RootShell.register('views.fiscalRefsAdmin', createView('fiscal-refs-view'));
+  // users-admin-view stub
+  browserWindow.RootShell.register('views.usersAdmin', createView('users-view'));
 
   executeRootScript('router.js', context);
 
@@ -147,6 +161,26 @@ test('router resolves supported actor routes and unknown hashes without changing
   assert.equal(adminMovementsResolution.routeKey, 'movements');
   assert.equal(adminMovementsResolution.view.name, 'movements-view');
 
+  const adminRecipesResolution = router.resolveRoute('#recetas', createCompanyAdminSession());
+  assert.equal(adminRecipesResolution.allowed, true);
+  assert.equal(adminRecipesResolution.routeKey, 'recetas');
+  assert.equal(adminRecipesResolution.view.name, 'recipes-view');
+
+  const adminProductionOrdersResolution = router.resolveRoute('#produccion_ordenes', createCompanyAdminSession());
+  assert.equal(adminProductionOrdersResolution.allowed, true);
+  assert.equal(adminProductionOrdersResolution.routeKey, 'produccion_ordenes');
+  assert.equal(adminProductionOrdersResolution.view.name, 'production-orders-view');
+
+  const adminQuotationsResolution = router.resolveRoute('#cotizaciones', createCompanyAdminSession());
+  assert.equal(adminQuotationsResolution.allowed, true);
+  assert.equal(adminQuotationsResolution.routeKey, 'cotizaciones');
+  assert.equal(adminQuotationsResolution.view.name, 'quotations-view');
+
+  const adminRfqTrackingResolution = router.resolveRoute('#seguimiento_cotizaciones', createCompanyAdminSession());
+  assert.equal(adminRfqTrackingResolution.allowed, true);
+  assert.equal(adminRfqTrackingResolution.routeKey, 'seguimiento_cotizaciones');
+  assert.equal(adminRfqTrackingResolution.view.name, 'rfq-tracking-view');
+
   const adminUnknownResolution = router.resolveRoute('#missing-route', createCompanyAdminSession());
   assert.equal(adminUnknownResolution.allowed, true);
   assert.equal(adminUnknownResolution.requestedRouteKey, 'missing-route');
@@ -189,6 +223,51 @@ test('router resolves approvals route to approvals admin view for company admin 
 
   // Root users cannot access approvals (company-admin scope)
   const rootResolution = router.resolveRoute('#approvals', createRootSession());
+  assert.equal(rootResolution.allowed, false);
+  assert.equal(rootResolution.routeKey, 'home');
+});
+
+test('router resolves recepciones route to receipts admin view for company admin actors', () => {
+  const router = createRouterHarness();
+  const session = createCompanyAdminSession();
+
+  const resolution = router.resolveRoute('#recepciones', session);
+  assert.equal(resolution.allowed, true);
+  assert.equal(resolution.routeKey, 'recepciones');
+  assert.equal(resolution.view.name, 'receipts-view');
+
+  // Root users cannot access recepciones (company-admin scope)
+  const rootResolution = router.resolveRoute('#recepciones', createRootSession());
+  assert.equal(rootResolution.allowed, false);
+  assert.equal(rootResolution.routeKey, 'home');
+});
+
+test('router resolves users route to users admin view for company admin actors', () => {
+  const router = createRouterHarness();
+  const session = createCompanyAdminSession();
+
+  const resolution = router.resolveRoute('#users', session);
+  assert.equal(resolution.allowed, true);
+  assert.equal(resolution.routeKey, 'users');
+  assert.equal(resolution.view.name, 'users-view');
+
+  // Root users cannot access users (company-admin scope)
+  const rootResolution = router.resolveRoute('#users', createRootSession());
+  assert.equal(rootResolution.allowed, false);
+  assert.equal(rootResolution.routeKey, 'home');
+});
+
+test('router resolves referencias_fiscales route to fiscal-refs admin view for company admin actors', () => {
+  const router = createRouterHarness();
+  const session = createCompanyAdminSession();
+
+  const resolution = router.resolveRoute('#referencias_fiscales', session);
+  assert.equal(resolution.allowed, true);
+  assert.equal(resolution.routeKey, 'referencias_fiscales');
+  assert.equal(resolution.view.name, 'fiscal-refs-view');
+
+  // Root users cannot access referencias_fiscales (company-admin scope)
+  const rootResolution = router.resolveRoute('#referencias_fiscales', createRootSession());
   assert.equal(rootResolution.allowed, false);
   assert.equal(rootResolution.routeKey, 'home');
 });

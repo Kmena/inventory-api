@@ -6,6 +6,8 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "node --watch src/server.js",
+    "dev:full": "docker compose -f docker-compose.dev.yml up -d db redis && node --watch src/server.js",
+    "dev:down": "docker compose -f docker-compose.dev.yml down",
     "start": "node src/server.js",
     "lint": "node scripts/run-eslint.js src scripts tests --max-warnings 0",
     "typecheck": "node scripts/run-tsc.js --project tsconfig.typecheck.json",

@@ -45,7 +45,7 @@ test('local lint and typecheck scripts resolve package CLI entrypoints without r
   assert.match(tscWrapperSource, /spawnSync\(process\.execPath/);
 });
 
-test('supported public runtime assets now include the minimal root shell while legacy warehouse and agent runtimes remain retired', () => {
+test('supported public runtime assets now include the minimal root shell plus the supported warehouse and agent SPAs', () => {
   const supportedFiles = [
     'index.html',
     'login.js',
@@ -66,6 +66,7 @@ test('supported public runtime assets now include the minimal root shell while l
     'root/router.js',
     'root/routes-api.js',
     'root/zones-api.js',
+    'root/quotations-api.js',
     'root/session-adapter.js',
     'root/ui.js',
     'root/views/agents-admin.helpers.js',
@@ -91,6 +92,9 @@ test('supported public runtime assets now include the minimal root shell while l
     'root/views/products-admin.renderers.js',
     'root/views/products-admin.state.js',
     'root/views/roles-admin.js',
+    'root/views/quotations-admin.helpers.js',
+    'root/views/quotations-admin.renderers.js',
+    'root/views/quotations-admin.js',
     'root/views/routes-admin.helpers.js',
     'root/views/routes-admin.renderers.js',
     'root/views/routes-admin.state.js',
@@ -100,6 +104,16 @@ test('supported public runtime assets now include the minimal root shell while l
     'shared/auth.js',
     'shared/session.js',
     'styles.css',
+    'warehouse/index.html',
+    'warehouse/api/warehouse-api.js',
+    'warehouse/app.js',
+    'warehouse/bootstrap.js',
+    'warehouse/captures.js',
+    'warehouse/state.js',
+    'warehouse/views/inspections.js',
+    'warehouse/views/production.js',
+    'warehouse/views/receipts.js',
+    'warehouse/views/recipe-consultation.js',
   ];
 
   for (const relativePath of supportedFiles) {
@@ -108,9 +122,9 @@ test('supported public runtime assets now include the minimal root shell while l
 
   assert.equal(fs.existsSync(path.join(publicRoot, 'root')), true, 'root shell should now exist under src/public');
 
-  // warehouse sigue retirado de src/public; legacy permanece en legacy-public-runtime
-  assert.equal(fs.existsSync(path.join(publicRoot, 'warehouse')), false, 'warehouse should not remain exposed from src/public');
-  assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'warehouse')), true, 'warehouse should be relocated for SPA transition reuse');
+  // TASK-017: warehouse SPA ahora existe en src/public/warehouse/ como SPA soportada
+  assert.equal(fs.existsSync(path.join(publicRoot, 'warehouse')), true, 'warehouse SPA should now exist under src/public/warehouse/');
+  assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'warehouse')), true, 'warehouse legacy should remain preserved in legacy-public-runtime');
 
   // agent SPA moderna existe en src/public/agent/ (implementada en agent-spa spec)
   assert.equal(fs.existsSync(path.join(publicRoot, 'agent')), true, 'agent SPA should now exist under src/public/agent/');
@@ -162,9 +176,13 @@ test('public login, no-access and migration screens keep strict same-origin wiri
   assert.match(rootShellHtmlSource, /<script src="\/root\/agents-api\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/clients-api\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/routes-api\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/quotations-api\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/ui\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/companies-admin\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/roles-admin\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/quotations-admin\.helpers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/quotations-admin\.renderers\.js"><\/script>/);
+  assert.match(rootShellHtmlSource, /<script src="\/root\/views\/quotations-admin\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/zones-admin\.helpers\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/zones-admin\.js"><\/script>/);
   assert.match(rootShellHtmlSource, /<script src="\/root\/views\/agents-admin\.helpers\.js"><\/script>/);
@@ -193,6 +211,7 @@ test('public login, no-access and migration screens keep strict same-origin wiri
   assert.match(rootShellManifestSource, /routeKey: 'routes'/);
   assert.match(rootShellManifestSource, /routeKey: 'roles_permissions'/);
   assert.match(rootShellManifestSource, /routeKey: 'zones'/);
+  assert.match(rootShellManifestSource, /routeKey: 'cotizaciones'/);
   assert.match(stylesSource, /\.root-sidebar,\s*\n\.root-sidebar \*/);
   assert.match(stylesSource, /\.root-sidebar__scroll \{[\s\S]*overflow-y: auto;[\s\S]*scrollbar-width: thin;[\s\S]*scrollbar-color: rgba\(203, 213, 225, 0\.28\) transparent;/);
   assert.match(stylesSource, /\.root-sidebar__nav,[\s\S]*\.root-sidebar__section-body,[\s\S]*\.root-sidebar__subnav \{[\s\S]*overflow-x: clip;/);

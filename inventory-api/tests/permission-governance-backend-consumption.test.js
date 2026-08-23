@@ -1,3 +1,6 @@
+process.env.NODE_ENV = 'test';
+process.env.BROWSER_SESSION_STORE_MODE = 'memory';
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -184,14 +187,17 @@ test('roleService.createCompanyRole records governance warnings in audit metadat
   await withStubs(
     [
       [roleRepository, {
-        findActivePermissions: async () => [{ code: 'inventory.manage' }],
+        findActivePermissions: async () => [{ code: 'root.access' }, { code: 'inventory.manage' }],
         createCompanyRole: async () => ({
           id: 71n,
           code: 'company_1_inventory_admin',
           name: 'Inventory Admin',
           companyId: 1n,
           isActive: true,
-          rolePermissions: [{ isEnabled: true, permission: { code: 'inventory.manage', isActive: true } }],
+          rolePermissions: [
+            { isEnabled: true, permission: { code: 'root.access', isActive: true } },
+            { isEnabled: true, permission: { code: 'inventory.manage', isActive: true } },
+          ],
         }),
       }],
       [audit, {
@@ -201,7 +207,7 @@ test('roleService.createCompanyRole records governance warnings in audit metadat
       }],
     ],
     async () => {
-      const role = await roleService.createCompanyRole({ name: 'Inventory Admin', permissionCodes: ['inventory.manage'] }, { companyId: '1' }, createRequest());
+      const role = await roleService.createCompanyRole({ name: 'Inventory Admin', permissionCodes: ['root.access', 'inventory.manage'] }, { companyId: '1' }, createRequest());
       assert.equal(role.name, 'Inventory Admin');
     },
   );
@@ -218,10 +224,10 @@ test('roleService.createCompanyRole keeps allowed tenant-scoped permissions work
   await withStubs(
     [
       [roleRepository, {
-        findActivePermissions: async () => [{ code: 'inventory.manage' }, { code: 'users.manage' }],
+        findActivePermissions: async () => [{ code: 'root.access' }, { code: 'inventory.manage' }, { code: 'users.manage' }],
         createCompanyRole: async ({ permissionCodes }) => {
           repositoryCalled = true;
-          assert.deepEqual(permissionCodes, ['inventory.manage', 'users.manage']);
+          assert.deepEqual(permissionCodes, ['root.access', 'inventory.manage', 'users.manage']);
           return {
             id: 88n,
             code: 'company_1_ops_admin',
@@ -229,6 +235,7 @@ test('roleService.createCompanyRole keeps allowed tenant-scoped permissions work
             companyId: 1n,
             isActive: true,
             rolePermissions: [
+              { isEnabled: true, permission: { code: 'root.access', isActive: true } },
               { isEnabled: true, permission: { code: 'inventory.manage', isActive: true } },
               { isEnabled: true, permission: { code: 'users.manage', isActive: true } },
             ],
@@ -241,7 +248,7 @@ test('roleService.createCompanyRole keeps allowed tenant-scoped permissions work
     ],
     async () => {
       const role = await roleService.createCompanyRole(
-        { name: 'Ops Admin', permissionCodes: ['inventory.manage', 'users.manage'] },
+        { name: 'Ops Admin', permissionCodes: ['root.access', 'inventory.manage', 'users.manage'] },
         { companyId: '1' },
         createRequest(),
       );

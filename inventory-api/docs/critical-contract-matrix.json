@@ -10,9 +10,9 @@
   ],
   "summary": {
     "optionSatisfied": "B",
-    "totalRoutes": 9,
-    "criticalRoutes": 8,
-    "criticalCoveredByOpenApi": 8,
+    "totalRoutes": 10,
+    "criticalRoutes": 9,
+    "criticalCoveredByOpenApi": 9,
     "criticalExplicitlyExcluded": 0,
     "supportingRoutes": 1,
     "supportingExplicitlyExcluded": 1,
@@ -105,6 +105,17 @@
       "justification": "La creación de roles de compañía forma parte del seam convergido acotado y preserva la gobernanza sensible en `role.service.js`.",
       "evidence": {
         "openApiPath": "/api/roles/company"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/roles/company/{roleId}",
+      "surface": "governance-admin",
+      "criticality": "critical",
+      "contractStatus": "covered-by-openapi",
+      "justification": "La actualización de roles de empresa requiere settings.manage, aplica gobernanza de permisos platform-scoped, protección anti auto-bloqueo y auditoría de cambios.",
+      "evidence": {
+        "openApiPath": "/api/roles/company/{roleId}"
       }
     },
     {

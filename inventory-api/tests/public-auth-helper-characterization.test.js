@@ -126,6 +126,7 @@ test('public auth helper bootstraps session state from /api/auth/me without expo
       companyId: 'cmp-7',
       role: { code: 'admin' },
       permissions: ['users.manage'],
+      landing: null,
     },
   });
   assert.equal(storage.size, 0);

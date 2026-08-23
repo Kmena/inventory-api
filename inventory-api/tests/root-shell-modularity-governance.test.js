@@ -66,7 +66,11 @@ test('root shell modules publish and consume dependencies through the bounded Ro
   const manifest = browserWindow.RootShell.require('manifest');
   assert.deepEqual(Array.from(runtimeContract.bootstrapModuleNames), ['sessionAdapter', 'guards', 'manifest', 'router']);
   assert.match(runtimeContract.getLoaderScriptPaths().join('\n'), /\/root\/runtime-contract\.js/);
+  assert.match(runtimeContract.getLoaderScriptPaths().join('\n'), /\/root\/rfq-tracking-api\.js/);
+  assert.match(runtimeContract.getLoaderScriptPaths().join('\n'), /\/root\/views\/rfq-tracking-admin\.js/);
   assert.equal(runtimeContract.getScriptContract('/root/app.js')?.requiresModules.includes('runtimeContract'), true);
+  assert.equal(runtimeContract.getScriptContract('/root/rfq-tracking-api.js')?.registers.includes('rfqTrackingApi'), true);
+  assert.equal(runtimeContract.getScriptContract('/root/views/rfq-tracking-admin.js')?.requiresModules.includes('views.rfqTrackingAdminRenderers'), true);
   assert.equal(Array.isArray(manifest.items), true);
   assert.equal(typeof browserWindow.RootShell.require('guards').isRootUser, 'function');
   assert.equal(typeof browserWindow.RootShell.require('sessionAdapter').bootstrap, 'function');
@@ -134,9 +138,42 @@ test('sensitive root-shell modules keep isolated characterization coverage and e
   assert.match(routesRenderersSource, /function renderRouteDetail\(route, zones, agents, selectedGoalsAgentId, goalRows\)/);
   assert.match(routesStateSource, /function getSelectedRoute\(overview, detailByRouteId, selectedRouteId\)/);
 
+  const recipesAdminHelpersSource = readRootFile(path.join('views', 'recipes-admin.helpers.js'));
+  const recipesAdminRenderersSource = readRootFile(path.join('views', 'recipes-admin.renderers.js'));
+  const recipesAdminStateSource = readRootFile(path.join('views', 'recipes-admin.state.js'));
+  const recipesAdminVersionEditorSource = readRootFile(path.join('views', 'recipes-admin.version-editor.js'));
+  const recipesAdminSource = readRootFile(path.join('views', 'recipes-admin.js'));
+  const productionOrdersAdminHelpersSource = readRootFile(path.join('views', 'production-orders-admin.helpers.js'));
+  const productionOrdersAdminStateSource = readRootFile(path.join('views', 'production-orders-admin.state.js'));
+  const productionOrdersAdminRenderersSource = readRootFile(path.join('views', 'production-orders-admin.renderers.js'));
+  const productionOrdersAdminSource = readRootFile(path.join('views', 'production-orders-admin.js'));
   const billingAdminSource = readRootFile(path.join('views', 'billing-admin.js'));
   const billingHelpersSource = readRootFile(path.join('views', 'billing-admin.helpers.js'));
   const billingRenderersSource = readRootFile(path.join('views', 'billing-admin.renderers.js'));
+
+  assert.match(recipesAdminHelpersSource, /rootShell\.register\('views\.recipesAdminHelpers'/);
+  assert.match(recipesAdminRenderersSource, /rootShell\.register\('views\.recipesAdminRenderers'/);
+  assert.match(recipesAdminStateSource, /rootShell\.register\('views\.recipesAdminState'/);
+  assert.match(recipesAdminVersionEditorSource, /rootShell\.register\('views\.recipesAdminVersionEditor'/);
+  assert.match(recipesAdminSource, /rootShell\.require\('recipesApi'\)/);
+  assert.match(recipesAdminSource, /rootShell\.require\('productsApi'\)/);
+  assert.match(recipesAdminSource, /rootShell\.require\('views\.recipesAdminHelpers'\)/);
+  assert.match(recipesAdminSource, /rootShell\.require\('views\.recipesAdminRenderers'\)/);
+  assert.match(recipesAdminSource, /rootShell\.require\('views\.recipesAdminState'\)/);
+  assert.match(recipesAdminSource, /rootShell\.require\('views\.recipesAdminVersionEditor'\)/);
+  assert.match(recipesAdminSource, /async function mount\(/);
+  assert.match(recipesAdminSource, /function render\(\)/);
+  assert.match(recipesAdminSource, /rootShell\.register\('views\.recipesAdmin'/);
+  assert.match(productionOrdersAdminHelpersSource, /rootShell\.register\('views\.productionOrdersAdminHelpers'/);
+  assert.match(productionOrdersAdminStateSource, /rootShell\.register\('views\.productionOrdersAdminState'/);
+  assert.match(productionOrdersAdminRenderersSource, /rootShell\.register\('views\.productionOrdersAdminRenderers'/);
+  assert.match(productionOrdersAdminSource, /rootShell\.require\('productionAdminApi'\)/);
+  assert.match(productionOrdersAdminSource, /rootShell\.require\('views\.productionOrdersAdminHelpers'\)/);
+  assert.match(productionOrdersAdminSource, /rootShell\.require\('views\.productionOrdersAdminRenderers'\)/);
+  assert.match(productionOrdersAdminSource, /rootShell\.require\('views\.productionOrdersAdminState'\)/);
+  assert.match(productionOrdersAdminSource, /async function mount\(/);
+  assert.match(productionOrdersAdminSource, /function render\(\)/);
+  assert.match(productionOrdersAdminSource, /rootShell\.register\('views\.productionOrdersAdmin'/);
 
   assert.match(billingAdminSource, /rootShell\.require\('billingApi'\)/);
   assert.match(billingAdminSource, /rootShell\.require\('views\.billingAdminHelpers'\)/);

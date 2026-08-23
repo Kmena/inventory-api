@@ -70,6 +70,7 @@ test('public session helper normalizes browser-state cookies to a browser-safe b
       companyId: 'cmp-1',
       role: { code: 'admin' },
       permissions: ['users.manage', 'users.manage'],
+      landing: null,
     },
   });
 });

@@ -80,6 +80,88 @@ enum WarehouseType {
   AFFILIATIONS_VIRTUAL
 }
 
+enum ProductSourcingMethod {
+  PRODUCTION_ONLY
+  PURCHASE_ONLY
+  PRODUCTION_OR_PURCHASE
+}
+
+enum ProductInventoryType {
+  RAW_MATERIAL
+  PACKAGING
+  WORK_IN_PROCESS
+  FINISHED_GOOD
+}
+
+enum RecipeVersionStatus {
+  DRAFT
+  APPROVED
+}
+
+enum ProductionOrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  QA_HOLD
+  CANCELLED
+}
+
+enum QualityInspectionResult {
+  APPROVED
+  CONDITIONALLY_ACCEPTED
+  REJECTED
+}
+
+enum PurchaseRequestStatus {
+  OPEN
+  CLOSED
+  CANCELLED
+}
+
+enum SupplierQuotationStatus {
+  SUBMITTED
+  SELECTED
+  REJECTED
+}
+
+enum ProcurementApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  ISSUED
+  CANCELLED
+}
+
+enum FiscalReferenceStatus {
+  PENDING
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
+
+enum PurchaseReceiptStatus {
+  DRAFT
+  PENDING_INSPECTION
+  PARTIALLY_ACCEPTED
+  ACCEPTED
+  REJECTED
+  CONFIRMED
+  REVERSED
+}
+
+enum ReceiptInspectionResult {
+  ACCEPTED
+  PARTIALLY_ACCEPTED
+  REJECTED
+}
+
 enum LotStatus {
   AVAILABLE
   QUARANTINED
@@ -93,6 +175,14 @@ enum LotQaStatus {
   APPROVED
   REJECTED
   FAILED
+}
+
+enum SupplierQuotationInvitationStatus {
+  PENDING
+  PREPARED
+  RESPONDED
+  EXPIRED
+  CANCELLED
 }
 
 enum PaymentConditionType {
@@ -122,6 +212,8 @@ model Company {
   email         String?
   address       String?
   isActive      Boolean       @default(true) @map("is_active")
+  /// Porcentaje de tolerancia de sobre-consumo de materias primas en producción. Default: 5.00%.
+  productionConsumptionTolerancePercent Decimal @default(5.00) @map("production_consumption_tolerance_percent") @db.Decimal(5, 2)
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
   users         User[]
@@ -129,6 +221,11 @@ model Company {
   regions       Region[]
   warehouses    Warehouse[]
   stockMovements StockMovement[]
+  purchaseRequests PurchaseRequest[]
+  supplierQuotations SupplierQuotation[]
+  supplierSelections SupplierSelection[]
+  purchaseOrders PurchaseOrder[]
+  purchaseReceipts PurchaseReceipt[]
   lots           Lot[]
   inventoryAlerts InventoryAlert[]
   lotStatusHistory LotStatusHistory[]
@@ -137,9 +234,11 @@ model Company {
   clientClassifications ClientClassification[]
   clientLegalEntities ClientLegalEntity[]
   recipes       Recipe[]
+  recipeVersions RecipeVersion[]
   products         Product[]
   orders           Order[]
   productionOrders ProductionOrder[]
+  productionOrderMaterialRequirements ProductionOrderMaterialRequirement[]
   suppliers        Supplier[]
   companyConfig    CompanyConfig?
   fiscalConfig     CompanyFiscalConfig?
@@ -151,6 +250,8 @@ model Company {
   routeVisitLogs         RouteVisitLog[]
   auditEvents            AuditEvent[]
   orderStoreBackfillAudits OrderStoreBackfillAudit[]
+  fiscalDocumentReferences FiscalDocumentReference[]
+  rfqInvitations           SupplierQuotationInvitation[]
 
   @@map("companies")
 }
@@ -261,12 +362,24 @@ model User {
   orders                Order[]                 @relation("order_user")
   approvals             Order[]                 @relation("order_approver")
   createdProducts       Product[]               @relation("product_creator")
+  createdRecipeVersions RecipeVersion[]         @relation("recipe_version_creator")
+  approvedRecipeVersions RecipeVersion[]        @relation("recipe_version_approver")
+  responsibleProductionOrders ProductionOrder[] @relation("production_order_responsible_user")
+  purchaseRequestsCreated PurchaseRequest[] @relation("purchase_request_created_by_user")
+  supplierQuotationsCreated SupplierQuotation[] @relation("supplier_quotation_created_by_user")
+  supplierSelectionsCreated SupplierSelection[] @relation("supplier_selection_created_by_user")
+  supplierSelectionsApproved SupplierSelection[] @relation("supplier_selection_approved_by_user")
+  purchaseOrdersCreated PurchaseOrder[] @relation("purchase_order_created_by_user")
+  receiptInspectionsCreated ReceiptInspection[] @relation("receipt_inspection_created_by_user")
+  fiscalDocumentReferences FiscalDocumentReference[]
   stockMovements        StockMovement[]
   lotStatusHistory      LotStatusHistory[]
   salesRouteAssignments SalesRouteAssignment[]
   salesGoals            SalesGoal[]
   routeVisitLogs        RouteVisitLog[]
   auditEvents           AuditEvent[]            @relation("audit_event_actor")
+  rfqInvitationsCreated SupplierQuotationInvitation[] @relation("rfq_invitation_created_by_user")
+  rfqInvitationsManualResponse SupplierQuotationInvitation[] @relation("rfq_invitation_manual_response_by_user")
 
   @@index([companyId, id])
   @@map("users")
@@ -608,6 +721,10 @@ model Warehouse {
   stockMovements   StockMovement[]
   inventoryAlerts  InventoryAlert[]
   orders           Order[]
+  originProductionOrders ProductionOrder[] @relation("production_order_origin_warehouse")
+  destinationProductionOrders ProductionOrder[] @relation("production_order_destination_warehouse")
+  purchaseReceipts PurchaseReceipt[]
+  allowedProducts  ProductAllowedWarehouse[]
 
   @@unique([companyId, code])
   @@unique([companyId, name])
@@ -688,16 +805,16 @@ model ProductSubcategory {
 }
 
 model Recipe {
-  id              BigInt             @id @default(autoincrement())
-  companyId       BigInt             @map("company_id")
-  code            String?
-  name            String
-  isActive        Boolean            @default(true) @map("is_active")
-  recipeType      String?            @map("recipe_type")
-  createdAt       DateTime           @default(now()) @map("created_at")
-  updatedAt       DateTime           @updatedAt @map("updated_at")
-  company          Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  ingredients      RecipeIngredient[]
+  id               BigInt             @id @default(autoincrement())
+  companyId        BigInt             @map("company_id")
+  code             String?
+  name             String
+  isActive         Boolean            @default(true) @map("is_active")
+  recipeType       String?            @map("recipe_type")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  versions         RecipeVersion[]
   products         Product[]
   productionOrders ProductionOrder[]
   productionItems  ProductionItem[]
@@ -714,8 +831,12 @@ model Product {
   recipeId         BigInt?           @map("recipe_id")
   createdByUserId  BigInt?           @map("created_by_user_id")
   code             String?
+  sku              String?           @map("sku")
+  barcode          String?           @map("barcode")
   name             String
   description      String?
+  sourcingMethod   ProductSourcingMethod? @map("sourcing_method")
+  inventoryType    ProductInventoryType?  @map("inventory_type")
   productType      String            @default("FINISHED_PRODUCT") @map("product_type")
   sellableKind     String            @default("STANDARD") @map("sellable_kind")
   unit             String            @default("KG")
@@ -729,6 +850,10 @@ model Product {
   taxRate          Decimal           @default(13.0) @db.Decimal(5, 2) @map("tax_rate")
   density          Decimal?          @db.Decimal(14, 6)
   densityUnit      String?           @map("density_unit")
+  requiresLot      Boolean?          @map("requires_lot")
+  requiresExpiration Boolean?        @map("requires_expiration")
+  standardCost     Decimal?          @db.Decimal(14, 2) @map("standard_cost")
+  realCost         Decimal?          @db.Decimal(14, 2) @map("real_cost")
   isActive         Boolean           @default(true) @map("is_active")
   lotStrategy      String            @default("TRACKED") @map("lot_strategy")
   inCatalog        Boolean           @default(false) @map("in_catalog")
@@ -753,12 +878,33 @@ model Product {
   stockMovements   StockMovement[]
   inventoryAlerts  InventoryAlert[]
   orderItems       OrderItem[]
-  recipeIngredients RecipeIngredient[]
+
+  recipeStageInputs RecipeStageInput[]
   supplierLinks    ProductSupplier[]
+  allowedWarehouses ProductAllowedWarehouse[]
+  productionOrders ProductionOrder[] @relation("production_order_product")
+  productionOrderMaterialRequirements ProductionOrderMaterialRequirement[]
   productionItems  ProductionItem[]
+  purchaseRequestItems PurchaseRequestItem[]
+  supplierQuotationItems SupplierQuotationItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  purchaseReceiptItems PurchaseReceiptItem[] @relation("purchase_receipt_item_product")
+  substituteReceiptItems PurchaseReceiptItem[] @relation("purchase_receipt_item_substitute_product")
+  receiptInspections ReceiptInspection[] @relation("receipt_inspection_product")
 
   @@unique([companyId, code])
   @@map("products")
+}
+
+model ProductAllowedWarehouse {
+  productId   BigInt    @map("product_id")
+  warehouseId BigInt    @map("warehouse_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@id([productId, warehouseId])
+  @@map("product_allowed_warehouses")
 }
 
 model ProductPrice {
@@ -803,20 +949,273 @@ model Supplier {
   company   Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   products  ProductSupplier[]
   lots      Lot[]
+  quotations SupplierQuotation[]
+  purchaseOrders PurchaseOrder[]
+  purchaseReceipts PurchaseReceipt[]
+  rfqInvitations SupplierQuotationInvitation[]
 
   @@unique([companyId, name])
   @@map("suppliers")
 }
 
 model ProductSupplier {
-  productId  BigInt   @map("product_id")
-  supplierId BigInt   @map("supplier_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  productId             BigInt    @map("product_id")
+  supplierId            BigInt    @map("supplier_id")
+  isPreferred           Boolean   @default(false) @map("is_preferred")
+  supplierSku           String?   @map("supplier_sku")
+  unitPrice             Decimal?  @db.Decimal(14, 2) @map("unit_price")
+  currency              String?   @default("CRC")
+  leadTimeDays          Int?      @map("lead_time_days")
+  minimumOrderQuantity  Decimal?  @db.Decimal(14, 3) @map("minimum_order_quantity")
+  notes                 String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  product               Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier              Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@id([productId, supplierId])
   @@map("product_suppliers")
+}
+
+model PurchaseRequest {
+  id              BigInt               @id @default(autoincrement())
+  companyId       BigInt               @map("company_id")
+  requestedByUserId BigInt?            @map("requested_by_user_id")
+  title           String
+  notes           String?
+  status          PurchaseRequestStatus @default(OPEN)
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  company         Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  requestedByUser User?                @relation("purchase_request_created_by_user", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  items           PurchaseRequestItem[]
+  quotations      SupplierQuotation[]
+  selections      SupplierSelection[]
+  purchaseOrders  PurchaseOrder[]
+  rfqInvitations  SupplierQuotationInvitation[]
+
+  @@index([companyId, status, createdAt])
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id               BigInt          @id @default(autoincrement())
+  purchaseRequestId BigInt         @map("purchase_request_id")
+  productId        BigInt          @map("product_id")
+  quantity         Decimal         @db.Decimal(14, 3)
+  notes            String?
+  createdAt        DateTime        @default(now()) @map("created_at")
+  purchaseRequest  PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseRequestId, productId])
+  @@map("purchase_request_items")
+}
+
+model SupplierQuotation {
+  id              BigInt                 @id @default(autoincrement())
+  companyId       BigInt                 @map("company_id")
+  purchaseRequestId BigInt               @map("purchase_request_id")
+  supplierId      BigInt                 @map("supplier_id")
+  createdByUserId BigInt?                @map("created_by_user_id")
+  reference       String?
+  currency        String                 @default("CRC")
+  notes           String?
+  evidence        Json?
+  status          SupplierQuotationStatus @default(SUBMITTED)
+  submittedAt     DateTime               @default(now()) @map("submitted_at")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  company         Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseRequest PurchaseRequest        @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  supplier        Supplier               @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdByUser   User?                  @relation("supplier_quotation_created_by_user", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  items           SupplierQuotationItem[]
+  selections      SupplierSelection[]
+  purchaseOrders  PurchaseOrder[]
+  rfqInvitations  SupplierQuotationInvitation[]
+
+  @@index([companyId, purchaseRequestId, createdAt])
+  @@map("supplier_quotations")
+}
+
+model SupplierQuotationItem {
+  id               BigInt            @id @default(autoincrement())
+  quotationId      BigInt            @map("quotation_id")
+  productId        BigInt            @map("product_id")
+  quantity         Decimal           @db.Decimal(14, 3)
+  unitPrice        Decimal           @db.Decimal(14, 2) @map("unit_price")
+  leadTimeDays     Int?              @map("lead_time_days")
+  availabilityNotes String?          @map("availability_notes")
+  notes            String?
+  quotation        SupplierQuotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product          Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId, productId])
+  @@map("supplier_quotation_items")
+}
+
+model SupplierSelection {
+  id               BigInt                    @id @default(autoincrement())
+  companyId        BigInt                    @map("company_id")
+  purchaseRequestId BigInt                   @map("purchase_request_id")
+  quotationId      BigInt                    @map("quotation_id")
+  selectedByUserId BigInt?                   @map("selected_by_user_id")
+  approvedByUserId BigInt?                   @map("approved_by_user_id")
+  approvalStatus   ProcurementApprovalStatus @default(NOT_REQUIRED) @map("approval_status")
+  approvalRequired Boolean                   @default(false) @map("approval_required")
+  totalAmount      Decimal                   @db.Decimal(14, 2) @map("total_amount")
+  currency         String                    @default("CRC")
+  justification    String?
+  approvedAt       DateTime?                 @map("approved_at")
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  updatedAt        DateTime                  @updatedAt @map("updated_at")
+  company          Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseRequest  PurchaseRequest           @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  quotation        SupplierQuotation         @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  selectedByUser   User?                     @relation("supplier_selection_created_by_user", fields: [selectedByUserId], references: [id], onDelete: SetNull)
+  approvedByUser   User?                     @relation("supplier_selection_approved_by_user", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  purchaseOrders   PurchaseOrder[]
+
+  @@index([companyId, purchaseRequestId, createdAt])
+  @@map("supplier_selections")
+}
+
+model PurchaseOrder {
+  id               BigInt             @id @default(autoincrement())
+  companyId        BigInt             @map("company_id")
+  purchaseRequestId BigInt?           @map("purchase_request_id")
+  quotationId      BigInt?            @map("quotation_id")
+  selectionId      BigInt?            @map("selection_id")
+  supplierId       BigInt             @map("supplier_id")
+  createdByUserId  BigInt?            @map("created_by_user_id")
+  status           PurchaseOrderStatus @default(DRAFT)
+  notes            String?
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseRequest  PurchaseRequest?   @relation(fields: [purchaseRequestId], references: [id], onDelete: SetNull)
+  quotation        SupplierQuotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  selection        SupplierSelection? @relation(fields: [selectionId], references: [id], onDelete: SetNull)
+  supplier         Supplier           @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdByUser    User?              @relation("purchase_order_created_by_user", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  items            PurchaseOrderItem[]
+  receipts         PurchaseReceipt[]
+  fiscalReferences FiscalDocumentReference[]
+
+  @@index([companyId, supplierId, createdAt])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              BigInt        @id @default(autoincrement())
+  purchaseOrderId BigInt        @map("purchase_order_id")
+  productId       BigInt        @map("product_id")
+  quantity        Decimal       @db.Decimal(14, 3)
+  unitPrice       Decimal       @db.Decimal(14, 2) @map("unit_price")
+  notes           String?
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  receiptItems    PurchaseReceiptItem[]
+
+  @@index([purchaseOrderId, productId])
+  @@map("purchase_order_items")
+}
+
+model FiscalDocumentReference {
+  id                BigInt               @id @default(autoincrement())
+  companyId         BigInt               @map("company_id")
+  purchaseReceiptId BigInt?              @map("purchase_receipt_id")
+  purchaseOrderId   BigInt?              @map("purchase_order_id")
+  createdByUserId   BigInt?              @map("created_by_user_id")
+  documentType      String               @map("document_type")
+  status            FiscalReferenceStatus @default(PENDING)
+  externalReference String?              @map("external_reference")
+  simplifiedRegime  Boolean              @default(false) @map("simplified_regime")
+  metadata          Json?
+  notes             String?
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  company           Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseReceipt   PurchaseReceipt?     @relation(fields: [purchaseReceiptId], references: [id], onDelete: SetNull)
+  purchaseOrder     PurchaseOrder?       @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  createdByUser     User?                @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status, createdAt])
+  @@index([purchaseReceiptId])
+  @@index([purchaseOrderId])
+  @@map("fiscal_document_references")
+}
+
+model PurchaseReceipt {
+  id             BigInt               @id @default(autoincrement())
+  companyId      BigInt               @map("company_id")
+  purchaseOrderId BigInt?             @map("purchase_order_id")
+  supplierId     BigInt               @map("supplier_id")
+  warehouseId    BigInt               @map("warehouse_id")
+  status         PurchaseReceiptStatus @default(DRAFT)
+  receivedAt     DateTime?            @map("received_at")
+  notes          String?
+  evidence       Json?
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  company        Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseOrder  PurchaseOrder?       @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  supplier       Supplier             @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  warehouse      Warehouse            @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  items            PurchaseReceiptItem[]
+  inspections      ReceiptInspection[]
+  fiscalReferences FiscalDocumentReference[]
+
+  @@index([companyId, status, createdAt])
+  @@map("purchase_receipts")
+}
+
+model PurchaseReceiptItem {
+  id                  BigInt               @id @default(autoincrement())
+  receiptId           BigInt               @map("receipt_id")
+  purchaseOrderItemId BigInt?              @map("purchase_order_item_id")
+  productId           BigInt               @map("product_id")
+  substituteProductId BigInt?              @map("substitute_product_id")
+  confirmedLotId      BigInt?              @map("confirmed_lot_id")
+  requestedQuantity   Decimal              @db.Decimal(14, 3) @map("requested_quantity")
+  receivedQuantity    Decimal              @db.Decimal(14, 3) @map("received_quantity")
+  rejectedQuantity    Decimal              @default(0) @db.Decimal(14, 3) @map("rejected_quantity")
+  lotNumber           String?              @map("lot_number")
+  expirationDate      DateTime?            @map("expiration_date")
+  unitCost            Decimal?             @db.Decimal(14, 2) @map("unit_cost")
+  observations        String?
+  receipt             PurchaseReceipt      @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  purchaseOrderItem   PurchaseOrderItem?   @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
+  product             Product              @relation("purchase_receipt_item_product", fields: [productId], references: [id], onDelete: Cascade)
+  substituteProduct   Product?             @relation("purchase_receipt_item_substitute_product", fields: [substituteProductId], references: [id], onDelete: SetNull)
+  confirmedLot        Lot?                 @relation("purchase_receipt_item_confirmed_lot", fields: [confirmedLotId], references: [id], onDelete: SetNull)
+  inspections         ReceiptInspection[]
+
+  @@index([receiptId, productId])
+  @@map("purchase_receipt_items")
+}
+
+model ReceiptInspection {
+  id                BigInt                  @id @default(autoincrement())
+  receiptId         BigInt                  @map("receipt_id")
+  receiptItemId     BigInt                  @map("receipt_item_id")
+  productId         BigInt                  @map("product_id")
+  inspectorUserId   BigInt?                 @map("inspector_user_id")
+  result            ReceiptInspectionResult
+  quantityAccepted  Decimal                 @db.Decimal(14, 3) @map("quantity_accepted")
+  quantityRejected  Decimal                 @default(0) @db.Decimal(14, 3) @map("quantity_rejected")
+  observations      String?
+  evidence          Json?
+  inspectedAt       DateTime                @default(now()) @map("inspected_at")
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
+  receipt           PurchaseReceipt         @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receiptItem       PurchaseReceiptItem     @relation(fields: [receiptItemId], references: [id], onDelete: Cascade)
+  product           Product                 @relation("receipt_inspection_product", fields: [productId], references: [id], onDelete: Cascade)
+  inspectorUser     User?                   @relation("receipt_inspection_created_by_user", fields: [inspectorUserId], references: [id], onDelete: SetNull)
+
+  @@index([receiptId, receiptItemId, createdAt])
+  @@map("receipt_inspections")
 }
 
 model Lot {
@@ -845,6 +1244,11 @@ model Lot {
   warehouseLotStocks    WarehouseLotStock[]
   inventoryAlerts       InventoryAlert[]
   statusHistory         LotStatusHistory[]
+  productionConsumptions ProductionConsumption[]
+  productionWastes      ProductionWaste[]
+  productionReturns     ProductionReturn[]
+  qualityInspections    QualityInspection[]
+  purchaseReceiptItemsConfirmed PurchaseReceiptItem[] @relation("purchase_receipt_item_confirmed_lot")
 
   @@unique([companyId, internalLotNumber])
   @@index([productId])
@@ -1090,38 +1494,148 @@ model PaymentReceipt {
   @@map("payment_receipts")
 }
 
-model RecipeIngredient {
-  id         BigInt   @id @default(autoincrement())
-  recipeId   BigInt   @map("recipe_id")
-  productId  BigInt   @map("product_id")
-  quantity   Decimal  @db.Decimal(14, 3)
-  sortOrder  Int      @default(0) @map("sort_order")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  product    Product  @relation(fields: [productId], references: [id])
 
-  @@unique([recipeId, productId])
-  @@map("recipe_ingredients")
+
+model RecipeVersion {
+  id                     BigInt                   @id @default(autoincrement())
+  companyId              BigInt                   @map("company_id")
+  recipeId               BigInt                   @map("recipe_id")
+  versionNumber          Int                      @map("version_number")
+  status                 RecipeVersionStatus      @default(DRAFT)
+  effectiveFrom          DateTime?                @map("effective_from")
+  effectiveTo            DateTime?                @map("effective_to")
+  expectedYield          Decimal?                 @db.Decimal(14, 3) @map("expected_yield")
+  expectedWaste          Decimal?                 @db.Decimal(14, 3) @map("expected_waste")
+  yieldTolerancePercent  Decimal?                 @db.Decimal(5, 2) @map("yield_tolerance_percent")
+  wasteTolerancePercent  Decimal?                 @db.Decimal(5, 2) @map("waste_tolerance_percent")
+  instructions           String?
+  notes                  String?
+  createdByUserId        BigInt?                  @map("created_by_user_id")
+  approvedByUserId       BigInt?                  @map("approved_by_user_id")
+  approvedAt             DateTime?                @map("approved_at")
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
+  company                Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  recipe                 Recipe                   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  createdByUser          User?                    @relation("recipe_version_creator", fields: [createdByUserId], references: [id])
+  approvedByUser         User?                    @relation("recipe_version_approver", fields: [approvedByUserId], references: [id])
+  stages                 RecipeStage[]
+  productionOrders       ProductionOrder[]
+
+  @@unique([recipeId, versionNumber])
+  @@index([companyId, recipeId, status])
+  @@map("recipe_versions")
+}
+
+
+
+model RecipeStage {
+  id                    BigInt                    @id @default(autoincrement())
+  recipeVersionId       BigInt                    @map("recipe_version_id")
+  stageOrder            Int                       @map("stage_order")
+  name                  String
+  instructions          String?
+  responsibleRoleCode   String?                   @map("responsible_role_code")
+  responsibleUserId     BigInt?                   @map("responsible_user_id")
+  expectedParameters    Json?                     @map("expected_parameters")
+  parameterTolerances   Json?                     @map("parameter_tolerances")
+  requiredEvidence      Json?                     @map("required_evidence")
+  qaMandatory           Boolean                   @default(false) @map("qa_mandatory")
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
+  recipeVersion         RecipeVersion             @relation(fields: [recipeVersionId], references: [id], onDelete: Cascade)
+  stageInputs           RecipeStageInput[]
+  stageExecutions       ProductionStageExecution[]
+
+  @@unique([recipeVersionId, stageOrder])
+  @@map("recipe_stages")
+}
+
+model RecipeStageInput {
+  id            BigInt       @id @default(autoincrement())
+  recipeStageId BigInt       @map("recipe_stage_id")
+  productId     BigInt?      @map("product_id")
+  name          String
+  /// Cantidad de insumo por 1 unidad de producto terminado (base unitaria).
+  quantity      Decimal?     @db.Decimal(14, 3)
+  unit          String?
+  sortOrder     Int          @default(0) @map("sort_order")
+  notes         String?
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  recipeStage   RecipeStage  @relation(fields: [recipeStageId], references: [id], onDelete: Cascade)
+  product       Product?     @relation(fields: [productId], references: [id])
+
+  @@unique([recipeStageId, sortOrder])
+  @@index([productId])
+  @@map("recipe_stage_inputs")
 }
 
 model ProductionOrder {
-  id           BigInt           @id @default(autoincrement())
-  companyId     BigInt          @map("company_id")
-  orderId      BigInt?          @map("order_id")
-  recipeId     BigInt?          @map("recipe_id")
-  quantity     Decimal          @db.Decimal(14, 3)
-  status       OrderStatus      @default(DRAFT)
-  priority     Int              @default(0)
-  responsible  String?
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
-  company      Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  order        Order?           @relation(fields: [orderId], references: [id])
-  recipe       Recipe?          @relation(fields: [recipeId], references: [id])
-  items        ProductionItem[]
+  id                     BigInt                    @id @default(autoincrement())
+  companyId              BigInt                    @map("company_id")
+  orderId                BigInt?                   @map("order_id")
+  productId              BigInt?                   @map("product_id")
+  recipeId               BigInt?                   @map("recipe_id")
+  recipeVersionId        BigInt?                   @map("recipe_version_id")
+  originWarehouseId      BigInt?                   @map("origin_warehouse_id")
+  destinationWarehouseId BigInt?                   @map("destination_warehouse_id")
+  responsibleUserId      BigInt?                   @map("responsible_user_id")
+  quantity               Decimal                   @db.Decimal(14, 3)
+  status                 ProductionOrderStatus     @default(DRAFT)
+  priority               Int                       @default(0)
+  responsible            String?
+  productionLotCode      String?                   @map("production_lot_code")
+  plannedDate            DateTime?                 @map("planned_date")
+  productionDate         DateTime?                 @map("production_date")
+  expirationDate         DateTime?                 @map("expiration_date")
+  submittedAt            DateTime?                 @map("submitted_at")
+  approvedAt             DateTime?                 @map("approved_at")
+  startedAt              DateTime?                 @map("started_at")
+  cancelledAt            DateTime?                 @map("cancelled_at")
+  overrideJustification  String?                   @map("override_justification")
+  recipeVersionSnapshot  Json?                     @map("recipe_version_snapshot")
+  createdAt              DateTime                  @default(now()) @map("created_at")
+  updatedAt              DateTime                  @updatedAt @map("updated_at")
+  company                Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  order                  Order?                    @relation(fields: [orderId], references: [id])
+  product                Product?                  @relation("production_order_product", fields: [productId], references: [id])
+  recipe                 Recipe?                   @relation(fields: [recipeId], references: [id])
+  recipeVersion          RecipeVersion?            @relation(fields: [recipeVersionId], references: [id])
+  originWarehouse        Warehouse?                @relation("production_order_origin_warehouse", fields: [originWarehouseId], references: [id])
+  destinationWarehouse   Warehouse?                @relation("production_order_destination_warehouse", fields: [destinationWarehouseId], references: [id])
+  responsibleUser        User?                     @relation("production_order_responsible_user", fields: [responsibleUserId], references: [id])
+  items                  ProductionItem[]
+  materialRequirements   ProductionOrderMaterialRequirement[]
+  stageExecutions        ProductionStageExecution[]
+  consumptions           ProductionConsumption[]
+  wastes                 ProductionWaste[]
+  returns                ProductionReturn[]
+  qualityInspections     QualityInspection[]
 
+  @@index([companyId, status, plannedDate])
+  @@index([companyId, productId, createdAt])
   @@map("production_orders")
+}
+
+model ProductionOrderMaterialRequirement {
+  id                  BigInt          @id @default(autoincrement())
+  companyId           BigInt          @map("company_id")
+  productionOrderId   BigInt          @map("production_order_id")
+  productId           BigInt          @map("product_id")
+  requiredQuantity    Decimal         @db.Decimal(14, 3) @map("required_quantity")
+  unit                String
+  availableAtCreation Decimal?        @db.Decimal(14, 3) @map("available_at_creation")
+  shortageAtCreation  Decimal?        @db.Decimal(14, 3) @map("shortage_at_creation")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  company             Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  productionOrder     ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  product             Product         @relation(fields: [productId], references: [id])
+
+  @@unique([productionOrderId, productId])
+  @@index([companyId, productionOrderId])
+  @@index([productId])
+  @@map("production_order_material_requirements")
 }
 
 model ProductionItem {
@@ -1139,6 +1653,124 @@ model ProductionItem {
 
   @@map("production_items")
 }
+
+model ProductionStageExecution {
+  id                BigInt             @id @default(autoincrement())
+  productionOrderId BigInt             @map("production_order_id")
+  recipeStageId     BigInt             @map("recipe_stage_id")
+  stageOrder        Int                @map("stage_order")
+  stageName         String             @map("stage_name")
+  responsibleUserId BigInt?            @map("responsible_user_id")
+  startedAt         DateTime           @map("started_at")
+  endedAt           DateTime           @map("ended_at")
+  actualParameters      Json?              @map("actual_parameters")
+  qaOutOfTolerance     Boolean            @default(false) @map("qa_out_of_tolerance")
+  overrideJustification String?           @map("override_justification")
+  evidence              Json?
+  notes                 String?
+  movementGroupId       String?            @map("movement_group_id")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  productionOrder   ProductionOrder    @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  recipeStage       RecipeStage        @relation(fields: [recipeStageId], references: [id])
+  consumptions      ProductionConsumption[]
+  wastes            ProductionWaste[]
+  returns           ProductionReturn[]
+  qualityInspections QualityInspection[]
+
+  @@index([productionOrderId, stageOrder, createdAt])
+  @@index([recipeStageId])
+  @@map("production_stage_executions")
+}
+
+model ProductionConsumption {
+  id                BigInt                   @id @default(autoincrement())
+  stageExecutionId  BigInt                   @map("stage_execution_id")
+  productionOrderId BigInt                   @map("production_order_id")
+  warehouseId       BigInt                   @map("warehouse_id")
+  productId         BigInt                   @map("product_id")
+  lotId             BigInt                   @map("lot_id")
+  quantity          Decimal                  @db.Decimal(14, 3)
+  note              String?
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  stageExecution    ProductionStageExecution @relation(fields: [stageExecutionId], references: [id], onDelete: Cascade)
+  productionOrder   ProductionOrder          @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  lot               Lot                      @relation(fields: [lotId], references: [id], onDelete: Restrict)
+
+  @@index([productionOrderId, warehouseId, productId, createdAt])
+  @@index([productionOrderId, stageExecutionId, productId, lotId])
+  @@index([lotId])
+  @@map("production_consumptions")
+}
+
+model ProductionWaste {
+  id                BigInt                   @id @default(autoincrement())
+  stageExecutionId  BigInt                   @map("stage_execution_id")
+  productionOrderId BigInt                   @map("production_order_id")
+  warehouseId       BigInt                   @map("warehouse_id")
+  productId         BigInt                   @map("product_id")
+  lotId             BigInt                   @map("lot_id")
+  quantity          Decimal                  @db.Decimal(14, 3)
+  note              String?
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  stageExecution    ProductionStageExecution @relation(fields: [stageExecutionId], references: [id], onDelete: Cascade)
+  productionOrder   ProductionOrder          @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  lot               Lot                      @relation(fields: [lotId], references: [id], onDelete: Restrict)
+
+  @@index([productionOrderId, warehouseId, productId, createdAt])
+  @@index([productionOrderId, stageExecutionId, productId, lotId])
+  @@index([lotId])
+  @@map("production_wastes")
+}
+
+model ProductionReturn {
+  id                BigInt                   @id @default(autoincrement())
+  stageExecutionId  BigInt                   @map("stage_execution_id")
+  productionOrderId BigInt                   @map("production_order_id")
+  warehouseId       BigInt                   @map("warehouse_id")
+  productId         BigInt                   @map("product_id")
+  lotId             BigInt                   @map("lot_id")
+  responsibleUserId BigInt?                  @map("responsible_user_id")
+  quantity          Decimal                  @db.Decimal(14, 3)
+  reasonCode        String                   @map("reason_code")
+  note              String?
+  movementGroupId   String?                  @map("movement_group_id")
+  returnedAt        DateTime                 @map("returned_at")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  stageExecution    ProductionStageExecution @relation(fields: [stageExecutionId], references: [id], onDelete: Cascade)
+  productionOrder   ProductionOrder          @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  lot               Lot                      @relation(fields: [lotId], references: [id], onDelete: Restrict)
+
+  @@index([productionOrderId, warehouseId, productId, createdAt])
+  @@index([productionOrderId, stageExecutionId, productId, lotId])
+  @@index([lotId])
+  @@map("production_returns")
+}
+
+model QualityInspection {
+  id                 BigInt                   @id @default(autoincrement())
+  productionOrderId  BigInt                   @map("production_order_id")
+  stageExecutionId   BigInt                   @map("stage_execution_id")
+  inspectorUserId    BigInt                   @map("inspector_user_id")
+  lotId              BigInt?                  @map("lot_id")
+  result             QualityInspectionResult
+  expectedParameters Json?                    @map("expected_parameters")
+  actualResults      Json?                    @map("actual_results")
+  observations       String?
+  evidence           Json?
+  correctiveAction   String?                  @map("corrective_action")
+  inspectedAt        DateTime                 @map("inspected_at")
+  createdAt          DateTime                 @default(now()) @map("created_at")
+  updatedAt          DateTime                 @updatedAt @map("updated_at")
+  productionOrder    ProductionOrder          @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  stageExecution     ProductionStageExecution @relation(fields: [stageExecutionId], references: [id], onDelete: Cascade)
+  lot                Lot?                     @relation(fields: [lotId], references: [id], onDelete: Restrict)
+
+  @@index([productionOrderId, stageExecutionId, createdAt])
+  @@index([lotId])
+  @@map("quality_inspections")
+}
+
 model AuditEvent {
   id            BigInt   @id @default(autoincrement())
   requestId     String   @map("request_id")
@@ -1196,5 +1828,39 @@ model ThrottleEntry {
 
   @@index([expiresAt])
   @@map("throttle_entries")
+}
+
+model SupplierQuotationInvitation {
+  id                      BigInt                              @id @default(autoincrement())
+  companyId               BigInt                              @map("company_id")
+  purchaseRequestId       BigInt                              @map("purchase_request_id")
+  supplierId              BigInt                              @map("supplier_id")
+  quotationId             BigInt?                             @map("quotation_id")
+  createdByUserId         BigInt?                             @map("created_by_user_id")
+  emailTo                 String?                             @map("email_to")
+  tokenHash               String                              @unique @map("token_hash")
+  status                  SupplierQuotationInvitationStatus    @default(PENDING)
+  expiresAt               DateTime                            @map("expires_at")
+  preparedAt              DateTime?                           @map("prepared_at")
+  respondedAt             DateTime?                           @map("responded_at")
+  cancelledAt             DateTime?                           @map("cancelled_at")
+  emailSubject            String?                             @map("email_subject")
+  emailBody               String?                             @map("email_body") @db.Text
+  responseSource          String?                             @map("response_source")
+  manualResponseByUserId  BigInt?                             @map("manual_response_by_user_id")
+  manualResponseNotes     String?                             @map("manual_response_notes") @db.Text
+  createdAt               DateTime                            @default(now()) @map("created_at")
+  updatedAt               DateTime                            @updatedAt @map("updated_at")
+  company                 Company                             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseRequest         PurchaseRequest                     @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  supplier                Supplier                            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  quotation               SupplierQuotation?                  @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  createdByUser           User?                               @relation("rfq_invitation_created_by_user", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  manualResponseByUser    User?                               @relation("rfq_invitation_manual_response_by_user", fields: [manualResponseByUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, purchaseRequestId])
+  @@index([supplierId])
+  @@index([status, expiresAt])
+  @@map("supplier_quotation_invitations")
 }
 

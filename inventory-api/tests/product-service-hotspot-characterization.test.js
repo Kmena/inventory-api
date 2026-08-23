@@ -48,6 +48,10 @@ test('updateProduct routes the final mutation through the company-scoped reposit
           id: productId,
           companyId,
           createdByUserId: 15n,
+          sku: null,
+          barcode: null,
+          sourcingMethod: 'PRODUCTION_OR_PURCHASE',
+          inventoryType: 'FINISHED_GOOD',
           productType: 'FINISHED_PRODUCT',
           sellableKind: 'STANDARD',
           taxExempt: false,
@@ -55,6 +59,10 @@ test('updateProduct routes the final mutation through the company-scoped reposit
           taxRate: 13,
           density: null,
           densityUnit: null,
+          requiresLot: true,
+          requiresExpiration: false,
+          standardCost: null,
+          realCost: null,
           isActive: true,
           lotStrategy: 'TRACKED',
           kgConversionFactor: 1,
@@ -83,6 +91,7 @@ test('updateProduct routes the final mutation through the company-scoped reposit
         name: 'Producto actualizado',
         price: 21.25,
         currency: 'USD',
+        companyId: 999n,
       },
       { companyId: '7', sub: '15', permissions: ['products.manage'] },
     ),
@@ -97,6 +106,10 @@ test('updateProduct routes the final mutation through the company-scoped reposit
       currency: 'USD',
       companyId: 7n,
       createdByUserId: 15n,
+      sku: null,
+      barcode: null,
+      sourcingMethod: 'PRODUCTION_OR_PURCHASE',
+      inventoryType: 'FINISHED_GOOD',
       productType: 'FINISHED_PRODUCT',
       sellableKind: 'STANDARD',
       cabysCode: null,
@@ -105,6 +118,10 @@ test('updateProduct routes the final mutation through the company-scoped reposit
       taxRate: 13,
       density: null,
       densityUnit: null,
+      requiresLot: true,
+      requiresExpiration: false,
+      standardCost: null,
+      realCost: null,
       isActive: true,
       // inCatalog ahora siempre se incluye — fix para el bug donde
       // buildProductWriteData omitia el campo y Prisma usaba @default(false),
@@ -195,6 +212,10 @@ test('createProduct zeroes stock counters, syncs general price, and keeps initia
 
   assert.equal(observed.createData.companyId, 7n);
   assert.equal(observed.createData.createdByUserId, 15n);
+  assert.equal(observed.createData.sourcingMethod, 'PRODUCTION_OR_PURCHASE');
+  assert.equal(observed.createData.inventoryType, 'FINISHED_GOOD');
+  assert.equal(observed.createData.requiresLot, true);
+  assert.equal(observed.createData.requiresExpiration, false);
   assert.equal(observed.createData.quantity, 0);
   assert.equal(observed.createData.reservedQuantity, 0);
   assert.deepEqual(observed.priceUpdates, [

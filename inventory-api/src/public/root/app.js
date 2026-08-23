@@ -35,7 +35,7 @@ let activeSidebarEntryId = null;
 const sidebarState = {
   collapsed: false,
   drawerOpen: false,
-  openGroups: new Set(['inventory-group', 'sales-group']),
+  openGroups: new Set(['inventory-group', 'sales-group', 'produccion-group', 'compras-group']),
 };
 
 function setStatus(message, tone = 'default') {
@@ -280,6 +280,22 @@ function updateNavigation(routeKey) {
 
 async function renderCurrentRoute() {
   const routeResolution = rootShellRouter.resolveRoute(window.location.hash, activeSession);
+
+  if (routeResolution.allowed === false) {
+    viewElement.innerHTML = `
+      <section class="root-hero" aria-labelledby="root-view-title">
+        <h2 id="root-view-title">Sin acceso</h2>
+        <p class="muted">No tienes permiso para ver esta sección.</p>
+      </section>
+    `;
+    const accessDeniedHeading = viewElement.querySelector('#root-view-title');
+    if (accessDeniedHeading instanceof HTMLElement) {
+      accessDeniedHeading.setAttribute('tabindex', '-1');
+      accessDeniedHeading.focus();
+    }
+    return;
+  }
+
   const routeKey = routeResolution.routeKey;
   activeSidebarEntryId = routeResolution.item?.id || null;
 

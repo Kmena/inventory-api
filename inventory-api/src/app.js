@@ -13,6 +13,14 @@ const roleRouter = require('./routes/role.routes');
 const userRouter = require('./routes/user.routes');
 const clientRouter = require('./routes/client.routes');
 const productRouter = require('./routes/product.routes');
+const recipeRouter = require('./routes/recipe.routes');
+const productionRouter = require('./routes/production.routes');
+const procurementRouter = require('./routes/procurement.routes');
+const procurementRfqRouter = require('./routes/procurement-rfq.routes');
+const publicSupplierQuotationRouter = require('./routes/public-supplier-quotation.routes');
+const supplierRouter = require('./routes/supplier.routes');
+const receiptRouter = require('./routes/receipt.routes');
+const fiscalReferenceRouter = require('./routes/fiscal-reference.routes');
 const orderRouter = require('./routes/order.routes');
 const invoiceRouter = require('./routes/invoice.routes');
 const paymentRouter = require('./routes/payment.routes');
@@ -36,7 +44,24 @@ const migrationDocumentPath = path.join(publicRootDirectory, 'migration.html');
 app.set('trust proxy', trustProxy);
 app.set('json replacer', (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
 
-function getFriendlyError(error) {
+const DB_UNREACHABLE_MESSAGE = 'No pudimos conectarnos a la base de datos. Intente de nuevo en unos momentos.';
+const DB_AUTH_FAILED_MESSAGE = 'El servicio no pudo conectarse a la base de datos. Intente de nuevo en unos momentos.';
+
+function extractDatabaseTarget(rawMessage) {
+  const match = /at\s+`([^`]+)`/i.exec(rawMessage || '');
+  return match ? match[1] : null;
+}
+
+function withDevHint(baseMessage, error, currentEnv) {
+  if (currentEnv === 'production') {
+    return baseMessage;
+  }
+  const target = extractDatabaseTarget(error?.message);
+  const targetHint = target ? ` en ${target}` : '';
+  return `${baseMessage} [dev] Base de datos no disponible${targetHint}. Revisa que los contenedores esten arriba (\`npm run dev:full\`).`;
+}
+
+function getFriendlyError(error, currentEnv = nodeEnv) {
   const rawMessage = error?.message || '';
   const lowerMessage = rawMessage.toLowerCase();
 
@@ -44,7 +69,7 @@ function getFriendlyError(error) {
     return {
       statusCode: 503,
       code: 'service_unavailable',
-      message: 'No pudimos conectarnos a la base de datos. Intente de nuevo en unos momentos.',
+      message: withDevHint(DB_UNREACHABLE_MESSAGE, error, currentEnv),
     };
   }
 
@@ -52,7 +77,7 @@ function getFriendlyError(error) {
     return {
       statusCode: 503,
       code: 'service_unavailable',
-      message: 'El servicio no pudo conectarse a la base de datos. Intente de nuevo en unos momentos.',
+      message: withDevHint(DB_AUTH_FAILED_MESSAGE, error, currentEnv),
     };
   }
 
@@ -93,6 +118,24 @@ function selectContentSecurityPolicy(pathName) {
     ]);
   }
 
+  // Warehouse/QA SPA: permite blob: para thumbnails de fotos en evidencia de recepciones.
+  // No requiere `unsafe-inline`; los estilos vienen de `/styles.css`.
+  if (pathName.startsWith('/warehouse/')) {
+    return buildContentSecurityPolicy([
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self'",
+      "style-src 'self'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self'",
+      "media-src 'self' blob:",
+    ]);
+  }
+
   // Rutas de la SPA del agente: permiten tiles de OpenStreetMap.
   // Este bloque debe evaluarse antes de isDeprecatedLegacyHtmlPath
   // porque /agent/*.html también coincide con el patron legacy.
@@ -108,6 +151,22 @@ function selectContentSecurityPolicy(pathName) {
       "img-src 'self' data: https://*.tile.openstreetmap.org",
       "font-src 'self' data:",
       "connect-src 'self' https://*.tile.openstreetmap.org",
+    ]);
+  }
+
+  // Supplier quote public page: minimal CSP, no external resources.
+  if (pathName.startsWith('/supplier-quote/')) {
+    return buildContentSecurityPolicy([
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data:",
+      "font-src 'self' data:",
+      "connect-src 'self'",
     ]);
   }
 
@@ -175,6 +234,14 @@ app.use('/api/roles', ...mediumPayloadParsers, roleRouter);
 app.use('/api/users', ...mediumPayloadParsers, userRouter);
 app.use('/api/clients', ...mediumPayloadParsers, clientRouter);
 app.use('/api/products', ...mediumPayloadParsers, productRouter);
+app.use('/api/recipes', ...mediumPayloadParsers, recipeRouter);
+app.use('/api/production', ...mediumPayloadParsers, productionRouter);
+app.use('/api/procurement', ...mediumPayloadParsers, procurementRouter);
+app.use('/api/procurement', ...mediumPayloadParsers, procurementRfqRouter);
+app.use('/api/public/supplier-quotations', ...mediumPayloadParsers, publicSupplierQuotationRouter);
+app.use('/api/suppliers', ...mediumPayloadParsers, supplierRouter);
+app.use('/api/receipts', ...mediumPayloadParsers, receiptRouter);
+app.use('/api/fiscal-references', ...mediumPayloadParsers, fiscalReferenceRouter);
 app.use('/api/orders', ...mediumPayloadParsers, orderRouter);
 app.use('/api/invoices', ...mediumPayloadParsers, invoiceRouter);
 app.use('/api/payments', ...mediumPayloadParsers, paymentRouter);

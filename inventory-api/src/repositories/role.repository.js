@@ -1,5 +1,9 @@
 const prisma = require('../lib/prisma');
 
+function roleWithPermissionsInclude() {
+  return { rolePermissions: { include: { permission: true } } };
+}
+
 function findActivePermissions() {
   return prisma.permission.findMany({
     where: { isActive: true },
@@ -43,7 +47,28 @@ function findAssignableRoles(companyId, pagination = null) {
 function findRoleById(roleId) {
   return prisma.role.findUnique({
     where: { id: roleId },
-    include: { rolePermissions: { include: { permission: true } } },
+    include: roleWithPermissionsInclude(),
+  });
+}
+
+function findCompanyOwnedRoleById(roleId, companyId) {
+  return prisma.role.findFirst({
+    where: {
+      id: roleId,
+      companyId,
+      isActive: true,
+    },
+    include: roleWithPermissionsInclude(),
+  });
+}
+
+function findAssignableRoleByIdForCompany(roleId, companyId) {
+  return prisma.role.findFirst({
+    where: {
+      id: roleId,
+      ...assignableRolesWhere(companyId),
+    },
+    include: roleWithPermissionsInclude(),
   });
 }
 
@@ -73,9 +98,43 @@ async function createCompanyRole({ companyId, code, name, permissionCodes }) {
   });
 }
 
+async function updateCompanyRolePermissions({ roleId, name, permissionCodes }) {
+  return prisma.$transaction(async (tx) => {
+    const permissions = await tx.permission.findMany({
+      where: { code: { in: permissionCodes }, isActive: true },
+    });
+
+    await tx.rolePermission.deleteMany({ where: { roleId } });
+
+    const updateData = {};
+    if (name !== undefined && name !== null) {
+      updateData.name = name;
+    }
+
+    const role = await tx.role.update({
+      where: { id: roleId },
+      data: {
+        ...updateData,
+        rolePermissions: {
+          create: permissions.map((permission) => ({
+            permissionId: permission.id,
+            isEnabled: true,
+          })),
+        },
+      },
+      include: { rolePermissions: { include: { permission: true } } },
+    });
+
+    return role;
+  });
+}
+
 module.exports = {
   findActivePermissions,
   findAssignableRoles,
   findRoleById,
+  findCompanyOwnedRoleById,
+  findAssignableRoleByIdForCompany,
   createCompanyRole,
+  updateCompanyRolePermissions,
 };

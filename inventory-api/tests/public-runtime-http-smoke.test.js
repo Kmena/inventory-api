@@ -39,7 +39,7 @@ test('reduced public runtime serves supported HTML entrypoints with strict secur
   const server = app.listen(0);
   t.after(() => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))));
 
-  const supportedPaths = ['/', '/index.html', '/no-access.html', '/migration.html', '/migration.html?mode=post-login-transition', '/root/'];
+  const supportedPaths = ['/', '/index.html', '/no-access.html', '/migration.html', '/migration.html?mode=post-login-transition', '/root/', '/warehouse/'];
 
   for (const pathName of supportedPaths) {
     const response = await request(server, pathName);
@@ -64,6 +64,13 @@ test('supported root shell and post-login transition URLs stay active while depr
   assert.equal(supportedRootShellResponse.statusCode, 200);
   assert.match(String(supportedRootShellResponse.headers['content-security-policy'] || ''), /default-src 'self'/);
   assert.match(supportedRootShellResponse.body, /root-main/);
+
+  const supportedWarehouseResponse = await request(server, '/warehouse/');
+  assert.equal(supportedWarehouseResponse.statusCode, 200);
+  assert.match(String(supportedWarehouseResponse.headers['content-security-policy'] || ''), /default-src 'self'/);
+  assert.match(String(supportedWarehouseResponse.headers['content-security-policy'] || ''), /img-src 'self' data: blob:/);
+  assert.match(String(supportedWarehouseResponse.headers['content-security-policy'] || ''), /style-src 'self'/);
+  assert.match(supportedWarehouseResponse.body, /warehouse-main/);
 
   const supportedTransitionResponse = await request(server, '/migration.html?mode=post-login-transition');
   assert.equal(supportedTransitionResponse.statusCode, 200);
@@ -100,7 +107,7 @@ test('reduced public runtime serves only the remaining supported JavaScript asse
   const server = app.listen(0);
   t.after(() => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))));
 
-  const supportedAssets = ['/login.js', '/migration.js', '/shared/auth.js', '/shared/session.js', '/root/app.js', '/root/router.js', '/root/registry.js', '/root/companies-api.js', '/root/roles-api.js', '/root/agents-api.js', '/root/clients-api.js', '/root/routes-api.js', '/root/ui.js', '/root/views/companies-admin.js', '/root/views/roles-admin.js', '/root/views/agents-admin.helpers.js', '/root/views/agents-admin.renderers.js', '/root/views/agents-admin.js', '/root/views/clients-admin.helpers.js', '/root/views/clients-admin.renderers.js', '/root/views/clients-admin.state.js', '/root/views/clients-admin.js', '/root/views/routes-admin.helpers.js', '/root/views/routes-admin.renderers.js', '/root/views/routes-admin.state.js', '/root/views/routes-admin.js'];
+  const supportedAssets = ['/login.js', '/migration.js', '/shared/auth.js', '/shared/session.js', '/root/app.js', '/root/router.js', '/root/registry.js', '/root/companies-api.js', '/root/roles-api.js', '/root/agents-api.js', '/root/clients-api.js', '/root/routes-api.js', '/root/quotations-api.js', '/root/ui.js', '/root/views/companies-admin.js', '/root/views/roles-admin.js', '/root/views/agents-admin.helpers.js', '/root/views/agents-admin.renderers.js', '/root/views/agents-admin.js', '/root/views/clients-admin.helpers.js', '/root/views/clients-admin.renderers.js', '/root/views/clients-admin.state.js', '/root/views/clients-admin.js', '/root/views/quotations-admin.helpers.js', '/root/views/quotations-admin.renderers.js', '/root/views/quotations-admin.js', '/root/views/routes-admin.helpers.js', '/root/views/routes-admin.renderers.js', '/root/views/routes-admin.state.js', '/root/views/routes-admin.js', '/warehouse/app.js', '/warehouse/bootstrap.js', '/warehouse/state.js', '/warehouse/captures.js', '/warehouse/api/warehouse-api.js', '/warehouse/views/inspections.js', '/warehouse/views/production.js', '/warehouse/views/receipts.js', '/warehouse/views/recipe-consultation.js'];
 
   for (const assetPath of supportedAssets) {
     const response = await request(server, assetPath);

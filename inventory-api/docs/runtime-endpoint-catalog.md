@@ -25,9 +25,9 @@ No se aceptan rutas montadas sin clasificar.
 
 ### Current contract summary
 Option B satisfied for the minimum critical contract surface.
-- Operaciones montadas en routers descubiertas desde `src/app.js` + `src/routes/*.routes.js`: `95`
-- Operaciones cubiertas por OpenAPI parcial: `75`
-- Operaciones excluidas explícitamente del OpenAPI parcial: `20`
+- Operaciones montadas en routers descubiertas desde `src/app.js` + `src/routes/*.routes.js`: `156`
+- Operaciones cubiertas por OpenAPI parcial: `113`
+- Operaciones excluidas explícitamente del OpenAPI parcial: `43`
 - Superficie runtime adicional intencionalmente fuera de OpenAPI: `express.static(src/public)`
 
 ### Intentionally excluded OpenAPI operations
@@ -59,6 +59,7 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 - Producción y formulación
 - Aprobaciones transversales
 - Reportes, dashboards y exportaciones
+- Warehouse/QA SPA — operativa de bodega y control de calidad (TASK-017)
 
 ## Plataforma y seguridad
 | Method | Path | Authentication | Authorization observed | Purpose | Notes |
@@ -86,6 +87,7 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 | GET | `/api/roles/permissions` | Sí | `authorizeAccessPolicy('role.permissions.list')` | Listar permisos asignables | Base para roles personalizados |
 | GET | `/api/roles/company` | Sí | `authorizeAccessPolicy('role.company.list')` | Listar roles asignables por compañía | Consumido por UI; actor scope `company-admin` |
 | POST | `/api/roles/company` | Sí | `authorizeAccessPolicy('role.company.create')` | Crear rol de compañía | Validado por schema; actor scope `company-admin`, y el servicio aplica gobernanza adicional, niega permisos de alcance plataforma como `companies.manage` antes de persistir y registra el deny path mediante auditoría fail-open cuando hay contexto de request |
+| PUT | `/api/roles/company/:roleId` | Sí | `authorizeAccessPolicy('role.company.update')` | Actualizar permisos y nombre de un rol de empresa | Requiere `settings.manage`; validación de tenant isolation, gobernanza de permisos platform-scoped, protección anti auto-bloqueo, auditoría de cambios |
 
 ## Clientes y crédito comercial
 | Method | Path | Authentication | Authorization observed | Purpose | Notes |
@@ -158,6 +160,84 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 | GET | `/api/warehouses/company` | Sí | `authorizePermission('inventory.view', 'inventory.manage')` | Listar bodegas de compañía | Consumido por UI |
 | POST | `/api/warehouses/company` | Sí | `authorizePermission('inventory.manage')` | Crear bodega de compañía | |
 
+## Producción y formulación
+| Method | Path | Authentication | Authorization observed | Purpose | Notes |
+|---|---|---|---|---|---|
+| GET | `/api/recipes/` | Sí | `authorizeAccessPolicy('recipe.view')` | Listar recetas maestras | Superficie tenant-scoped factual ahora cubierta por el OpenAPI parcial |
+| POST | `/api/recipes/` | Sí | `authorizeAccessPolicy('recipe.manage')` | Crear receta maestra | Validado por schema |
+| GET | `/api/recipes/:id` | Sí | `authorizeAccessPolicy('recipe.view')` | Obtener detalle de receta | |
+| PUT | `/api/recipes/:id` | Sí | `authorizeAccessPolicy('recipe.manage')` | Actualizar receta maestra | |
+| GET | `/api/recipes/:id/versions` | Sí | `authorizeAccessPolicy('recipe.view')` | Listar versiones de receta | |
+| POST | `/api/recipes/:id/versions` | Sí | `authorizeAccessPolicy('recipe.manage')` | Crear versión borrador | Validado por schema |
+| PUT | `/api/recipes/versions/:id` | Sí | `authorizeAccessPolicy('recipe.manage')` | Actualizar versión borrador | Rechaza mutación in-place si ya fue aprobada |
+| POST | `/api/recipes/versions/:id/approve` | Sí | `authorizeAccessPolicy('recipe.approve')` | Aprobar versión de receta | Congela la versión aprobada |
+| GET | `/api/production/orders` | Sí | `authorizeAccessPolicy('production.view')` | Listar órdenes de producción | Paginado tenant-scoped |
+| POST | `/api/production/orders` | Sí | `authorizeAccessPolicy('production.create')` | Crear orden de producción | Valida guardrails de sourcing/receta y congela `recipeVersionSnapshot` |
+| GET | `/api/production/orders/:id` | Sí | `authorizeAccessPolicy('production.view')` | Obtener detalle de orden de producción | |
+| GET | `/api/production/orders/:id/material-requirements` | Sí | `authorizeAccessPolicy('production.view')` | Consultar requerimientos de materiales y faltantes de la orden | Devuelve `required/available/missing` usando la bodega origen de la orden |
+| GET | `/api/production/orders/:id/stages/:stageId/available-lots` | Sí | `authorizeAccessPolicy('production.execute')` | Consultar lotes sugeridos para una etapa | Ordena FEFO cuando aplica vencimiento y FIFO por `entryDate` cuando no; omite `internalLotNumber` |
+| POST | `/api/production/orders/:id/submit` | Sí | `authorizeAccessPolicy('production.create')` | Enviar orden a aprobación | Transición `DRAFT -> PENDING_APPROVAL` |
+| POST | `/api/production/orders/:id/approve` | Sí | `authorizeAccessPolicy('production.approve')` | Aprobar orden de producción | Revalida guardrails y mantiene snapshot congelado |
+| POST | `/api/production/orders/:id/start` | Sí | `authorizeAccessPolicy('production.execute')` | Iniciar orden de producción | Transición `APPROVED -> IN_PROGRESS` |
+| POST | `/api/production/orders/:id/stages/:stageId/execute` | Sí | `authorizeAccessPolicy('production.execute')` | Ejecutar etapa de producción | Valida payload de tiempos/materiales/evidencia, resuelve la etapa desde `recipeVersionSnapshot`, y registra movimientos `OUT` con `reasonCode` `PRODUCTION_CONSUMPTION` / `PRODUCTION_WASTE` |
+| POST | `/api/production/orders/:id/stages/:stageId/returns` | Sí | `authorizeAccessPolicy('production.execute')` | Registrar devolución de materia prima por etapa/lote | Requiere `lotId`, usa una entidad explícita de devolución y registra movimiento `IN` ligado al detalle por etapa/producto/lote |
+| POST | `/api/production/orders/:id/stages/:stageId/inspections` | Sí | `authorizeAccessPolicy('quality.inspect')` | Registrar inspección QA por etapa | Vincula inspección a la última ejecución de la etapa; si el resultado es `REJECTED`, la orden transiciona a `QA_HOLD`; si es `APPROVED`/`CONDITIONALLY_ACCEPTED` y la orden estaba en `QA_HOLD`, retorna a `IN_PROGRESS` |
+| GET | `/api/production/orders/:id/inspections` | Sí | `authorizeAccessPolicy('quality.view')` | Listar inspecciones QA de una orden | Retorna todas las inspecciones ordenadas por fecha descendente |
+| POST | `/api/production/orders/:id/complete` | Sí | `authorizeAccessPolicy('production.complete')` | Completar orden de producción | Valida QA gates, crea lote del producto terminado, registra movimiento `PRODUCTION_RECEIPT` en bodega destino, transiciona a `COMPLETED` |
+| POST | `/api/production/orders/:id/cancel` | Sí | `authorizeAccessPolicy('production.cancel')` | Cancelar orden de producción | Transición compatible desde estados operativos tempranos |
+
+## Gestión de proveedores
+| Method | Path | Authentication | Authorization observed | Purpose | Notes |
+|---|---|---|---|---|---|
+| GET | `/api/suppliers/company` | Sí | `authorizeAccessPolicy('supplier.view')` | Listar proveedores de la compañía | Superficie tenant-scoped ahora cubierta por OpenAPI parcial |
+| POST | `/api/suppliers/company` | Sí | `authorizeAccessPolicy('supplier.manage')` | Crear proveedor | Validado por schema; cubierto por OpenAPI parcial |
+| GET | `/api/suppliers/company/:id` | Sí | `authorizeAccessPolicy('supplier.view')` | Obtener detalle de proveedor | |
+| PUT | `/api/suppliers/company/:id` | Sí | `authorizeAccessPolicy('supplier.manage')` | Actualizar proveedor | |
+| DELETE | `/api/suppliers/company/:id` | Sí | `authorizeAccessPolicy('supplier.manage')` | Eliminar proveedor | Devuelve `204` |
+| POST | `/api/suppliers/company/:id/products` | Sí | `authorizeAccessPolicy('supplier.manage')` | Asignar producto autorizado al proveedor | Validado por schema |
+| DELETE | `/api/suppliers/company/:id/products/:productId` | Sí | `authorizeAccessPolicy('supplier.manage')` | Remover producto autorizado del proveedor | Devuelve `204` |
+
+## Abastecimiento y compras
+| Method | Path | Authentication | Authorization observed | Purpose | Notes |
+|---|---|---|---|---|---|
+| GET | `/api/procurement/quotable-products` | Sí | `authorizeAccessPolicy('procurement.view')` | Listar productos cotizables | Superficie auxiliar de apoyo al workspace interno; clasificada por exclusión explícita en el manifiesto |
+| GET | `/api/procurement/products/:id/suppliers-pricing` | Sí | `authorizeAccessPolicy('procurement.view')` | Consultar pricing y proveedores por producto | Lectura auxiliar para análisis interno; clasificada por exclusión explícita en el manifiesto |
+| POST | `/api/procurement/products/:id/request-quotations` | Sí | `authorizeAccessPolicy('procurement.manage')` | Crear solicitud asistida de cotización por producto | Mutación auxiliar fuera del recorte OpenAPI parcial actual |
+| GET | `/api/procurement/requests` | Sí | `authorizeAccessPolicy('procurement.view')` | Listar solicitudes de compra | Tenant-scoped, sin efectos de inventario |
+| POST | `/api/procurement/requests` | Sí | `authorizeAccessPolicy('procurement.manage')` | Crear solicitud de compra | Crea intención de compra y sus items; no mueve stock |
+| GET | `/api/procurement/requests/:id` | Sí | `authorizeAccessPolicy('procurement.view')` | Obtener detalle de solicitud de compra | Incluye cotizaciones, selecciones y POs relacionadas |
+| POST | `/api/procurement/requests/:id/quotations` | Sí | `authorizeAccessPolicy('procurement.manage')` | Registrar cotización de proveedor | Cotización/proforma como intención comercial; sin efectos de inventario |
+| GET | `/api/procurement/requests/:id/comparison` | Sí | `authorizeAccessPolicy('procurement.view')` | Comparar cotizaciones de proveedores | Ordena por monto total y expone lead time promedio |
+| POST | `/api/procurement/requests/:id/select-quotation` | Sí | `authorizeAccessPolicy('procurement.manage')` | Seleccionar cotización/proveedor | Genera selección con aprobación automática o pendiente según threshold de la empresa |
+| POST | `/api/procurement/selections/:id/approve` | Sí | `authorizeAccessPolicy('procurement.approve')` | Aprobar selección de proveedor | Requerido cuando el monto supera el threshold configurado |
+| GET | `/api/procurement/orders` | Sí | `authorizeAccessPolicy('procurement.view')` | Listar órdenes de compra de la empresa | Ordenadas por `createdAt` DESC; incluye `supplier` e `items[].product` |
+| POST | `/api/procurement/requests/:id/purchase-orders` | Sí | `authorizeAccessPolicy('procurement.manage')` | Crear orden de compra desde selección | Requiere selección aprobada cuando aplica; no afecta inventario |
+| POST | `/api/procurement/requests/:id/cancel` | Sí | `authorizeAccessPolicy('procurement.manage')` | Cancelar solicitud de compra sin generar orden | Marca la solicitud como CANCELLED; disponible solo cuando status es OPEN |
+| POST | `/api/procurement/requests/:id/rfq-invitations` | Sí | `authorizeAccessPolicy('procurement.manage')` | Crear invitaciones RFQ para proveedores | Genera link seguro y machote; sin envío automático de correo |
+| GET | `/api/procurement/requests/:id/rfq-invitations` | Sí | `authorizeAccessPolicy('procurement.view')` | Listar invitaciones RFQ de una solicitud | Visible para seguimiento interno |
+| POST | `/api/procurement/rfq-invitations/:id/refresh-template` | Sí | `authorizeAccessPolicy('procurement.manage')` | Regenerar machote y link seguro RFQ | Puede reemitir token y extender expiración |
+| POST | `/api/procurement/rfq-invitations/:id/cancel` | Sí | `authorizeAccessPolicy('procurement.manage')` | Cancelar invitación RFQ | Terminal para uso público |
+| POST | `/api/procurement/rfq-invitations/:id/manual-response` | Sí | `authorizeAccessPolicy('procurement.manage')` | Registrar respuesta manual de proveedor | Usado desde workspace interno y `#seguimiento_cotizaciones` |
+| GET | `/api/procurement/rfq-tracking` | Sí | `authorizeAccessPolicy('procurement.view')` | Consultar tracking interno RFQ | Alimenta la página root-shell `#seguimiento_cotizaciones` |
+
+## RFQ público por token
+| Method | Path | Authentication | Authorization observed | Purpose | Notes |
+|---|---|---|---|---|---|
+| GET | `/api/public/supplier-quotations/:token` | No | None | Consultar invitación pública RFQ | Aplica throttling dedicado `30/min`, persiste `EXPIRED` de forma lazy y responde `429` con `Retry-After` cuando corresponde |
+| POST | `/api/public/supplier-quotations/:token/response` | No | None | Registrar respuesta pública RFQ del proveedor | Aplica throttling dedicado `10/min`, materializa `SupplierQuotation` solo si la invitación sigue válida |
+
+## Recepciones e inspección de ingreso
+| Method | Path | Authentication | Authorization observed | Purpose | Notes |
+|---|---|---|---|---|---|
+| GET | `/api/receipts/` | Sí | `authorizeAccessPolicy('receipt.view')` | Listar documentos de recepción | Tenant-scoped, sin efectos de inventario en esta fase |
+| POST | `/api/receipts/` | Sí | `authorizeAccessPolicy('receipt.inspect')` | Crear documento de recepción | Representa llegada real con diferencias, lotes, vencimiento, costo y observaciones; no confirma stock |
+| GET | `/api/receipts/:id` | Sí | `authorizeAccessPolicy('receipt.view')` | Obtener detalle de documento de recepción | Incluye items e inspecciones |
+| POST | `/api/receipts/:id/items/:itemId/inspections` | Sí | `authorizeAccessPolicy('receipt.inspect')` | Inspeccionar ítem de recepción | Actualiza el estado del documento según el resultado (`ACCEPTED`, `PARTIALLY_ACCEPTED`, `REJECTED`) |
+| POST | `/api/receipts/:id/confirm` | Sí | `authorizeAccessPolicy('receipt.confirm')` | Confirmar recepción e ingresar stock | Transaccional: crea lote, actualiza WarehouseLotStock/WarehouseStock/Product, registra movimiento `PURCHASE_RECEIPT`; requiere estado `ACCEPTED` o `PARTIALLY_ACCEPTED` |
+| POST | `/api/receipts/:id/reverse` | Sí | `authorizeAccessPolicy('receipt.reverse')` | Revertir recepción confirmada | Crea movimiento `RECEIPT_REVERSAL`, revierte stock sin borrar historia; requiere estado `CONFIRMED` |
+| GET | `/api/receipts/:id/fiscal-references` | Sí | `authorizeAccessPolicy('receipt.view')` | Listar referencias de documentos fiscales de una recepción | Metadata de handoff hacia Billing/Hacienda; status siempre empieza en `PENDING` porque el API externo no existe aún |
+| POST | `/api/receipts/:id/fiscal-references` | Sí | `authorizeAccessPolicy('receipt.confirm')` | Crear referencia de documento fiscal pendiente | Solo aplica a recepciones confirmadas; no invoca API externa (DEC-003) |
+
 ## Pedidos
 | Method | Path | Authentication | Authorization observed | Purpose | Notes |
 |---|---|---|---|---|---|
@@ -212,32 +292,53 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 ## Exclusions currently governed outside partial OpenAPI
 | Method | Path | Reason code |
 |---|---|---|
-| GET | `/api/users/` | `root-global-user-admin-outside-partial-openapi` |
-| POST | `/api/users/` | `root-global-user-admin-outside-partial-openapi` |
-| GET | `/api/clients/` | `legacy-client-list-alias-outside-preferred-company-contract` |
-| GET | `/api/products/:id` | `product-detail-lifecycle-outside-current-openapi-baseline` |
-| PUT | `/api/products/:id` | `product-detail-lifecycle-outside-current-openapi-baseline` |
-| DELETE | `/api/products/:id` | `product-delete-compatibility-outside-current-openapi-baseline` |
-| GET | `/api/orders/:id` | `order-lifecycle-outside-current-openapi-baseline` |
-| PUT | `/api/orders/:id` | `order-lifecycle-outside-current-openapi-baseline` |
-| POST | `/api/orders/:id/approve` | `order-lifecycle-outside-current-openapi-baseline` |
-| POST | `/api/orders/:id/cancel` | `order-lifecycle-outside-current-openapi-baseline` |
-| POST | `/api/orders/:id/dispatch` | `order-lifecycle-outside-current-openapi-baseline` |
-| DELETE | `/api/orders/:id` | `order-lifecycle-outside-current-openapi-baseline` |
-| GET | `/api/invoices/:id` | `invoice-detail-lifecycle-outside-current-openapi-baseline` |
-| PUT | `/api/invoices/:id` | `invoice-detail-lifecycle-outside-current-openapi-baseline` |
-| DELETE | `/api/invoices/:id` | `invoice-delete-compatibility-outside-current-openapi-baseline` |
-| PUT | `/api/sales-routes/company/:routeId/subzones` | `subzone-bulk-mutation-outside-current-openapi-baseline` |
-| DELETE | `/api/sales-routes/company/:routeId/subzones/:subzoneId` | `subzone-bulk-mutation-outside-current-openapi-baseline` |
-| GET | `/api/agent/stores/:storeId/purchase-history` | `agent-deep-read-subresource-outside-current-openapi-baseline` |
-| GET | `/api/agent/stores/:storeId/sellable-products` | `agent-deep-read-subresource-outside-current-openapi-baseline` |
+| DELETE | `/api/invoices/{id}` | `invoice-delete-compatibility-outside-current-openapi-baseline` |
+| DELETE | `/api/orders/{id}` | `order-lifecycle-outside-current-openapi-baseline` |
+| DELETE | `/api/products/{id}` | `product-delete-compatibility-outside-current-openapi-baseline` |
+| DELETE | `/api/sales-routes/company/{routeId}/subzones/{subzoneId}` | `subzone-bulk-mutation-outside-current-openapi-baseline` |
 | GET | `/api/agent/goals` | `agent-goals-read-surface-outside-current-openapi-baseline` |
+| GET | `/api/agent/orders` | `agent-orders-read-surface-outside-current-openapi-baseline` |
+| GET | `/api/agent/stores/{storeId}/purchase-history` | `agent-deep-read-subresource-outside-current-openapi-baseline` |
+| GET | `/api/agent/stores/{storeId}/sellable-products` | `agent-deep-read-subresource-outside-current-openapi-baseline` |
+| GET | `/api/clients/` | `legacy-client-list-alias-outside-preferred-company-contract` |
+| GET | `/api/clients/{clientId}/ledger` | `client-billing-ledger-outside-current-openapi-baseline` |
 | GET | `/api/economic-activities/` | `auxiliary-integration-lookup-outside-current-openapi-baseline` |
+| GET | `/api/invoices/{id}` | `invoice-detail-lifecycle-outside-current-openapi-baseline` |
+| GET | `/api/orders/{id}` | `order-lifecycle-outside-current-openapi-baseline` |
+| GET | `/api/procurement/products/{id}/suppliers-pricing` | `procurement-supporting-read-outside-current-openapi-baseline` |
+| GET | `/api/procurement/quotable-products` | `procurement-supporting-read-outside-current-openapi-baseline` |
+| GET | `/api/procurement/requests` | `procurement-foundation-outside-current-openapi-baseline` |
+| GET | `/api/procurement/requests/{id}` | `procurement-foundation-outside-current-openapi-baseline` |
+| GET | `/api/procurement/requests/{id}/comparison` | `procurement-comparison-outside-current-openapi-baseline` |
+| GET | `/api/production/orders/{id}/inspections` | `quality-inspection-list-outside-current-openapi-baseline` |
+| GET | `/api/production/orders/{id}/material-requirements` | `production-material-readout-outside-current-openapi-baseline` |
+| GET | `/api/production/orders/{id}/stages/{stageId}/available-lots` | `production-available-lots-outside-current-openapi-baseline` |
+| GET | `/api/products/{id}` | `product-detail-lifecycle-outside-current-openapi-baseline` |
+| GET | `/api/products/categories/company` | `product-category-admin-outside-current-openapi-baseline` |
+| GET | `/api/receipts/{id}/fiscal-references` | `fiscal-reference-outside-current-openapi-baseline` |
+| GET | `/api/users/` | `root-global-user-admin-outside-partial-openapi` |
+| POST | `/api/orders/{id}/approve` | `order-lifecycle-outside-current-openapi-baseline` |
+| POST | `/api/orders/{id}/cancel` | `order-lifecycle-outside-current-openapi-baseline` |
+| POST | `/api/orders/{id}/dispatch` | `order-lifecycle-outside-current-openapi-baseline` |
+| POST | `/api/procurement/products/{id}/request-quotations` | `procurement-assisted-request-outside-current-openapi-baseline` |
+| POST | `/api/procurement/requests` | `procurement-foundation-outside-current-openapi-baseline` |
+| POST | `/api/procurement/requests/{id}/purchase-orders` | `procurement-purchase-order-outside-current-openapi-baseline` |
+| POST | `/api/procurement/requests/{id}/quotations` | `procurement-quotation-outside-current-openapi-baseline` |
+| POST | `/api/procurement/requests/{id}/select-quotation` | `procurement-selection-outside-current-openapi-baseline` |
+| POST | `/api/procurement/selections/{id}/approve` | `procurement-approval-outside-current-openapi-baseline` |
+| POST | `/api/production/orders/{id}/stages/{stageId}/execute` | `production-stage-execution-outside-current-openapi-baseline` |
+| POST | `/api/production/orders/{id}/stages/{stageId}/inspections` | `quality-inspection-outside-current-openapi-baseline` |
+| POST | `/api/production/orders/{id}/stages/{stageId}/returns` | `production-stage-return-outside-current-openapi-baseline` |
+| POST | `/api/products/categories/company` | `product-category-admin-outside-current-openapi-baseline` |
+| POST | `/api/receipts/{id}/fiscal-references` | `fiscal-reference-outside-current-openapi-baseline` |
+| POST | `/api/receipts/{id}/items/{itemId}/inspections` | `receipt-inspection-outside-current-openapi-baseline` |
+| POST | `/api/users/` | `root-global-user-admin-outside-partial-openapi` |
+| PUT | `/api/invoices/{id}` | `invoice-detail-lifecycle-outside-current-openapi-baseline` |
+| PUT | `/api/orders/{id}` | `order-lifecycle-outside-current-openapi-baseline` |
+| PUT | `/api/products/{id}` | `product-detail-lifecycle-outside-current-openapi-baseline` |
+| PUT | `/api/sales-routes/company/{routeId}/subzones` | `subzone-bulk-mutation-outside-current-openapi-baseline` |
 
 Vea `docs/runtime-contract-manifest.json` para el detalle justificativo completo.
-
-## Producción y formulación
-- No se observaron rutas montadas en `src/app.js` que expongan un módulo runtime dedicado de producción o formulación.
 
 ## Aprobaciones transversales
 - No existe un router transversal único de aprobaciones.

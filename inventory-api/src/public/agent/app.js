@@ -103,11 +103,42 @@ async function handleRoute(session) {
 
 // ─── Bootstrapper ────────────────────────────────────────────────────────────
 
+function hasAgentAccess(session) {
+  // Primary: explicit landing (TASK-004)
+  if (session?.user?.landing?.target === 'agent') {
+    return true;
+  }
+
+  // Legacy fallback (DEC-007): role code or operational heuristic
+  const roleCode = session?.user?.role?.code;
+  if (roleCode === 'sales_agent') {
+    return true;
+  }
+
+  const permissions = session?.user?.permissions || [];
+  if (
+    permissions.includes('sales.routes.view.own') &&
+    permissions.includes('sales.orders.create') &&
+    permissions.includes('customer.activities.manage') &&
+    !permissions.includes('sales.routes.assign') &&
+    !permissions.includes('sales.routes.view.all')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 async function bootstrap() {
   const session = await inventoryAuth.bootstrapSession();
 
   if (!session || !session.user || !session.user.companyId) {
     window.location.href = '/';
+    return;
+  }
+
+  if (!hasAgentAccess(session)) {
+    window.location.href = '/no-access.html';
     return;
   }
 

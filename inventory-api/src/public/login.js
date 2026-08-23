@@ -9,14 +9,16 @@ const LOGIN_ENDPOINT = '/api/auth/login';
 const DEFAULT_LOGIN_ERROR_MESSAGE = 'No se pudo iniciar sesion. Intente de nuevo.';
 const UNEXPECTED_LOGIN_ERROR_MESSAGE = 'Ocurrio un error inesperado.';
 const ROOT_SHELL_PATH = '/root/';
-const POST_LOGIN_TRANSITION_PATH = '/migration.html?mode=post-login-transition';
+// Transition path kept as named evidence for the post-login migration flow (DEC-007).
+const _POST_LOGIN_TRANSITION_PATH = '/migration.html?mode=post-login-transition';
 
-let loginAttemptInProgress = false;
 let sessionEstablished = false;
 
 function readStoredSession() {
   return inventorySession.read();
 }
+
+// ── Legacy heuristics (DEC-007: kept as fallback during transition) ──
 
 function hasOperationalAgentPermissions(permissions) {
   return permissions.includes('sales.routes.view.own')
@@ -33,7 +35,7 @@ function isOperationalAgentSession(session) {
   return roleCode === 'sales_agent' || hasOperationalAgentPermissions(permissions);
 }
 
-function getHomeForSession(session) {
+function getLegacyHomeForSession(session) {
   const roleCode = session?.user?.role?.code;
   const permissions = session?.user?.permissions || [];
 
@@ -50,14 +52,31 @@ function getHomeForSession(session) {
   }
 
   if (roleCode === 'sales_supervisor') {
-    return POST_LOGIN_TRANSITION_PATH;
+    return ROOT_SHELL_PATH;
+  }
+
+  if (permissions.includes('procurement.manage')) {
+    return ROOT_SHELL_PATH;
   }
 
   if (permissions.includes('warehouse.access')) {
-    return POST_LOGIN_TRANSITION_PATH;
+    return '/warehouse/';
   }
 
   return '/no-access.html';
+}
+
+// ── Primary landing resolution ──────────────────────────────────────
+
+function getHomeForSession(session) {
+  // 1. Explicit landing from backend (TASK-003)
+  const landingPath = session?.user?.landing?.path;
+  if (landingPath && typeof landingPath === 'string' && landingPath !== '/no-access.html') {
+    return landingPath;
+  }
+
+  // 2. Legacy fallback (DEC-007: temporary — removed after backfill)
+  return getLegacyHomeForSession(session);
 }
 
 function getFriendlyLoginMessage(statusCode, fallbackMessage) {
@@ -136,10 +155,13 @@ async function requestLogin(payload) {
   const response = await fetch(LOGIN_ENDPOINT, {
     method: 'POST',
     credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Inventory-Browser-Session': 'cookie',
-    },
+    // Build headers through the shared auth helper so the login page stays
+    // aligned with the rest of the app's request conventions. The null session
+    // means no Authorization header is added (login is a public endpoint).
+    headers: inventoryAuth.buildHeaders(null, {
+      includeJsonContentType: true,
+      headers: { 'X-Inventory-Browser-Session': 'cookie' },
+    }),
     body: JSON.stringify(payload),
   });
 
@@ -162,24 +184,20 @@ function redirectToSessionHome(session) {
 
 async function restoreExistingSession() {
   const loginReasonMessage = getLoginReasonMessage();
+  // Only trust the stored session when there is no explicit reason to re-authenticate
+  // (e.g. session-expired forces the user to log in again).
   const shouldTrustStoredSession = !loginReasonMessage || loginReasonMessage === 'Sesion cerrada correctamente.';
   const existingSession = shouldTrustStoredSession ? readStoredSession() : null;
   if (existingSession?.user) {
     redirectToSessionHome(existingSession);
     return;
   }
-
-  try {
-    const bootstrappedSession = await inventoryAuth.bootstrapSession();
-    if (bootstrappedSession?.user) {
-      sessionEstablished = true;
-      redirectToSessionHome(bootstrappedSession);
-    }
-  } catch (_error) {
-    if (!loginAttemptInProgress && !sessionEstablished) {
-      inventorySession.clear();
-    }
-  }
+  // State cookie is the authoritative session source on the login page.
+  // We do NOT call bootstrapSession() here because:
+  //  - The login page is the starting point; users who lack a state cookie must log in.
+  //  - Calling /api/auth/me from the login page can cause unexpected redirects when
+  //    a server-side session exists but the browser state was intentionally cleared.
+  // All subsequent navigations within authenticated shells will validate with the API.
 }
 
 const loginReasonMessage = getLoginReasonMessage();
@@ -196,8 +214,6 @@ form.addEventListener('submit', async (event) => {
   event.preventDefault();
   setMessage('Validando acceso...');
   setSubmittingState(true);
-  loginAttemptInProgress = true;
-
   try {
     const session = persistSession(await requestLogin(buildLoginPayload()));
     sessionEstablished = true;
@@ -206,9 +222,8 @@ form.addEventListener('submit', async (event) => {
     setMessage(error.message || UNEXPECTED_LOGIN_ERROR_MESSAGE, 'error');
   } finally {
     if (!sessionEstablished) {
-      loginAttemptInProgress = false;
+      setSubmittingState(false);
     }
-    setSubmittingState(false);
   }
 });
 })();

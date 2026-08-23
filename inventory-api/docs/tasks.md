@@ -1,5 +1,1030 @@
 # Tasks
 
+## TASK-104: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` warehouse UI `TASK-011` + `TASK-012`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Warehouse production browser runtime / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after warehouse UI `TASK-011` + `TASK-012` executed by `sdd-implementation-agent-5c0604`
+**Reason:** After the approved warehouse production execution hardening shipped, the canonical architecture-facing docs still described the warehouse production UI too generically and still referenced older execute-stage form details instead of the implemented modular split, inline QA capture, shared override flow, and updated validation baseline with known unrelated repository failures.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that `src/public/warehouse/views/production.js` remains a thin orchestrator while `production.state.js`, `production.renderers.js`, and `production.controllers.js` own the active production-detail behavior; the current warehouse execute-stage form now includes inline numeric QA capture for `qaMandatory` snapshot stages, shares the `overrideJustification` client flow between QA out-of-tolerance and lot over-consumption warning paths, and derives `WAITING_QA` with the same `qaOutOfTolerance` semantics expected by the backend completion gate.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after warehouse UI `TASK-011` + `TASK-012`, including the current validation evidence (`node --test tests/warehouse-spa-runtime.test.js` ✅, targeted eslint ✅, `npm run build` ✅, with unrelated pre-existing `typecheck` and full `npm test` failures still outstanding) and the note that manual browser validation remains pending.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented browser/runtime code in `src/public/warehouse/views/production.state.js`, `src/public/warehouse/views/production.renderers.js`, `src/public/warehouse/views/production.controllers.js`, `src/public/warehouse/views/production.js`, `src/public/warehouse/index.html`, updated characterization coverage in `tests/warehouse-spa-runtime.test.js`, and the supplied validation evidence from `sdd-implementation-agent-5c0604`
+**Database impact:** None; this refresh documents warehouse UI behavior only
+**API impact:** None; the current `/api/production/**` contract remains unchanged
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the active warehouse QA/override gating behavior and known validation debt are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable post-implementation warehouse production split, inline QA capture, shared override flow, `WAITING_QA` gating semantics, current targeted validation evidence, and the fact that manual browser validation is still pending
+**Validation evidence:** User-supplied results report `node --test tests/warehouse-spa-runtime.test.js` ✅, targeted eslint for `src/public/warehouse/views/production.state.js`, `src/public/warehouse/views/production.renderers.js`, `src/public/warehouse/views/production.controllers.js`, and `tests/warehouse-spa-runtime.test.js` ✅, `npm run build` ✅, `npm run typecheck` ❌ because of pre-existing unrelated landing typing failures, and full `npm test` ❌ because of pre-existing governance-baseline/documentation drift failures
+**Required tests:** Preserve `tests/warehouse-spa-runtime.test.js`; keep the warehouse runtime contract coverage aligned with the production module split and inline QA/override flow language
+**Migration considerations:** Keep this refresh documentation-only and additive; do not reinterpret the warehouse modular split as a backend production contract change
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state changes the warehouse production runtime contract, module split, or validation baseline again
+**Risk:** Low
+
+## TASK-103: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` `TASK-010`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Root recipes admin browser runtime / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after `TASK-010` executed by `sdd-implementation-agent-5c0604`
+**Reason:** After the approved root recipes-admin hardening shipped, the canonical architecture-facing docs still described the `#recetas` browser module too generically and did not record the new renderer-owned workspace markup seam, the dedicated registered version-editor seam, or the updated validation baseline with unrelated repository-wide typecheck debt outside this feature.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that `src/public/root/views/recipes-admin.renderers.js` owns static workspace markup through `renderWorkspace()`, `src/public/root/views/recipes-admin.version-editor.js` owns dynamic stage and QA editor behavior through the registered `views.recipesAdminVersionEditor` seam, `src/public/root/index.html` and `src/public/root/runtime-contract.js` treat that seam as part of the approved loader contract, and the current validation evidence for this cycle is aligned with the repository truth.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after `recipes-production-qa-execution-hardening` `TASK-010`, including the line-count compliance note (`recipes-admin.js=569`) and the supplied validation evidence, without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented browser/runtime code in `src/public/root/views/recipes-admin.renderers.js`, `src/public/root/views/recipes-admin.version-editor.js`, `src/public/root/views/recipes-admin.js`, `src/public/root/index.html`, `src/public/root/runtime-contract.js`, the updated characterization coverage in `tests/root-shell-recipes-admin-view-characterization.test.js` and `tests/root-shell-modularity-governance.test.js`, and the supplied validation evidence from `sdd-implementation-agent-5c0604`
+**Database impact:** None; this refresh documents browser-runtime modularity and validation only
+**API impact:** None; `/api/recipes/**` and related product assignment contracts remain unchanged
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the supported loader contract and bounded validation truth are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable post-`TASK-010` root recipes-admin structure, distinguish the implemented renderer/version-editor seam split from any future deeper decomposition, record the current line-count compliance fact, and preserve that `npm run typecheck` is still failing only for unrelated permission-metadata typing outside this feature scope
+**Validation evidence:** User-supplied results report `node --test tests/root-shell-recipes-admin-view-characterization.test.js tests/root-shell-modularity-governance.test.js` ✅, targeted eslint ✅, `npm run build` ✅, `npm test -- --silent` ✅, and `npm run typecheck` still red only for unrelated permission-metadata typing outside this feature
+**Required tests:** Preserve `tests/root-shell-recipes-admin-view-characterization.test.js` and `tests/root-shell-modularity-governance.test.js` coverage for the recipes-admin seam split and approved loader/runtime contract
+**Migration considerations:** Keep this refresh documentation-only and additive; do not reinterpret the UI hardening as a backend recipe/production contract change
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state changes the recipes-admin loader contract, seam registration, or validation baseline again
+**Risk:** Low
+
+## TASK-102: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` Fase 2 / `TASK-007`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production material-availability read model / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after Fase 2 / `TASK-007` executed by `sdd-implementation-agent-e88e1e`
+**Reason:** After the approved `TASK-007` implementation added the production material-availability read model and two mounted production read endpoints, the canonical architecture-facing docs still described the production surface as if those runtime reads were pending.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that `src/services/production-material-availability.service.js` exists, that `GET /api/production/orders/:id/material-requirements` and `GET /api/production/orders/:id/stages/:stageId/available-lots` are active tenant-scoped runtime contracts, that material availability is derived from persisted `production_order_material_requirements` plus current origin-warehouse stock, and that available-lot suggestions use the frozen stage snapshot together with current tenant product `requiresLot` / `requiresExpiration` flags, sellable-lot filtering, FEFO/FIFO ordering, and omission of `internalLotNumber`.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after `TASK-007`, including the runtime-contract governance classification and supplied validation evidence, without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented code in `src/services/production-material-availability.service.js`, `src/routes/production.routes.js`, `src/repositories/production.repository.js`, `src/repositories/inventory.repository.js`, `src/repositories/product.repository.js`, `tests/production-material-availability.service.test.js`, `tests/production-routes-contract.test.js`, and the updated runtime governance artifacts, plus the supplied validation evidence from `sdd-implementation-agent-e88e1e`
+**Database impact:** None; this refresh documents reads over the already-implemented `production_order_material_requirements` persistence boundary and current inventory stock state
+**API impact:** None beyond documentation alignment to the already-mounted runtime contracts for `GET /api/production/orders/:id/material-requirements` and `GET /api/production/orders/:id/stages/:stageId/available-lots`
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the tenant-scoped production read contracts and data-exposure limits are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable post-`TASK-007` state, distinguish persisted planning requirements from current-stock-derived availability, capture the current dependency on live product `requiresLot` / `requiresExpiration` flags because those are not frozen in existing snapshots, and do not claim unimplemented execution-hardening work
+**Validation evidence:** User-supplied results report targeted service + route tests ✅, focused eslint ✅, `npm run typecheck` ✅, full test suite ✅, and `npm run build` ✅
+**Required tests:** Preserve `tests/production-material-availability.service.test.js`, `tests/production-routes-contract.test.js`, and `tests/runtime-contract-governance.test.js` coverage for the mounted read-model contract and runtime-governance classification
+**Migration considerations:** Keep this refresh documentation-only and explicit that the available-lots read currently depends on live tenant product flags because `requiresLot` / `requiresExpiration` are not frozen in the existing production-order snapshot
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state changes the read-model source, freezes those product flags into snapshots, or alters the mounted route contracts
+**Risk:** Low
+
+## TASK-101: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` Fase 2 / `TASK-006`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production planning QA snapshot hardening / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after Fase 2 / `TASK-006` executed by `sdd-implementation-agent-e88e1e`
+**Reason:** After the approved `TASK-006` implementation hardened production-order snapshot serialization, the canonical architecture docs still described planning snapshots only at the material-requirements level and did not record the formal QA-parameter normalization, legacy `parameterTolerances` retention rules, or the fact that the change reuses existing create/approve snapshot builders without altering routes or schema.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that snapshot creation lives in `src/services/production-planning.service.js`, that `buildRecipeVersionSnapshot(...)` explicitly normalizes stage `expectedParameters` to `{ name, unit, expectedValue, minTolerance, maxTolerance }`, omits empty `parameterTolerances`, preserves non-empty legacy `parameterTolerances` arrays for backward compatibility, and feeds the unchanged create/approve route contracts through `buildEnrichedSnapshot(...)` and `buildOrderSnapshotWithMaterialRequirements(...)`.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after `TASK-006`, keeping the update narrowly scoped to the planning-layer snapshot contract and the supplied validation evidence.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented code in `src/services/production-planning.service.js`, `src/services/production.service.js`, `tests/production-planning.service.test.js`, and `tests/production-service-foundation.test.js`, plus the supplied validation evidence from `sdd-implementation-agent-e88e1e`
+**Database impact:** None; this refresh documents that `TASK-006` changed snapshot serialization only and did not alter Prisma schema or migrations
+**API impact:** None; existing create/approve endpoints keep the same mounted route surface while their snapshot payloads now carry normalized QA parameter definitions
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the frozen QA snapshot contract is now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable post-`TASK-006` state, distinguish the normalized QA snapshot contract from still-pending execution-time QA tolerance enforcement, and do not claim any route or schema change
+**Validation evidence:** User-supplied results report targeted tests ✅, focused eslint ✅, `npm run typecheck` ✅, and `npm test -- --silent` ✅
+**Required tests:** Preserve `tests/production-planning.service.test.js` and `tests/production-service-foundation.test.js` coverage for snapshot normalization behavior
+**Migration considerations:** Keep this refresh documentation-only and additive; preserve that legacy non-empty `parameterTolerances` still appear in snapshots for backward compatibility
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state changes snapshot serialization or removes the legacy compatibility field
+**Risk:** Low
+
+## TASK-100: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` Fase 2 / `TASK-005` functional scope
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production planning hardening / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after Fase 2 / `TASK-005` functional scope executed by `sdd-implementation-agent-e88e1e`
+**Reason:** After the approved Fase 2 implementation materially changed production-order planning behavior, the canonical architecture docs still described planning as internal-only and did not reflect persisted material requirements, approval-time stock revalidation, advisory-lock-backed planning transactions, or request-aware stock-override audit correlation.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that migration `20260915001000_production_order_material_requirements` and Prisma model `ProductionOrderMaterialRequirement` are active repository truth; `production.repository.js` includes/persists `materialRequirements`; `production.service.js` now computes and persists planning requirements, enriches `recipeVersionSnapshot.materialRequirements`, revalidates stock on approval inside inventory transactions with advisory lock, and emits stock-override audit events when request context is available; `production.routes.js` now passes `req` into create/approve calls for audit correlation; and the repository has since advanced the originally later execution split by explicit user authorization so `src/services/production.service.js` is now a 585-line façade delegating execution/return/completion work to `src/services/production-execution.service.js` while preserving public API and `__private__` compatibility.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after the Fase 2 / `TASK-005` closure, explicitly recording that an originally later structural split was advanced by explicit user authorization only far enough to satisfy the approved `production.service.js <= 600 lines` acceptance, while also preserving that the remaining `TASK-008` execution-validation features were not implemented in this cycle.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented code in `prisma/migrations/20260915001000_production_order_material_requirements/migration.sql`, `prisma/schema.prisma`, `src/repositories/production.repository.js`, `src/services/production.service.js`, `src/services/production-planning.service.js`, `src/services/production-execution.service.js`, and `src/routes/production.routes.js`, plus the supplied validation evidence from `sdd-implementation-agent-e88e1e`
+**Database impact:** Documentation records additive migration `20260915001000_production_order_material_requirements` and active model `ProductionOrderMaterialRequirement`; no new schema change in this refresh
+**API impact:** None in this refresh beyond documenting the already-implemented runtime behavior change on existing create/approve production endpoints
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because approval-time stock enforcement and request-aware override auditing are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable post-closure state of Fase 2 / `TASK-005`, state that the `production.service.js <= 600 lines` acceptance is now satisfied through an explicitly user-authorized early split, and still distinguish that from the not-yet-implemented `TASK-008` execution-validation features
+**Validation evidence:** User-supplied results report targeted tests ✅, focused eslint ✅, `npm run typecheck` ✅, `npm run build` ✅, and `npm test -- --silent` ✅
+**Required tests:** Preserve the targeted Fase 2 production planning coverage together with the repository-wide green validation lane supplied for this cycle
+**Migration considerations:** Keep this refresh documentation-only and additive; record that the execution-service split is already implemented by explicit user authorization, but do not reinterpret the still-pending `TASK-008` validation enhancements as already delivered
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state changes the create/approve planning behavior or finally completes the deferred service split
+**Risk:** Low
+
+## TASK-099: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` Fase 2 / `TASK-004`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production planning foundation / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; post-implementation refresh after Fase 2 / `TASK-004`
+**Reason:** After the approved planning extraction shipped, the canonical architecture docs still needed to reflect the new internal planning seam and FEFO helper extraction without overstating later create/approve behavior as already implemented.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that `production-planning.service.js` exists, `production.service.js` reuses the centralized snapshot builder, `sortLotsByFefo(...)` is a pure exported helper used by `reserveLots(...)`, and material-requirement persistence / active stock enforcement remain future work.
+**Implemented change:** Documentation-only refresh aligned to the observable repository state after `src/services/production-planning.service.js` was introduced and FEFO sorting was extracted.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented code in `src/services/production-planning.service.js`, `src/services/inventory-transaction-support.service.js`, `src/services/production.service.js`, plus focused tests
+**Database impact:** None in this refresh
+**API impact:** None; no public contract change documented
+**Container impact:** None
+**Security impact:** Low
+**Acceptance criteria:** Docs describe the new planning seam and FEFO extraction as current truth, explicitly preserve that create/approve runtime behavior is not yet changed, and note the unrelated governance-baseline test failure accurately.
+**Validation evidence:** User-supplied targeted tests ✅, focused eslint ✅, `npm run typecheck` ✅, `npm run build` ✅; repository-wide `npm test` still fails only in `tests/governance-baseline-sync-guardrails.test.js` due to `docs/audit/current-code-audit.md` wording drift
+**Required tests:** Preserve `tests/production-planning.service.test.js`, `tests/inventory-transaction-support.service.test.js`, and `tests/production-service-foundation.test.js`
+**Migration considerations:** Keep this refresh documentation-only and do not claim active stock enforcement or persisted material requirements before later tasks
+**Rollback or mitigation:** Revert wording if a later verified implementation changes the actual adoption level of the planning seam
+**Risk:** Low
+
+## TASK-098: Refresh architecture-facing docs after `recipes-production-qa-execution-hardening` Fase 1
+**Status:** Completed
+**Priority:** Low
+**Domain:** Recipe / production QA hardening / Architecture documentation
+**Requirement:** `specs/recipes-production-qa-execution-hardening`; mandatory post-implementation documentation refresh requested by `sdd-implementation-agent-e88e1e` after Fase 1 (`TASK-001`, `TASK-002`, `TASK-003`)
+**Reason:** After the approved Fase 1 implementation shipped, the canonical architecture-facing docs still needed to reflect the active recipe-write invariants, the new additive production QA persistence fields, and the remaining stage-execution idempotency contradiction without overstating later phases as already implemented.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record the observable repository truth after Fase 1: recipe stage-input unit consistency is enforced in Zod, service, and DB layers; `qaMandatory` stages require formal numeric expected parameters; `RecipeStageInput.quantity` is explicitly documented as per-unit quantity on the existing column; additive `ProductionStageExecution.qaOutOfTolerance` / `overrideJustification` fields exist but are not yet consumed by runtime flows; and the `endedAt` / active-execution contradiction is explicitly tracked as remaining risk.
+**Implemented change:** Synchronized architecture-facing documentation to the actual repository state after `recipes-production-qa-execution-hardening` Fase 1 without changing production runtime contracts beyond the implemented backend hardening already completed in code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented Fase 1 code in `prisma/migrations/20260915000000_recipe_qa_and_stage_input_unit/migration.sql`, `prisma/schema.prisma`, `src/schemas/recipe.schema.js`, `src/services/recipe.service.js`, plus focused tests and spec documentation updated by `sdd-implementation-agent-e88e1e`
+**Database impact:** Documentation records additive migration `20260915000000_recipe_qa_and_stage_input_unit`; no new schema change in this refresh
+**API impact:** None; this refresh only documents the already-implemented recipe write-contract hardening
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because tenant-scoped validation boundaries and remaining production-QA runtime gaps are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable Fase 1 implementation, distinguish active recipe-write hardening from future production-execution hardening, and note the active-state/idempotency contradiction without claiming it is solved
+**Validation evidence:** User-supplied Fase 1 results report `npm run prisma:deploy` ✅, `npm run build` ✅, `npm run typecheck` ✅, `node --test tests/recipe-schema.test.js` ✅, `node --test tests/recipe-service-foundation.test.js` ✅, and `npm test -- --silent` ✅ (`1205` pass, `0` fail, `2` skipped); `npm run lint` remains red only because of unrelated pre-existing files outside this feature slice
+**Required tests:** Preserve `tests/recipe-schema.test.js`, `tests/recipe-service-foundation.test.js`, and the documented aggregate validation evidence for this implementation cycle
+**Migration considerations:** Keep the documented migration additive; do not claim a new `quantity_per_unit` column or fully implemented execution-QA tolerance behavior until later phases wire those runtime flows
+**Rollback or mitigation:** Revert documentation wording if a later verified implementation changes the actual recipe or production QA runtime behavior
+**Risk:** Low
+
+## TASK-097: Refresh architecture-facing docs after supplier-management RFQ tracking layout cycle
+**Status:** Completed
+**Priority:** Low
+**Domain:** Architecture documentation / Root shell browser runtime / Supplier management RFQ tracking
+**Requirement:** `specs/supplier-management`; mandatory post-implementation documentation refresh requested by `sdd-implementation-agent-24580e` after the `rfq-tracking-admin` sidebar+detail layout cycle
+**Reason:** After the browser-side RFQ tracking layout refresh shipped, the canonical architecture-facing docs still described the older RFQ tracking renderer shape and did not yet record the commercial sidebar+detail layout, the active RFQ tracking CSS rules, or the updated repository-wide validation baseline for this cycle.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that `#seguimiento_cotizaciones` uses the commercial sidebar+detail pattern, that `renderTrackingTable` is no longer part of the active renderer contract, that `.rfq-tracking-sidebar-list` and `#rfq-tracking-detail-panel` are active style hooks, and that the user-supplied validation baseline for this cycle reports `npm run typecheck` ✅, `npm run lint` ✅, `npm run test -- --silent` ✅ with `974/976` passing, `0` failing, and `2` skipped, plus governance tests green after the audit-file correction.
+**Implemented change:** Synchronized the architecture-facing documentation to the observable repository state after the RFQ tracking sidebar+detail layout change without modifying backend routes, services, repositories, schemas, or migrations.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented browser/runtime code in `src/public/root/views/rfq-tracking-admin.js`, `src/public/root/views/rfq-tracking-admin.renderers.js`, `src/public/styles.css`, the focused audit record in `docs/audit/current-code-audit.md`, and the updated validation evidence in `tests/rfq-tracking-view-characterization.test.js`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** None; RFQ tracking continues using `GET /api/procurement/rfq-tracking` and `POST /api/procurement/rfq-invitations/:id/manual-response`
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the browser contract, active validation baseline, and governance-test recovery are now aligned with the actual implemented state
+**Acceptance criteria:** Canonical docs describe the RFQ sidebar+detail layout, the updated renderer export contract, the new RFQ tracking CSS classes, and the latest user-supplied green validation baseline without claiming direct command execution by this refresh
+**Validation evidence:** User-supplied cycle results report `npm run typecheck` ✅, `npm run lint` ✅, `npm run test -- --silent` ✅ (`974/976` pass, `0` fail, `2` skipped), and governance tests ✅ after the audit file was corrected
+**Required tests:** Preserve `tests/rfq-tracking-view-characterization.test.js`, `tests/root-shell-rfq-tracking-api-characterization.test.js`, `tests/rfq-runtime-governance-alignment.test.js`, `tests/root-shell-supply-manifest.test.js`, `tests/root-shell-router-characterization.test.js`, and the repository-wide aggregate validation gates already referenced in the canonical docs
+**Migration considerations:** Keep this refresh documentation-only and incremental; do not reinterpret the browser-layout change as a backend/API/schema redesign
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state changes the RFQ tracking browser contract or validation baseline again
+**Risk:** Low
+
+## TASK-096: Refresh architecture-facing docs after supplier-management final validation recovery
+**Status:** Completed
+**Priority:** Low
+**Domain:** Architecture documentation / Governance baseline / Supplier management
+**Requirement:** `specs/supplier-management`; final-cycle architecture refresh requested by `sdd-implementation-agent-24580e`
+**Reason:** After the implemented supplier-management slice remained validated and the final cycle restored repository-wide `typecheck`, `lint`, and aggregate test health, the canonical architecture-facing docs still carried older RFQ-era statements that described repository-wide lint/test debt as current truth.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now record the latest user-supplied final-cycle validation reality: `npm run typecheck` passed, `npm run lint` passed, and `npm test -- --silent` passed for the current implemented repository state, while preserving the remaining operational and architectural follow-up items that are still real.
+**Implemented change:** Synchronized architecture-facing documentation to the final validated repository state without redesigning production code, schemas, or runtime contracts.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** User-supplied final validation evidence; active runtime/browser-governance documentation already in `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** None; endpoint contracts remain unchanged
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because repository-wide validation posture is now aligned with the actual final cycle state
+**Acceptance criteria:** Architecture-facing docs no longer describe repository-wide lint/test debt as current truth, they preserve the bounded same-origin helper and supplier-management runtime facts already documented, and they record the final-cycle green validation evidence without claiming direct command execution by this refresh
+**Validation evidence:** User-supplied final-cycle results report `npm run typecheck` ✅, `npm run lint` ✅, and `npm test -- --silent` ✅
+**Required tests:** Preserve the existing repository-wide validation gates and the supplier/RFQ/browser-governance characterization suites already named in the canonical docs
+**Migration considerations:** Keep this refresh documentation-only and incremental; do not reinterpret the green validation baseline as proof that all architectural debt is removed
+**Rollback or mitigation:** Revert documentation wording if a later verified repository state reintroduces aggregate validation failures
+**Risk:** Low
+
+## TASK-095: Refresh architecture-facing docs after `rfq-hardening-alignment`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Procurement / Public RFQ surface / RFQ tracking root shell / Architecture documentation
+**Requirement:** `rfq-hardening-alignment`; mandatory post-implementation documentation refresh requested after RFQ throttling, lazy expiration persistence, runtime/OpenAPI alignment, and terminal expired-invitation rendering shipped
+**Reason:** After the RFQ hardening slice landed, the canonical architecture-facing docs still described public RFQ throttling, runtime-contract alignment, and persisted `EXPIRED` materialization as open gaps, and they did not yet record the added runtime-governance test or the fact that broader full lint/test debt remains outside the RFQ slice.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now explicitly record route-specific public RFQ throttling (`GET /api/public/supplier-quotations/:token` => `30/min`, `POST /api/public/supplier-quotations/:token/response` => `10/min`), lazy persistence of stale invitations to `EXPIRED` on relevant public/internal RFQ access paths, synchronized root runtime/OpenAPI/runtime-catalog governance for RFQ surfaces, terminal expired-invitation rendering on the dedicated tracking UI, the new `tests/rfq-runtime-governance-alignment.test.js` baseline, and the fact that broader repo lint/test debt remains unrelated and still open.
+**Implemented change:** Synchronized architecture-facing documentation to the actual repository state after `rfq-hardening-alignment` without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented code in `src/middlewares/request-throttle.js`, `src/routes/public-supplier-quotation.routes.js`, `src/services/procurement-rfq.service.js`, `src/public/root/runtime-contract.js`, `src/public/root/views/rfq-tracking-admin.renderers.js`, `docs/openapi/runtime-baseline.openapi.json`, `docs/runtime-endpoint-catalog.md`, and focused validation in `tests/rfq-runtime-governance-alignment.test.js` plus the existing RFQ contract/service/audit/browser suites
+**Database impact:** Documentation now reflects the already-implemented lazy persisted `EXPIRED` transition behavior; no schema or migration change
+**API impact:** Documentation now reflects the active public RFQ throttle contract, lazy expiration persistence semantics, and runtime/OpenAPI/catalog alignment without changing endpoint paths or payloads
+**Container impact:** None
+**Security impact:** Medium documentation-accuracy impact because the public RFQ hardening posture is now explicit while the remaining uncertainty is limited to broader deployment/store-mode operations rather than missing route protection in code
+**Acceptance criteria:** Architecture-facing docs truthfully describe the implemented RFQ hardening behavior, the aligned runtime/OpenAPI/catalog surfaces, the terminal expired-invitation UI behavior, the added focused governance test, and the remaining broader governance debt outside the RFQ slice
+**Validation evidence:** User-supplied results report `npm run typecheck` passed, targeted ESLint passed, and the targeted RFQ suite passed `103/103`, including `tests/rfq-runtime-governance-alignment.test.js`
+**Required tests:** Preserve `tests/secure-token.test.js`, `tests/procurement-rfq-routes-contract.test.js`, `tests/procurement-rfq-service.test.js`, `tests/procurement-rfq-audit.test.js`, `tests/rfq-tracking-view-characterization.test.js`, `tests/root-shell-rfq-tracking-api-characterization.test.js`, and `tests/rfq-runtime-governance-alignment.test.js`
+**Migration considerations:** Keep the docs explicit that this continuation closes the previously documented public-throttling, lazy-expiration-persistence, and RFQ runtime-governance gaps without introducing schema changes, inventory mutation, or broader repository-wide quality recovery
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes alter the throttle contract, expiration materialization semantics, approved RFQ browser/runtime inventory, or targeted validation evidence
+**Risk:** Low
+
+## TASK-094: Refresh architecture-facing docs after `supplier-rfq-requests` continuation
+**Status:** Completed
+**Priority:** Low
+**Domain:** Procurement / RFQ tracking root shell / Audit instrumentation / Architecture documentation
+**Requirement:** `supplier-rfq-requests`; mandatory post-continuation documentation refresh requested after the previously missing RFQ tracking page and audit coverage were implemented
+**Reason:** After the follow-up continuation landed, the canonical architecture-facing docs still implied that RFQ tracking lived only inside `#cotizaciones` and did not yet record the dedicated `#seguimiento_cotizaciones` page, the new RFQ tracking browser modules, the request-item serialization used for manual capture, or the added RFQ audit coverage in `src/services/procurement-rfq.service.js`.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now explicitly record the dedicated root-shell route/page `#seguimiento_cotizaciones`, browser modules `src/public/root/rfq-tracking-api.js`, `src/public/root/views/rfq-tracking-admin.js`, and `src/public/root/views/rfq-tracking-admin.renderers.js`, RFQ tracking payload serialization of purchase-request items for manual response capture, focused RFQ audit instrumentation in `src/services/procurement-rfq.service.js`, and the updated focused regression coverage for the RFQ tracking and audit seam.
+**Implemented change:** Synchronized architecture-facing documentation to the actual repository state after the `supplier-rfq-requests` continuation without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Active runtime and backend code in `src/public/root/manifest.js`, `src/public/root/router.js`, `src/public/root/index.html`, `src/public/root/rfq-tracking-api.js`, `src/public/root/views/rfq-tracking-admin.js`, `src/public/root/views/rfq-tracking-admin.renderers.js`, `src/routes/procurement-rfq.routes.js`, `src/routes/public-supplier-quotation.routes.js`, `src/services/procurement-rfq.service.js`, and focused validation in `tests/procurement-rfq-audit.test.js`, `tests/rfq-tracking-view-characterization.test.js`, `tests/root-shell-rfq-tracking-api-characterization.test.js`, `tests/root-shell-supply-manifest.test.js`, and `tests/root-shell-router-characterization.test.js`
+**Database impact:** Documentation now reflects implemented RFQ tracking serialization/audit behavior; no schema or migration change
+**API impact:** Documentation now reflects the dedicated RFQ tracking page consumption of `GET /api/procurement/rfq-tracking` and `POST /api/procurement/rfq-invitations/:id/manual-response` without changing endpoint paths or payloads
+**Container impact:** None
+**Security impact:** Medium documentation-accuracy impact because the new RFQ audit coverage is now explicit, while the remaining public-throttling and runtime-contract drift risks stay documented as open follow-up
+**Acceptance criteria:** Architecture-facing docs truthfully describe the implemented dedicated RFQ tracking page, RFQ audit coverage, request-item-aware manual-capture payloads, focused validation evidence, and the remaining bounded RFQ governance gaps
+**Validation evidence:** User-supplied results report `npm run typecheck`, targeted eslint, and RFQ suites green with 93 passing tests, including `tests/procurement-rfq-audit.test.js`, `tests/rfq-tracking-view-characterization.test.js`, `tests/root-shell-rfq-tracking-api-characterization.test.js`, `tests/root-shell-supply-manifest.test.js`, and `tests/root-shell-router-characterization.test.js`
+**Required tests:** Preserve the named RFQ audit, RFQ tracking view/API, manifest, and router characterization suites together with the existing `tests/secure-token.test.js`, `tests/procurement-rfq-routes-contract.test.js`, and `tests/procurement-rfq-service.test.js` baseline
+**Migration considerations:** Keep the docs explicit that this continuation closes the dedicated root follow-up page and audit-observability gap without changing the additive database model, without introducing inventory mutations, and without yet closing the public throttling or `runtime-contract.js` drift follow-ups
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes alter the dedicated RFQ tracking route, audit event coverage, or approved browser module inventory
+**Risk:** Low
+
+## TASK-093: Refresh architecture-facing docs after `supplier-rfq-requests` implementation
+**Status:** Completed
+**Priority:** Low
+**Domain:** Procurement / Public supplier quotation surface / Architecture documentation
+**Requirement:** `supplier-rfq-requests`; mandatory post-implementation documentation refresh requested after the RFQ invitation lifecycle shipped
+**Reason:** After the supplier RFQ invitation lifecycle was implemented, the canonical architecture-facing docs still described procurement mainly in terms of purchase requests, quotations, comparison, selection, and purchase-order flows, and did not yet record the new invitation persistence model, the public token-based supplier flow, or the expanded `#cotizaciones` runtime scope.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now explicitly record Prisma model `SupplierQuotationInvitation` plus enum `SupplierQuotationInvitationStatus`, migration `20260823000000_add_supplier_quotation_invitations`, the layered `procurement-rfq` backend module, the unauthenticated public route `/api/public/supplier-quotations/:token`, the internal RFQ routes under `/api/procurement/**`, `src/lib/secure-token.js` token-hash behavior, the public `/supplier-quote/` browser surface, the `#cotizaciones` RFQ UI additions, and the remaining security/automation gaps around public throttling and persisted `EXPIRED` transitions.
+**Implemented change:** Synchronized architecture-facing documentation to the actual repository state after `supplier-rfq-requests`, preserving prior procurement refresh history while updating current truth and validation references without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Active runtime and backend code in `prisma/schema.prisma`, `prisma/migrations/20260823000000_add_supplier_quotation_invitations/migration.sql`, `src/lib/secure-token.js`, `src/schemas/procurement-rfq.schema.js`, `src/repositories/procurement-rfq.repository.js`, `src/services/procurement-rfq.service.js`, `src/routes/procurement-rfq.routes.js`, `src/routes/public-supplier-quotation.routes.js`, `src/app.js`, `src/public/root/quotations-api.js`, `src/public/root/views/quotations-admin.helpers.js`, `src/public/root/views/quotations-admin.renderers.js`, `src/public/root/views/quotations-admin.js`, `src/public/supplier-quote/index.html`, `src/public/supplier-quote/app.js`, and focused validation in `tests/secure-token.test.js`, `tests/procurement-rfq-routes-contract.test.js`, and `tests/procurement-rfq-service.test.js`
+**Database impact:** Documentation now reflects the already-implemented additive RFQ invitation table, enum, and migration; no new schema or migration added by this refresh
+**API impact:** Documentation now reflects the active authenticated RFQ internal routes and the unauthenticated public supplier-quotation token contract without changing endpoint paths or payloads
+**Container impact:** None
+**Security impact:** Medium documentation-accuracy impact because token-hash-only persistence, tenant scoping, public CSP, and the remaining missing throttling/auto-expire gaps are now explicit as current truth
+**Acceptance criteria:** Architecture-facing docs truthfully describe the completed `supplier-rfq-requests` feature state, including the internal/public route split, token-hash storage model, public browser surface, extended `#cotizaciones` workspace behavior, and remaining bounded RFQ risks
+**Validation evidence:** User-supplied results report typecheck passed, lint passed, migration applied, and 66 new tests passed including `tests/secure-token.test.js`, `tests/procurement-rfq-routes-contract.test.js`, and `tests/procurement-rfq-service.test.js`
+**Required tests:** Preserve `tests/secure-token.test.js`, `tests/procurement-rfq-routes-contract.test.js`, `tests/procurement-rfq-service.test.js`, and the existing root-shell quotations/runtime governance suites that cover `#cotizaciones`
+**Migration considerations:** Keep the docs explicit that the RFQ slice is additive under the existing layered monolith, that the procurement area still remains non-stock-mutating until receipt confirmation, and that the public supplier token flow is intentionally unauthenticated but not yet separately rate-limited
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes alter the RFQ route surface, token-storage approach, or public supplier page exposure
+**Risk:** Low
+
+## TASK-092: Refresh architecture-facing docs after `procurement-quotation-workspace` `TASK-008` convergence closure
+**Status:** Completed
+**Priority:** Low
+**Domain:** Procurement / Root shell runtime / Architecture documentation
+**Requirement:** `specs/procurement-quotation-workspace`; mandatory post-implementation documentation refresh requested after final `TASK-008` closure
+**Reason:** After all approved `procurement-quotation-workspace` tasks (`TASK-001` through `TASK-008`) were completed, the canonical architecture-facing docs needed to record the final integrated state rather than the earlier backend-only and root-shell-only checkpoints.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now explicitly record that convergence migrations `20260822000000_backfill_suppliers_permission_catalog` and `20260822001000_backfill_supplier_product_pricing_convergence` are present and tested, that the procurement quotations backend and root-shell `#cotizaciones` workspace are both implemented, that `tests/procurement-quotation-workspace-convergence.test.js` is the final cross-layer convergence suite for this feature, and that the remaining compras placeholders are exactly `#solicitudes_compra`, `#ordenes_compra`, `#recepciones`, and `#referencias_fiscales`.
+**Implemented change:** Synchronized architecture-facing documentation to the actual repository state after `procurement-quotation-workspace` `TASK-008`, preserving earlier refresh history while updating current truth and validation references without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Active runtime and backend code in `src/routes/procurement.routes.js`, `src/services/procurement.service.js`, `src/repositories/procurement.repository.js`, `src/schemas/procurement.schema.js`, `src/public/root/manifest.js`, `src/public/root/router.js`, `src/public/root/quotations-api.js`, `src/public/root/views/quotations-admin.helpers.js`, `src/public/root/views/quotations-admin.renderers.js`, `src/public/root/views/quotations-admin.js`, migrations `prisma/migrations/20260822000000_backfill_suppliers_permission_catalog/migration.sql` and `prisma/migrations/20260822001000_backfill_supplier_product_pricing_convergence/migration.sql`, and convergence coverage in `tests/procurement-quotation-workspace-convergence.test.js`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** Documentation now reflects the completed integrated procurement quotation-workspace contract without changing endpoint paths, payloads, or authorization semantics
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the supported procurement workspace surface, tested convergence migrations, and remaining placeholder split are now explicit as current truth
+**Acceptance criteria:** Architecture-facing docs truthfully describe the completed `procurement-quotation-workspace` feature state after `TASK-008`, include the final convergence suite, preserve the non-stock-mutating procurement truth, and identify the remaining compras placeholders exactly
+**Validation evidence:** User-supplied results report the targeted `TASK-008` validation lane passed, including `node --test tests/suppliers-permission-catalog-backfill-migration.test.js tests/supplier-pricing-migration.test.js tests/procurement-foundation.test.js tests/procurement-routes-contract.test.js tests/root-shell-quotations-api-characterization.test.js tests/quotations-view-characterization.test.js tests/root-shell-supply-manifest.test.js tests/root-shell-router-characterization.test.js tests/public-surface-characterization.test.js tests/public-runtime-http-smoke.test.js tests/procurement-quotation-workspace-convergence.test.js`, plus `npm run typecheck` and targeted eslint
+**Required tests:** Preserve `tests/suppliers-permission-catalog-backfill-migration.test.js`, `tests/supplier-pricing-migration.test.js`, `tests/procurement-foundation.test.js`, `tests/procurement-routes-contract.test.js`, `tests/root-shell-quotations-api-characterization.test.js`, `tests/quotations-view-characterization.test.js`, `tests/root-shell-supply-manifest.test.js`, `tests/root-shell-router-characterization.test.js`, `tests/public-surface-characterization.test.js`, `tests/public-runtime-http-smoke.test.js`, and `tests/procurement-quotation-workspace-convergence.test.js`
+**Migration considerations:** Keep the docs explicit that the completed feature still stops at procurement quotation workspace and does not yet implement root-shell screens for `#solicitudes_compra`, `#ordenes_compra`, `#recepciones`, or `#referencias_fiscales`
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes alter the convergence suite, route surface, or remaining compras placeholder split
+**Risk:** Low
+
+## TASK-091: Refresh architecture-facing docs after `procurement-quotation-workspace` `TASK-007` root-shell quotations workspace implementation
+**Status:** Completed
+**Priority:** Low
+**Domain:** Procurement / Root shell runtime / Architecture documentation
+**Requirement:** `specs/procurement-quotation-workspace`; post-implementation documentation refresh requested after `TASK-007` for the implemented root-shell quotations workspace
+**Reason:** After the procurement quotations workspace became reachable from the supported root shell, the canonical architecture-facing docs still described `#cotizaciones` as a placeholder route and did not yet record the approved runtime asset surface, router/manifest wiring, or the updated split between implemented versus still-pending compras entries.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now explicitly record that `#cotizaciones` is an implemented company-admin route, that the supported root runtime now includes `root/quotations-api.js`, `root/views/quotations-admin.helpers.js`, `root/views/quotations-admin.renderers.js`, and `root/views/quotations-admin.js`, that the procurement grouped quotation workflow is reachable from the root shell, and that the remaining compras placeholders are now only `#solicitudes_compra`, `#ordenes_compra`, `#recepciones`, and `#referencias_fiscales`.
+**Implemented change:** Synchronized architecture-facing documentation to the actual repository state after `procurement-quotation-workspace` `TASK-007`, preserving the previously documented backend quotation-workspace foundation while updating root-shell/runtime truth and validation evidence without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Active runtime code in `src/public/root/manifest.js`, `src/public/root/router.js`, `src/public/root/quotations-api.js`, `src/public/root/views/quotations-admin.helpers.js`, `src/public/root/views/quotations-admin.renderers.js`, `src/public/root/views/quotations-admin.js`, plus supported public-surface/runtime coverage in `tests/public-surface-characterization.test.js`, `tests/public-runtime-http-smoke.test.js`, `tests/root-shell-supply-manifest.test.js`, `tests/root-shell-router-characterization.test.js`, `tests/root-shell-quotations-api-characterization.test.js`, and `tests/quotations-view-characterization.test.js`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** Documentation now reflects the active root-shell consumption of the already-implemented procurement quotation-workspace backend contract without changing endpoint paths, payloads, or authorization semantics
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the supported root runtime surface and implemented procurement route exposure are now explicit while remaining compras placeholders are not overstated as complete
+**Acceptance criteria:** Architecture-facing docs truthfully describe `#cotizaciones` as an implemented root-shell route, list the supported quotations runtime assets, preserve the non-stock-mutating procurement truth, identify the remaining compras placeholders exactly, and record the supplied validation evidence without claiming broader production-code changes
+**Validation evidence:** User-supplied results report targeted shell/runtime tests passed, `npm run typecheck` passed, and targeted eslint passed for the quotations workspace slice; repository evidence reviewed from the runtime files and named tests listed above
+**Required tests:** Preserve `tests/public-surface-characterization.test.js`, `tests/public-runtime-http-smoke.test.js`, `tests/root-shell-supply-manifest.test.js`, `tests/root-shell-router-characterization.test.js`, `tests/root-shell-quotations-api-characterization.test.js`, and `tests/quotations-view-characterization.test.js`
+**Migration considerations:** Keep the docs explicit that this slice closes the root-shell quotations workspace only; `#solicitudes_compra`, `#ordenes_compra`, `#recepciones`, and `#referencias_fiscales` remain pending root-shell placeholders
+**Rollback or mitigation:** Revert documentation-only wording if later runtime changes retire the quotations route, change the approved asset surface, or alter the remaining compras placeholder split
+**Risk:** Low
+
+## TASK-090: Refresh architecture-facing docs after partial `procurement-quotation-workspace` backend implementation
+**Status:** Completed
+**Priority:** Low
+**Domain:** Procurement / Supplier pricing / Architecture documentation
+**Requirement:** `specs/procurement-quotation-workspace`; post-implementation documentation refresh requested after partial backend delivery by `sdd-implementation-agent-24580e`
+**Reason:** After the approved backend portion of the procurement quotation workspace shipped, the canonical architecture-facing docs still described the procurement slice mainly in terms of request/quotation/comparison/selection/order flows and did not yet state that quotable-product listing, supplier-pricing lookup, grouped assisted quotation-request creation, supplier permission backfill, and pricing convergence migrations are now active repository truth.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now explicitly record the active backend endpoints `GET /api/procurement/quotable-products`, `GET /api/procurement/products/:id/suppliers-pricing`, and `POST /api/procurement/products/:id/request-quotations`; the grouped assisted quotation payload contract in `src/schemas/procurement.schema.js`; additive supplier-pricing reads backed by `product_suppliers.unit_price` and `currency`; and the fact that root-shell/frontend procurement tasks remained pending at that earlier backend-only checkpoint even though these backend capabilities now exist.
+**Implemented change:** Synchronized architecture-facing documentation to the actual repository state after the partial `procurement-quotation-workspace` backend implementation, and added a focused note file `docs/procurement-quotation-workspace-doc-refresh.md` summarizing the refresh scope and remaining frontend gap without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `docs/procurement-quotation-workspace-doc-refresh.md`
+**Dependencies:** Implemented backend changes in `src/routes/procurement.routes.js`, `src/services/procurement.service.js`, `src/repositories/procurement.repository.js`, `src/schemas/procurement.schema.js`, migrations `prisma/migrations/20260822000000_backfill_suppliers_permission_catalog/migration.sql` and `prisma/migrations/20260822001000_backfill_supplier_product_pricing_convergence/migration.sql`, and focused validation in `tests/procurement-foundation.test.js`, `tests/procurement-routes-contract.test.js`, `tests/suppliers-permission-catalog-backfill-migration.test.js`, and `tests/supplier-pricing-migration.test.js`
+**Database impact:** Documentation now reflects already-implemented additive backfill/convergence migrations and additive supplier-pricing read dependencies; no new schema or migration added by this refresh
+**API impact:** Documentation now reflects the active procurement quotation-workspace backend contract without changing endpoint paths, payloads, or authorization semantics
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because active procurement/supplier permission and pricing-read behavior is now explicit while the remaining runtime gaps for that earlier checkpoint were not misrepresented as implemented
+**Acceptance criteria:** Architecture-facing docs truthfully describe the active procurement quotation-workspace backend surface, preserve the fact that procurement remains non-stock-mutating, and explicitly capture that this earlier refresh preceded the later root-shell quotations implementation
+**Validation evidence:** Repository evidence reviewed from the changed backend files and focused tests listed above; this documentation refresh does not claim fresh command execution beyond repository inspection
+**Required tests:** Preserve `tests/procurement-foundation.test.js`, `tests/procurement-routes-contract.test.js`, `tests/suppliers-permission-catalog-backfill-migration.test.js`, and `tests/supplier-pricing-migration.test.js`
+**Migration considerations:** Keep the documentation explicit that these migrations are additive and that backend truth preceded the later procurement frontend/runtime implementation
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes alter the assisted quotation contract, supplier-pricing ownership, or procurement route surface
+**Risk:** Low
+
+
+## TASK-089: Refresh architecture-facing docs after supplier browser-runtime same-origin hardening
+**Status:** Completed
+**Priority:** Low
+**Domain:** Browser runtime / Supplier management / Architecture documentation
+**Requirement:** `specs/supplier-management`; post-debug documentation refresh requested by `sdd-implementation-agent-24580e`
+**Reason:** After validating the supplier-management runtime, the shared browser auth helper was hardened so nested supported shells resolve root-relative API URLs against same origin, and local debugging also revealed that a host-side `node src/server.js` process on port `2500` can mask the Docker-published app and produce misleading supplier-route 404s.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now record that `src/public/shared/auth.js` resolves `/api/**` calls such as `/api/auth/me`, `/api/auth/logout`, and `/api/suppliers/company` through `window.location.origin` before dispatch, preserving same-origin browser-session behavior under `/root/` and other nested shells, while also documenting the development-time host-port conflict risk on `2500`.
+**Implemented change:** Synchronized architecture-facing documentation to the post-debug repository state for the supplier browser runtime and shared auth helper without changing backend contracts.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Active runtime code in `src/public/shared/auth.js`, `src/public/root/suppliers-api.js`, `src/public/root/views/suppliers-admin.js`; focused validation in `tests/public-auth-helper-characterization.test.js`, `tests/public-auth-helper-same-origin-resolution.test.js`, and `tests/root-shell-suppliers-api-characterization.test.js`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** Documentation now reflects same-origin URL resolution in the shared browser helper without changing endpoint paths or payloads
+**Container impact:** Documentation now records the local host-port conflict risk that can hide the Docker-published app during debugging, but no container contract changed in this documentation refresh
+**Security impact:** Low direct impact; medium documentation-accuracy impact because cookie-authenticated nested-shell API resolution is now explicit and the misleading local-port conflict is called out
+**Acceptance criteria:** Architecture-facing docs explicitly state the shared auth helper same-origin resolution behavior and the local `2500` port-conflict debugging caveat without overstating any broader platform redesign
+**Validation evidence:** `node --test tests/public-auth-helper-characterization.test.js tests/public-auth-helper-same-origin-resolution.test.js tests/root-shell-suppliers-api-characterization.test.js` passed; container verification confirmed `/health/ready` 200 and `/api/suppliers/company` 401 inside the active app runtime when unauthenticated
+**Required tests:** Preserve the named shared-auth-helper and supplier browser-runtime characterization suites
+**Migration considerations:** Keep this documentation refresh scoped to the browser helper/runtime behavior and local development diagnostics; do not imply broader auth-model or infrastructure redesign
+**Rollback or mitigation:** Revert documentation-only wording if later runtime changes replace the shared helper resolution strategy or the local development port model
+**Risk:** Low
+
+## TASK-088: Refresh architecture-facing docs after `supplier-management`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Supply / Supplier management / Architecture documentation
+**Requirement:** `specs/supplier-management`; post-implementation refresh requested by `sdd-implementation-agent-24580e`
+**Reason:** After the approved supplier-management slice was validated, the canonical architecture-facing docs still described standalone supplier routes and the root-shell `#proveedores` destination as pending or placeholder-only behavior.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now record that `/api/suppliers` is mounted for company-scoped supplier CRUD plus product assignment/removal, that mounted supplier routes actively consume `supplier.view` / `supplier.manage`, and that the root-shell company-admin route `#proveedores` is now an implemented destination rather than a shared `in_process` placeholder.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation repository state for `supplier-management`, documenting the active backend route group, authorization consumption, root-shell route exposure, and bounded browser runtime support without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Active runtime code in `src/routes/supplier.routes.js`, `src/app.js`, `src/public/root/manifest.js`, `src/public/root/router.js`, `src/public/root/suppliers-api.js`, `src/public/root/views/suppliers-admin.js`; focused validation in `tests/supplier-routes-contract.test.js`, `tests/root-shell-suppliers-api-characterization.test.js`, `tests/suppliers-view-characterization.test.js`, `tests/root-shell-supply-manifest.test.js`, `tests/root-shell-router-characterization.test.js`, and `tests/runtime-contract-governance.test.js`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** Documentation now reflects the active `/api/suppliers` runtime contract without changing endpoint paths or payloads
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because active `supplier.view` / `supplier.manage` enforcement is now explicit
+**Acceptance criteria:** Architecture-facing docs stop describing `/api/suppliers` and `#proveedores` as pending, accurately state the mounted route/policy/browser-runtime truth, and do not overstate broader procurement or quality scope
+**Validation evidence:** `npx prisma validate` passed; `node --test tests/supplier-pricing-migration.test.js tests/supplier-schema.test.js tests/supplier-routes-contract.test.js tests/suppliers-view-characterization.test.js` passed; `node --test tests/runtime-contract-governance.test.js` passed; `node --test tests/root-shell-suppliers-api-characterization.test.js` passed; `node --test tests/suppliers-view-characterization.test.js` passed; `node --test tests/root-shell-supply-manifest.test.js` passed; `node --test tests/root-shell-router-characterization.test.js` passed; `npm run typecheck` passed; `npm test -- --silent` passed earlier in the cycle; scoped baseline audit verdict `8.4/10` `Acceptable` is documented as a warning below the preferred threshold
+**Required tests:** Preserve the named supplier-management route, browser-runtime, router, manifest, runtime-governance, and aggregate validation evidence
+**Migration considerations:** Keep this documentation refresh scoped to the implemented supplier-management slice; do not imply standalone quality routes, procurement-shell screens beyond suppliers, or external billing handoff completion
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes retire the supplier route group or change root-shell supplier exposure
+**Risk:** Low
+
+## TASK-087: Refresh architecture-facing docs after `platform-permission-catalog-filter`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Identity and access / Company-role governance / Architecture documentation
+**Requirement:** `specs/platform-permission-catalog-filter`; post-implementation refresh requested by the user after implementation by `sdd-implementation-agent-a4adf0`
+**Reason:** After the approved permission-catalog filtering slice shipped, the canonical architecture-facing docs still needed to state explicitly that `GET /api/roles/permissions` no longer returns platform-scoped permission entries to company-admin callers.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that `src/services/role.service.js` filters the metadata-enriched permission catalog by governance `scope` before returning it to company-admin callers, so platform-scoped permissions such as `companies.manage` no longer reach `#roles_permissions` through `GET /api/roles/permissions`.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation repository state for `platform-permission-catalog-filter`, documenting the server-side catalog filter, the unchanged defense-in-depth assignment denial for platform-scoped permissions, and the focused test evidence without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented service change in `src/services/role.service.js`; active route in `src/routes/role.routes.js`; focused validation in `tests/role-permissions-enrichment.test.js`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** Documentation now reflects the active runtime contract that `GET /api/roles/permissions` excludes platform-scoped permissions for company-admin callers while preserving the same endpoint path and metadata-enriched response shape for returned entries
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the least-exposure behavior for the company-admin permission catalog is now explicit
+**Acceptance criteria:** Architecture-facing docs state that company-admin callers of `GET /api/roles/permissions` do not receive platform-scoped permissions, preserve the truth that create/update governance denial remains in place as defense in depth, and reference the focused catalog-filter test evidence without overstating broader scope changes
+**Validation evidence:** User-supplied results report `68/68` passing, `lint` passing, and `typecheck` passing after the implementation; focused repository evidence includes the added coverage in `tests/role-permissions-enrichment.test.js`
+**Required tests:** Preserve `tests/role-permissions-enrichment.test.js`; keep the broader role-permission governance suites intact as existing supporting evidence
+**Migration considerations:** Keep this documentation refresh scoped to the implemented server-side filter; do not imply bundle, governance-config, or UI redesign changes that were explicitly out of scope
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes alter the permission-catalog response contract or broaden the caller set beyond the current company-admin path
+**Risk:** Low
+
+## TASK-086: Add guardrail for permission-catalog config/seed/backfill drift
+**Status:** Proposed
+**Priority:** Medium
+**Domain:** Identity and access / Supply governance / Database migration governance
+**Requirement:** `supply-inventory-entry` remediation follow-up after migration `20260819000000_backfill_production_permission_catalog`
+**Reason:** The current remediation now keeps the approved `recipes.*` and `production.*` permission rows aligned for fresh environments (`prisma/seed.js`) and already-provisioned databases (additive backfill migration), but repository truth still relies on manual coordination across governance metadata, seed data, and backfill SQL.
+**Current problem:** `src/security/permission-governance.config.js`, `prisma/seed.js`, and `prisma/migrations/20260819000000_backfill_production_permission_catalog/migration.sql` can drift in future slices because no automated guardrail currently verifies that approved permission codes remain synchronized across those sources.
+**Proposed change:** Add an approved automated guardrail that compares the active governance-backed permission catalog against the seeded and backfilled recipes/production permission rows, failing fast when approved codes diverge across config, seed, or remediation migration sources.
+**Affected files:** `src/security/permission-governance.config.js`, `prisma/seed.js`, `prisma/migrations/20260819000000_backfill_production_permission_catalog/migration.sql`, new or updated governance tests/scripts, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Current metadata enrichment in `src/services/role.service.js`; active role-permission route at `src/routes/role.routes.js`; existing targeted tests `tests/role-permissions-enrichment.test.js`, `tests/role-permissions-route.test.js`, and `tests/production-permission-catalog-backfill-migration.test.js`
+**Database impact:** None expected unless a later approved approach adds catalog-version tracking or broader remediation migrations
+**API impact:** None expected; the task preserves current `GET /api/roles/permissions` and root `#roles_permissions` behavior
+**Container impact:** None
+**Security impact:** Medium positive impact because drift in approved permission rows can silently break authorization-dependent administration surfaces on upgraded databases
+**Acceptance criteria:** A repeatable automated check fails when approved recipes/production permission definitions diverge across governance config, seed data, or backfill SQL, and current docs describe the synchronized catalog truth without reintroducing the closed existing-database gap
+**Required tests:** `tests/production-permission-catalog-backfill-migration.test.js`, `tests/role-permissions-enrichment.test.js`, `tests/role-permissions-route.test.js`, any new drift-guardrail suite, plus existing lint/typecheck/build guardrails
+**Migration considerations:** Keep the current remediation additive; do not rewrite prior applied migrations or remove the existing backfill path for already-provisioned databases
+**Rollback or mitigation:** If the guardrail proves too brittle, keep the current backfill + seed baseline and narrow the check scope rather than removing the existing remediation path
+**Risk:** Medium
+
+## TASK-085: Refresh architecture-facing docs after production permission-catalog remediation
+**Status:** Completed
+**Priority:** Low
+**Domain:** Identity and access / Supply governance / Architecture documentation
+**Requirement:** Post-implementation refresh requested by the user after remediation in feature `supply-inventory-entry`; implementation executed by `sdd-implementation-agent-e8c511`
+**Reason:** After the additive existing-database permission-catalog remediation shipped, the canonical architecture-facing docs still described the recipes/production permission gap mainly in terms of seed alignment and did not yet reflect the new additive backfill migration or its targeted validation evidence.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now state that migration `20260819000000_backfill_production_permission_catalog` upserts/reactivates the approved `recipes.*` and `production.*` permission rows required by `GET /api/roles/permissions` and the root `#roles_permissions` UI, closing the previously documented existing-database catalog gap for this scope.
+**Implemented change:** Synchronized architecture-facing documentation to the post-remediation repository state, documenting the additive backfill migration, the current role-permission surface dependency on those rows, the updated residual-risk posture, and the supplied targeted validation evidence without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented migration `prisma/migrations/20260819000000_backfill_production_permission_catalog/migration.sql`; tests `tests/production-permission-catalog-backfill-migration.test.js`, `tests/role-permissions-enrichment.test.js`, `tests/role-permissions-route.test.js`; active runtime consumers in `src/services/role.service.js`, `src/routes/role.routes.js`, and `src/public/root/views/roles-admin.js`
+**Database impact:** Documentation now reflects the already-implemented additive backfill migration for existing databases; no new schema or migration added by this refresh
+**API impact:** Documentation now reflects the existing `GET /api/roles/permissions` and root `#roles_permissions` dependency on approved recipes/production permission rows without changing runtime contracts
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the closed existing-database permission gap and the remaining drift-guardrail follow-up are now explicit
+**Acceptance criteria:** Architecture-facing docs record the additive backfill migration, stop treating the recipes/production permission gap for existing databases as an open current defect, and preserve the remaining follow-up need for automated config/seed/backfill drift detection
+**Validation evidence:** User-supplied results report targeted remediation suites passing (`16/16`) across `tests/production-permission-catalog-backfill-migration.test.js`, `tests/role-permissions-enrichment.test.js`, and `tests/role-permissions-route.test.js`, together with `npm run lint`, `npm run typecheck`, `npx prisma validate --schema prisma/schema.prisma`, and `npm run build`; pre-existing unrelated Windows Prisma file-lock/full-suite characterization issues remain documented
+**Required tests:** Preserve `tests/production-permission-catalog-backfill-migration.test.js`, `tests/role-permissions-enrichment.test.js`, `tests/role-permissions-route.test.js`, and the supplied lint/typecheck/prisma-validate/build evidence
+**Migration considerations:** Keep the current remediation documented as additive and safe for already-provisioned databases; do not imply that historical applied migrations were rewritten
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes materially alter the permission-catalog remediation path or broaden the scope beyond the approved recipes/production rows
+**Risk:** Low
+
+## TASK-084: Refresh architecture-facing docs after `session-docs-tenant-hardening` `TASK-008` final validation closeout
+**Status:** Completed
+**Priority:** Low
+**Domain:** Identity and access / Governance validation / Architecture documentation
+**Requirement:** `specs/session-docs-tenant-hardening`; final validation closeout requested by `sdd-implementation-agent-a4adf0`
+**Reason:** After the final focused plus aggregate validation cycle completed, the canonical architecture-facing docs still described the reviewed auth/runtime seam as awaiting aggregate closure and did not yet classify the remaining `9.4/10` audit posture as operational/maintainability follow-up.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now record that the aggregate suite is green, that focused compatibility/governance/tenant/session evidence is closed for the reviewed seam, and that the remaining audit warnings are tracked as operational/maintainability follow-up rather than confirmed regressions.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `session-docs-tenant-hardening` `TASK-008`, documenting the green aggregate evidence, the closed focused validation lane, the discarded invalid parallel validation attempt, and the remaining warning posture without changing production code.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** User-supplied validation evidence for `tests/governance-baseline-sync-guardrails.test.js`, `tests/access-policies.test.js`, `tests/critical-contract-governance.test.js`, `tests/permission-governance-backend-consumption.test.js`, auth/runtime compatibility suites, `npm run test -- --silent`, `npm run lint`, `npm run typecheck`, and `npm run build`; current repository truth in `docs/critical-contract-matrix.json`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** Documentation now reflects the already-implemented validation closure without changing runtime contracts
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the green validation lane and the remaining warning posture are now explicit and no longer misclassified as active regressions
+**Acceptance criteria:** Architecture-facing docs state that the reviewed `session-docs-tenant-hardening` seam has green focused and aggregate evidence, do not continue treating `TASK-008` as pending, and classify the remaining `9.4/10` audit concerns as operational/maintainability follow-up only
+**Validation evidence:** User-supplied results report targeted compatibility/governance/tenant/session suites passing, `npm run test -- --silent` passing with `812` tests (`810` pass, `0` fail, `2` skipped), `npm run lint` passing, `npm run typecheck` passing, `npm run build` passing, and a baseline audit verdict of `9.4/10` with verdict `Acceptable`; the earlier invalid parallel `test` + `build` attempt was explicitly discarded
+**Required tests:** Preserve the focused auth/runtime, governance, tenant-scope, session-invalidation, and aggregate validation suites already named in the supplied evidence; do not weaken coverage to preserve closure wording
+**Migration considerations:** Keep the docs aligned with the isolated aggregate rerun evidence and avoid restating the discarded parallel attempt as valid proof
+**Rollback or mitigation:** Revert documentation wording if later repository changes reopen the validation lane or materially change the remaining warning posture
+**Risk:** Low
+
+## TASK-083: Refresh architecture-facing docs after auth/runtime compatibility validation
+**Status:** Completed
+**Priority:** Low
+**Domain:** Identity and access / Embedded browser runtime / Architecture documentation
+**Requirement:** `specs/session-docs-tenant-hardening`; post-implementation refresh requested by `sdd-implementation-agent-a4adf0` after `TASK-007 Validate backward compatibility of auth/runtime behavior`
+**Reason:** After the focused compatibility-validation cycle completed, the canonical architecture-facing docs still needed to state explicitly that supported auth-route compatibility evidence exists, that browser-session login/me/logout behavior remains compatible in the reviewed seam, that root-shell actor-scoped fallback behavior remains compatible in the reviewed seam, and that repository-wide aggregate confidence is still gated by pending `TASK-008`.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now explicitly record the focused TASK-007 validation evidence for `/api/auth/login`, `/api/auth/me`, `/api/auth/logout`, root-shell router fallback behavior, and the remaining dependency on `TASK-008` for broader aggregate compatibility confidence.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `session-docs-tenant-hardening` `TASK-007`, documenting the reviewed auth/runtime compatibility seam without changing production code or overstating repository-wide closure.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Focused validation evidence from `tests/browser-session-auth-boundary.test.js`, `tests/root-shell-router-characterization.test.js`, `tests/root-shell-route-governance.test.js`, `npm run lint`, and `npm run typecheck`; supporting runtime truth in `src/app.js`, `src/routes/auth.routes.js`, `src/middlewares/authenticate.js`, and `src/public/root/router.js`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** Documentation now reflects the already-implemented supported auth-route and root-shell compatibility baseline without changing runtime contracts
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the reviewed compatibility seam and the remaining aggregate-confidence limitation are now explicit
+**Acceptance criteria:** Architecture-facing docs mention the focused compatibility evidence for supported auth routes and root-shell fallback behavior, preserve the current browser-session semantics truthfully, and state that aggregate compatibility confidence still depends on pending `TASK-008`
+**Validation evidence:** User-supplied results report `node --test tests/browser-session-auth-boundary.test.js`, `node --test tests/root-shell-router-characterization.test.js`, `node --test tests/root-shell-route-governance.test.js`, `npm run lint`, and `npm run typecheck` all passing after the implementation cycle; baseline audit verdict supplied by the user is `9.2/10` with verdict `Acceptable`
+**Required tests:** Preserve `tests/browser-session-auth-boundary.test.js`, `tests/root-shell-router-characterization.test.js`, `tests/root-shell-route-governance.test.js`, and keep the broader aggregate confidence gate explicit through pending `TASK-008`
+**Migration considerations:** Keep the docs explicit that this refresh closes focused compatibility documentation only; do not treat the TASK-007 evidence as full-repository aggregate verification
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes alter supported auth-route behavior, root-shell fallback semantics, or the remaining aggregate-validation dependency
+**Risk:** Low
+
+## TASK-082: Refresh architecture-facing docs after focused docs/contracts/tests sync coverage
+**Status:** Completed
+**Priority:** Low
+**Domain:** Governance documentation / Runtime-contract governance / Company-role update seam
+**Requirement:** `specs/session-docs-tenant-hardening`; post-implementation refresh requested by the user after `TASK-006`
+**Reason:** After the implemented focused governance/doc-sync follow-up, the canonical architecture-facing docs still did not fully state that the new drift guardrails are intentionally bounded, that canonical docs plus runtime-contract artifacts now explicitly freeze the role-update seam, or that the bounded OpenAPI consistency guardrail now covers `PUT /api/roles/company/{roleId}`.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now explicitly record that the focused governance/doc-sync seam is intentionally narrow, that canonical `docs/**` plus runtime-contract artifacts are the authority for the audited role-update surface, that the role-update seam is frozen by focused route/service/browser-session tests, and that `tests/openapi-contract-consistency.test.js` explicitly covers `PUT /api/roles/company/{roleId}` in the reviewed partial OpenAPI baseline.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `session-docs-tenant-hardening` `TASK-006`, documenting the intentionally bounded guardrail scope, the canonical docs/runtime-contract freeze around the role-update seam, and the explicit OpenAPI consistency coverage for the company-role update operation without changing runtime behavior.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented guardrail changes in `tests/governance-baseline-sync-guardrails.test.js`, `tests/openapi-contract-consistency.test.js`, and the canonical runtime-contract artifacts under `docs/**`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** Documentation now reflects the already-implemented bounded OpenAPI coverage for `PUT /api/roles/company/{roleId}` without changing runtime contracts
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the guarded role-update seam and the intentionally bounded scope of the drift tests are now explicit
+**Acceptance criteria:** Architecture-facing docs state that the focused governance/doc-sync guardrail is intentionally bounded, identify canonical docs/runtime-contract artifacts as the authority for the role-update seam, and mention that `tests/openapi-contract-consistency.test.js` explicitly includes `PUT /api/roles/company/{roleId}`
+**Validation evidence:** User-supplied results report `node --test tests/governance-baseline-sync-guardrails.test.js`, `node --test tests/documentation-ownership-governance.test.js`, `node --test tests/openapi-contract-consistency.test.js`, `npm run lint`, and `npm run typecheck` all passing after the implementation cycle
+**Required tests:** Preserve `tests/governance-baseline-sync-guardrails.test.js`, `tests/documentation-ownership-governance.test.js`, `tests/openapi-contract-consistency.test.js`, and the supplied lint/typecheck evidence
+**Migration considerations:** Keep the docs explicit that these guardrails are focused drift detectors for selected truths only and do not represent full repository-wide semantic verification
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes materially widen or narrow the guardrail scope or change the covered role-update contract surface
+**Risk:** Low
+
+## TASK-081: Refresh architecture-facing docs after tenant-scoped role-read hardening
+**Status:** Completed
+**Priority:** Low
+**Domain:** Company-role governance / Company-user provisioning / Architecture documentation
+**Requirement:** `specs/session-docs-tenant-hardening`; post-implementation refresh requested by the user after `TASK-005`
+**Reason:** After the implemented tenant role-read hardening slice, the canonical architecture-facing docs still described the repository lookup boundary too broadly and did not fully reflect the new scoped-first read behavior for company-role updates and company-user creation.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe that `role.repository.findCompanyOwnedRoleById(...)` is used first for company-role updates, `role.repository.findAssignableRoleByIdForCompany(...)` is used first for company-user creation, active global non-root roles remain assignable when they satisfy the scoped assignable lookup, and the remaining broad `findRoleById(...)` read is retained only as a narrow fallback for differentiated `404` / `403` / `400` semantics.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `session-docs-tenant-hardening` `TASK-005`, documenting the stronger repository boundary, the preserved classification-only fallback behavior, and the unchanged residual risks around post-commit session invalidation ambiguity and Redis reverse-index hygiene.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented repository changes in `src/repositories/role.repository.js`, `src/services/role.service.js`, `src/services/user.service.js`, and validation evidence from `tests/role-update-service.test.js`, `tests/user-company-role-scope.test.js`, `tests/audit-instrumentation.test.js`, `tests/bcrypt-supply-chain-closeout.test.js`, `tests/browser-session-auth-boundary.test.js`, `npm run lint`, and `npm run typecheck`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** Documentation now reflects the already-implemented scoped-first lookup behavior without changing runtime contracts
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because tenant role-read boundaries and remaining fallback semantics are now explicit
+**Acceptance criteria:** Architecture-facing docs record the scoped-first repository reads for role update and company-user creation, preserve the truth that active global non-root roles remain assignable, and keep the remaining fallback and post-commit invalidation limitations explicit without overstating the hardening
+**Validation evidence:** User-supplied results report `node --test tests/role-update-service.test.js`, `node --test tests/user-company-role-scope.test.js`, `node --test tests/audit-instrumentation.test.js`, `node --test tests/bcrypt-supply-chain-closeout.test.js`, `node --test tests/browser-session-auth-boundary.test.js`, `npm run lint`, and `npm run typecheck` all passing after the implementation cycle
+**Required tests:** Preserve `tests/role-update-service.test.js`, `tests/user-company-role-scope.test.js`, `tests/audit-instrumentation.test.js`, `tests/bcrypt-supply-chain-closeout.test.js`, `tests/browser-session-auth-boundary.test.js`, and the supplied lint/typecheck evidence
+**Migration considerations:** Keep the current documentation explicit that fallback broad reads still exist for classification semantics and that the browser-session invalidation step remains post-persistence
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes materially alter the scoped lookup contract or retire the remaining fallback path
+**Risk:** Low
+
+## TASK-080: Clarify or mitigate post-commit role-update session-invalidation failures
+**Status:** Proposed
+**Priority:** High
+**Domain:** Identity and access / Company-role governance / Browser-session reliability
+**Requirement:** `specs/session-docs-tenant-hardening`; baseline audit follow-up noted by `sdd-implementation-agent-a4adf0`
+**Reason:** Repository truth now shows that successful company-role updates trigger targeted browser-session invalidation, but that invalidation is executed after persistence.
+**Current problem:** `src/services/role.service.js` commits the role-permission update before calling browser-session invalidation. If the browser-session store is unavailable, the API can return `503 service_unavailable` even though the permission change already committed, creating an ambiguous post-commit error contract for operators and clients.
+**Proposed change:** Evaluate and implement an approved mitigation for post-commit invalidation failure semantics, such as explicit response-contract clarification, compensating retry/outbox handling, or stronger operational observability, while preserving the current security goal that affected sessions must not continue with stale permissions silently.
+**Affected files:** `src/services/role.service.js`, `src/services/browser-session.service.js`, related audit/role/session tests, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented targeted invalidation in `src/services/browser-session.service.js`; implemented role-update coupling in `src/services/role.service.js`
+**Database impact:** None unless a later approved retry/outbox design introduces persistence for deferred invalidation work
+**API impact:** Possible clarification or adjustment of the role-update error contract; backward compatibility review required
+**Container impact:** None unless a later approved async worker/retry mechanism is introduced
+**Security impact:** Medium to High because the task affects how quickly and transparently permission changes converge during partial infrastructure failure
+**Acceptance criteria:** The repository documents and/or implements an approved strategy for role-update cases where persistence succeeds but session invalidation fails, and regression tests cover the chosen behavior without weakening the security boundary
+**Required tests:** `tests/role-update-service.test.js`, `tests/browser-session-auth-boundary.test.js`, any new failure-semantics characterization, plus existing lint/typecheck guardrails
+**Migration considerations:** Preserve the current successful invalidation behavior and avoid implying transactional coupling with Redis unless that design is explicitly approved
+**Rollback or mitigation:** Keep any mitigation incremental so the flow can fall back to the current explicit `503` behavior if the new strategy proves too risky
+**Risk:** High
+
+## TASK-079: Prune stale Redis browser-session user membership sets
+**Status:** Proposed
+**Priority:** Medium
+**Domain:** Identity and access / Browser-session infrastructure
+**Requirement:** `specs/session-docs-tenant-hardening`; baseline audit follow-up noted by `sdd-implementation-agent-a4adf0`
+**Reason:** The Redis browser-session adapter now keeps user-scoped session-ID sets to enable targeted invalidation, but repository truth still shows no cleanup path for stale set members left behind after natural session-key expiry.
+**Current problem:** `src/services/browser-session-redis.store.js` removes membership on explicit invalidation, but naturally expired session keys can leave orphaned IDs in the user-scoped Redis set, increasing reverse-index drift and unnecessary work during later invalidation calls.
+**Proposed change:** Add safe reverse-index hygiene for Redis-backed browser sessions, either by pruning missing session IDs during user/batch invalidation and lookup-adjacent paths or by introducing an approved cleanup mechanism that preserves the current raw-socket adapter boundary.
+**Affected files:** `src/services/browser-session-redis.store.js`, targeted browser-session tests, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Current targeted invalidation primitives in `src/services/browser-session.service.js` and `src/services/browser-session-redis.store.js`; existing Redis-path coverage in `tests/browser-session-redis-store.test.js`
+**Database impact:** None
+**API impact:** None unless a later approved slice exposes operational metrics or admin controls for cleanup state
+**Container impact:** None expected unless a later approved cleanup worker is introduced
+**Security impact:** Low direct confidentiality impact; medium session-governance integrity/operability impact because stale reverse-index entries can weaken confidence in targeted invalidation hygiene
+**Acceptance criteria:** Redis-backed targeted invalidation no longer leaves unbounded stale user-set memberships after natural key expiry, and regression tests cover the approved cleanup behavior without changing current login/logout contracts
+**Required tests:** `tests/browser-session-redis-store.test.js`, relevant auth/session regression suites, and any new DB-free characterization for stale-membership cleanup
+**Migration considerations:** Preserve the current Redis key prefixes and supported session contracts; avoid introducing background infrastructure unless explicitly approved
+**Rollback or mitigation:** Keep cleanup additive and reversible so the store can fall back to the current explicit-invalidation-only behavior if the hygiene path causes regressions
+**Risk:** Medium
+
+## TASK-078: Integrate role updates with targeted browser-session invalidation
+**Status:** Completed
+**Priority:** High
+**Domain:** Identity and access / Company-role governance
+**Requirement:** `specs/session-docs-tenant-hardening`; existing role-governance update flow documented in `docs/current-state.md`
+**Reason:** The browser-session service exposed targeted invalidation primitives by user and deduplicated user batches, and the reviewed role-update flow needed to invoke them to prevent stale browser authorization state.
+**Current problem resolved:** Successful company-role permission updates now resolve active users assigned to the changed role, invalidate only those users' browser sessions with reason `role_permission_change`, preserve unaffected sessions, and force subsequent affected browser requests such as `GET /api/auth/me` to fail until a new login occurs.
+**Implemented change:** Wired the approved role-permission mutation flow to call `browserSessionService.invalidateBrowserSessionsForUsers(...)` after successful persistence, using `userRepository.findActiveUsersByRoleId(...)` to resolve the impacted active tenant users while preserving the current `PUT /api/roles/company/:roleId` contract and existing audit semantics.
+**Affected files:** `src/services/role.service.js`, `src/repositories/user.repository.js`, `src/services/browser-session.service.js`, `tests/role-update-service.test.js`, `tests/browser-session-auth-boundary.test.js`, `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Current role update flow in `src/services/role.service.js`; targeted invalidation primitives in `src/services/browser-session.service.js`; browser-session store readiness/error semantics
+**Database impact:** None
+**API impact:** No success-path contract change; current failure-path behavior still allows `503 service_unavailable` when invalidation fails after persistence, which is tracked separately
+**Container impact:** None
+**Security impact:** Medium to High positive impact because permission changes now converge immediately for already-authenticated browser sessions by forcing re-authentication
+**Acceptance criteria:** Approved role-update flows invalidate the affected browser sessions through the existing service seam, unrelated sessions are preserved, and regression tests prove that affected stale browser sessions no longer continue authenticating after a successful role change
+**Required tests:** `tests/role-update-service.test.js`, `tests/browser-session-auth-boundary.test.js`, plus existing lint/typecheck guardrails named in the supplied implementation evidence
+**Migration considerations:** Preserve current role-update API semantics; note that invalidation remains post-persistence and therefore is not transactionally coupled to the role update
+**Rollback or mitigation:** The integration remains behind the current service boundary, so the flow could revert to refresh-on-next-auth behavior if a later approved change requires decoupling
+**Risk:** High
+
+## TASK-077: Refresh architecture-facing docs after browser-session targeted invalidation primitives
+**Status:** Completed
+**Priority:** Low
+**Domain:** Identity and access / Architecture documentation
+**Requirement:** `specs/session-docs-tenant-hardening`; post-implementation refresh requested by `sdd-implementation-agent-a4adf0`
+**Reason:** After `TASK-003` added targeted browser-session invalidation primitives, the canonical architecture-facing docs still needed to reflect the actual implemented service/store behavior and the remaining pending role-update integration.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` were synchronized to describe the new user- and batch-scoped invalidation primitives, the memory-store reverse index, the Redis user-scoped session-ID sets plus `SMEMBERS` array parsing, the focused test coverage, and the then-remaining gaps around role-update integration and stale Redis user-set memberships.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of the browser-session targeted invalidation slice without changing production code or public API contracts.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented repository changes in `src/services/browser-session.service.js`, `src/services/browser-session-memory.store.js`, `src/services/browser-session-redis.store.js`, `tests/browser-session-targeted-invalidation.test.js`, and `tests/browser-session-redis-store.test.js`
+**Database impact:** Documentation only; no schema or migration change
+**API impact:** Documentation now reflects internal service/store capabilities only; no new public endpoint was introduced in this refresh
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because session invalidation boundaries and remaining convergence gaps are now explicit
+**Acceptance criteria:** Architecture-facing docs record targeted invalidation primitives, reverse-index/store details, the tested current behavior at that time, and the then-pending role-update integration truthfully
+**Required tests:** Preserve `tests/browser-session-targeted-invalidation.test.js`, `tests/browser-session-redis-store.test.js`, `tests/browser-session-auth-boundary.test.js`, plus the supplied `npm run lint` and `npm run typecheck` validation baseline
+**Migration considerations:** Keep the docs aligned with the current internal-only invalidation seam until a later approved slice changes runtime integration or exposes new contracts
+**Rollback or mitigation:** Revert documentation wording if later repository changes alter the targeted invalidation seam or close the pending role-update/stale-membership gaps
+**Risk:** Low
+
+## TASK-076: Refresh architecture-facing docs after session-docs/governance and company-admin production-bundle alignment
+**Status:** Completed
+**Priority:** Low
+**Domain:** Root shell governance / Role-governance baseline / Permission bundle documentation
+**Requirement:** `specs/session-docs-tenant-hardening`, `specs/supply-inventory-entry` `TASK-019`; post-implementation refresh requested by `sdd-implementation-agent-a4adf0`
+**Reason:** After the implemented router/governance/bundle follow-up, the canonical architecture-facing docs did not yet explicitly capture the current root-shell router dependencies for `#recetas` and `#produccion_ordenes`, the guarded current truth that runtime company-role update exists, or the updated `company_admin` default production-permission grouping.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now state that `root/router.js` explicitly depends on `views.recipesAdmin` and `views.productionOrdersAdmin`, that `tests/governance-baseline-sync-guardrails.test.js` guards canonical `docs/**` ownership plus the current `PUT /api/roles/company/:roleId` truth, and that the implemented `company_admin` bundle includes `recipes.*` plus `production.*` by default while excluding `quality.*` from that grouping.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of the completed session-docs/governance and permission-governance follow-up, documenting router dependency truth, current documentation guardrail truth, metadata-backed production-category grouping in the root roles-permissions path, the default `company_admin` bundle coverage, and the remaining limitation that bundles are still governance metadata rather than runtime-enforced personas.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented repository changes in `src/public/root/router.js`, `src/security/role-bundles.config.js`, `tests/root-shell-router-characterization.test.js`, `tests/governance-baseline-sync-guardrails.test.js`, `tests/permission-governance-foundation.test.js`, and `tests/root-roles-permissions-governance.test.js`
+**Database impact:** Documentation only in this refresh; records current permission-catalog and bundle truth without schema or migration changes
+**API impact:** Documentation now reflects the already-implemented metadata-backed roles-permissions catalog and existing `PUT /api/roles/company/:roleId` truth without changing runtime contracts
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because company-role governance truth and bundle boundaries are now explicit
+**Acceptance criteria:** Architecture-facing docs explicitly record the router dependencies for `#recetas` / `#produccion_ordenes`, the current company-role update governance truth, and that the approved production grouping for this scope is `recipes.*` + `production.*`, excluding `quality.*`
+**Validation evidence:** User-supplied results report router characterization, governance baseline sync, documentation ownership governance, OpenAPI consistency, permission governance foundation, root roles-permissions governance, lint, typecheck, and build all passing after the implementation cycle
+**Required tests:** Preserve `tests/root-shell-router-characterization.test.js`, `tests/governance-baseline-sync-guardrails.test.js`, `tests/permission-governance-foundation.test.js`, `tests/root-roles-permissions-governance.test.js`, `tests/openapi-contract-consistency.test.js`, and the broader lint/typecheck/build guardrails named in the supplied validation evidence
+**Migration considerations:** Keep bundle behavior documented as metadata-backed guidance only until a later approved slice adds runtime enforcement, seeded presets, or broader persona coverage
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes alter the router dependency map, production-category grouping, or bundle composition
+**Risk:** Low
+
+## TASK-075: Refresh architecture-facing docs after `audit-findings-remediation` role-governance update flow
+**Status:** Completed
+**Priority:** Low
+**Domain:** Company-role governance / Root roles admin UI / Architecture documentation
+**Requirement:** `specs/audit-findings-remediation`; post-implementation refresh requested by the user after the approved remediation slice
+**Reason:** After the implemented role-governance remediation, the canonical architecture-facing docs still contained stale statements that the runtime had no company-role update flow and that the roles admin shell was limited to list/create behavior only.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now describe the active `PUT /api/roles/company/:roleId` backend surface, the metadata-enriched permission catalog returned by `GET /api/roles/permissions`, the editable `#roles_permissions` shell workflow, the read-only treatment of global roles, the self-lockout guard for own-role edits, and the remaining advisory risks around session-permission refresh timing plus the then-current reliance on a broader repository lookup path.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of the `audit-findings-remediation` role-governance slice, documenting the enriched permission catalog fields, the `role.company.update` access-policy requirement for `settings.manage`, the transactional role-permission replacement path, the denial-audit actions `roles.company.create.governance_denied` / `roles.company.update.governance_denied`, the updated root roles admin browser behavior, and the fact that `prisma/seed.js` now includes the missing active permission definitions needed by the current catalog.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implemented repository changes in `src/security/**`, `src/routes/role.routes.js`, `src/services/role.service.js`, `src/repositories/role.repository.js`, `src/schemas/role.schema.js`, `src/public/root/**`, and `prisma/seed.js`
+**Database impact:** Documentation only in this refresh; records that the permission seed catalog is now aligned for the implemented role-governance surface, with no Prisma schema migration added by this doc task
+**API impact:** Documentation now reflects the active `PUT /api/roles/company/:roleId` contract and the metadata-enriched `GET /api/roles/permissions` response without changing the runtime contracts themselves
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the active tenant role-update boundary, self-lockout protection, and remaining session-refresh/repository-boundary advisory risks are now explicit
+**Acceptance criteria:** Architecture-facing docs no longer claim that role updates are unimplemented, record the actual root roles admin edit workflow and permission catalog metadata shape, and keep the remaining advisory risks explicit without redesigning the module
+**Validation evidence:** User-supplied results report `npm run lint`, `npm run typecheck`, `npm run build`, `npm run validate:public-runtime`, 35 feature-specific tests, `tests/runtime-contract-governance.test.js`, and `tests/pagination.test.js` all passing; repository inspection also confirms mounted `PUT /api/roles/company/:roleId`, enriched `role.service.js` serialization, `roles-api.js.updateRole(...)`, and the updated roles-admin browser workflow
+**Required tests:** Preserve `tests/role-update-service.test.js`, `tests/role-update-authorization.test.js`, `tests/role-permissions-enrichment.test.js`, `tests/runtime-contract-governance.test.js`, and the broader lint/typecheck/build/public-runtime guardrails named in the supplied validation evidence
+**Migration considerations:** Keep the current update flow documented as additive within the existing layered monolith; do not imply session-permission auto-refresh, role delete, or user-role reassignment behavior that is not implemented
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes materially alter the active role update contract, remove the edit workflow, or add deeper permission/session propagation behavior
+**Risk:** Low
+
+## TASK-074: Refresh architecture-facing docs after `root-admin-recipes-production` TASK-006 production-orders supervision view
+**Status:** Completed
+**Priority:** Low
+**Domain:** Root shell production-order supervision surface / Architecture documentation
+**Requirement:** `specs/root-admin-recipes-production/requirements.md` (`FR-011`, `FR-012`, `FR-013`, `FR-014`, `AC-009`, `AC-010`); post-implementation refresh requested by `sdd-implementation-agent-a4adf0`
+**Reason:** After the approved `root-admin-recipes-production` `TASK-006` implementation cycle, the canonical architecture-facing docs still described `/root/#produccion_ordenes` as a structural oversight screen rather than the now-usable read-only supervision workflow.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now record that `#produccion_ordenes` actively consumes `productionAdminApi` plus helper/state/renderer seams, that the route now offers list/detail/KPI/filter behavior, and that the explicit limitation remains server-side pagination only with the remaining filters applied client-side over the loaded page.
+**Implemented change:** Synchronized architecture-facing documentation to the post-`TASK-006` state, documenting the live read-only supervision workflow, runtime-contract and `index.html` registration of the production-orders state/renderer files, the characterization coverage in `tests/root-shell-production-orders-admin-view-characterization.test.js` and `tests/root-shell-modularity-governance.test.js`, and the remaining architectural limitation around filter depth.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation only; no schema change
+**API impact:** Documentation now reflects active root-shell consumption of the read-only `/api/production/orders/**` list/detail contracts with server-side pagination only; no backend contract change in this refresh
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the root supervision boundary, permission seam, and no-warehouse-actions constraint are now explicit together with the client-side-filter limitation
+**Acceptance criteria:** Architecture-facing docs state that `/root/#produccion_ordenes` is now a usable read-only supervision workflow, that runtime/test inventory includes the new production-orders state/renderer/view characterization coverage, and that only pagination is currently server-side while the remaining filters are client-side over the loaded page.
+**Validation evidence:** User-supplied results report `tests/root-shell-production-orders-admin-view-characterization.test.js`, `tests/root-shell-production-admin-api-characterization.test.js`, `tests/root-shell-modularity-governance.test.js`, `npm run validate:public-runtime`, `npm run typecheck`, `npm run lint`, and `npm run build` all passing.
+**Required tests:** Preserve `tests/root-shell-production-orders-admin-view-characterization.test.js`, `tests/root-shell-production-admin-api-characterization.test.js`, `tests/root-shell-modularity-governance.test.js`, and `scripts/validate-public-runtime.js`.
+**Migration considerations:** Keep the workflow documented as read-only supervision and keep the pagination-server-side / remaining-filters-client-side limitation explicit until a later approved slice deepens backend query support.
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes either remove the production-orders live supervision behavior or extend backend filtering in a way that changes the limitation statement.
+**Risk:** Low
+
+## TASK-073: Refresh architecture-facing docs after `root-admin-recipes-production` TASK-005 production-orders seam
+**Status:** Completed
+**Priority:** Low
+**Domain:** Root shell production-order oversight surface / Architecture documentation
+**Requirement:** `specs/root-admin-recipes-production/requirements.md` (`FR-011`, `FR-012`, `FR-013`, `FR-014`, `AC-009`, `AC-010`); post-implementation refresh requested by `sdd-implementation-agent-a4adf0`
+**Reason:** After the approved `root-admin-recipes-production` `TASK-005` implementation cycle, the canonical architecture-facing docs still described `/root/#produccion_ordenes` as lacking a dedicated adapter seam and did not reflect the new read-only production-orders browser boundary.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now record that `#produccion_ordenes` has `productionAdminApi` plus `production-orders-admin.helpers.js` registered in the public runtime, that the seam remains read-only and keeps unsupported filters explicitly client-side, and that the shipped route still does not provide the usable admin list/detail screen yet.
+**Implemented change:** Synchronized architecture-facing documentation to the post-`TASK-005` state, documenting the dedicated `/api/production/orders/**` browser adapter, helper-owned filter/permission normalization, characterization coverage in `tests/root-shell-production-admin-api-characterization.test.js`, runtime-contract/index.html registration, and the remaining gap that `views.productionOrdersAdmin` still renders only structural oversight guidance.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation only; no schema change
+**API impact:** Documentation now reflects active root-shell registration of the read-only `/api/production/orders/**` browser adapter and unchanged backend production-order contracts
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the root oversight boundary, permission seam, and still-missing usable view are now explicit
+**Acceptance criteria:** Architecture-facing docs state that `/root/#produccion_ordenes` now has a dedicated read-only browser adapter/helper seam, that runtime/test inventory includes the new files, and that the shipped route is still not a usable production-orders admin workspace.
+**Validation evidence:** User-supplied results report `tests/root-shell-production-admin-api-characterization.test.js`, `npm run validate:public-runtime`, `npm run typecheck`, `npm run lint`, and `npm run build` all passing.
+**Required tests:** Preserve `tests/root-shell-production-admin-api-characterization.test.js`, `tests/root-shell-route-governance.test.js`, `tests/root-shell-modularity-governance.test.js`, and `scripts/validate-public-runtime.js`.
+**Migration considerations:** Keep the seam documented as partial implementation until a later approved slice wires list/detail/filter behavior into `views.productionOrdersAdmin`.
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes either remove the adapter/helper seam or complete the live admin view.
+**Risk:** Low
+
+## TASK-072: Refresh architecture-facing docs after `root-admin-recipes-production` recipes workflow activation
+**Status:** Completed
+**Priority:** Low
+**Domain:** Root shell production/recipe administration surface / Architecture documentation
+**Requirement:** `specs/root-admin-recipes-production/requirements.md`; post-implementation refresh requested by `sdd-implementation-agent-a4adf0`
+**Reason:** After the latest `root-admin-recipes-production` implementation cycle, the canonical architecture-facing docs still described both production-group routes as shallow starter pages and did not reflect that `/root/#recetas` is now a usable administrative workflow while `/root/#produccion_ordenes` remains only structurally wired.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now distinguish the two production-group routes accurately: `#recetas` is documented as a live root-admin workflow over `recipesApi` and `productsApi`, while `#produccion_ordenes` is documented as a dedicated oversight route that still lacks `/api/production/orders/**` orchestration.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of the root recipes workflow, documenting recipe list/detail/filter behavior, root-side recipe creation, draft version create/edit, version approval, product assignment via `productsApi.assignRecipeToProduct(...)`, the runtime-contract registration of `recipes-admin.state.js` and `recipes-admin.renderers.js`, the characterization coverage added for the recipes admin view, and the remaining production-orders gap.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation only; no schema change
+**API impact:** Documentation now reflects active root-shell consumption of `/api/recipes/**` plus recipe assignment through `PUT /api/products/:id`; no backend contract change in this refresh
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because permission-gated recipe admin behavior and the still-missing production-orders data path are now explicit
+**Acceptance criteria:** Architecture-facing docs state that `/root/#recetas` is a usable admin workflow, that `/root/#produccion_ordenes` is still structurally wired but not functionally complete, and that the current runtime/test inventory includes the recipe workflow support files and characterization coverage.
+**Validation evidence:** User-supplied results report `tests/root-shell-recipes-admin-view-characterization.test.js`, `tests/root-shell-recipes-api-characterization.test.js`, `tests/root-shell-modularity-governance.test.js`, `npm run validate:public-runtime`, `npm run typecheck`, `npm run lint`, and `npm run build` all passing.
+**Required tests:** Preserve `tests/root-shell-recipes-admin-view-characterization.test.js`, `tests/root-shell-recipes-api-characterization.test.js`, `tests/root-shell-route-governance.test.js`, `tests/root-shell-modularity-governance.test.js`, and `scripts/validate-public-runtime.js`.
+**Migration considerations:** Keep the current split-depth production-group behavior documented truthfully until a later approved slice implements production-order list/detail/filter orchestration.
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes either deepen `#produccion_ordenes` or materially reduce the current `#recetas` workflow.
+**Risk:** Low
+
+## TASK-071: Refresh architecture-facing docs after `root-admin-recipes-production`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Root shell production/recipe administration surface / Architecture documentation
+**Requirement:** `specs/root-admin-recipes-production/requirements.md`; post-implementation refresh requested by `sdd-implementation-agent-a4adf0`
+**Reason:** After the approved `root-admin-recipes-production` implementation cycle, the canonical architecture-facing docs still described the root production area as placeholder-heavy and did not reflect the actual mounted `#recetas` / `#produccion_ordenes` routes, runtime-contract entries, recipe adapter seam, or the still-limited depth of the shipped UI.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now record that the root shell exposes dedicated `#recetas` and `#produccion_ordenes` routes, that `root/recipes-api.js` and `root/views/recipes-admin.helpers.js` are part of the approved runtime inventory, that public-runtime and governance validators cover those files, and that the shipped browser behavior is currently a route-level implementation with introductory administrative content rather than full live recipe/order workflows.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `root-admin-recipes-production`, documented the `produccion-group` and `compras-group` sidebar structure, the continued backward-compatible legacy `#production` / `#purchases` route keys, the new `recipesApi` adapter and `assignRecipeToProduct(...)` helper seam, the dedicated `views.recipesAdmin` and `views.productionOrdersAdmin` registrations, and the remaining architectural gap that `#produccion_ordenes` still lacks a production-orders adapter while both new views remain starter screens.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation only; no schema change
+**API impact:** Documentation now reflects active root-shell consumption of `/api/recipes/**` and the additive product recipe-assignment helper contract; no backend contract change in this refresh
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the implemented route depth and permission/governance seams are now explicit
+**Acceptance criteria:** Architecture-facing docs distinguish generic `in_process` routes from the now-mounted production routes, record the active recipe adapter/helper/runtime inventory, and state clearly that current root production screens are starter implementations rather than full operational workflows.
+**Validation evidence:** User-supplied results report `npm run lint`, `npm run typecheck`, `npm run build`, `npm run validate:public-runtime`, root shell governance tests, and `tests/root-shell-recipes-api-characterization.test.js` all passing after the feature implementation.
+**Required tests:** Preserve `tests/root-shell-supply-manifest.test.js`, `tests/root-shell-route-governance.test.js`, `tests/root-shell-modularity-governance.test.js`, `tests/root-shell-recipes-api-characterization.test.js`, and `scripts/validate-public-runtime.js`.
+**Migration considerations:** Keep the route-level implementation documented truthfully until a later approved slice adds live CRUD/list/filter behavior.
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes deepen or remove the current root production screens.
+**Risk:** Low
+
+## TASK-070: Refresh architecture-facing docs after `audit-findings-remediation` warehouse/runtime governance alignment
+**Status:** Completed
+**Priority:** Low
+**Domain:** Browser runtime governance / Warehouse QA SPA / Architecture documentation
+**Requirement:** `specs/audit-findings-remediation`; warehouse/runtime governance alignment follow-up implemented by `sdd-implementation-agent-a4adf0`
+**Reason:** After the approved warehouse/runtime alignment cycle was implemented, the canonical architecture-facing docs still needed a final synchronization pass so supported browser runtime inventory, warehouse/QA SPA governance status, bounded typecheck coverage, validator ownership, and remaining non-warehouse risks matched the repository reality.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, and `docs/action-plan.md` now reflect `/warehouse/` as a supported runtime, record validator and smoke/characterization coverage for the warehouse SPA, clarify that bounded typecheck now includes the warehouse runtime while still excluding broader root/agent inventory, and remove stale wording that treated the warehouse gap as still open.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of the `audit-findings-remediation` warehouse/runtime alignment work, documenting supported `/root/`, `/agent/`, and `/warehouse/` browser inventory, `scripts/validate-public-runtime.js` warehouse inventory enforcement, `tsconfig.typecheck.json` warehouse coverage, the updated warehouse/browser test baseline, and the remaining non-warehouse risk set (production-detail DB integrity, override-auditability, root-admin receipt/fiscal pages, standalone quality/supplier routes, external billing handoff, and broader Playwright-lane instability).
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation only; no schema change
+**API impact:** Documentation now reflects the already-supported `/warehouse/` browser runtime surface and unchanged backend receipt/production contracts consumed by that SPA
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because current runtime boundaries and remaining non-warehouse risk ownership are now explicit
+**Acceptance criteria:** Architecture-facing docs describe `/warehouse/` as supported current runtime, identify warehouse-specific governance alignment as closed, record bounded typecheck/runtime-validator coverage truthfully, and limit remaining open-risk wording to non-warehouse concerns only.
+**Validation evidence:** User-supplied results for `npm run lint`, `npm run typecheck`, `npm run build`, `node scripts/validate-public-runtime.js`, and `npm run test -- --silent` all passed (`763` pass, `0` fail, `2` skipped pre-existing DB-dependent); the final audit score is `9.1/10` with verdict `Acceptable`.
+**Required tests:** Preserve `tests/warehouse-spa-runtime.test.js`, `tests/public-surface-characterization.test.js`, `tests/public-runtime-http-smoke.test.js`, `tests/post-audit-baseline-hardening.test.js`, `tests/browser-e2e.e2e.js`, and `scripts/validate-public-runtime.js`.
+**Migration considerations:** Keep the warehouse alignment documented as implemented current-state/runtime-governance truth; do not re-open warehouse-gap wording unless repository evidence changes.
+**Rollback or mitigation:** Revert documentation-only wording if later repository changes redefine the supported browser inventory or bounded typecheck scope.
+**Risk:** Low
+
+## TASK-069: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-014` and `TASK-015`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Receipt confirmation/reversal and fiscal-reference boundary / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-014`; `supply-inventory-entry` `TASK-015`
+**Reason:** After the approved receipt-confirmation and fiscal-reference slices were implemented, the canonical architecture/runtime docs still described `/api/receipts` as pre-confirmation only and still treated fiscal handoff persistence as future work rather than active pending metadata storage.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `TASK-014` and `TASK-015` as implemented slices, record mounted `/api/receipts` confirmation/reversal/fiscal-reference behavior, document transactional stock effects plus `confirmedLotId` traceability, clarify that `FiscalDocumentReference` is pending metadata only with no external Billing/Hacienda integration, and identify `TASK-016` as the next downstream supply follow-up.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-014` and `TASK-015`, documented migrations `20260818030000_add_receipt_confirmation_lot_link` and `20260818040000_add_fiscal_document_reference`, the new `fiscal-reference` repository/service/schema modules, the active routes `POST /api/receipts/:id/confirm`, `POST /api/receipts/:id/reverse`, `GET /api/receipts/:id/fiscal-references`, and `POST /api/receipts/:id/fiscal-references`, the transactional stock workflow with movement reasons `PURCHASE_RECEIPT` / `RECEIPT_REVERSAL`, and the remaining root-admin-page plus warehouse-SPA gaps after this slice.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records the already-implemented additive receipt confirmation/fiscal-reference schema baseline; no new schema change in this refresh
+**API impact:** Documentation now reflects the mounted authenticated `/api/receipts` confirmation, reversal, and fiscal-reference contract
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because active receipt authorization and the non-integrated fiscal boundary are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-014` and `TASK-015` implementation, distinguish transactional stock posting from pending fiscal metadata persistence, record that no external billing API exists yet, and identify `TASK-016` as the next supply follow-up.
+**Validation evidence:** User-supplied results report 102 tests passed with all validations green; repository inspection also confirms mounted `/api/receipts` confirm/reverse/fiscal-reference routes, receipt transactional stock logic, new `fiscal-reference` modules, and additive Prisma receipt/fiscal migrations.
+**Required tests:** Preserve `tests/receipt-confirmation.test.js`, `tests/fiscal-reference-boundary.test.js`, `tests/receipt-routes-contract.test.js`, and the broader lint/typecheck/build guardrails for this slice.
+**Migration considerations:** Keep the receipt/fiscal baseline documented as additive under the existing layered monolith; do not claim external billing submission, root-admin UI completion, or warehouse SPA completion beyond reviewed repository evidence.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented receipt/fiscal baseline or downstream sequencing.
+**Risk:** Low
+
+## TASK-068: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-013`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Receipt foundation / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-013`
+**Reason:** After the approved receipt slice was implemented, the canonical architecture/runtime docs still described `/api/receipts` as absent and still treated receipt confirmation work as if no receipt runtime foundation existed yet.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `TASK-013` as an implemented receipt slice, record mounted `/api/receipts` runtime behavior plus additive receipt persistence, clarify that the workflow currently stops at actual-arrival document plus inspection-driven pre-confirmation states, and identify `TASK-014` as the next downstream supply follow-up.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-013`, documented the additive Prisma receipt enums/models and migration `20260818020000_add_purchase_receipt_foundation`, the new route/service/repository/schema module set, the current workflow `actual-arrival receipt document -> item inspection -> pre-confirmation state transitions`, the active route-policy usage `receipt.view/inspect`, and the remaining confirmation/reversal, fiscal handoff, and supplier/runtime gaps after this slice.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records the already-implemented additive receipt schema and migration baseline; no new schema change in this refresh
+**API impact:** Documentation now reflects the mounted authenticated `/api/receipts` route group and its current contract limits
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because active receipt authorization and non-confirming scope are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-013` implementation, distinguish the active receipt foundation from later confirmation/reversal and fiscal handoff work, record that no inventory mutations occur in this slice, and identify `TASK-014` as the next supply follow-up.
+**Validation evidence:** User-supplied results report 87 tests passed, plus `npm run lint`, `npm run typecheck`, and `npm run build`; repository inspection also confirms mounted `/api/receipts`, new receipt schema/repository/service/route files, and additive Prisma receipt models/migration.
+**Required tests:** Preserve `tests/receipt-foundation.test.js`, `tests/receipt-routes-contract.test.js`, `tests/receipt-migration.test.js`, and the broader lint/typecheck/build guardrails for this slice.
+**Migration considerations:** Keep the receipt baseline documented as additive under the existing layered monolith; do not claim inventory confirmation, reversal, supplier runtime, or fiscal handoff completion beyond reviewed repository evidence.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented receipt baseline or downstream sequencing.
+**Risk:** Low
+
+## TASK-067: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-012`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Procurement foundation / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-012`
+**Reason:** After the approved procurement slice was implemented, the canonical architecture/runtime docs still described `/api/procurement` as absent, still treated procurement as config-only, and still identified `TASK-012` as the next downstream supply task.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `TASK-012` as an implemented procurement slice, record mounted `/api/procurement` runtime behavior plus additive procurement persistence, clarify that the workflow is intention/approval only without stock mutation, and identify `TASK-013` as the next downstream supply task.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-012`, documented the additive Prisma procurement enums/models and migration `20260818010000_add_procurement_foundation`, the new route/service/repository/schema module set, the current workflow `request -> quotation -> comparison -> selection -> optional approval -> purchase order`, the active route-policy usage `procurement.view/manage/approve`, and the remaining receipt/fiscal handoff gaps after this slice.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records the already-implemented additive procurement schema and migration baseline; no new schema change in this refresh
+**API impact:** Documentation now reflects the mounted authenticated `/api/procurement` route group and its current contract limits
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because active procurement authorization and non-stock-mutating scope are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-012` implementation, distinguish the active procurement foundation from later receipt and fiscal handoff work, record that no inventory mutations occur in this slice, and identify `TASK-013` as the next supply follow-up.
+**Validation evidence:** User-supplied results report 79 tests passed, plus `npm run lint`, `npm run typecheck`, and `npm run build`; repository inspection also confirms mounted `/api/procurement`, new procurement schema/repository/service/route files, and additive Prisma procurement models/migration.
+**Required tests:** Preserve `tests/procurement-foundation.test.js`, `tests/procurement-routes-contract.test.js`, `tests/procurement-migration.test.js`, and the broader lint/typecheck/build guardrails for this slice.
+**Migration considerations:** Keep the procurement baseline documented as additive under the existing layered monolith; do not claim receipt posting, inventory impact, standalone supplier runtime, or fiscal handoff completion beyond reviewed repository evidence.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented procurement baseline or downstream sequencing.
+**Risk:** Low
+
+## TASK-066: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-011`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production completion / QA-gated finished-goods receipt / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-011`
+**Reason:** After the approved production-completion slice was implemented, the canonical architecture/runtime docs still described completion as future work, still treated `checkMandatoryQaGatesForOrder` as only preparatory, and still identified `TASK-011` as the next downstream supply task.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `TASK-011` as an implemented production slice, record `/api/production/orders/:id/complete`, active `PRODUCTION_RECEIPT` intake behavior, QA-gated completion wiring, the full current production-order lifecycle, the narrowed remaining production gaps after completion, and identify `TASK-012` as the next downstream supply task.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-011`, documented transactional `completeProductionOrder(...)`, `productionCompletionSchema`, route policy `production.complete`, mandatory QA-gate enforcement during completion, finished-goods lot creation, destination-warehouse receipt posting with `reasonCode: PRODUCTION_RECEIPT`, and the `COMPLETED` transition reached through `/complete`.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records runtime behavior over the existing production/inventory schema; no new schema change in this refresh
+**API impact:** Documentation now reflects mounted authenticated route `POST /api/production/orders/:id/complete` and its current validation/policy/runtime-contract posture
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because production completion authorization, QA gating, and finished-goods intake behavior are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-011` implementation, distinguish the active completion baseline from later downstream supply work, record the active movement reason `PRODUCTION_RECEIPT`, and identify `TASK-012` as the next supply follow-up without inventing its scope.
+**Validation evidence:** User-supplied results report 12 new tests with 59 total passing, plus `npm run lint`, `npm run typecheck`, and `npm run build`; repository inspection also confirms `completeProductionOrder(...)`, `productionCompletionSchema`, and mounted `POST /api/production/orders/:id/complete` guarded by `production.complete`.
+**Required tests:** Preserve `tests/production-completion.test.js`, existing production route/schema/service governance coverage, and the broader lint/typecheck/build guardrails for this slice.
+**Migration considerations:** Keep the completion baseline documented as additive under the existing `/api/production` route group; do not claim broader downstream receipt, standalone quality, or warehouse/QA module completion beyond reviewed repository evidence.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented production-completion baseline or downstream sequencing.
+**Risk:** Low
+
+## TASK-065: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-010`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production / Quality inspection foundation / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-010`
+**Reason:** After the approved QA inspection slice was implemented, the canonical architecture/runtime docs still described quality as future work and still identified `TASK-010` as the next downstream supply task.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `TASK-010` as an implemented production/quality slice, record `QualityInspection` and `QualityInspectionResult` as active repository truth, classify the inspection endpoints under the existing `/api/production` mount with `quality.inspect` / `quality.view` policies, and identify `TASK-011` as the next downstream supply task.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-010`, documented the additive Prisma enum/model and migration `20260818000000_add_quality_inspection_foundation`, the new schema/repository/service quality layer, the current status transitions (`REJECTED -> QA_HOLD`, `APPROVED` or `CONDITIONALLY_ACCEPTED` on `QA_HOLD -> IN_PROGRESS`), and the reusable `checkMandatoryQaGatesForOrder` helper prepared for downstream production completion gating.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** Implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records the already-implemented additive quality-inspection schema and migration baseline; no new schema change in this refresh
+**API impact:** Documentation now reflects the mounted authenticated routes `POST /api/production/orders/:id/stages/:stageId/inspections` and `GET /api/production/orders/:id/inspections` under the existing production route group
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the active quality route policies and current QA gate/status behavior are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-010` implementation, distinguish the implemented QA inspection foundation from still-pending completion-gate wiring in `TASK-011`, and record the supplied validation evidence without claiming broader warehouse-QA or standalone quality-module completion.
+**Validation evidence:** User-supplied results report 53 tests passed, plus `npm run lint`, `npm run typecheck`, and `npm run build`; repository inspection also confirms `src/schemas/quality.schema.js`, `src/repositories/quality.repository.js`, `src/services/quality.service.js`, mounted production inspection endpoints, and Prisma `QualityInspection` schema/migration changes.
+**Required tests:** Preserve `tests/quality-inspection-foundation.test.js`, route/contract governance coverage, and the broader production, lint, typecheck, and build guardrails for this slice.
+**Migration considerations:** Keep the current quality foundation documented as additive under the existing production mount; do not claim production completion gating, standalone `/api/quality` routing, or richer override-justification persistence beyond reviewed repository evidence.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented quality-inspection baseline or downstream sequencing.
+**Risk:** Low
+
+## TASK-064: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-009`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production auxiliary aggregate alignment / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-009`
+**Reason:** After the approved production aggregate-alignment slice was implemented, the canonical architecture/runtime docs and the standing audit still described `ProductionItem.consumedQuantity` drift plus downstream aggregate-first assumptions as open residual risks.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, and `docs/audit/current-code-audit.md` now describe `TASK-009` as an implemented production slice, record `ProductionItem.consumedQuantity` as an explicitly synchronized auxiliary aggregate, close `RISK-007` and `RISK-009`, mark the `TASK-006` through `TASK-009` amendment sequence complete, and identify `TASK-010` as the next downstream supply task.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-009`, documented repository/service aggregate sync and reconciliation behavior, clarified the current aggregation rule (`SUM(ProductionConsumption.quantity)` at order scope; waste and returns excluded), and narrowed the remaining production follow-up posture to execution-detail FK hardening and later downstream supply work.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `docs/audit/current-code-audit.md`
+**Dependencies:** Implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records current auxiliary aggregate synchronization behavior only; no schema change in this refresh
+**API impact:** None; runtime endpoint surface is unchanged in `TASK-009`
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because downstream consumers must now treat granular `ProductionConsumption` detail as authoritative while the synchronized aggregate remains explicitly auxiliary
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-009` implementation, state the aggregate rule precisely, close the documented aggregate-drift risks without claiming new DB FK hardening, and record the supplied validation evidence plus downstream sequencing.
+**Validation evidence:** User-supplied results report 31 tests passed, plus `npm run lint`, `npm run typecheck`, and `npm run build`; repository inspection also confirms `syncProductionItemConsumedQuantity`, `getProductionItemAggregateState`, `reconcileProductionOrderAggregates`, and the expanded `tests/production-service-foundation.test.js` coverage.
+**Required tests:** Preserve `tests/production-service-foundation.test.js` aggregate synchronization/reconciliation coverage together with the broader production, lint, typecheck, and build guardrails for this slice.
+**Migration considerations:** Keep the aggregate alignment documented as additive behavior over the existing production foundation; do not claim new FK enforcement, new API routes, or completion of later downstream supply tasks beyond the reviewed repository evidence.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented aggregate-alignment baseline or reopens the documented risks.
+**Risk:** Low
+
+## TASK-063: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-008`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production return foundation / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-008`
+**Reason:** After the approved production-return slice was implemented, the canonical architecture/runtime docs and the standing audit still described explicit returns modeling as future work.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, and `docs/audit/current-code-audit.md` now describe `TASK-008` as an implemented production slice, record migration `20260817000000_add_production_return_foundation`, and narrow the remaining production follow-ups to missing `warehouseId` / `productId` FK hardening, aggregate synchronization for `ProductionItem.consumedQuantity`, and broader downstream supply workflows.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-008`, documented mounted route `POST /api/production/orders/:id/stages/:stageId/returns`, explicit `ProductionReturn` persistence, current stock-restoring movement behavior, validated runtime-contract classification, and the remaining follow-up posture without redesigning later approved tasks.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `docs/audit/current-code-audit.md`
+**Dependencies:** `specs/supply-inventory-entry/implementation-report.md`; implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records the already-implemented additive production-return migration and current `ProductionReturn -> Lot` integrity; no new schema change in this refresh
+**API impact:** Documentation now reflects the mounted authenticated route `POST /api/production/orders/:id/stages/:stageId/returns` and its current runtime-contract governance posture
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because the production contract and remaining gaps are now stated more precisely
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-008` implementation, distinguish implemented return modeling from still-open FK and aggregate-alignment follow-ups, and record the supplied validation evidence without claiming broader completion than the repository currently enforces.
+**Validation evidence:** User-supplied results for `node --test tests/production-service-foundation.test.js tests/production-schema.test.js tests/production-routes-contract.test.js tests/runtime-contract-governance.test.js tests/production-return-foundation-migration.test.js`, `npm run lint`, `npm run typecheck`, `npx prisma validate --schema prisma/schema.prisma`, and `npm run build`.
+**Required tests:** Preserve `tests/production-service-foundation.test.js`, `tests/production-schema.test.js`, `tests/production-routes-contract.test.js`, `tests/runtime-contract-governance.test.js`, `tests/production-return-foundation-migration.test.js`, and the broader lint/typecheck/build/prisma-validate guardrails for this slice.
+**Migration considerations:** Keep the current return foundation additive; do not claim warehouse/product FK enforcement, aggregate synchronization, QA completion, or procurement/receipt integration beyond reviewed repository evidence.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented production-return baseline or closes the currently documented follow-ups.
+**Risk:** Low
+
+## TASK-062: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-007`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production waste hardening / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-007`
+**Reason:** After the approved production-waste hardening slice was implemented, the canonical architecture/runtime docs still described waste detail as less constrained than the actual repository state.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `TASK-007` as an implemented production hardening slice, record migration `20260816000000_harden_production_waste_lot_fk`, and narrow the remaining gaps to missing `warehouseId` / `productId` FKs, explicit returns modeling, and `ProductionItem.consumedQuantity` drift.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-007`, documented mandatory `ProductionWaste.lotId`, enforced FK linkage to `Lot`, current validation evidence, and the remaining follow-up posture without redesigning later approved tasks.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `specs/supply-inventory-entry/implementation-report.md`; implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records the already-implemented additive hardening migration and current lot-bound waste integrity; no new schema change in this refresh
+**API impact:** None; the runtime endpoint surface is unchanged in `TASK-007`
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because current DB/detail integrity guarantees are now stated more precisely
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-007` implementation, distinguish the now-hardened waste detail from the still-open execution-detail and aggregate gaps, and record the remaining risks without claiming broader integrity than the repository currently enforces.
+**Validation evidence:** User-supplied results for `node --test tests/production-service-foundation.test.js tests/production-schema.test.js tests/production-waste-hardening-migration.test.js`, `npm run lint`, `npm run typecheck`, `npx prisma validate --schema prisma/schema.prisma`, and `npm run build`.
+**Required tests:** Preserve `tests/production-service-foundation.test.js`, `tests/production-schema.test.js`, `tests/production-waste-hardening-migration.test.js`, and the broader lint/typecheck/build/prisma-validate guardrails for this slice.
+**Migration considerations:** Keep the current hardening additive; do not claim clean-database execution evidence, warehouse/product FK enforcement, explicit returns modeling, or aggregate synchronization beyond reviewed repository evidence.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented hardening baseline or closes the currently documented follow-ups.
+**Risk:** Low
+
+## TASK-061: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-006`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production consumption hardening / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-006`
+**Reason:** After the approved production-consumption hardening slice was implemented, the canonical architecture/runtime docs still understated the current DB-enforced `ProductionConsumption -> Lot` integrity and still described both execution-detail tables as equally unhardened.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `TASK-006` as an implemented production hardening slice, record migration `20260815000000_harden_production_consumption_lot_fk`, and narrow the remaining gaps to waste hardening, missing `warehouseId` / `productId` FKs, and `ProductionItem.consumedQuantity` drift.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-006`, documented mandatory `ProductionConsumption.lotId`, enforced FK linkage to `Lot`, current validation evidence, and the remaining follow-up posture without redesigning later approved tasks.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `specs/supply-inventory-entry/implementation-report.md`; implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records the already-implemented additive hardening migration and current lot-bound consumption integrity; no new schema change in this refresh
+**API impact:** None; the runtime endpoint surface is unchanged in `TASK-006`
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because current DB/detail integrity guarantees are now stated more precisely
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-006` implementation, distinguish hardened consumption detail from still-pending waste hardening, and record the remaining detail-table and aggregate risks without claiming broader integrity than the repository currently enforces.
+**Validation evidence:** User-supplied results for `node --test tests/production-service-foundation.test.js tests/production-schema.test.js tests/production-consumption-hardening-migration.test.js`, `npm run lint`, `npm run typecheck`, `npx prisma validate --schema prisma/schema.prisma`, and `npm run build`.
+**Required tests:** Preserve `tests/production-service-foundation.test.js`, `tests/production-schema.test.js`, `tests/production-consumption-hardening-migration.test.js`, and the broader lint/typecheck/build/prisma-validate guardrails for this slice.
+**Migration considerations:** Keep the current hardening additive; do not claim equivalent waste hardening, clean-database execution evidence, warehouse/product FK enforcement, or aggregate synchronization beyond reviewed repository evidence.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented hardening baseline or closes the currently documented follow-ups.
+**Risk:** Low
+
+## TASK-060: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-005`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production execution foundation / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-005`
+**Reason:** After the approved production stage-execution slice was implemented, the canonical architecture/runtime docs still understated the mounted `/api/production/orders/:id/stages/:stageId/execute` contract, the new execution detail persistence, and the remaining post-audit follow-ups.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, and `docs/runtime-endpoint-catalog.md` now describe `TASK-005` as an implemented production execution foundation, include the stage-execution route in the human-readable runtime catalog, and keep the remaining DB/read-model follow-ups explicit.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-005`, recorded migration `20260814000000_add_production_stage_execution_foundation`, documented `ProductionStageExecution` / `ProductionConsumption` / `ProductionWaste`, clarified that stage resolution now comes from the frozen `recipeVersionSnapshot`, and preserved the current audit-backed warnings about FK hardening and `ProductionItem.consumedQuantity` drift.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, `docs/runtime-endpoint-catalog.md`
+**Dependencies:** `specs/supply-inventory-entry/implementation-report.md`; `inventory-api/docs/audit/current-code-audit.md`; implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records the already-implemented additive production execution schema and migration baseline; no new schema change in this refresh
+**API impact:** Documentation records mounted `/api/production/orders/:id/stages/:stageId/execute` and its current manifest-based contract governance posture
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because active `production.execute` enforcement, transactional stock deductions, and remaining integrity gaps are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-005` implementation, distinguish current production execution behavior from later QA/completion/receipt workflows, and document the current contract-governance plus DB/read-model limitation posture without claiming stronger integrity guarantees than the repository currently enforces.
+**Validation evidence:** User-supplied results for `node --test tests/production-service-foundation.test.js tests/production-schema.test.js tests/production-routes-contract.test.js tests/runtime-contract-governance.test.js`, `npm run lint`, `npm run typecheck`, `npm run build`, and `npx prisma validate`, together with the post-implementation audit score `8.6/10` and its remaining warnings.
+**Required tests:** Preserve `tests/production-service-foundation.test.js`, `tests/production-schema.test.js`, `tests/production-routes-contract.test.js`, `tests/runtime-contract-governance.test.js`, and the broader lint/typecheck/build/prisma-validate guardrails for this slice.
+**Migration considerations:** Keep the current migration additive; do not claim warehouse/product/lot FK hardening, synchronized aggregate consumption totals, QA gating, or completion-posting behavior beyond the reviewed repository evidence.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented production execution baseline or closes the currently documented DB/detail-model follow-ups.
+**Risk:** Low
+
+## TASK-059: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-004`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Production foundation / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-004`
+**Reason:** After the approved production-order lifecycle foundation was implemented, the architecture-facing documents still needed to reflect the real mounted `/api/production` runtime, additive Prisma lifecycle/snapshot fields, service-layer guardrail enforcement, and the remaining warnings around permission-seed drift and app-layer-only production invariants.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `TASK-004` as an implemented production-order lifecycle foundation, stop understating the mounted `/api/production` runtime, and preserve the current warnings about seed/runtime permission drift plus permissive DB-level production invariants.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-004`, recorded the additive migration `20260813000000_add_production_order_lifecycle_foundation`, documented the mounted production routes and current service/repository boundaries, and clarified that production guardrails and several lifecycle invariants are currently enforced in Zod/service code rather than fully constrained in the database.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `specs/supply-inventory-entry/implementation-report.md`; implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records the already-implemented additive production-order lifecycle schema and migration baseline; no new schema change in this refresh
+**API impact:** Documentation records mounted `/api/production/**` endpoints and their current manifest-based runtime-contract governance posture
+**Container impact:** None
+**Security impact:** Low direct impact; medium documentation-accuracy impact because active production policy consumption and current `production.override` justification enforcement are now explicit while broader persistence/audit gaps remain visible
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-004` implementation, distinguish current production-lifecycle behavior from later QA/completion/receipt workflows, and document the current contract-governance and DB-constraint posture without claiming broader OpenAPI coverage or stronger database enforcement than exists today.
+**Validation evidence:** User-supplied results for `node --test tests/production-schema.test.js tests/production-service-foundation.test.js tests/production-routes-contract.test.js tests/runtime-contract-governance.test.js`, `npm run lint`, `npm run typecheck`, and `npm run build` with local Windows Prisma retry noise handled by the existing safe script.
+**Required tests:** Preserve `tests/production-schema.test.js`, `tests/production-service-foundation.test.js`, `tests/production-routes-contract.test.js`, `tests/runtime-contract-governance.test.js`, and the broader lint/typecheck/build guardrails for this slice.
+**Migration considerations:** Keep the current migration additive; do not claim clean-database execution evidence, stronger DB-level lifecycle constraints, or completed QA/receipt behavior beyond the reviewed repository evidence.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented production baseline or closes the currently documented seed-drift, persistence/audit, or DB-constraint gaps.
+**Risk:** Low
+
+## TASK-058: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-003`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Recipe / formulation foundation / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-003`
+**Reason:** After the approved recipe versioning foundation was implemented, the architecture-facing documents still needed to reflect the real Prisma schema, mounted `/api/recipes` runtime surface, service-layer tenant validation, approval immutability rules, and current governance posture without overstating downstream production workflows.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `TASK-003` as an implemented additive recipe/versioning foundation, distinguish it from later production/procurement work, and record that the runtime surface is mounted but intentionally excluded from the current partial OpenAPI baseline.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-003`, recorded the additive migration `20260812000000_add_recipe_versioning_foundation`, documented the mounted recipe routes and current service/repository boundaries, and preserved the current governance/architecture limitations such as legacy recipe coexistence and manifest-based contract exclusion.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `specs/supply-inventory-entry/implementation-report.md`; implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records the already-implemented additive recipe-versioning schema and migration baseline; no new schema change in this refresh
+**API impact:** Documentation records mounted `/api/recipes/**` endpoints and their current manifest-based contract governance posture
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance accuracy impact because active recipe policy consumption and company-scoped nested product validation are now explicit
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-003` implementation, distinguish current recipe/versioning behavior from future production workflows, and document the current contract-governance posture without claiming broader OpenAPI coverage than exists today.
+**Validation evidence:** User-supplied results for targeted recipe tests, `npm run lint`, `npm run typecheck`, `npx prisma validate --schema prisma/schema.prisma`, `npm run test -- --silent`, and note that local Windows build remains environment-sensitive due to the existing Prisma rename-lock behavior.
+**Required tests:** Preserve `tests/recipe-routes-contract.test.js`, `tests/recipe-schema.test.js`, `tests/recipe-service-foundation.test.js`, runtime-contract governance coverage, and aggregate regressions.
+**Migration considerations:** Keep the current migration additive; do not claim full model migration away from legacy recipe ingredients or OpenAPI coverage expansion beyond reviewed evidence.
+**Rollback or mitigation:** Revert documentation wording only if later verified repository evidence changes the implemented recipe/versioning baseline or closes the currently documented coexistence/governance gaps.
+**Risk:** Low
+
+## TASK-057: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-002`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Security governance / Supply foundation / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-002`
+**Reason:** After the approved supply security/governance foundation was implemented, the architecture-facing documents still needed to reflect the real access-policy registry, permission metadata, justification markers, proposed bundles, and the remaining readiness gaps without overstating unmounted supply APIs as active runtime behavior.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe `TASK-002` as implemented centralized security metadata and named policy foundation only, explicitly distinguish it from future production/procurement/receipt runtime modules, and record the current follow-up warning about permission-catalog drift versus `prisma/seed.js` plus metadata-only override enforcement.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-002`, recorded the new named supply/intake access policies, centralized permission metadata and justification helpers, proposed operational role bundles, and the fact that no new route groups, browser surfaces, or database migrations were introduced in this cycle.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `specs/supply-inventory-entry/implementation-report.md`; `inventory-api/docs/audit/current-code-audit.md`; implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records current config-to-seed drift risk only; no schema change in this refresh
+**API impact:** Documentation records that new named policies exist before the related supply APIs are mounted; no new endpoint introduced by this refresh
+**Container impact:** None
+**Security impact:** Low direct impact; high documentation-accuracy impact because override metadata, future policy inventory, and permission-seed drift are now stated explicitly
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-002` implementation, distinguish current security/governance foundation from future supply workflows, and document the latest audit concerns without claiming unimplemented route enforcement or seed synchronization.
+**Validation evidence:** User-supplied results for targeted security/governance tests, `npm run lint`, `npm run typecheck`, `npm run build`, `npm run test -- --silent`, and the audit follow-up scoring `9.1/10` with `TASK-002` marked baseline-safe.
+**Required tests:** Preserve `tests/access-policies.test.js`, `tests/permission-governance-foundation.test.js`, aggregate regression coverage, and later add config-to-seed synchronization guardrails before supply APIs are exposed.
+**Migration considerations:** Keep the current change documented as configuration-only; do not treat proposed bundles or permission metadata as active seeded permission/role rollout until `prisma/seed.js` and future runtime consumers are aligned.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented governance baseline or closes the documented seed-drift and justification-enforcement gaps.
+**Risk:** Low
+
+## TASK-056: Refresh architecture-facing docs after `supply-inventory-entry` `TASK-001`
+**Status:** Completed
+**Priority:** Low
+**Domain:** Product catalog / Inventory foundation / Architecture documentation
+**Requirement:** `supply-inventory-entry` `TASK-001`
+**Reason:** After the approved product sourcing foundation was implemented, the architecture-facing documents still needed to reflect the real schema, service, repository, migration, and test baseline without overstating later supply/procurement work as already active.
+**Current problem resolved:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/tasks.md` now describe the additive product sourcing foundation as implemented repository truth, including new Prisma enums and columns, company-scoped warehouse/supplier authorization validation, hotspot/schema characterization coverage, and the remaining non-blocking gaps called out by the latest audit rerun.
+**Implemented change:** Synchronized architecture-facing documentation to the post-implementation state of `supply-inventory-entry` `TASK-001`, recorded the current product contract expansion on existing `/api/products/**` routes, documented the committed migration `20260811000000_add_product_sourcing_foundation`, and preserved the open concerns around clean-database migration execution evidence, thinner route/integration coverage, and `product.service.js` hotspot sensitivity as current limitations rather than hidden debt.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`
+**Dependencies:** `specs/supply-inventory-entry/implementation-report.md`; implementation by `sdd-implementation-agent-a4adf0`
+**Database impact:** Documentation records the already-implemented additive Prisma schema and migration baseline; no new schema change in this refresh
+**API impact:** Documentation records additive product payload/response fields on existing `/api/products/**` contracts; no new endpoint introduced by this refresh
+**Container impact:** None
+**Security impact:** Low direct impact; medium governance accuracy impact because tenant-scoped warehouse/supplier validation and remaining coverage gaps are now documented explicitly
+**Acceptance criteria:** Architecture-facing docs reflect the observable `supply-inventory-entry` `TASK-001` implementation, distinguish current product-foundation behavior from future supply workflows, and document the latest audit concerns without claiming unverified migration execution.
+**Validation evidence:** User-supplied results for targeted product/regression tests, `npm run lint`, `npm run typecheck`, `npx prisma validate --schema prisma/schema.prisma`, `npm run build`, `npm run test -- --silent`, and the audit rerun scoring `9.2/10` with `TASK-001` marked baseline-safe.
+**Required tests:** Preserve `tests/product-sourcing-schema.test.js`, `tests/product-service-hotspot-characterization.test.js`, aggregate product regressions, and later add endpoint-level route/integration coverage before downstream supply slices expand.
+**Migration considerations:** Keep the current migration additive; do not claim deployment readiness beyond the reviewed schema/build/test evidence until the committed migration has been executed on a clean database baseline.
+**Rollback or mitigation:** Revert documentation-only wording if later verified repository evidence changes the implemented supply foundation baseline or closes the currently documented non-blocking concerns.
+**Risk:** Low
+
 ## TASK-055: Refresh architecture-facing docs after the modern products and categories admin implementation
 **Status:** Completed
 **Priority:** Low

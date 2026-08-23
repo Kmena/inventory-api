@@ -62,6 +62,8 @@ test('root shell guards and router keep actor-scoped route fallback behavior', (
   assert.match(routerSource, /const productsAdminView = rootShell\.require\('views\.productsAdmin'\)/);
   assert.match(routerSource, /const lotsAdminView = rootShell\.require\('views\.lotsAdmin'\)/);
   assert.match(routerSource, /const movementsAdminView = rootShell\.require\('views\.movementsAdmin'\)/);
+  assert.match(routerSource, /const recipesAdminView = rootShell\.require\('views\.recipesAdmin'\)/);
+  assert.match(routerSource, /const productionOrdersAdminView = rootShell\.require\('views\.productionOrdersAdmin'\)/);
   assert.match(routerSource, /const billingAdminView = rootShell\.require\('views\.billingAdmin'\)/);
   assert.match(routerSource, /item\.routeKey === 'zones'/);
   assert.match(routerSource, /item\.routeKey === 'agents'/);
@@ -71,5 +73,7 @@ test('root shell guards and router keep actor-scoped route fallback behavior', (
   assert.match(routerSource, /item\.routeKey === 'products'/);
   assert.match(routerSource, /item\.routeKey === 'lots'/);
   assert.match(routerSource, /item\.routeKey === 'movements'/);
+  assert.match(routerSource, /item\.routeKey === 'recetas'/);
+  assert.match(routerSource, /item\.routeKey === 'produccion_ordenes'/);
   assert.match(routerSource, /item\.routeKey === 'billing'/);
 });

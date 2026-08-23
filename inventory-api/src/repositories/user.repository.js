@@ -89,6 +89,22 @@ function createUser(data) {
   });
 }
 
+function findActiveUsersByRoleId(roleId, companyId = null) {
+  return prisma.user.findMany({
+    where: {
+      roleId,
+      status: 'ACTIVE',
+      ...(companyId ? { companyId } : {}),
+    },
+    select: {
+      id: true,
+    },
+    orderBy: {
+      id: 'asc',
+    },
+  });
+}
+
 module.exports = {
   findAllUsers,
   findUsersByCompanyId,
@@ -97,4 +113,5 @@ module.exports = {
   findUserByUsernameWithRelations,
   findAuthenticatedUserById,
   createUser,
+  findActiveUsersByRoleId,
 };

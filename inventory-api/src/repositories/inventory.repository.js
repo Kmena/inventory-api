@@ -254,6 +254,32 @@ function findReservableLotStocks(warehouseId, productId, db = prisma) {
   });
 }
 
+function findWarehouseStocksByProductIds(companyId, warehouseId, productIds, db = prisma) {
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    return Promise.resolve([]);
+  }
+
+  return db.warehouseStock.findMany({
+    where: {
+      warehouseId,
+      productId: { in: productIds },
+      warehouse: { companyId },
+    },
+    include: {
+      product: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          unit: true,
+          requiresLot: true,
+          requiresExpiration: true,
+        },
+      },
+    },
+  });
+}
+
 function findOrderAllocations(companyId, warehouseId, orderId, db = prisma) {
   return db.stockMovement.findMany({
     where: {
@@ -388,6 +414,7 @@ module.exports = {
   createStockMovementRecord,
   findLotByInternalNumber,
   findReservableLotStocks,
+  findWarehouseStocksByProductIds,
   findOrderAllocations,
   createLot,
   createInventoryAlert,

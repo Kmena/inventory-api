@@ -27,9 +27,9 @@ test('legacy warehouse runtime remains retired while agent SPA and root shell co
   assert.equal(fs.existsSync(path.join(publicRoot, 'root')), true, 'supported root shell should exist under src/public');
   assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'root')), true, 'legacy root inventory should remain preserved for transition work');
 
-  // warehouse sigue retirado de src/public; legacy permanece en legacy-public-runtime
-  assert.equal(fs.existsSync(path.join(publicRoot, 'warehouse')), false, 'warehouse should not remain under src/public');
-  assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'warehouse')), true, 'warehouse should remain preserved for SPA transition work');
+  // TASK-017: warehouse SPA ahora existe en src/public/warehouse/ como SPA soportada; legacy permanece como referencia
+  assert.equal(fs.existsSync(path.join(publicRoot, 'warehouse')), true, 'warehouse SPA should exist under src/public after TASK-017 implementation');
+  assert.equal(fs.existsSync(path.join(legacyRuntimeRoot, 'warehouse')), true, 'warehouse legacy should remain preserved in legacy-public-runtime for reference');
 
   // agent fue implementado como SPA moderna (agent-spa spec); legacy del agente preservado como referencia
   assert.equal(fs.existsSync(path.join(publicRoot, 'agent')), true, 'agent SPA should exist under src/public after agent-spa implementation');

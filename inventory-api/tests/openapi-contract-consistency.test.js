@@ -44,6 +44,7 @@ test('OpenAPI baseline stays explicitly partial and machine-readable while cover
   assert.match(domains, /warehouses/i);
   assert.match(domains, /regions/i);
   assert.match(domains, /sales-routes/i);
+  assert.match(domains, /procurement\/rfq/i);
 });
 
 test('OpenAPI baseline keeps legacy company dashboard alias and preferred alias', () => {
@@ -74,6 +75,7 @@ test('OpenAPI baseline covers expanded auth, client, agent, integration and phas
     ['/api/roles/permissions', 'get'],
     ['/api/roles/company', 'get'],
     ['/api/roles/company', 'post'],
+    ['/api/roles/company/{roleId}', 'put'],
     ['/api/users/company', 'post'],
     ['/api/clients/company', 'get'],
     ['/api/clients/classifications/company', 'get'],
@@ -88,6 +90,14 @@ test('OpenAPI baseline covers expanded auth, client, agent, integration and phas
     ['/api/taxpayers/lookup', 'get'],
     ['/api/products', 'get'],
     ['/api/products/import', 'post'],
+    ['/api/procurement/requests/{id}/rfq-invitations', 'post'],
+    ['/api/procurement/requests/{id}/rfq-invitations', 'get'],
+    ['/api/procurement/rfq-invitations/{id}/refresh-template', 'post'],
+    ['/api/procurement/rfq-invitations/{id}/cancel', 'post'],
+    ['/api/procurement/rfq-invitations/{id}/manual-response', 'post'],
+    ['/api/procurement/rfq-tracking', 'get'],
+    ['/api/public/supplier-quotations/{token}', 'get'],
+    ['/api/public/supplier-quotations/{token}/response', 'post'],
     ['/api/orders', 'post'],
     ['/api/invoices', 'get'],
     ['/api/invoices/inconsistencies', 'get'],
@@ -114,9 +124,14 @@ test('OpenAPI baseline covers expanded auth, client, agent, integration and phas
   assert.equal(openApi.paths['/api/roles/permissions'].get['x-governance']?.routePolicy, 'role.permissions.list');
   assert.equal(openApi.paths['/api/roles/company'].get['x-governance']?.actorScope, 'company-admin');
   assert.equal(openApi.paths['/api/roles/company'].post['x-governance']?.serviceRevalidation, 'role.service.js company-role governance evaluation');
+  assert.equal(openApi.paths['/api/roles/company/{roleId}'].put['x-governance']?.routePolicy, 'role.company.update');
+  assert.equal(openApi.paths['/api/roles/company/{roleId}'].put['x-governance']?.actorScope, 'company-admin');
+  assert.equal(openApi.paths['/api/roles/company/{roleId}'].put['x-runtime-source']?.expressPath, '/company/:roleId');
   assert.equal(openApi.paths['/api/payments/{id}'].delete['x-compatibility']?.status, 'compatibility-delete-reverse');
   assert.match(openApi.paths['/api/geocoding/search'].get.summary, /throttle/i);
   assert.match(openApi.paths['/api/taxpayers/lookup'].get.summary, /throttle/i);
+  assert.match(openApi.paths['/api/public/supplier-quotations/{token}'].get.summary, /throttle/i);
+  assert.match(openApi.paths['/api/public/supplier-quotations/{token}/response'].post.summary, /throttle/i);
 });
 
 test('every covered OpenAPI operation matches a mounted runtime route', () => {

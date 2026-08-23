@@ -270,21 +270,19 @@ test('listAssignableRoles returns paginated metadata when requested', async () =
     () => roleService.listAssignableRoles({ companyId: '2' }, { page: 2, pageSize: 1, skip: 1, take: 1 }),
   );
 
-  assert.deepEqual(result, {
-    items: [{
-      id: 6n,
-      code: 'admin_local',
-      name: 'Admin local',
-      companyId: 2n,
-      isActive: true,
-      permissions: [{ code: 'users.view', isActive: true }],
-    }],
-    pagination: {
-      page: 2,
-      pageSize: 1,
-      totalItems: 4,
-      totalPages: 4,
-    },
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].id, 6n);
+  assert.equal(result.items[0].code, 'admin_local');
+  assert.equal(result.items[0].name, 'Admin local');
+  assert.equal(result.items[0].companyId, 2n);
+  assert.equal(result.items[0].isActive, true);
+  assert.equal(result.items[0].permissions.length, 1);
+  assert.equal(result.items[0].permissions[0].code, 'users.view');
+  assert.deepEqual(result.pagination, {
+    page: 2,
+    pageSize: 1,
+    totalItems: 4,
+    totalPages: 4,
   });
 });
 

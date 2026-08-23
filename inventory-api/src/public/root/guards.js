@@ -10,8 +10,25 @@
     return roleCode === 'admin' && Boolean(session?.user?.companyId);
   }
 
+  function hasProcurementAccess(session) {
+    return Boolean(
+      session?.user?.companyId &&
+      (session?.user?.permissions || []).includes('procurement.manage')
+    );
+  }
+
+  function hasExplicitRootLanding(session) {
+    return session?.user?.landing?.target === 'root';
+  }
+
   function isEligibleRootShellSession(session) {
-    return isRootUser(session) || isCompanyAdmin(session);
+    // Primary: explicit landing (TASK-004)
+    if (hasExplicitRootLanding(session)) {
+      return true;
+    }
+
+    // Legacy fallback (DEC-007: kept during transition before backfill)
+    return isRootUser(session) || isCompanyAdmin(session) || hasProcurementAccess(session);
   }
 
   function resolveShellAccess(session) {
@@ -36,6 +53,8 @@
 
   rootShell.register('guards', {
     canAccessRoute,
+    hasExplicitRootLanding,
+    hasProcurementAccess,
     isCompanyAdmin,
     isEligibleRootShellSession,
     isRootUser,

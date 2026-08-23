@@ -14,9 +14,22 @@
   const productsAdminView = rootShell.require('views.productsAdmin');
   const lotsAdminView = rootShell.require('views.lotsAdmin');
   const movementsAdminView = rootShell.require('views.movementsAdmin');
+  const recipesAdminView = rootShell.require('views.recipesAdmin');
+  const productionOrdersAdminView = rootShell.require('views.productionOrdersAdmin');
+  const productionPlannerView = rootShell.require('views.productionPlanner');
   // TASK-012: billing admin view (client-payment-ledger)
   const billingAdminView = rootShell.require('views.billingAdmin');
   const approvalsAdminView = rootShell.require('views.approvalsAdmin');
+  const suppliersAdminView = rootShell.require('views.suppliersAdmin');
+  const quotationsAdminView = rootShell.require('views.quotationsAdmin');
+  const rfqTrackingAdminView = rootShell.require('views.rfqTrackingAdmin');
+  const purchaseRequestsAdminView = rootShell.require('views.purchaseRequestsAdmin');
+  const purchaseOrdersAdminView = rootShell.require('views.purchaseOrdersAdmin');
+  // recepciones-fiscales-workspace views
+  const receiptsAdminView = rootShell.require('views.receiptsAdmin');
+  const fiscalRefsAdminView = rootShell.require('views.fiscalRefsAdmin');
+  // users-admin-view feature
+  const usersAdminView = rootShell.require('views.usersAdmin');
 
   function normalizeHashRoute(hashValue) {
     return String(hashValue || '').replace(/^#/, '').trim();
@@ -91,12 +104,56 @@
       return movementsAdminView;
     }
 
+    if (item.routeKey === 'recetas') {
+      return recipesAdminView;
+    }
+
+    if (item.routeKey === 'produccion_ordenes') {
+      return productionOrdersAdminView;
+    }
+
+    if (item.routeKey === 'produccion_planificador') {
+      return productionPlannerView;
+    }
+
     if (item.routeKey === 'billing') {
       return billingAdminView;
     }
 
     if (item.routeKey === 'approvals') {
       return approvalsAdminView;
+    }
+
+    if (item.routeKey === 'proveedores') {
+      return suppliersAdminView;
+    }
+
+    if (item.routeKey === 'cotizaciones') {
+      return quotationsAdminView;
+    }
+
+    if (item.routeKey === 'seguimiento_cotizaciones') {
+      return rfqTrackingAdminView;
+    }
+
+    if (item.routeKey === 'solicitudes_compra') {
+      return purchaseRequestsAdminView;
+    }
+
+    if (item.routeKey === 'ordenes_compra') {
+      return purchaseOrdersAdminView;
+    }
+
+    if (item.routeKey === 'recepciones') {
+      return receiptsAdminView;
+    }
+
+    if (item.routeKey === 'referencias_fiscales') {
+      return fiscalRefsAdminView;
+    }
+
+    if (item.routeKey === 'users') {
+      return usersAdminView;
     }
 
     return inProcessView;

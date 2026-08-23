@@ -17,6 +17,12 @@ const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   userRouter: 'src/routes/user.routes.js',
   clientRouter: 'src/routes/client.routes.js',
   productRouter: 'src/routes/product.routes.js',
+  recipeRouter: 'src/routes/recipe.routes.js',
+  productionRouter: 'src/routes/production.routes.js',
+  procurementRouter: 'src/routes/procurement.routes.js',
+  procurementRfqRouter: 'src/routes/procurement-rfq.routes.js',
+  publicSupplierQuotationRouter: 'src/routes/public-supplier-quotation.routes.js',
+  receiptRouter: 'src/routes/receipt.routes.js',
   orderRouter: 'src/routes/order.routes.js',
   invoiceRouter: 'src/routes/invoice.routes.js',
   paymentRouter: 'src/routes/payment.routes.js',
@@ -28,6 +34,9 @@ const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   taxpayerRouter: 'src/routes/taxpayer.routes.js',
   geocodingRouter: 'src/routes/geocoding.routes.js',
   economicActivityRouter: 'src/routes/economic-activity.routes.js',
+  supplierRouter: 'src/routes/supplier.routes.js',
+  // recepciones-fiscales-workspace: global fiscal references listing endpoint
+  fiscalReferenceRouter: 'src/routes/fiscal-reference.routes.js',
 });
 
 function read(filePath) {

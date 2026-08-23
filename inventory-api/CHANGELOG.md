@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-01 — recepciones-fiscales-workspace (spec)
+- Creado paquete de especificación completo para la implementación de los placeholders `#recepciones` y `#referencias_fiscales` del root shell.
+- Documentados 7 tasks en orden de ejecución óptimo: TASK-001 (backend endpoint GET /api/fiscal-references) → TASK-002 (adaptador browser) → TASK-003/004 (renderers y view de recepciones) → TASK-005/006 (renderers y view de referencias fiscales) → TASK-007 (wiring).
+- Spec `status: approved` listo para ejecución por el agente implementador.
+
+## 2026-08-25 — purchase-orders-workspace
+- Implementado `TASK-001`: servicio `listPurchaseOrders`, repositorio `listPurchaseOrdersForCompany`, y ruta `GET /api/procurement/orders` con `procurement.view`; registrado en OpenAPI baseline y catálogo de endpoints.
+- Implementado `TASK-002`: extraída la sección de comparación de cotizaciones en módulos dedicados `quotations-comparison.js` y `quotations-comparison.renderers.js` con tabla de comparación, diálogo de selección de proveedor y montado como extensión del workspace de cotizaciones.
+- Implementado `TASK-003`: diálogo de creación de orden de compra desde selección aprobada (`quotations-create-po-dialog`), con resumen de ítems, campo de notas y llamada a `quotationsApi.createPurchaseOrder()`.
+- Implementado `TASK-004`: vista `#solicitudes_compra` con layout de dos columnas (lista + panel de detalle), renderers XSS-safe, e indicador de "OC emitida"; `solicitudes_compra` promovida de `createAdminPendingEntry` a `createRouteItem` con `implemented: true`.
+- Implementado `TASK-005`: vista `#ordenes_compra` con layout de dos columnas (lista + panel de detalle), módulo `purchase-orders-api.js` sobre `GET /api/procurement/orders`, renderers de estados `PENDING/CONFIRMED/RECEIVED`, y placeholder de comprobante fiscal Hacienda CR; `ordenes_compra` promovida de `createAdminPendingEntry` a `createRouteItem` con `implemented: true`.
+- Implementado `TASK-006` (incluido en TASK-003): flujo de aprobación gerencial en comparación — banner de advertencia con botón "Aprobar selección" condicionado a `procurement.approve`, llamada a `quotationsApi.approveSelection()`, y apertura del diálogo de OC tras aprobación.
+- Añadidos 22 tests de caracterización en `purchase-orders-workspace-views-characterization.test.js`; actualizados `root-shell-supply-manifest.test.js` y `root-shell-router-characterization.test.js`. Suite: 1011 tests, 1008 pass, 1 fallo pre-existente.
+
 ## 2026-08-04
 - Implementado `bcrypt-supply-chain-closeout`: actualizado `bcrypt` a `^6.0.0`, eliminado el chain `@mapbox/node-pre-gyp`/`tar`, añadida caracterización de compatibilidad de hashes/login y convergida la gobernanza de `npm audit` a un baseline de 0 vulnerabilidades documentando el bloqueo local de Docker.
 - Implementado `due-diligence-final-closeout`: capturada la baseline fresca de `npm audit`, separadas correcciones seguras frente al path breaking de `bcrypt`, sincronizada la gobernanza/documentación del lane `dependency-hygiene`, añadidos índices Prisma acotados para `User`, `OrderItem` e `Invoice`, y actualizado el cierre final en `docs/audit/current-code-audit.md`.

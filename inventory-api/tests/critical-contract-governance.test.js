@@ -101,5 +101,5 @@ test('critical contract matrix resolves the minimum critical surface with approv
     ['GET /api/clients'],
   );
   assert.deepEqual(matrix.requiredCriticalSurfaces, ['auth', 'governance-admin']);
-  assert.equal(criticalRoutes.filter((route) => route.surface === 'governance-admin').length, 7);
+  assert.equal(criticalRoutes.filter((route) => route.surface === 'governance-admin').length, 8);
 });

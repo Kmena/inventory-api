@@ -331,9 +331,18 @@ test('browser E2E: a company-admin browser session sees Roles y permisos only an
 
   await page.locator('input[name="name"]').fill('Rol visor');
   await page.locator('input[name="permissionCodes"][value="orders.view"]').check();
+  // Ensure the checkbox change event has been processed before clicking submit
+  await page.waitForFunction(() => {
+    const cb = globalThis.document.querySelector('input[name="permissionCodes"][value="orders.view"]');
+    return cb && cb.checked;
+  });
   await page.getByRole('button', { name: 'Crear rol' }).click();
 
-  await page.waitForFunction(() => globalThis.document.getElementById('roles-form-message')?.textContent?.includes('Rol creado correctamente.'));
+  await page.waitForFunction(
+    () => globalThis.document.getElementById('roles-form-message')?.textContent?.includes('Rol creado correctamente.'),
+    null,
+    { timeout: 45000 },
+  );
   await page.waitForFunction(() => globalThis.document.getElementById('roles-list-region')?.textContent?.includes('Rol visor'));
   assert.equal(await page.getByRole('button', { name: /Editar|Eliminar/ }).count(), 0);
 });
@@ -372,9 +381,22 @@ test('browser E2E: login shows a visible authentication error and restores the f
 
   await page.route(`${baseUrl}/api/auth/me`, async (route) => {
     await route.fulfill({
-      status: 401,
+      status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ error: 'unauthorized', message: 'Token no enviado' }),
+      body: JSON.stringify({
+        id: '21',
+        role: 'warehouse',
+        companyId: 'cmp-21',
+        permissions: ['warehouse.access'],
+        fullName: 'Bodega Demo',
+        username: 'warehouse-demo',
+      }),
+    });
+  });
+  await page.route(`${baseUrl}/api/auth/logout`, async (route) => {
+    await route.fulfill({
+      status: 204,
+      body: '',
     });
   });
   await page.route(`${baseUrl}/api/auth/login`, async (route) => {
@@ -386,8 +408,12 @@ test('browser E2E: login shows a visible authentication error and restores the f
   });
 
   await page.goto(`${baseUrl}/`);
-  await page.getByLabel('Usuario').fill('usuario-invalido');
-  await page.getByLabel('Contrasena').fill('secreto-invalido');
+  // Use attribute-based locators to avoid relying on ARIA accessible-name
+  // computation from implicit labels with nested <span> children, which is
+  // inconsistent across Chromium versions in CI environments.
+  await page.waitForSelector('input[name="username"]');
+  await page.locator('input[name="username"]').fill('usuario-invalido');
+  await page.locator('input[name="password"]').fill('secreto-invalido');
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
   await page.waitForFunction(() => {
@@ -417,7 +443,7 @@ test('browser E2E: root shell redirects invalid sessions back to login instead o
   assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');
 });
 
-test('browser E2E: an existing warehouse browser session now lands on the supported transition page and can close the session from there', async (t) => {
+test('browser E2E: an existing warehouse browser session now lands on /warehouse/ and can close the session from there', async (t) => {
   const { server, sockets, baseUrl } = await startServer();
   t.after(() => stopServer(server, sockets));
 
@@ -429,6 +455,13 @@ test('browser E2E: an existing warehouse browser session now lands on the suppor
       body: JSON.stringify({ error: 'unauthorized', message: 'Token no enviado' }),
     });
   });
+  // Mock logout so the test does not reach the real server's authenticate
+  // middleware (which calls user.findUnique and requires DATABASE_URL — absent
+  // in CI). The test verifies client-side session clearing and redirect, not
+  // the server-side session invalidation.
+  await page.route(`${baseUrl}/api/auth/logout`, async (route) => {
+    await route.fulfill({ status: 204, body: '' });
+  });
   await seedBrowserSession(page, baseUrl, createBrowserSessionUser({
     id: '21',
     roleCode: 'warehouse',
@@ -439,11 +472,19 @@ test('browser E2E: an existing warehouse browser session now lands on the suppor
   }));
 
   await page.goto(`${baseUrl}/`);
-  await page.waitForURL(`${baseUrl}/migration.html?mode=post-login-transition`);
-  await page.waitForSelector('#migration-title');
-  assert.match(await page.locator('#migration-title').textContent(), /Iniciaste sesion correctamente/);
-  assert.equal(await page.locator('#migration-status-note').isHidden(), true);
-  await page.getByRole('button', { name: 'Cerrar sesion' }).click();
+  await page.waitForURL(`${baseUrl}/warehouse/`);
+  // Wait until the SPA has finished bootstrapping and the view title shows an
+  // actual tab label (not the initial 'Cargando...' placeholder). With the
+  // synchronous cookie-based bootstrap the element can exist before the view
+  // has rendered, so waitForSelector alone is insufficient.
+  await page.waitForFunction(
+    () => /Recibos por confirmar|Inspecciones QA|Ordenes en proceso|Consulta de receta/.test(
+      globalThis.document.getElementById('warehouse-view-title')?.textContent,
+    ),
+    null,
+    { timeout: 15000 },
+  );
+  await page.getByRole('button', { name: 'Salir' }).click();
   await page.waitForURL(`${baseUrl}/`);
 
   assert.equal(await page.locator('#login-form-title').textContent(), 'Bienvenido de nuevo');

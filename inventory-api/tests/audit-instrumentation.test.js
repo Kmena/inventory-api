@@ -360,7 +360,10 @@ test('userService.registerCompanyUser records an administrative user audit event
         createUser: async () => ({ id: 61n, companyId: 7n, roleId: 3n, username: 'worker', status: 'ACTIVE', passwordHash }),
       }],
       [roleRepository, {
-        findRoleById: async () => ({ id: 3n, code: 'sales', companyId: 7n, isActive: true }),
+        findAssignableRoleByIdForCompany: async () => ({ id: 3n, code: 'sales', companyId: 7n, isActive: true }),
+        findRoleById: async () => {
+          throw new Error('findRoleById should not be used when the scoped assignable lookup succeeds');
+        },
       }],
       [audit, {
         recordAuditEventIfAvailable: async (payload) => {
@@ -412,14 +415,17 @@ test('roleService.createCompanyRole records an administrative role audit event',
   await withStubs(
     [
       [roleRepository, {
-        findActivePermissions: async () => [{ code: 'inventory.manage' }],
+        findActivePermissions: async () => [{ code: 'inventory.manage' }, { code: 'root.access' }],
         createCompanyRole: async () => ({
           id: 71n,
           code: 'company_1_inventory_admin',
           name: 'Inventory Admin',
           companyId: 1n,
           isActive: true,
-          rolePermissions: [{ isEnabled: true, permission: { code: 'inventory.manage', isActive: true } }],
+          rolePermissions: [
+            { isEnabled: true, permission: { code: 'root.access', isActive: true } },
+            { isEnabled: true, permission: { code: 'inventory.manage', isActive: true } },
+          ],
         }),
       }],
       [audit, {
@@ -429,7 +435,7 @@ test('roleService.createCompanyRole records an administrative role audit event',
       }],
     ],
     async () => {
-      await roleService.createCompanyRole({ name: 'Inventory Admin', permissionCodes: ['inventory.manage'] }, { companyId: '1' }, createRequest());
+      await roleService.createCompanyRole({ name: 'Inventory Admin', permissionCodes: ['root.access', 'inventory.manage'] }, { companyId: '1' }, createRequest());
     },
   );
 

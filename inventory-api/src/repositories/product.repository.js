@@ -9,10 +9,15 @@ const warehouseStockOrderBy = { warehouseId: 'asc' };
 /** @type {[{ warehouseId: 'asc' }, { lotId: 'asc' }]} */
 const warehouseLotStockOrderBy = [{ warehouseId: 'asc' }, { lotId: 'asc' }];
 
+/** @type {[{ warehouseId: 'asc' }]} */
+const allowedWarehouseOrderBy = [{ warehouseId: 'asc' }];
+
+/** @type {[{ supplierId: 'asc' }]} */
+const supplierLinkOrderBy = [{ supplierId: 'asc' }];
+
 /** @type {[{ id: 'asc' }]} */
 const productListOrderBy = [{ id: 'asc' }];
 
-/** @type {import('@prisma/client').Prisma.ProductInclude} */
 const productInclude = {
   category: true,
   subcategory: true,
@@ -35,6 +40,11 @@ const productInclude = {
   },
   supplierLinks: {
     include: { supplier: true },
+    orderBy: supplierLinkOrderBy,
+  },
+  allowedWarehouses: {
+    include: { warehouse: true },
+    orderBy: allowedWarehouseOrderBy,
   },
   warehouseStocks: {
     include: { warehouse: true },
@@ -81,8 +91,8 @@ function findAllProducts(companyId, pagination = null) {
   ]).then(([totalItems, items]) => ({ totalItems, items }));
 }
 
-function findProductById(id, companyId) {
-  return prisma.product.findFirst({
+function findProductById(id, companyId, db = prisma) {
+  return db.product.findFirst({
     where: buildDefaultActiveProductWhere({ id, companyId }),
     include: productInclude,
   });
@@ -92,6 +102,27 @@ function findProductsByIds(ids, companyId) {
   return prisma.product.findMany({
     where: { id: { in: ids }, companyId },
     include: { category: true, subcategory: true, prices: true },
+  });
+}
+
+function findCompanyWarehousesByIds(companyId, warehouseIds, db = prisma) {
+  return db.warehouse.findMany({
+    where: {
+      companyId,
+      id: { in: warehouseIds },
+      isActive: true,
+    },
+    select: { id: true },
+  });
+}
+
+function findCompanySuppliersByIds(companyId, supplierIds, db = prisma) {
+  return db.supplier.findMany({
+    where: {
+      companyId,
+      id: { in: supplierIds },
+    },
+    select: { id: true },
   });
 }
 
@@ -179,6 +210,36 @@ async function updateProduct(id, companyId, data, db = prisma) {
   });
 }
 
+async function replaceProductAllowedWarehouses(productId, warehouseIds, db = prisma) {
+  await /** @type {any} */ (db).productAllowedWarehouse.deleteMany({ where: { productId } });
+  if (!warehouseIds.length) {
+    return;
+  }
+
+  await /** @type {any} */ (db).productAllowedWarehouse.createMany({
+    data: warehouseIds.map((warehouseId) => ({ productId, warehouseId })),
+  });
+}
+
+async function replaceProductSupplierLinks(productId, supplierLinks, db = prisma) {
+  await db.productSupplier.deleteMany({ where: { productId } });
+  if (!supplierLinks.length) {
+    return;
+  }
+
+  await db.productSupplier.createMany({
+    data: supplierLinks.map((supplierLink) => ({
+      productId,
+      supplierId: supplierLink.supplierId,
+      isPreferred: supplierLink.isPreferred,
+      supplierSku: supplierLink.supplierSku,
+      leadTimeDays: supplierLink.leadTimeDays,
+      minimumOrderQuantity: supplierLink.minimumOrderQuantity,
+      notes: supplierLink.notes,
+    })),
+  });
+}
+
 function deactivateCompanyProduct(id, companyId) {
   return prisma.product.updateMany({
     where: buildDefaultActiveProductWhere({ id, companyId }),
@@ -195,6 +256,8 @@ module.exports = {
   findProductById,
   findProductsByIds,
   findInventoryByCompanyId,
+  findCompanyWarehousesByIds,
+  findCompanySuppliersByIds,
   findActiveCategoriesByInventoryId,
   findActiveCategoriesWithSubcategories,
   findCategoryByType,
@@ -204,5 +267,7 @@ module.exports = {
   createSubcategory,
   createProduct,
   updateProduct,
+  replaceProductAllowedWarehouses,
+  replaceProductSupplierLinks,
   deactivateCompanyProduct,
 };

@@ -11,13 +11,13 @@ services:
     environment:
       PORT: ${PORT:-2500}
       NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tracksys}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tracksys}?schema=public
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:2500}
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       JWT_SECRET: ${JWT_SECRET:-}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       BROWSER_SESSION_STORE_MODE: ${BROWSER_SESSION_STORE_MODE:-redis}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_URL: redis://redis:6379/0
       HACIENDA_TAXPAYER_LOOKUP_URL: ${HACIENDA_TAXPAYER_LOOKUP_URL:-https://api.hacienda.go.cr/fe/ae?identificacion={identification}}
       GEOCODING_SEARCH_URL: ${GEOCODING_SEARCH_URL:-https://nominatim.openstreetmap.org/search}
     depends_on:
