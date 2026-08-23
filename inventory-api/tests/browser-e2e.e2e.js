@@ -455,6 +455,13 @@ test('browser E2E: an existing warehouse browser session now lands on /warehouse
       body: JSON.stringify({ error: 'unauthorized', message: 'Token no enviado' }),
     });
   });
+  // Mock logout so the test does not reach the real server's authenticate
+  // middleware (which calls user.findUnique and requires DATABASE_URL — absent
+  // in CI). The test verifies client-side session clearing and redirect, not
+  // the server-side session invalidation.
+  await page.route(`${baseUrl}/api/auth/logout`, async (route) => {
+    await route.fulfill({ status: 204, body: '' });
+  });
   await seedBrowserSession(page, baseUrl, createBrowserSessionUser({
     id: '21',
     roleCode: 'warehouse',
