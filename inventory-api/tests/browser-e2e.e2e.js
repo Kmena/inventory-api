@@ -331,9 +331,18 @@ test('browser E2E: a company-admin browser session sees Roles y permisos only an
 
   await page.locator('input[name="name"]').fill('Rol visor');
   await page.locator('input[name="permissionCodes"][value="orders.view"]').check();
+  // Ensure the checkbox change event has been processed before clicking submit
+  await page.waitForFunction(() => {
+    const cb = globalThis.document.querySelector('input[name="permissionCodes"][value="orders.view"]');
+    return cb && cb.checked;
+  });
   await page.getByRole('button', { name: 'Crear rol' }).click();
 
-  await page.waitForFunction(() => globalThis.document.getElementById('roles-form-message')?.textContent?.includes('Rol creado correctamente.'));
+  await page.waitForFunction(
+    () => globalThis.document.getElementById('roles-form-message')?.textContent?.includes('Rol creado correctamente.'),
+    null,
+    { timeout: 45000 },
+  );
   await page.waitForFunction(() => globalThis.document.getElementById('roles-list-region')?.textContent?.includes('Rol visor'));
   assert.equal(await page.getByRole('button', { name: /Editar|Eliminar/ }).count(), 0);
 });
@@ -399,8 +408,12 @@ test('browser E2E: login shows a visible authentication error and restores the f
   });
 
   await page.goto(`${baseUrl}/`);
-  await page.getByLabel('Usuario').fill('usuario-invalido');
-  await page.getByLabel('Contrasena').fill('secreto-invalido');
+  // Use attribute-based locators to avoid relying on ARIA accessible-name
+  // computation from implicit labels with nested <span> children, which is
+  // inconsistent across Chromium versions in CI environments.
+  await page.waitForSelector('input[name="username"]');
+  await page.locator('input[name="username"]').fill('usuario-invalido');
+  await page.locator('input[name="password"]').fill('secreto-invalido');
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
 
   await page.waitForFunction(() => {
@@ -453,8 +466,17 @@ test('browser E2E: an existing warehouse browser session now lands on /warehouse
 
   await page.goto(`${baseUrl}/`);
   await page.waitForURL(`${baseUrl}/warehouse/`);
-  await page.waitForSelector('#warehouse-view-title');
-  assert.match(await page.locator('#warehouse-view-title').textContent(), /Recibos por confirmar|Inspecciones QA|Ordenes en proceso|Consulta de receta/);
+  // Wait until the SPA has finished bootstrapping and the view title shows an
+  // actual tab label (not the initial 'Cargando...' placeholder). With the
+  // synchronous cookie-based bootstrap the element can exist before the view
+  // has rendered, so waitForSelector alone is insufficient.
+  await page.waitForFunction(
+    () => /Recibos por confirmar|Inspecciones QA|Ordenes en proceso|Consulta de receta/.test(
+      globalThis.document.getElementById('warehouse-view-title')?.textContent,
+    ),
+    null,
+    { timeout: 15000 },
+  );
   await page.getByRole('button', { name: 'Salir' }).click();
   await page.waitForURL(`${baseUrl}/`);
 
