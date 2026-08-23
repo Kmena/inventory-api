@@ -1,5 +1,6 @@
 (() => {
 const inventorySession = /** @type {any} */ (window).InventorySession;
+const inventoryAuth = /** @type {any} */ (window).InventoryAuth;
 const form = /** @type {HTMLFormElement | null} */ (document.getElementById('login-form'));
 const message = /** @type {HTMLElement | null} */ (document.getElementById('login-message'));
 const loginButton = /** @type {HTMLButtonElement | null} */ (document.getElementById('login-button'));
@@ -154,10 +155,13 @@ async function requestLogin(payload) {
   const response = await fetch(LOGIN_ENDPOINT, {
     method: 'POST',
     credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Inventory-Browser-Session': 'cookie',
-    },
+    // Build headers through the shared auth helper so the login page stays
+    // aligned with the rest of the app's request conventions. The null session
+    // means no Authorization header is added (login is a public endpoint).
+    headers: inventoryAuth.buildHeaders(null, {
+      includeJsonContentType: true,
+      headers: { 'X-Inventory-Browser-Session': 'cookie' },
+    }),
     body: JSON.stringify(payload),
   });
 
