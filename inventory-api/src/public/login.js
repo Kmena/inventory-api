@@ -1,6 +1,5 @@
 (() => {
 const inventorySession = /** @type {any} */ (window).InventorySession;
-const inventoryAuth = /** @type {any} */ (window).InventoryAuth;
 const form = /** @type {HTMLFormElement | null} */ (document.getElementById('login-form'));
 const message = /** @type {HTMLElement | null} */ (document.getElementById('login-message'));
 const loginButton = /** @type {HTMLButtonElement | null} */ (document.getElementById('login-button'));
@@ -12,7 +11,6 @@ const ROOT_SHELL_PATH = '/root/';
 // Transition path kept as named evidence for the post-login migration flow (DEC-007).
 const _POST_LOGIN_TRANSITION_PATH = '/migration.html?mode=post-login-transition';
 
-let loginAttemptInProgress = false;
 let sessionEstablished = false;
 
 function readStoredSession() {
@@ -212,8 +210,6 @@ form.addEventListener('submit', async (event) => {
   event.preventDefault();
   setMessage('Validando acceso...');
   setSubmittingState(true);
-  loginAttemptInProgress = true;
-
   try {
     const session = persistSession(await requestLogin(buildLoginPayload()));
     sessionEstablished = true;
@@ -222,9 +218,8 @@ form.addEventListener('submit', async (event) => {
     setMessage(error.message || UNEXPECTED_LOGIN_ERROR_MESSAGE, 'error');
   } finally {
     if (!sessionEstablished) {
-      loginAttemptInProgress = false;
+      setSubmittingState(false);
     }
-    setSubmittingState(false);
   }
 });
 })();
