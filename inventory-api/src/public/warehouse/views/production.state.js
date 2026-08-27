@@ -15,9 +15,37 @@ const WarehouseShell = /** @type {any} */ (window).WarehouseShell;
 function qaIsCleared(snapshotStage, execution) {
   if (!snapshotStage?.qaMandatory) { return true; }
   if (!execution) { return false; }
-  if (!execution.qaOutOfTolerance) { return true; }
+  // Una etapa qaMandatory siempre requiere una inspeccion formal aprobada,
+  // sin importar si los parametros quedaron dentro de tolerancia.
+  // Esto es consistente con el gate del backend (executionHasApprovedQa).
   const inspections = Array.isArray(execution.qualityInspections) ? execution.qualityInspections : [];
   return inspections.some((i) => i.result === 'APPROVED' || i.result === 'CONDITIONALLY_ACCEPTED');
+}
+
+/**
+ * TASK-007: Returns the most recent finished execution for a stage
+ * (ordered by createdAt DESC). Returns null if none.
+ * @param {any} order
+ * @param {any} snapshotStage
+ */
+function findLatestFinishedExecution(order, snapshotStage) {
+  const executions = Array.isArray(order?.stageExecutions) ? order.stageExecutions : [];
+  const stageId = String(snapshotStage?.id ?? '');
+  const finished = executions
+    .filter((ex) => String(ex.recipeStageId) === stageId && ex.endedAt)
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  return finished[0] || null;
+}
+
+/**
+ * TASK-007: Returns the latest execution with status=QA_REJECTED for a stage.
+ * Used by renderers to pre-populate the loss form with consumed items.
+ * @param {any} order
+ * @param {any} snapshotStage
+ */
+function findLatestRejectedExecution(order, snapshotStage) {
+  const latest = findLatestFinishedExecution(order, snapshotStage);
+  return (latest && latest.status === 'QA_REJECTED') ? latest : null;
 }
 
 /**
@@ -30,15 +58,21 @@ function deriveStageStatus(order, snapshotStage) {
   const executions = Array.isArray(order?.stageExecutions) ? order.stageExecutions : [];
   const stageId = String(snapshotStage?.id ?? '');
 
-  const finished = executions.find(
-    (ex) => String(ex.recipeStageId) === stageId && ex.endedAt,
-  );
+  // TASK-007: use the LATEST finished execution (sort by createdAt DESC)
+  // to correctly handle multiple executions after rejection+re-execution cycles.
+  const finished = findLatestFinishedExecution(order, snapshotStage);
   if (finished) {
-    // Si la ejecucion QA quedó fuera de tolerancia y aun no hay aprobación posterior -> WAITING_QA
+    // TASK-007: QA_REJECTED status — two sub-states based on lossesAcknowledged
+    if (finished.status === 'QA_REJECTED') {
+      if (!finished.lossesAcknowledged) { return 'QA_REJECTED_PENDING_LOSSES'; }
+      return 'QA_REJECTED_LOSSES_DONE';
+    }
+    // Si la etapa es qaMandatory y aun no hay inspeccion formal aprobada -> WAITING_QA
     if (!qaIsCleared(snapshotStage, finished)) { return 'WAITING_QA'; }
     return 'COMPLETED';
   }
 
+  // Check for a non-finished (active) execution
   const active = executions.find(
     (ex) => String(ex.recipeStageId) === stageId && !ex.endedAt,
   );
@@ -54,11 +88,12 @@ function deriveStageStatus(order, snapshotStage) {
   const currentOrder = Number(snapshotStage?.stageOrder ?? 0);
   for (const prior of snapshotStages) {
     if (Number(prior.stageOrder ?? 0) >= currentOrder) { break; }
-    const priorExec = executions.find(
-      (ex) => String(ex.recipeStageId) === String(prior.id) && ex.endedAt,
-    );
+    // TASK-007: BR-005 — gate uses COMPLETED execution only (not QA_REJECTED)
+    const priorExec = findLatestFinishedExecution(order, prior);
     // Bloqueado si etapa previa no tiene ejecucion
     if (!priorExec) { return 'BLOCKED'; }
+    // Bloqueado si la ejecucion mas reciente de la etapa previa no esta COMPLETED
+    if (priorExec.status === 'QA_REJECTED') { return 'BLOCKED'; }
     // Bloqueado si etapa previa con qaMandatory aun no tiene QA aprobado
     if (!qaIsCleared(prior, priorExec)) { return 'BLOCKED'; }
   }
@@ -81,7 +116,9 @@ function resolveNextExecutableStage(order) {
   for (const stage of snapshotStages) {
     const status = deriveStageStatus(order, stage);
     if (status === 'PENDING') { return stage; }
-    if (status === 'BLOCKED') { return null; }
+    // TASK-007: QA_REJECTED_LOSSES_DONE is also executable (re-execution)
+    if (status === 'QA_REJECTED_LOSSES_DONE') { return stage; }
+    if (status === 'BLOCKED' || status === 'QA_REJECTED_PENDING_LOSSES' || status === 'WAITING_QA') { return null; }
   }
   return null;
 }
@@ -100,11 +137,10 @@ function buildStagesViewModel(order, requirements) {
     : [];
 
   return snapshotStages.map((stage) => {
-    const stageId = String(stage?.id ?? '');
     const status = deriveStageStatus(order, stage);
-    const execution = (order?.stageExecutions || []).find(
-      (ex) => String(ex.recipeStageId) === stageId && ex.endedAt,
-    ) || null;
+    // TASK-007: use findLatestFinishedExecution instead of find() to handle multi-execution
+    const execution = findLatestFinishedExecution(order, stage);
+    const stageId = String(stage?.id ?? ''); // was missing — caused ReferenceError → blank page
 
     const stageRequirements = (requirements || []).filter(
       (r) => String(r.stageId ?? r.recipeStageId ?? '') === stageId,
@@ -147,7 +183,7 @@ function allSnapshotStagesCompleted(order) {
     ? order.recipeVersionSnapshot.recipeVersion.stages
     : [];
   if (!snapshotStages.length) { return false; }
-  // WAITING_QA no cuenta como completado; el inspector debe aprobar primero.
+  // WAITING_QA y QA_REJECTED no cuentan como completados.
   return snapshotStages.every((stage) => deriveStageStatus(order, stage) === 'COMPLETED');
 }
 
@@ -158,5 +194,8 @@ WarehouseShell.register('views.productionState', {
   deriveStageStatus,
   resolveNextExecutableStage,
   qaIsCleared,
+  // TASK-007: rejection helpers
+  findLatestFinishedExecution,
+  findLatestRejectedExecution,
 });
 })();
