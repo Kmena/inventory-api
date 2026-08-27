@@ -27,11 +27,17 @@ const ORDER_STATUS_BADGE = {
 const STAGE_STATUS_LABELS = {
   PENDING: 'Pendiente', IN_PROGRESS: 'En progreso', COMPLETED: 'Completado',
   BLOCKED: 'Bloqueado ⛔', WAITING_QA: 'Esperando QA', QA_HOLD: 'Retenido QA',
+  // TASK-007: QA rejection sub-states
+  QA_REJECTED_PENDING_LOSSES: 'Rechazada por QA — registrar pérdidas',
+  QA_REJECTED_LOSSES_DONE: 'Rechazada por QA — lista para re-ejecutar',
 };
 const STAGE_STATUS_BADGE = {
   PENDING: 'wh-badge--pending', IN_PROGRESS: 'wh-badge--pending',
   COMPLETED: 'wh-badge--confirmed', BLOCKED: 'wh-badge--rejected',
   WAITING_QA: 'wh-badge--hold', QA_HOLD: 'wh-badge--hold',
+  // TASK-007: QA rejection sub-states
+  QA_REJECTED_PENDING_LOSSES: 'wh-badge--rejected',
+  QA_REJECTED_LOSSES_DONE: 'wh-badge--warning',
 };
 
 function renderStatusBadge(status) {
@@ -197,7 +203,7 @@ function renderQaAnalysisForm(snapshotStage, stageId) {
     <div class="qa-param-row" style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:0.4rem"
          data-param-name="${escapeHtml(param.name)}">
       <label style="flex:1;min-width:160px"><span>${escapeHtml(param.name)}
-        <small class="wh-caption">(esperado: ${escapeHtml(String(param.expectedValue ?? '?'))} ± ${escapeHtml(String(param.minTolerance ?? 0))}/${escapeHtml(String(param.maxTolerance ?? 0))} ${escapeHtml(param.unit || '')})</small>
+        <small class="wh-caption">(esperado: ${escapeHtml(String(param.expectedValue ?? '?'))} ${escapeHtml(param.unit || '')} · rango: ${escapeHtml(String(Number(param.expectedValue ?? 0) - Number(param.minTolerance ?? 0)))}–${escapeHtml(String(Number(param.expectedValue ?? 0) + Number(param.maxTolerance ?? 0)))} ${escapeHtml(param.unit || '')})</small>
       </span>
         <input type="number" step="any" class="qa-result-value" required
                aria-label="Valor medido de ${escapeHtml(param.name)}" />
@@ -284,7 +290,8 @@ function renderInlineQaCapture(snapshotStage) {
         <strong>${escapeHtml(param.name)}</strong>
         <p class="wh-caption" style="margin:0.15rem 0 0 0">
           Esperado: ${escapeHtml(String(param.expectedValue ?? '?'))} ${escapeHtml(param.unit || '')}
-          · Tolerancia -${escapeHtml(String(param.minTolerance ?? 0))} / +${escapeHtml(String(param.maxTolerance ?? 0))}
+          · Rango valido: ${escapeHtml(String(Number(param.expectedValue ?? 0) - Number(param.minTolerance ?? 0)))}
+          – ${escapeHtml(String(Number(param.expectedValue ?? 0) + Number(param.maxTolerance ?? 0)))} ${escapeHtml(param.unit || '')}
         </p>
       </div>
       <label>
@@ -445,9 +452,7 @@ function renderCompleteForm(order, warehouses) {
 function renderStageItem(order, vm, permissions) {
   const { stage, status, execution } = vm;
   const stageId = stage?.id ?? '';
-  const isExecutable = (status === 'PENDING') && permissions.canExecuteProduction;
-  const isWaitingQa = status === 'WAITING_QA';
-  const canDoQa = permissions.canInspectQa && isWaitingQa;
+
   const formId = `exec-form-${escapeHtml(String(stageId))}`;
   const qaFormId = `qa-form-${escapeHtml(String(stageId))}`;
 
@@ -460,13 +465,24 @@ function renderStageItem(order, vm, permissions) {
       </p>`;
   }
 
+  // Las acciones de etapa solo aplican cuando la orden esta activa (IN_PROGRESS).
+  // Una orden CANCELLED, COMPLETED, etc. no debe mostrar ningun boton de accion.
+  const orderIsActive = order.status === 'IN_PROGRESS';
+  const isWaitingQa = status === 'WAITING_QA';
+  // TASK-007: re-executable after QA_REJECTED + lossesAcknowledged
+  const isExecutable = orderIsActive && (status === 'PENDING' || status === 'QA_REJECTED_LOSSES_DONE') && permissions.canExecuteProduction;
+  const canDoQa = orderIsActive && permissions.canInspectQa && isWaitingQa;
+  // TASK-007: manager must declare losses when QA_REJECTED + no losses yet
+  const isRejectedPendingLosses = orderIsActive && status === 'QA_REJECTED_PENDING_LOSSES' && permissions.canManageProduction;
+  const isRejectedLossesDone    = orderIsActive && status === 'QA_REJECTED_LOSSES_DONE'    && permissions.canManageProduction;
+
   let blockedMsg = '';
   if (status === 'BLOCKED') {
     blockedMsg = '<p class="wh-caption" style="color:var(--color-danger,#c00)">⛔ Complete la etapa anterior primero.</p>';
   }
   if (isWaitingQa) {
     blockedMsg = `<p class="wh-caption" style="color:var(--color-warning,#b86000)">
-      🔬 La ejecución quedó fuera de tolerancia. QA debe aprobar antes de liberar la siguiente etapa.
+      🔬 Inspección QA pendiente. El inspector debe registrar su análisis antes de continuar.
     </p>`;
   }
 
@@ -493,7 +509,7 @@ function renderStageItem(order, vm, permissions) {
                    data-order-id="${escapeHtml(String(order.id))}"
                    data-form-id="${formId}"
                    aria-expanded="false" aria-controls="${formId}">
-             Ejecutar etapa
+             ${status === 'QA_REJECTED_LOSSES_DONE' ? '🔄 Re-ejecutar etapa' : 'Ejecutar etapa'}
            </button>`
         : ''}
       ${canDoQa
@@ -504,9 +520,17 @@ function renderStageItem(order, vm, permissions) {
              🔬 Registrar analisis QA
            </button>`
         : ''}
+      ${isRejectedPendingLosses
+        ? `<button type="button" class="secondary-button wh-declare-losses-btn"
+                   data-stage-id="${escapeHtml(String(stageId))}"
+                   data-order-id="${escapeHtml(String(order.id))}">
+             📋 Declarar pérdidas
+           </button>`
+        : ''}
     </div>
     <div id="${formId}-slot"></div>
     <div id="${qaFormId}-slot"></div>
+    <div id="loss-form-${escapeHtml(String(stageId))}-slot"></div>
   </li>`;
 }
 
@@ -546,6 +570,11 @@ function renderOrderDetail(order, permissions, stagesVm, requirements, warehouse
                    data-order-id="${escapeHtml(String(order.id))}">▶ Iniciar produccion</button>
            <p id="start-production-error" class="wh-error-msg" hidden
               role="alert" aria-live="assertive"></p>`
+        : ''}
+      ${['DRAFT','PENDING_APPROVAL','APPROVED','IN_PROGRESS','QA_HOLD'].includes(order.status) && permissions.canCancelProduction
+        ? `<button type="button" class="secondary-button danger wh-terminate-production-btn"
+                   data-order-id="${escapeHtml(String(order.id))}"
+                   style="margin-left:0.5rem">🛑 Cancelar orden</button>`
         : ''}
     </div>
     ${requirementsHtml}
