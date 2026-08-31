@@ -69,8 +69,8 @@
             <div class="root-form-grid">
               <label><span>Codigo *</span><input name="code" type="text" required minlength="2" maxlength="40" /></label>
               <label><span>Nombre *</span><input name="name" type="text" required minlength="2" maxlength="120" /></label>
-              <label><span>Frecuencia de visita *</span><input name="visitFrequencyDays" type="number" min="1" required /></label>
-              <label><span>Umbral de alerta *</span><input name="nearLimitDays" type="number" min="0" required /></label>
+              <label><span>Frecuencia de visita (días) *</span><input name="visitFrequencyDays" type="number" min="5" required /></label>
+              
               <label><span>Activa</span><input name="isActive" type="checkbox" checked /></label>
             </div>
           </fieldset>

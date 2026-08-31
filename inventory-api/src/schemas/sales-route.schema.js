@@ -9,11 +9,11 @@ const salesGoalSchema = z.object({
   isActive: z.coerce.boolean().optional().default(true),
 });
 
+// nearLimitDays is a system constant (5 days) — not accepted from client.
 const saveSalesRouteSchema = z.object({
   code: z.string().trim().min(2).max(40),
   name: z.string().trim().min(2).max(120),
-  visitFrequencyDays: z.coerce.number().int().min(1).max(365),
-  nearLimitDays: z.coerce.number().int().min(0).max(365),
+  visitFrequencyDays: z.coerce.number().int().min(5).max(365),
   isActive: z.coerce.boolean().optional().default(true),
 });
 

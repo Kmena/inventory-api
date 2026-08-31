@@ -85,7 +85,6 @@
       code: String(formData.get('code') || '').trim(),
       name: String(formData.get('name') || '').trim(),
       visitFrequencyDays: Number(formData.get('visitFrequencyDays') || 0),
-      nearLimitDays: Number(formData.get('nearLimitDays') || 0),
       isActive: formData.get('isActive') === 'on',
     };
   }
