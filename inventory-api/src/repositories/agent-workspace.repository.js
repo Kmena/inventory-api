@@ -86,6 +86,7 @@ function findVisibleStoresForAgent(companyId, salesRouteIds) {
         where: { companyId },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         include: {
+          clientStore: true,
           invoices: {
             include: {
               payments: true,
@@ -150,6 +151,7 @@ function findStoreByIdForAgent(companyId, salesRouteIds, storeId) {
         where: { companyId },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         include: {
+          clientStore: true,
           invoices: {
             include: {
               payments: true,

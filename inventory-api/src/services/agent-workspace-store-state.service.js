@@ -33,7 +33,10 @@ function computeVisitState(store, route) {
   const referenceDate = latestVisit?.visitedAt || store.createdAt;
   const daysSinceReference = referenceDate ? daysBetween(referenceDate) : 0;
   const frequency = Number(route?.visitFrequencyDays || 15);
-  const nearLimit = Number(route?.nearLimitDays || 3);
+  // Cap nearLimit so it never equals or exceeds frequency — otherwise
+  // Math.max(0, frequency - nearLimit) collapses to 0 and the store
+  // is permanently PROXIMA_A_VENCER regardless of when it was visited.
+  const nearLimit = Math.min(Number(route?.nearLimitDays || 3), Math.max(1, frequency - 1));
   const dueInDays = frequency - daysSinceReference;
   const hasVisits = Boolean(latestVisit);
 
