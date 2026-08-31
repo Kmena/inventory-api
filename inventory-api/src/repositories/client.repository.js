@@ -23,6 +23,12 @@ function clientInclude() {
         subregion: { include: { region: true } },
         legalEntity: true,
         representatives: { where: { isActive: true }, orderBy: clientRepresentativeOrderBy },
+        // Only active (non-final) orders — lightweight, no items
+        orders: {
+          where: { status: { in: ['DRAFT', 'APPROVED', 'IN_PRODUCTION'] } },
+          select: { id: true, status: true },
+          orderBy: /** @type {any} */ ({ createdAt: 'desc' }),
+        },
       },
     },
     contacts: true,
