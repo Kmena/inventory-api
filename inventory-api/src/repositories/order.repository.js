@@ -113,6 +113,66 @@ async function deleteOrder(id, companyId) {
   });
 }
 
+/** @param {bigint} companyId */
+function findApprovedOrdersForDispatch(companyId) {
+  return prisma.order.findMany({
+    where: { companyId, status: 'APPROVED' },
+    orderBy: /** @type {any} */ ({ approvedAt: 'asc' }),
+    include: {
+      client:      true,
+      clientStore: { include: { subregion: { include: { region: true } } } },
+      user:        true,
+      approvedBy:  true,
+      warehouse:   true,
+      items: {
+        include: {
+          product: { select: { id: true, name: true, code: true, lotStrategy: true } },
+        },
+      },
+    },
+  });
+}
+
+/**
+ * Single order for warehouse dispatch view — includes RESERVE stock movements (lot allocations).
+ * @param {bigint} id
+ * @param {bigint} companyId
+ */
+async function findOrderWithAllocations(id, companyId) {
+  const order = await prisma.order.findFirst({
+    where: { id, companyId },
+    include: {
+      client:      true,
+      clientStore: { include: { subregion: { include: { region: true } } } },
+      user:        true,
+      approvedBy:  true,
+      warehouse:   true,
+      items: {
+        include: {
+          product: { select: { id: true, name: true, code: true, lotStrategy: true } },
+        },
+      },
+    },
+  });
+  if (!order) return null;
+
+  // Attach lot allocation info from RESERVE stock movements
+  const allocations = await prisma.stockMovement.findMany({
+    where: {
+      companyId,
+      sourceType: 'order',
+      sourceId: id,
+      movementType: 'RESERVE',
+    },
+    include: {
+      lot: { select: { id: true, code: true, expiresAt: true } },
+    },
+    orderBy: /** @type {any} */ ({ id: 'asc' }),
+  });
+
+  return { ...order, allocations };
+}
+
 module.exports = {
   findAllOrders,
   findOrderById,
@@ -122,4 +182,6 @@ module.exports = {
   createOrder,
   updateOrder,
   deleteOrder,
+  findApprovedOrdersForDispatch,
+  findOrderWithAllocations,
 };

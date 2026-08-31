@@ -383,6 +383,7 @@ model User {
   role                  Role?                   @relation(fields: [roleId], references: [id])
   orders                Order[]                 @relation("order_user")
   approvals             Order[]                 @relation("order_approver")
+  dispatches            Order[]                 @relation("order_dispatcher")
   createdProducts       Product[]               @relation("product_creator")
   createdRecipeVersions RecipeVersion[]         @relation("recipe_version_creator")
   approvedRecipeVersions RecipeVersion[]        @relation("recipe_version_approver")
@@ -1379,7 +1380,13 @@ model Order {
   transferMetadata  Json?                 @map("transfer_metadata")
   total             Decimal              @default(0) @db.Decimal(14, 2)
   otherCosts    Decimal      @default(0) @db.Decimal(14, 2) @map("other_costs")
-  transport     String?
+  transport             String?
+  // Dispatch / shipping info — filled by warehouse at dispatch time
+  transportMethod       String?   @map("transport_method")
+  trackingNumber        String?   @map("tracking_number")
+  transportResponsible  String?   @map("transport_responsible")
+  dispatchedAt          DateTime? @map("dispatched_at")
+  dispatchedById        BigInt?   @map("dispatched_by_id")
   status        OrderStatus  @default(DRAFT)
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
@@ -1388,6 +1395,7 @@ model Order {
   clientStore   ClientStore? @relation(fields: [clientStoreId], references: [id])
   user          User?        @relation("order_user", fields: [userId], references: [id])
   approvedBy    User?        @relation("order_approver", fields: [approvedById], references: [id])
+  dispatchedBy  User?        @relation("order_dispatcher", fields: [dispatchedById], references: [id])
   warehouse     Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   items         OrderItem[]
   invoices      Invoice[]

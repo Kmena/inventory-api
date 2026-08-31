@@ -343,6 +343,18 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'tenant-operational',
     transition: 'permission-governed',
   },
+  'warehouse.orders.view': {
+    mode: 'permission',
+    permissions: ['inventory.manage', 'sales.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  'warehouse.orders.dispatch': {
+    mode: 'permission',
+    permissions: ['inventory.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
   'billing.ledger.client': {
     mode: 'role',
     roles: ['admin', 'sales'],

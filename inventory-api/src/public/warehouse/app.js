@@ -70,6 +70,7 @@ const VIEW_MODULE_KEYS = /** @type {Record<string, string>} */ ({
   'production':          'views.production',
   'recipe-consultation': 'views.recipeConsultation',
   'inventory':           'views.inventory',
+  'dispatching':         'views.dispatching',
 });
 
 const TAB_DEFINITIONS = [
@@ -103,6 +104,12 @@ const TAB_DEFINITIONS = [
     label:      'Inventario',
     icon:       '📊',
     /** @param {string[]} p */ permission: (p) => p.includes('warehouse.receive'),
+  },
+  {
+    view:       'dispatching',
+    label:      'Despachos',
+    icon:       '🚚',
+    /** @param {string[]} p */ permission: (p) => p.includes('inventory.manage'),
   },
 ];
 
