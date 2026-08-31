@@ -84,10 +84,10 @@ const ACCESS_POLICIES = Object.freeze({
     actorScope: 'company-admin',
   },
   'role.company.update': {
-    mode: 'permission',
-    permissions: ['settings.manage'],
+    mode: 'role',
+    roles: ['admin'],
     boundary: 'tenant-admin-legacy',
-    transition: 'permission-governed',
+    transition: 'documented-legacy-role',
     actorScope: 'company-admin',
   },
   'region.company.list': {
@@ -336,6 +336,12 @@ const ACCESS_POLICIES = Object.freeze({
     roles: ['admin'],
     boundary: 'tenant-admin-legacy',
     transition: 'documented-legacy-role',
+  },
+  'client.store.credit.manage': {
+    mode: 'permission',
+    permissions: ['clients.credit.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
   },
   'billing.ledger.client': {
     mode: 'role',
@@ -610,6 +616,13 @@ const ACCESS_POLICIES = Object.freeze({
   'production.override': {
     mode: 'permission',
     permissions: ['production.override'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  // TASK-006: production-stage-rejection-and-reexecution — loss registration
+  'production.manage': {
+    mode: 'permission',
+    permissions: ['production.manage'],
     boundary: 'tenant-operational',
     transition: 'permission-governed',
   },
