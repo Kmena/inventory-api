@@ -18,6 +18,7 @@ const productionOriginals = {
   findProductionOrderById: productionRepository.findProductionOrderById,
   findLatestProductionStageExecutionForOrderStage: productionRepository.findLatestProductionStageExecutionForOrderStage,
   updateProductionOrder: productionRepository.updateProductionOrder,
+  updateStageExecutionStatus: productionRepository.updateStageExecutionStatus,
 };
 
 const qualityOriginals = {
@@ -32,6 +33,7 @@ function patchRepositories(overrides) {
     findProductionOrderById: overrides.findProductionOrderById || productionOriginals.findProductionOrderById,
     findLatestProductionStageExecutionForOrderStage: overrides.findLatestProductionStageExecutionForOrderStage || productionOriginals.findLatestProductionStageExecutionForOrderStage,
     updateProductionOrder: overrides.updateProductionOrder || productionOriginals.updateProductionOrder,
+    updateStageExecutionStatus: overrides.updateStageExecutionStatus || productionOriginals.updateStageExecutionStatus,
   });
   Object.assign(qualityRepository, {
     createQualityInspection: overrides.createQualityInspection || qualityOriginals.createQualityInspection,
@@ -169,12 +171,13 @@ test('createInspectionForStage creates a QA inspection linked to the latest stag
       observations: 'OK',
     }, auth);
 
-    assert.equal(result.id, 1001n);
-    assert.equal(result.productionOrderId, 501n);
-    assert.equal(result.stageExecutionId, 901n);
-    assert.equal(result.inspectorUserId, 99n);
-    assert.equal(result.result, 'APPROVED');
-    assert.equal(result.lotId, 700n);
+    // Service now returns { inspection, dispositionsSummary }
+    assert.equal(result.inspection.id, 1001n);
+    assert.equal(result.inspection.productionOrderId, 501n);
+    assert.equal(result.inspection.stageExecutionId, 901n);
+    assert.equal(result.inspection.inspectorUserId, 99n);
+    assert.equal(result.inspection.result, 'APPROVED');
+    assert.equal(result.inspection.lotId, 700n);
     assert.equal(createdInspections.length, 1);
     assert.equal(orderUpdates.length, 0, 'APPROVED should not transition order status when already IN_PROGRESS');
   });
@@ -202,6 +205,8 @@ test('createInspectionForStage transitions order to QA_HOLD on REJECTED result',
       orderUpdates.push({ id, companyId, data });
       return {};
     },
+    // TASK-003: must be mocked so it does not hit the real DB with a fake id
+    updateStageExecutionStatus: async () => ({}),
   }, async () => {
     const result = await qualityService.createInspectionForStage(501n, 101n, {
       result: 'REJECTED',
@@ -209,7 +214,7 @@ test('createInspectionForStage transitions order to QA_HOLD on REJECTED result',
       correctiveAction: 'Repetir mezcla',
     }, auth);
 
-    assert.equal(result.result, 'REJECTED');
+    assert.equal(result.inspection.result, 'REJECTED');
     assert.equal(orderUpdates.length, 1, 'REJECTED must transition order to QA_HOLD');
     assert.equal(orderUpdates[0].data.status, 'QA_HOLD');
   });
@@ -242,7 +247,7 @@ test('createInspectionForStage transitions order from QA_HOLD to IN_PROGRESS on 
       result: 'APPROVED',
     }, auth);
 
-    assert.equal(result.result, 'APPROVED');
+    assert.equal(result.inspection.result, 'APPROVED');
     assert.equal(orderUpdates.length, 1, 'APPROVED on QA_HOLD order must restore IN_PROGRESS');
     assert.equal(orderUpdates[0].data.status, 'IN_PROGRESS');
   });
@@ -507,5 +512,257 @@ test('checkMandatoryQaGatesForOrder passes when no stages require QA', async () 
   }, async () => {
     const result = await qualityService.checkMandatoryQaGatesForOrder(501n, 7n);
     assert.equal(result.allMandatoryGatesPassed, true);
+  });
+});
+
+// ─── TASK-003 / AC-001: REJECTED marks stageExecution as QA_REJECTED ────────
+
+test('[AC-001] REJECTED inspection marks stageExecution.status=QA_REJECTED', async () => {
+  const statusUpdates = [];
+
+  await withPatchedRepositories({
+    findProductionOrderById: async () => ({
+      id: 501n,
+      companyId: 7n,
+      status: 'IN_PROGRESS',
+      recipeVersionSnapshot: { recipeVersion: { stages: [] } },
+    }),
+    findLatestProductionStageExecutionForOrderStage: async () => ({
+      id: 901n,
+      productionOrderId: 501n,
+      recipeStageId: 101n,
+    }),
+    createQualityInspection: async (data) => ({
+      id: 1010n, ...data, createdAt: new Date(), updatedAt: new Date(),
+    }),
+    updateProductionOrder: async () => ({}),
+    updateStageExecutionStatus: async (execId, status) => {
+      statusUpdates.push({ execId, status });
+      return {};
+    },
+  }, async () => {
+    await qualityService.createInspectionForStage(501n, 101n, {
+      result: 'REJECTED',
+      observations: 'pH fuera de rango',
+    }, auth);
+
+    assert.equal(
+      statusUpdates.length,
+      1,
+      'updateStageExecutionStatus must be called once on REJECTED',
+    );
+    assert.equal(statusUpdates[0].execId, 901n);
+    assert.equal(statusUpdates[0].status, 'QA_REJECTED');
+  });
+});
+
+test('[AC-001] APPROVED inspection does NOT change stageExecution status', async () => {
+  const statusUpdates = [];
+
+  await withPatchedRepositories({
+    findProductionOrderById: async () => ({
+      id: 501n,
+      companyId: 7n,
+      status: 'IN_PROGRESS',
+      recipeVersionSnapshot: { recipeVersion: { stages: [] } },
+    }),
+    findLatestProductionStageExecutionForOrderStage: async () => ({
+      id: 902n,
+      productionOrderId: 501n,
+      recipeStageId: 101n,
+    }),
+    createQualityInspection: async (data) => ({
+      id: 1011n, ...data, createdAt: new Date(), updatedAt: new Date(),
+    }),
+    updateProductionOrder: async () => ({}),
+    updateStageExecutionStatus: async (execId, status) => {
+      statusUpdates.push({ execId, status });
+      return {};
+    },
+  }, async () => {
+    await qualityService.createInspectionForStage(501n, 101n, {
+      result: 'APPROVED',
+    }, auth);
+
+    assert.equal(
+      statusUpdates.length,
+      0,
+      'updateStageExecutionStatus must NOT be called for APPROVED result',
+    );
+  });
+});
+
+test('[AC-001] After REJECTED: stageExecution.lossesAcknowledged stays false (gate not cleared)', async () => {
+  // This test confirms that the quality service does NOT call acknowledgeStageExecutionLosses.
+  // The lossesAcknowledged field only becomes true after POST .../losses is called.
+  const acknowledgesCalled = [];
+
+  await withPatchedRepositories({
+    findProductionOrderById: async () => ({
+      id: 501n,
+      companyId: 7n,
+      status: 'IN_PROGRESS',
+      recipeVersionSnapshot: { recipeVersion: { stages: [] } },
+    }),
+    findLatestProductionStageExecutionForOrderStage: async () => ({
+      id: 903n,
+      productionOrderId: 501n,
+      recipeStageId: 101n,
+      lossesAcknowledged: false,
+    }),
+    createQualityInspection: async (data) => ({
+      id: 1012n, ...data, createdAt: new Date(), updatedAt: new Date(),
+    }),
+    updateProductionOrder: async () => ({}),
+    updateStageExecutionStatus: async () => ({}),
+    // acknowledgeStageExecutionLosses should NOT be called by quality.service
+    acknowledgeStageExecutionLosses: async (execId) => {
+      acknowledgesCalled.push(execId);
+      return {};
+    },
+  }, async () => {
+    await qualityService.createInspectionForStage(501n, 101n, {
+      result: 'REJECTED',
+    }, auth);
+
+    assert.equal(
+      acknowledgesCalled.length,
+      0,
+      'quality.service must NOT call acknowledgeStageExecutionLosses — lossesAcknowledged stays false',
+    );
+  });
+});
+
+// ─── TASK-004: New disposition + continuation tests ──────────────────────────
+
+test('[AC-005] Sin materialDispositions → dispositionsSummary=null (backward compat)', async () => {
+  await withPatchedRepositories({
+    findProductionOrderById: async () => ({
+      id: 501n, companyId: 7n, status: 'IN_PROGRESS',
+      recipeVersionSnapshot: { recipeVersion: { stages: [] } },
+    }),
+    findLatestProductionStageExecutionForOrderStage: async () => ({
+      id: 901n, productionOrderId: 501n, recipeStageId: 101n,
+    }),
+    createQualityInspection: async (data) => ({ id: 1020n, ...data, createdAt: new Date(), updatedAt: new Date() }),
+    updateProductionOrder: async () => ({}),
+    updateStageExecutionStatus: async () => ({}),
+  }, async () => {
+    const result = await qualityService.createInspectionForStage(501n, 101n, {
+      result: 'REJECTED',
+      observations: 'sin disposiciones',
+    }, auth);
+
+    assert.equal(result.inspection.result, 'REJECTED');
+    assert.equal(result.dispositionsSummary, null,
+      '[AC-005] Without materialDispositions, dispositionsSummary must be null (backward compat)');
+  });
+});
+
+test('acquireInventoryLockWithRetry retries up to 3 times and fails with 503 when lock is unavailable', async () => {
+  const inventoryRepo = require('../src/repositories/inventory.repository');
+  const originalTryAcquire = inventoryRepo.tryAcquireCompanyInventoryAdvisoryLock;
+  let attempts = 0;
+  inventoryRepo.tryAcquireCompanyInventoryAdvisoryLock = async () => {
+    attempts += 1;
+    return false;
+  };
+
+  try {
+    await assert.rejects(
+      () => qualityService.__private__.acquireInventoryLockWithRetry(7n, {}),
+      (err) => err?.statusCode === 503 && err?.code === 'inventory_lock_unavailable',
+    );
+    assert.equal(attempts, 3);
+  } finally {
+    inventoryRepo.tryAcquireCompanyInventoryAdvisoryLock = originalTryAcquire;
+  }
+});
+
+test('[AC-018] REJECTED inspection persists continuationPoint and materialDispositions in BD', async () => {
+  let persistedData = null;
+  const inventoryRepo = require('../src/repositories/inventory.repository');
+  const origTransaction2 = inventoryRepo.transaction;
+  const origTryAcquireLock = inventoryRepo.tryAcquireCompanyInventoryAdvisoryLock;
+  const origAcknowledge = productionRepository.acknowledgeStageExecutionLosses;
+  const origFindConsumptions = productionRepository.findConsumptionsByExecutionId;
+  const origFindRecolection = productionRepository.findRecolectionStageByExecutionId;
+
+  inventoryRepo.transaction = async (cb) => cb(productionRepository);
+  inventoryRepo.tryAcquireCompanyInventoryAdvisoryLock = async () => true;
+  productionRepository.acknowledgeStageExecutionLosses = async () => ({});
+  productionRepository.findConsumptionsByExecutionId = async () => [];
+  productionRepository.findRecolectionStageByExecutionId = async () => null;
+
+  try {
+    await withPatchedRepositories({
+      findProductionOrderById: async () => ({
+        id: 501n, companyId: 7n, status: 'IN_PROGRESS',
+        recipeVersionSnapshot: { recipeVersion: { stages: [{ id: 101, stageOrder: 0, name: 'Mezcla' }] } },
+        materialRequirements: [],
+      }),
+      findLatestProductionStageExecutionForOrderStage: async () => ({
+        id: 901n, productionOrderId: 501n, recipeStageId: 101n,
+      }),
+      createQualityInspection: async (data) => {
+        persistedData = data;
+        return { id: 1021n, ...data, createdAt: new Date(), updatedAt: new Date() };
+      },
+      updateProductionOrder: async () => ({}),
+      updateStageExecutionStatus: async () => ({}),
+    }, async () => {
+      const result = await qualityService.createInspectionForStage(501n, 101n, {
+        result: 'REJECTED',
+        continuationPoint: 'CURRENT',
+        materialDispositions: [],
+      }, auth);
+
+      assert.ok(persistedData, 'createQualityInspection must be called');
+      assert.equal(persistedData.continuationPoint, 'CURRENT',
+        '[AC-018] continuationPoint must be persisted in quality_inspections');
+      assert.ok(result.dispositionsSummary !== null,
+        'dispositionsSummary must be present when materialDispositions provided');
+      assert.equal(result.dispositionsSummary.lossesAcknowledged, true,
+        'lossesAcknowledged must be true when materialDispositions provided (even [])');
+    });
+  } finally {
+    inventoryRepo.transaction = origTransaction2;
+    inventoryRepo.tryAcquireCompanyInventoryAdvisoryLock = origTryAcquireLock;
+    productionRepository.acknowledgeStageExecutionLosses = origAcknowledge;
+    productionRepository.findConsumptionsByExecutionId = origFindConsumptions;
+    productionRepository.findRecolectionStageByExecutionId = origFindRecolection;
+  }
+});
+
+test('[AC-008] PRIOR_STAGE with stageOrder >= rejected → 400 validation_error', async () => {
+  await withPatchedRepositories({
+    findProductionOrderById: async () => ({
+      id: 501n, companyId: 7n, status: 'IN_PROGRESS',
+      stageExecutions: [{ id: 800n, recipeStageId: 102n, endedAt: new Date(), status: 'COMPLETED', createdAt: new Date() }],
+      recipeVersionSnapshot: {
+        recipeVersion: {
+          stages: [
+            { id: 101, stageOrder: 1, name: 'Etapa1' },
+            { id: 102, stageOrder: 2, name: 'Etapa2' },
+            { id: 103, stageOrder: 3, name: 'Etapa3' },
+          ],
+        },
+      },
+    }),
+    findLatestProductionStageExecutionForOrderStage: async () => ({
+      id: 901n, productionOrderId: 501n, recipeStageId: 103n,
+    }),
+  }, async () => {
+    // Trying to go to etapa2 (stageOrder=2) when rejecting etapa2 (stageOrder=2)
+    await assert.rejects(
+      () => qualityService.createInspectionForStage(501n, 103n, {
+        result: 'REJECTED',
+        continuationPoint: 'PRIOR_STAGE',
+        continuationStageId: 103n, // same stageOrder as rejected → invalid
+        materialDispositions: [],
+        invalidatedStagesDispositions: [],
+      }, auth),
+      (err) => err?.statusCode === 400 && err?.code === 'validation_error',
+    );
   });
 });

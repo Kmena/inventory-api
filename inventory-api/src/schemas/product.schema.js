@@ -3,6 +3,13 @@ const { optionalLotDateSchema } = require('./lot-date.schema');
 
 const productSourcingMethodSchema = z.enum(['PRODUCTION_ONLY', 'PURCHASE_ONLY', 'PRODUCTION_OR_PURCHASE']);
 const productInventoryTypeSchema = z.enum(['RAW_MATERIAL', 'PACKAGING', 'WORK_IN_PROCESS', 'FINISHED_GOOD']);
+const productPresentationTypeSchema = z.enum(['VOLUME', 'MASS', 'LENGTH', 'COUNT']);
+const productNetContentUnitSchema = z.enum(['ML', 'L', 'G', 'KG', 'M', 'UN']);
+
+/** Units that correspond to the VOLUME presentation type. */
+const VOLUME_UNITS = ['ML', 'L'];
+/** Units that correspond to the MASS presentation type. */
+const MASS_UNITS = ['G', 'KG'];
 
 const initialLotSchema = z.object({
   warehouseId: z.coerce.bigint(),
@@ -53,6 +60,8 @@ const productFieldsSchema = z.object({
   taxRate: z.number().min(0).max(100).optional(),
   density: z.number().min(0).optional(),
   densityUnit: z.string().max(30).optional(),
+  presentationType: productPresentationTypeSchema.optional().nullable(),
+  netContentUnit: productNetContentUnitSchema.optional().nullable(),
   requiresLot: z.boolean().optional(),
   requiresExpiration: z.boolean().optional(),
   standardCost: z.number().min(0).optional().nullable(),
@@ -69,6 +78,107 @@ const productFieldsSchema = z.object({
   allowedWarehouseIds: z.array(z.coerce.bigint()).optional(),
   authorizedSuppliers: z.array(authorizedSupplierSchema).optional(),
 });
+
+/**
+ * Validates that the presentation-type fields are internally consistent.
+ * Used in both create (strict) and update (soft — only checks fields present in payload).
+ *
+ * @param {object} payload - The parsed payload object.
+ * @param {import('zod').RefinementCtx} context - Zod refinement context.
+ * @param {boolean} strict - When true, ALL required conversion fields must be present
+ *   in the payload.  When false (update path), a field is only validated when it is
+ *   explicitly included in the same payload (i.e. its key exists in the object).
+ */
+function validatePresentationType(payload, context, strict) {
+  const { presentationType } = payload;
+  if (!presentationType) return;
+
+  const has = (key) => key in payload;
+
+  if (presentationType === 'VOLUME') {
+    if (strict || has('netContentUnit')) {
+      if (!payload.netContentUnit || !VOLUME_UNITS.includes(payload.netContentUnit)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['netContentUnit'],
+          message: 'La presentación volumétrica requiere unidad ML o L',
+        });
+      }
+    }
+    if (strict || has('density')) {
+      if (!payload.density || payload.density <= 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['density'],
+          message: 'La presentación volumétrica requiere densidad positiva (kg/L)',
+        });
+      }
+    }
+    if (strict || has('netContent')) {
+      if (!payload.netContent || payload.netContent <= 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['netContent'],
+          message: 'La presentación volumétrica requiere contenido neto positivo',
+        });
+      }
+    }
+    return;
+  }
+
+  if (presentationType === 'MASS') {
+    if (strict || has('netContentUnit')) {
+      if (!payload.netContentUnit || !MASS_UNITS.includes(payload.netContentUnit)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['netContentUnit'],
+          message: 'La presentación másica requiere unidad G o KG',
+        });
+      }
+    }
+    if (strict || has('netContent')) {
+      if (!payload.netContent || payload.netContent <= 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['netContent'],
+          message: 'La presentación másica requiere contenido neto positivo',
+        });
+      }
+    }
+    return;
+  }
+
+  if (presentationType === 'LENGTH') {
+    if (strict || has('netContentUnit')) {
+      if (payload.netContentUnit !== 'M') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['netContentUnit'],
+          message: 'La presentación lineal requiere unidad M',
+        });
+      }
+    }
+    if (strict || has('netContent')) {
+      if (!payload.netContent || payload.netContent <= 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['netContent'],
+          message: 'La presentación lineal requiere contenido neto positivo (metros por unidad)',
+        });
+      }
+    }
+    if (strict || has('kgConversionFactor')) {
+      if (!payload.kgConversionFactor || payload.kgConversionFactor <= 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['kgConversionFactor'],
+          message: 'La presentación lineal requiere factor de conversión kg/m positivo',
+        });
+      }
+    }
+  }
+  // COUNT has no additional field constraints at schema level.
+}
 
 const createProductSchema = productFieldsSchema.extend({
   initialLots: z.array(initialLotSchema).default([]),
@@ -109,6 +219,7 @@ const createProductSchema = productFieldsSchema.extend({
       message: 'Los proveedores autorizados no pueden repetirse',
     });
   }
+  validatePresentationType(payload, context, true);
 });
 
 const updateProductSchema = productFieldsSchema.partial().omit({
@@ -129,6 +240,8 @@ const updateProductSchema = productFieldsSchema.partial().omit({
       message: 'Los proveedores autorizados no pueden repetirse',
     });
   }
+  // Soft validation: only checks cross-field consistency for fields explicitly provided in the payload.
+  validatePresentationType(payload, context, false);
 });
 
 const createCategorySchema = z.object({
@@ -168,6 +281,8 @@ const importProductRowSchema = z.object({
   taxRate: z.coerce.number().min(0).max(100).optional().nullable(),
   density: z.coerce.number().min(0).optional().nullable(),
   densityUnit: z.string().max(30).optional().nullable(),
+  presentationType: productPresentationTypeSchema.optional().nullable(),
+  netContentUnit: productNetContentUnitSchema.optional().nullable(),
   requiresLot: z.boolean().optional().nullable(),
   requiresExpiration: z.boolean().optional().nullable(),
   standardCost: z.coerce.number().min(0).optional().nullable(),
@@ -201,5 +316,13 @@ const importProductsSchema = z.object({
   rows: z.array(importProductRowSchema).min(1),
 });
 
-module.exports = { createProductSchema, updateProductSchema, createCategorySchema, createSubcategorySchema, importProductsSchema };
+module.exports = {
+  createProductSchema,
+  updateProductSchema,
+  createCategorySchema,
+  createSubcategorySchema,
+  importProductsSchema,
+  productPresentationTypeSchema,
+  productNetContentUnitSchema,
+};
 

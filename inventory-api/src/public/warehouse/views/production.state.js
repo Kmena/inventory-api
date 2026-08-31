@@ -65,6 +65,13 @@ function deriveStageStatus(order, snapshotStage) {
     // TASK-007: QA_REJECTED status — two sub-states based on lossesAcknowledged
     if (finished.status === 'QA_REJECTED') {
       if (!finished.lossesAcknowledged) { return 'QA_REJECTED_PENDING_LOSSES'; }
+      // TASK-007 (qa-rejection-disposition): check for pending recolection (DEC-003)
+      // TASK-006 (qa-rejection-material-reconciliation-amendment): distinguish REPLACEMENT_RECOVERY
+      const pendingRecol = findPendingRecolectionForExecution(order, finished.id);
+      if (pendingRecol) {
+        if (pendingRecol.recoveryType === 'REPLACEMENT_RECOVERY') { return 'REPLACEMENT_RECOVERY_PENDING'; }
+        return 'RECOLECTION_PENDING';
+      }
       return 'QA_REJECTED_LOSSES_DONE';
     }
     // Si la etapa es qaMandatory y aun no hay inspeccion formal aprobada -> WAITING_QA
@@ -118,7 +125,14 @@ function resolveNextExecutableStage(order) {
     if (status === 'PENDING') { return stage; }
     // TASK-007: QA_REJECTED_LOSSES_DONE is also executable (re-execution)
     if (status === 'QA_REJECTED_LOSSES_DONE') { return stage; }
-    if (status === 'BLOCKED' || status === 'QA_REJECTED_PENDING_LOSSES' || status === 'WAITING_QA') { return null; }
+    // RECOLECTION_PENDING and REPLACEMENT_RECOVERY_PENDING block execution until operator confirms
+    if (
+      status === 'BLOCKED' ||
+      status === 'QA_REJECTED_PENDING_LOSSES' ||
+      status === 'WAITING_QA' ||
+      status === 'RECOLECTION_PENDING' ||
+      status === 'REPLACEMENT_RECOVERY_PENDING'
+    ) { return null; }
   }
   return null;
 }
@@ -174,6 +188,66 @@ function buildLotPickerModel(availableLotsResponse, requiredByProduct) {
 }
 
 /**
+ * TASK-007 (qa-rejection-disposition): Returns the pending recolection stage for a
+ * given rejected execution id, or null if none / already completed.
+ * @param {any} order
+ * @param {any} rejectedExecutionId
+ * @returns {any|null}
+ */
+function findPendingRecolectionForExecution(order, rejectedExecutionId) {
+  const stages = Array.isArray(order?.recolectionStages) ? order.recolectionStages : [];
+  const found = stages.find(
+    (r) => String(r.rejectedExecutionId) === String(rejectedExecutionId) && r.status === 'PENDING',
+  );
+  return found || null;
+}
+
+/**
+ * TASK-007 (qa-rejection-disposition): Returns the recolection stage for a given
+ * rejected execution (any status), or null if none.
+ * @param {any} order
+ * @param {any} rejectedExecutionId
+ * @returns {any|null}
+ */
+function findRecolectionForExecution(order, rejectedExecutionId) {
+  const stages = Array.isArray(order?.recolectionStages) ? order.recolectionStages : [];
+  return stages.find(
+    (r) => String(r.rejectedExecutionId) === String(rejectedExecutionId),
+  ) || null;
+}
+
+/**
+ * Builds the virtual recolection stage view-model entry to be inserted in the
+ * stages list between the rejected stage and the continuation point.
+ * Returns null when there is no recolection stage linked to this execution.
+ * @param {any} order
+ * @param {any} rejectedExecution
+ * @returns {{stage:any, status:string, execution:null, stageRequirements:[], recolection:any}|null}
+ */
+function buildRecolectionStageViewModel(order, rejectedExecution) {
+  if (!rejectedExecution) { return null; }
+  const recolection = findRecolectionForExecution(order, rejectedExecution.id);
+  if (!recolection) { return null; }
+  const isReplacement = recolection.recoveryType === 'REPLACEMENT_RECOVERY';
+  const stageName = isReplacement ? 'Reposición de materiales' : 'Recolección de material';
+  const doneStatus = isReplacement ? 'REPLACEMENT_RECOVERY_DONE' : 'RECOLECTION_DONE';
+  const pendingStatus = isReplacement ? 'REPLACEMENT_RECOVERY_PENDING' : 'RECOLECTION_PENDING';
+  return {
+    stage: {
+      id: `recolection-${String(rejectedExecution.id)}`,
+      name: stageName,
+      isVirtual: true,
+      recipeStageId: rejectedExecution.recipeStageId,
+      rejectedExecutionId: rejectedExecution.id,
+    },
+    status: recolection.status === 'COMPLETED' ? doneStatus : pendingStatus,
+    execution: null,
+    stageRequirements: [],
+    recolection,
+  };
+}
+
+/**
  * Derives whether all snapshot stages are completed (for complete-order gate).
  * @param {any} order
  * @returns {boolean}
@@ -183,7 +257,7 @@ function allSnapshotStagesCompleted(order) {
     ? order.recipeVersionSnapshot.recipeVersion.stages
     : [];
   if (!snapshotStages.length) { return false; }
-  // WAITING_QA y QA_REJECTED no cuentan como completados.
+  // WAITING_QA, QA_REJECTED and RECOLECTION_PENDING do not count as completed.
   return snapshotStages.every((stage) => deriveStageStatus(order, stage) === 'COMPLETED');
 }
 
@@ -197,5 +271,9 @@ WarehouseShell.register('views.productionState', {
   // TASK-007: rejection helpers
   findLatestFinishedExecution,
   findLatestRejectedExecution,
+  // TASK-007 (qa-rejection-disposition): recolection helpers
+  findPendingRecolectionForExecution,
+  findRecolectionForExecution,
+  buildRecolectionStageViewModel,
 });
 })();

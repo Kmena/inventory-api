@@ -109,7 +109,8 @@
       stages: rawValues.stages,
     };
 
-    for (const fieldName of ['effectiveFrom', 'effectiveTo', 'expectedYield', 'expectedWaste', 'yieldTolerancePercent', 'wasteTolerancePercent', 'instructions', 'notes']) {
+    // TASK-006: 'quantityBasis' agregado al conjunto de campos serializables.
+    for (const fieldName of ['effectiveFrom', 'effectiveTo', 'expectedYield', 'expectedWaste', 'yieldTolerancePercent', 'wasteTolerancePercent', 'instructions', 'notes', 'quantityBasis']) {
       if (rawValues[fieldName] !== undefined) {
         payload[fieldName] = rawValues[fieldName];
       }

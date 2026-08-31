@@ -141,7 +141,11 @@ test('assertStagePrerequisites blocks next stage when previous stage has qaManda
         recipeStageId: 101n,
         stageOrder: 0,
         stageName: 'Mezcla',
+        // TASK-005: status required for findLatestCompletedExecutionForStage
+        status: 'COMPLETED',
+        lossesAcknowledged: false,
         endedAt: new Date('2026-08-20T08:30:00.000Z'),
+        createdAt: new Date(),
         qualityInspections: [], // no inspections
       },
     ],
@@ -162,7 +166,11 @@ test('assertStagePrerequisites allows next stage when previous qaMandatory stage
         recipeStageId: 101n,
         stageOrder: 0,
         stageName: 'Mezcla',
+        // TASK-005: status required for findLatestCompletedExecutionForStage
+        status: 'COMPLETED',
+        lossesAcknowledged: false,
         endedAt: new Date('2026-08-20T08:30:00.000Z'),
+        createdAt: new Date(),
         qualityInspections: [
           { id: 1001n, result: 'APPROVED' }, // approved QA
         ],
@@ -416,4 +424,219 @@ test('executeProductionStage decrements inventory and records consumptions for s
     assert.equal(movementCalls[0].reasonCode, 'PRODUCTION_CONSUMPTION');
     assert.equal(result.consumptions.length, 1);
   });
+});
+
+// ─── TASK-005 / AC-005, AC-006a, AC-006b, AC-007: Re-execution + rejection gate ─
+
+test("[AC-006a] assertStagePrerequisites blocks re-execution when latest execution is COMPLETED", () => {
+  const order = buildOrder({
+    stageExecutions: [
+      {
+        id: 901n,
+        recipeStageId: 101n,
+        stageOrder: 0,
+        stageName: "Mezcla",
+        status: "COMPLETED",
+        lossesAcknowledged: false,
+        endedAt: new Date(),
+        createdAt: new Date(),
+        qualityInspections: [],
+      },
+    ],
+  });
+
+  assert.throws(
+    () => __private__.assertStagePrerequisites(order, 101n),
+    (err) => err?.statusCode === 409 && err?.subCode === "stage_execution_in_progress",
+    "COMPLETED latest execution must block re-execution (DEC-016 preserved)",
+  );
+});
+
+test("[AC-006b] assertStagePrerequisites blocks re-execution when QA_REJECTED but losses not acknowledged", () => {
+  const order = buildOrder({
+    stageExecutions: [
+      {
+        id: 901n,
+        recipeStageId: 101n,
+        stageOrder: 0,
+        stageName: "Mezcla",
+        status: "QA_REJECTED",
+        lossesAcknowledged: false,
+        endedAt: new Date(),
+        createdAt: new Date(),
+        qualityInspections: [],
+      },
+    ],
+  });
+
+  assert.throws(
+    () => __private__.assertStagePrerequisites(order, 101n),
+    (err) => err?.statusCode === 409 && err?.subCode === "stage_losses_required",
+    "QA_REJECTED + lossesAcknowledged=false must throw stage_losses_required",
+  );
+});
+
+test("[AC-005] assertStagePrerequisites allows re-execution when QA_REJECTED + lossesAcknowledged=true", () => {
+  const order = buildOrder({
+    stageExecutions: [
+      {
+        id: 901n,
+        recipeStageId: 101n,
+        stageOrder: 0,
+        stageName: "Mezcla",
+        status: "QA_REJECTED",
+        lossesAcknowledged: true,
+        endedAt: new Date(),
+        createdAt: new Date(),
+        qualityInspections: [],
+      },
+    ],
+  });
+
+  // Should NOT throw — QA_REJECTED with losses declared allows re-execution
+  assert.doesNotThrow(
+    () => __private__.assertStagePrerequisites(order, 101n),
+    "QA_REJECTED + lossesAcknowledged=true must allow re-execution",
+  );
+});
+
+test("assertStagePrerequisites blocks stage 2 when stage 1 latest execution is QA_REJECTED (not COMPLETED)", () => {
+  // BR-005: gate for next stage uses findLatestCompletedExecutionForStage
+  // If latest execution for stage 1 is QA_REJECTED, stage 2 must be blocked.
+  const order = buildOrder({
+    stageExecutions: [
+      {
+        id: 901n,
+        recipeStageId: 101n,  // stage 1
+        stageOrder: 0,
+        stageName: "Mezcla",
+        status: "QA_REJECTED",
+        lossesAcknowledged: true,
+        endedAt: new Date(),
+        createdAt: new Date(),
+        qualityInspections: [],
+      },
+    ],
+  });
+
+  assert.throws(
+    () => __private__.assertStagePrerequisites(order, 102n),  // try stage 2
+    (err) => err?.statusCode === 409 && err?.subCode === "stage_out_of_sequence",
+    "Stage 2 must be blocked when stage 1 latest execution is QA_REJECTED (not COMPLETED)",
+  );
+});
+
+test("assertStagePrerequisites allows stage 2 when stage 1 has a COMPLETED execution (even with older QA_REJECTED)", () => {
+  // BR-005: gate uses the latest COMPLETED execution.
+  // If stage 1 has one QA_REJECTED (older) and one COMPLETED (newer), stage 2 is available.
+  const older = new Date(Date.now() - 3600000);  // 1 hour ago
+  const newer = new Date();  // now
+  const order = buildOrder({
+    stageExecutions: [
+      {
+        id: 901n,
+        recipeStageId: 101n,  // stage 1, attempt 1 — rejected
+        stageOrder: 0,
+        stageName: "Mezcla",
+        status: "QA_REJECTED",
+        lossesAcknowledged: true,
+        endedAt: older,
+        createdAt: older,
+        qualityInspections: [],
+      },
+      {
+        id: 902n,
+        recipeStageId: 101n,  // stage 1, attempt 2 — completed
+        stageOrder: 0,
+        stageName: "Mezcla",
+        status: "COMPLETED",
+        lossesAcknowledged: false,
+        endedAt: newer,
+        createdAt: newer,
+        qualityInspections: [
+          { id: 1001n, result: "APPROVED" },
+        ],
+      },
+    ],
+  });
+
+  // Should NOT throw — stage 1 has a COMPLETED execution with approved QA
+  assert.doesNotThrow(
+    () => __private__.assertStagePrerequisites(order, 102n),
+    "Stage 2 must be available when stage 1 latest execution is COMPLETED with approved QA",
+  );
+});
+
+// ─── TASK-005: Recolection gate tests ──────────────────────────────────────
+
+test('[AC-012] assertStagePrerequisites blocks re-execution when pending recolection stage', () => {
+  const order = buildOrder({
+    stageExecutions: [
+      {
+        id: 901n, recipeStageId: 101n, status: 'QA_REJECTED',
+        lossesAcknowledged: true, endedAt: new Date(), createdAt: new Date(),
+      },
+    ],
+    recolectionStages: [
+      { rejectedExecutionId: 901n, status: 'PENDING' },
+    ],
+  });
+
+  assert.throws(
+    () => __private__.assertStagePrerequisites(order, 101n),
+    (err) => err?.subCode === 'recolection_pending',
+    'Must throw recolection_pending when recolection is PENDING',
+  );
+});
+
+test('[AC-013] assertStagePrerequisites allows re-execution when recolection is COMPLETED', () => {
+  const order = buildOrder({
+    stageExecutions: [
+      {
+        id: 901n, recipeStageId: 101n, status: 'QA_REJECTED',
+        lossesAcknowledged: true, endedAt: new Date(), createdAt: new Date(),
+      },
+    ],
+    recolectionStages: [
+      { rejectedExecutionId: 901n, status: 'COMPLETED' },
+    ],
+  });
+
+  assert.doesNotThrow(
+    () => __private__.assertStagePrerequisites(order, 101n),
+    'Re-execution must be allowed when recolection is COMPLETED',
+  );
+});
+
+test('assertStagePrerequisites allows re-execution with lossesAcknowledged and no recolection', () => {
+  const order = buildOrder({
+    stageExecutions: [
+      {
+        id: 901n, recipeStageId: 101n, status: 'QA_REJECTED',
+        lossesAcknowledged: true, endedAt: new Date(), createdAt: new Date(),
+      },
+    ],
+    recolectionStages: [], // no recolection
+  });
+
+  assert.doesNotThrow(
+    () => __private__.assertStagePrerequisites(order, 101n),
+    'Re-execution must be allowed when losses acknowledged and no recolection',
+  );
+});
+
+test("[AC-007] order with multiple executions for same stage has all executions in stageExecutions", () => {
+  // Verifies that the data model supports multiple executions per stage.
+  // The key requirement: stageExecutions array can have multiple entries with the same recipeStageId.
+  const order = buildOrder({
+    stageExecutions: [
+      { id: 901n, recipeStageId: 101n, status: "QA_REJECTED", lossesAcknowledged: true, endedAt: new Date(), createdAt: new Date(Date.now()-1000) },
+      { id: 902n, recipeStageId: 101n, status: "COMPLETED", lossesAcknowledged: false, endedAt: new Date(), createdAt: new Date() },
+    ],
+  });
+
+  const allForStage101 = order.stageExecutions.filter((ex) => String(ex.recipeStageId) === "101");
+  assert.equal(allForStage101.length, 2, "Order must support multiple stageExecutions for same stage");
+  assert.equal(allForStage101[0].id, 901n);
+  assert.equal(allForStage101[1].id, 902n);
 });

@@ -14,6 +14,12 @@
     });
   }
 
+  async function getRole(session, roleId) {
+    return inventoryAuth.fetchJson(session, `/api/roles/company/${encodeURIComponent(roleId)}`, {
+      fallbackMessage: 'No se pudo cargar el rol.',
+    });
+  }
+
   async function createRole(session, payload) {
     return inventoryAuth.fetchJson(session, '/api/roles/company', {
       method: 'POST',
@@ -32,6 +38,7 @@
 
   rootShell.register('rolesApi', {
     createRole,
+    getRole,
     listPermissions,
     listRoles,
     updateRole,

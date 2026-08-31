@@ -360,7 +360,24 @@ function validateInspectionInputs(accepted, rejected, result, received) {
   return null;
 }
 
-function wireInspectionSaveHandler(container, api, session, receipt, item, params) {
+/**
+ * Wires the save-inspection button for a single pending item.
+ *
+ * On success the step-2 panel is re-rendered in-place with fresh receipt data
+ * instead of navigating away and back.  Navigation would silently fail when
+ * the current hash is already #receipts?id=X&step=2 because the browser does
+ * not fire a hashchange event when the hash value does not change.
+ *
+ * @param {HTMLElement}  container  The step-2 content element (wh-item-list).
+ * @param {HTMLElement}  nav        The step-nav element.
+ * @param {object}       api
+ * @param {object}       session
+ * @param {object}       receipt    The receipt object at render time.
+ * @param {object}       item       The individual item being inspected.
+ * @param {object}       params     Current route params.
+ * @param {Function}     goToStep   Navigation helper.
+ */
+function wireInspectionSaveHandler(container, nav, api, session, receipt, item, params, goToStep) {
   const itemId = String(item.id);
   const escapedId = window.CSS && window.CSS.escape ? window.CSS.escape(itemId) : itemId;
   const saveBtn = /** @type {HTMLButtonElement | null} */ (container.querySelector(`#inspect-save-btn-${escapedId}`));
@@ -398,9 +415,13 @@ function wireInspectionSaveHandler(container, api, session, receipt, item, param
         quantityRejected: rejected,
         observations: observations || null,
       });
-      const app = WarehouseShell.require('app');
-      // Force reload by re-navigating; fetches fresh receipt with new inspection
-      app.navigate('receipts', { ...params, step: '2' });
+
+      // Re-fetch fresh receipt data and re-render step 2 in-place.
+      // Do NOT use app.navigate() here: if the current hash is already
+      // #receipts?id=X&step=2, the browser silently ignores the assignment
+      // and hashchange never fires, leaving the UI stale.
+      const freshReceipt = await api.getReceipt(session, receipt.id);
+      renderStepInspection(container, nav, session, freshReceipt, params, goToStep);
     } catch (err) {
       errorEl.textContent = err?.message || 'No se pudo guardar la inspeccion.';
       errorEl.hidden = false;
@@ -435,7 +456,7 @@ function renderStepInspection(container, nav, session, receipt, params, goToStep
   for (const item of items) {
     const alreadyInspected = (item.inspections || []).length > 0;
     if (!alreadyInspected) {
-      wireInspectionSaveHandler(container, api, session, receipt, item, params);
+      wireInspectionSaveHandler(container, nav, api, session, receipt, item, params, goToStep);
     }
   }
 

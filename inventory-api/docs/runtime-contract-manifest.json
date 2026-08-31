@@ -452,6 +452,42 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "subzone-bulk-mutation-outside-current-openapi-baseline",
       "reason": "La mutación masiva de subzonas de rutas comerciales sigue soportada, pero todavía no forma parte del recorte factual del OpenAPI parcial."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/production",
+      "expressPath": "/orders/:id/stages/:stageId/losses",
+      "routeFile": "src/routes/production.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "stage-loss-registration-outside-current-openapi-baseline",
+      "reason": "TASK-006: Registro de pérdidas post-rechazo QA (production-stage-rejection-and-reexecution). Ruta activa en runtime pero excluida del contrato parcial OpenAPI hasta formalización del módulo de rechazo."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/production",
+      "expressPath": "/orders/:id/stages/:stageId/losses",
+      "routeFile": "src/routes/production.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "stage-loss-list-outside-current-openapi-baseline",
+      "reason": "TASK-006: Listado de pérdidas por etapa (production-stage-rejection-and-reexecution). Ruta activa en runtime pero excluida del contrato parcial OpenAPI hasta formalización."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/production",
+      "expressPath": "/orders/:id/recolections/:recolectionId/confirm",
+      "routeFile": "src/routes/production.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "recolection-confirm-outside-current-openapi-baseline",
+      "reason": "TASK-006 (qa-rejection-disposition-and-continuation): Confirmación de etapa virtual de recolección de material. Ruta activa en runtime pero excluida del contrato parcial OpenAPI hasta formalización del spec extendido."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/production",
+      "expressPath": "/orders/:id/recolections/:recolectionId/reconciliation",
+      "routeFile": "src/routes/production.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "recolection-reconciliation-outside-current-openapi-baseline",
+      "reason": "TASK-006 (qa-rejection-material-reconciliation-amendment): Registro de resultados de conciliación (USED/RETURNED/DISCARDED) para material recolectado. Ruta activa en runtime pero excluida del contrato parcial OpenAPI hasta formalización."
     }
   ]
 }

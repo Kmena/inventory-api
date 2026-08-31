@@ -118,10 +118,81 @@ const productionCompletionSchema = z.object({
   note: z.string().trim().max(1000).optional().nullable(),
 }).strict();
 
+// ─── TASK-006: Stage loss registration schema (production-stage-rejection-and-reexecution) ───
+
+const stageLossItemSchema = z.object({
+  productId: z.coerce.bigint(),
+  lotId: z.coerce.bigint(),
+  // quantity must be positive; validated also at service layer (BR-002)
+  quantity: z.coerce.number().positive('La cantidad de pérdida debe ser positiva'),
+  // reasonCode: free text, max 100 chars (DEC-005)
+  reasonCode: z.string().trim().min(1, 'El código de razón es obligatorio').max(100),
+  note: z.string().trim().max(1000).optional().nullable(),
+}).strict();
+
+// losses can be empty [] — explicit declaration of zero losses (DEC-003)
+const stageLossSchema = z.object({
+  losses: z.array(stageLossItemSchema),
+}).strict();
+
+// ─── Cancel with material returns ────────────────────────────────────────────
+// Each item represents one batch to put back into stock when cancelling.
+// quantity = 0 items are silently skipped by the service.
+// Either targetLotId (existing lot) OR newLotCode (create new lot) is required
+// when quantity > 0; the service enforces this — schema stays permissive.
+
+const cancelReturnItemSchema = z.object({
+  productId:      z.coerce.bigint(),
+  quantity:       z.coerce.number().nonnegative(),
+  targetLotId:    z.coerce.bigint().optional().nullable(),
+  newLotCode:     z.string().trim().min(1).max(100).optional().nullable(),
+  expirationDate: z.union([z.coerce.date(), z.null()]).optional(),
+  note:           z.string().trim().max(500).optional().nullable(),
+}).strict();
+
+const cancelWithReturnsSchema = z.object({
+  returns: z.array(cancelReturnItemSchema).optional().default([]),
+  note:    z.string().trim().max(1000).optional().nullable(),
+}).strict();
+
+// TASK-006 (original): recolection confirmation payload
+// AUD-001: entries allows lot-level declaration when confirming REPLACEMENT_RECOVERY stages
+const recolectionEntryItemSchema = z.object({
+  productId: z.coerce.bigint(),
+  lotId: z.coerce.bigint(),
+  quantity: z.coerce.number().positive(),
+  unit: z.string().trim().max(30).optional().nullable(),
+});
+
+const recolectionConfirmSchema = z.object({
+  notes: z.string().trim().max(1000).optional().nullable(),
+  entries: z.array(recolectionEntryItemSchema).optional().nullable(),
+}).strict();
+
+// TASK-006 (qa-rejection-material-reconciliation-amendment): reconciliation outcome payload
+const reconciliationOutcomeItemSchema = z.object({
+  productId: z.coerce.bigint(),
+  lotId: z.coerce.bigint(),
+  quantity: z.coerce.number().positive(),
+  outcome: z.enum(['USED', 'RETURNED', 'DISCARDED']),
+  notes: z.string().trim().max(500).optional().nullable(),
+});
+
+const recordReconciliationOutcomesSchema = z.object({
+  outcomes: z.array(reconciliationOutcomeItemSchema).min(1),
+}).strict();
+
 module.exports = {
   createProductionOrderSchema,
   productionApprovalSchema,
   productionStageExecutionSchema,
   productionStageReturnSchema,
   productionCompletionSchema,
+  stageLossItemSchema,
+  stageLossSchema,
+  cancelReturnItemSchema,
+  cancelWithReturnsSchema,
+  recolectionConfirmSchema,
+  reconciliationOutcomeItemSchema,
+  recordReconciliationOutcomesSchema,
 };

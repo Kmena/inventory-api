@@ -86,6 +86,19 @@
     `;
   }
 
+  // Referencia al loader interno; se asigna una vez montado el modulo
+  let _refreshRef = null;
+
+  /**
+   * Recarga la seccion de comparacion para el purchaseRequestId dado.
+   * Sirve para actualizarla despues de registrar una cotizacion directa.
+   */
+  async function refreshForRequest(requestId) {
+    if (typeof _refreshRef === 'function') {
+      await _refreshRef(requestId);
+    }
+  }
+
   async function mountComparisonSection(container, session, purchaseRequestId, helpersBag) {
     const setShellStatus = typeof helpersBag?.setShellStatus === 'function' ? helpersBag.setShellStatus : () => {};
     const canManage = sessionAdapter.hasPermission(session, 'procurement.manage');
@@ -171,6 +184,9 @@
         section.hidden = true;
       }
     }
+
+    // Exponer el loader para que modulos externos puedan refrescar
+    _refreshRef = loadComparisonData;
 
     function bindSelectButtons() {
       tableRegion.querySelectorAll('.quotations-select-supplier-button').forEach((btn) => {
@@ -328,5 +344,6 @@
 
   rootShell.register('views.quotationsComparison', {
     mountComparisonSection,
+    refreshForRequest,
   });
 }(window));

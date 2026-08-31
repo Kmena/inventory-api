@@ -174,25 +174,58 @@
     const subcategoryId = String(formData.get('subcategoryId') || '').trim();
     const description = String(formData.get('description') || '').trim();
     const code = String(formData.get('code') || '').trim();
-    const unit = String(formData.get('unit') || '').trim();
     const currency = String(formData.get('currency') || '').trim();
     // Los checkboxes HTML solo aparecen en FormData cuando estan marcados ('on').
     // Desmarcado o ausente => null/undefined => false.
     // La casilla viene marcada por defecto en el HTML del formulario.
     const inCatalog = formData.get('inCatalog') === 'on';
 
-    return {
+    // netContentUnit es el campo de unidad del producto (siempre requerido en el form).
+    // Se usa también como `unit` para mantener compatibilidad con el resto del sistema
+    // (warehouse SPA, recetas, supplier-quote) que leen product.unit para mostrar labels.
+    const rawNetContentUnit = String(formData.get('netContentUnit') || '').trim();
+
+    const payload = {
       name: String(formData.get('name') || '').trim(),
       code: code || undefined,
       description: description || undefined,
       subcategoryId: subcategoryId ? Number(subcategoryId) : null,
-      unit: unit || undefined,
+      unit: rawNetContentUnit || undefined,
       currency: currency || undefined,
       price: parseOptionalNumber(formData.get('price')),
       minStock: parseOptionalNumber(formData.get('minStock')),
       maxStock: parseOptionalNumber(formData.get('maxStock')),
       inCatalog,
     };
+
+    // netContentUnit siempre se envía (el campo es obligatorio en el form).
+    if (rawNetContentUnit) payload.netContentUnit = rawNetContentUnit;
+
+    // TASK-006: campos de presentación comercial para conversión kg.
+    // presentationType se envía siempre (null limpia el campo en actualizaciones).
+    const rawPresentationType = String(formData.get('presentationType') || '').trim();
+    const presentationType = rawPresentationType || null;
+    payload.presentationType = presentationType;
+
+    if (presentationType) {
+      // netContent es requerido para VOLUME, MASS y LENGTH.
+      const netContent = parseOptionalNumber(formData.get('netContent'));
+      if (netContent !== undefined) payload.netContent = netContent;
+
+      // density solo aplica a VOLUME.
+      if (presentationType === 'VOLUME') {
+        const density = parseOptionalNumber(formData.get('density'));
+        if (density !== undefined) payload.density = density;
+      }
+
+      // kgConversionFactor: requerido en LENGTH, opcional en COUNT.
+      if (presentationType === 'LENGTH' || presentationType === 'COUNT') {
+        const kgFactor = parseOptionalNumber(formData.get('kgConversionFactor'));
+        if (kgFactor !== undefined) payload.kgConversionFactor = kgFactor;
+      }
+    }
+
+    return payload;
   }
 
   /**

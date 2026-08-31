@@ -277,11 +277,15 @@
     var editingRoleId = null;
     var currentUserRoleId = session?.user?.roleId ? String(session.user.roleId) : null;
     var confirmResolve = null;
-    // Only users with roles.manage (or root) can edit company roles.
-    // Company admins without explicit roles.manage can create roles but cannot edit them.
+    // El rol global 'admin' (isCompanyAdmin) y root pueden editar roles de empresa.
+    // La politica de API role.company.update usa mode: 'role', roles: ['admin'].
+    // Tambien se admite settings.manage y roles.manage para compatibilidad.
     var sessionPermissions = session?.user?.permissions || [];
     var sessionRoleCode = session?.user?.role?.code;
-    var canEditRoles = sessionRoleCode === 'root' || sessionPermissions.includes('roles.manage');
+    var canEditRoles = sessionRoleCode === 'root'
+      || sessionRoleCode === 'admin'
+      || sessionPermissions.includes('settings.manage')
+      || sessionPermissions.includes('roles.manage');
     /** @type {string|null} Selected landing permission code */
     var _selectedLandingCode = null;
     /** @type {Set<string>} Source of truth for selected operational permission codes — survives search re-renders. */
@@ -334,19 +338,35 @@
       });
     }
 
-    function enterEditMode(role) {
-      editingRoleId = role.id;
-      formTitle.textContent = 'Editando: ' + role.name;
+    async function enterEditMode(roleStub) {
+      // Mostrar estado de carga inmediato con datos del stub (cache)
+      editingRoleId = roleStub.id;
+      formTitle.textContent = 'Editando: ' + roleStub.name;
       formSubtitle.textContent = 'Los cambios se aplicaran a todos los usuarios con este rol.';
-      editBanner.innerHTML = '<p><strong>Editando: ' + rootShellUi.escapeHtml(role.name) + '</strong><br />Los cambios se aplicaran a todos los usuarios que tengan este rol asignado.</p>';
+      editBanner.innerHTML = '<p><strong>Editando: ' + rootShellUi.escapeHtml(roleStub.name) + '</strong><br />Cargando permisos...</p>';
       editBanner.style.display = '';
       submitButton.textContent = 'Guardar cambios';
+      submitButton.disabled = true;
       clearButton.textContent = 'Cancelar edicion';
       var nameInput = form.querySelector('input[name="name"]');
-      if (nameInput) { nameInput.value = role.name || ''; }
+      if (nameInput) { nameInput.value = roleStub.name || ''; }
       formMessage.innerHTML = '';
+      // Limpiar busqueda para que todos los permisos sean visibles
+      if (searchInput) { searchInput.value = ''; }
 
-      // Separate landing from operational codes
+      var role = roleStub;
+      try {
+        // Obtener datos frescos del servidor para garantizar permisos completos y actualizados
+        role = await rolesApi.getRole(session, roleStub.id);
+      } catch (_err) {
+        // Si falla, usar el stub del cache como fallback
+        role = roleStub;
+      }
+
+      editBanner.innerHTML = '<p><strong>Editando: ' + rootShellUi.escapeHtml(role.name) + '</strong><br />Los cambios se aplicaran a todos los usuarios que tengan este rol asignado.</p>';
+      submitButton.disabled = false;
+
+      // Separar landing de permisos operativos
       _selectedLandingCode = role.landingPermission ? role.landingPermission.code : null;
       var opCodes = (role.operationalPermissions || role.permissions || []).map(function (p) { return p.code; });
       _selectedPermissionCodes = new Set(opCodes);
@@ -453,6 +473,17 @@
           _selectedPermissionCodes.delete(event.target.value);
         }
         updateSelectionCount();
+        // Actualizar quirurgicamente solo el badge de conteo de la categoria afectada
+        // sin re-renderizar todo el grid (evita cerrar categorias y perder scroll).
+        var categorySection = event.target.closest('.permission-category');
+        if (categorySection) {
+          var countBadge = categorySection.querySelector('.permission-category__count');
+          if (countBadge) {
+            var allCbs = categorySection.querySelectorAll('input[name="permissionCodes"]');
+            var checkedCbs = Array.from(allCbs).filter(function (cb) { return cb.checked; }).length;
+            countBadge.textContent = checkedCbs + '/' + allCbs.length;
+          }
+        }
       }
     });
 

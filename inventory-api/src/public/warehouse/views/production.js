@@ -97,7 +97,10 @@ async function renderOrderDetail(container, session, params) {
       contentEl || container, session, order, stagesVm, reload,
     );
   } catch (err) {
-    if (statusEl) { statusEl.textContent = err?.message || 'Error al cargar la orden.'; }
+    if (statusEl) {
+      statusEl.hidden = false; // restore visibility in case it was hidden before the error
+      statusEl.textContent = err?.message || 'Error al cargar la orden.';
+    }
   }
 }
 

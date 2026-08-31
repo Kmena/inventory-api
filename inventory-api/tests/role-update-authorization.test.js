@@ -18,33 +18,36 @@ async function runGuard(guard, auth) {
   return nextError;
 }
 
-test('PUT /company/:roleId route exists and requires settings.manage permission', async () => {
+// La politica role.company.update usa mode:'role', roles:['admin'] — igual que list y create.
+// Solo el rol global 'admin' puede editar roles de empresa.
+
+test('PUT /company/:roleId route allows the admin role regardless of permissions', async () => {
   const guard = getRouteGuard(roleRoutes, '/company/:roleId', 'put');
 
-  const deniedNoPermission = await runGuard(guard, {
+  const allowedAdmin = await runGuard(guard, {
     role: 'admin',
     companyId: '7',
-    permissions: ['inventory.manage'],
+    permissions: [],
   });
-  assert.equal(deniedNoPermission?.statusCode, 403);
+  assert.equal(allowedAdmin, undefined);
+});
 
-  const allowedWithSettingsManage = await runGuard(guard, {
-    role: 'admin',
+test('PUT /company/:roleId denies actors whose role is not admin (e.g. sales, warehouse)', async () => {
+  const guard = getRouteGuard(roleRoutes, '/company/:roleId', 'put');
+
+  const deniedSales = await runGuard(guard, {
+    role: 'sales',
     companyId: '7',
     permissions: ['settings.manage'],
   });
-  assert.equal(allowedWithSettingsManage, undefined);
-});
+  assert.equal(deniedSales?.statusCode, 403);
 
-test('PUT /company/:roleId denies actors without settings.manage even if they have users.manage', async () => {
-  const guard = getRouteGuard(roleRoutes, '/company/:roleId', 'put');
-
-  const denied = await runGuard(guard, {
-    role: 'admin',
+  const deniedWarehouse = await runGuard(guard, {
+    role: 'warehouse',
     companyId: '7',
-    permissions: ['users.manage'],
+    permissions: ['settings.manage', 'users.manage'],
   });
-  assert.equal(denied?.statusCode, 403);
+  assert.equal(deniedWarehouse?.statusCode, 403);
 });
 
 test('existing GET and POST role routes remain unchanged', async () => {
