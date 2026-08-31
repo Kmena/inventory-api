@@ -28,6 +28,14 @@ function isAgentWorkspaceUser(user) {
     return true;
   }
 
+  // Explicit landing permission is the canonical signal — mirrors resolveLanding().
+  // A role with agent.access is always an agent workspace user regardless of
+  // which other operational permissions it carries.
+  if (hasPermission(user, 'agent.access')) {
+    return true;
+  }
+
+  // Legacy heuristic for roles created before the landing-permission system.
   return Boolean(
     hasPermission(user, 'sales.routes.view.own')
     && hasPermission(user, 'sales.orders.create')
