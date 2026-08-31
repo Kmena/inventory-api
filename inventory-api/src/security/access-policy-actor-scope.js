@@ -13,10 +13,12 @@ function isAgentWorkspaceActor(auth) {
     return false;
   }
 
-  if (auth?.role === 'sales_agent') {
+  // Canonical check: explicit landing permission (mirrors resolveLanding + isAgentWorkspaceUser)
+  if (auth?.role === 'sales_agent' || hasPermission(auth, 'agent.access')) {
     return true;
   }
 
+  // Legacy heuristic for roles predating the landing-permission system.
   return Boolean(
     hasPermission(auth, 'sales.routes.view.own')
     && hasPermission(auth, 'sales.orders.create')

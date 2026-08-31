@@ -111,22 +111,20 @@ function hasAgentAccess(session) {
 
   // Legacy fallback (DEC-007): role code or operational heuristic
   const roleCode = session?.user?.role?.code;
-  if (roleCode === 'sales_agent') {
+  const permissions = session?.user?.permissions || [];
+
+  if (roleCode === 'sales_agent' || permissions.includes('agent.access')) {
     return true;
   }
 
-  const permissions = session?.user?.permissions || [];
-  if (
+  // Heuristic for roles predating the landing-permission system
+  return (
     permissions.includes('sales.routes.view.own') &&
     permissions.includes('sales.orders.create') &&
     permissions.includes('customer.activities.manage') &&
     !permissions.includes('sales.routes.assign') &&
     !permissions.includes('sales.routes.view.all')
-  ) {
-    return true;
-  }
-
-  return false;
+  );
 }
 
 async function bootstrap() {
