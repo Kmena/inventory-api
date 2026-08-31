@@ -552,10 +552,16 @@ async function releaseStockReservation(orderId, cancel, auth, req = null) {
 /**
  * @param {bigint} orderId
  * @param {any} auth
- * @param {{ transportMethod?: string, trackingNumber?: string, transportResponsible?: string } | null} [transportPayload]
+ * @param {{ transportMethod?: string, trackingNumber?: string, transportResponsible?: string, lotSelections?: Array<{ productId: string|bigint, selections: Array<{ lotId: string|bigint, quantity: number }> }> } | null} [transportPayload]
  * @param {any} [req]
  */
 async function dispatchOrder(orderId, auth, transportPayload = null, req = null) {
+  // Lot overrides: bodega can choose different lots than the FIFO auto-allocation.
+  // If provided for a product, the system releases the FIFO reserve and creates
+  // OUT movements from the chosen lots instead.
+  const lotSelectionsByProduct = new Map(
+    (transportPayload?.lotSelections || []).map((s) => [BigInt(s.productId).toString(), s.selections || []]),
+  );
   const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const scope = authScope(auth);
     const order = /** @type {any} */ (await inventoryRepository.findOrderForCompany(
@@ -585,6 +591,23 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
         throw createHttpError(409, 'La reserva del pedido no coincide con sus lineas', 'conflict');
       }
 
+      const overrideSelections = context.product.lotStrategy !== 'NONE'
+        ? (lotSelectionsByProduct.get(item.productId.toString()) || null)
+        : null;
+
+      if (overrideSelections && overrideSelections.length > 0) {
+        const overrideTotal = overrideSelections.reduce((s, sel) => s + Number(sel.quantity), 0);
+        if (Math.abs(overrideTotal - quantity) > 0.000001) {
+          throw createHttpError(
+            409,
+            `La seleccion de lotes para "${context.product.name}" no coincide con la cantidad del pedido (esperado: ${quantity}, recibido: ${overrideTotal})`,
+            'conflict',
+          );
+        }
+      } else if (Math.abs(reserved - quantity) > 0.000001) {
+        throw createHttpError(409, 'La reserva del pedido no coincide con sus lineas', 'conflict');
+      }
+
       const stock = await changeWarehouseStock(tx, context, -quantity, -quantity);
       await inventoryRepository.updateProductById(
         context.product.id,
@@ -596,30 +619,74 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
         tx,
       );
 
-      for (const allocation of itemAllocations) {
-        let lot = null;
-        if (allocation.lotId) {
-          lot = await inventoryRepository.findLotById(allocation.lotId, tx);
-          await changeLotStock(tx, context, lot, -allocation.quantity, -allocation.quantity);
-          await inventoryRepository.updateLotById(
-            lot.id,
-            { quantity: { decrement: allocation.quantity } },
-            tx,
-          );
+      if (overrideSelections && overrideSelections.length > 0) {
+        // 1. Release the FIFO-reserved lots (unreserve only, no quantity change)
+        for (const allocation of itemAllocations) {
+          if (allocation.lotId) {
+            const lot = await inventoryRepository.findLotById(allocation.lotId, tx);
+            await changeLotStock(tx, context, lot, 0, -allocation.quantity);
+          }
+          await createMovement(tx, context, {
+            lotId: allocation.lotId,
+            movementType: 'RELEASE',
+            quantity: allocation.quantity,
+            quantityBefore: stock.before,
+            quantityAfter: stock.after,
+            reasonCode: 'ORDER_LOT_OVERRIDE',
+            movementGroupId,
+            sourceType: 'order',
+            sourceId: order.id,
+            note: `Liberacion por cambio de lote en despacho ${order.id.toString()}`,
+          });
         }
 
-        await createMovement(tx, context, {
-          lotId: allocation.lotId,
-          movementType: 'OUT',
-          quantity: allocation.quantity,
-          quantityBefore: stock.before,
-          quantityAfter: stock.after,
-          reasonCode: 'ORDER_DISPATCH',
-          movementGroupId,
-          sourceType: 'order',
-          sourceId: order.id,
-          note: `Despacho de pedido ${order.id.toString()}`,
-        });
+        // 2. OUT from the bodega-selected lots
+        for (const sel of overrideSelections) {
+          const selQty = Number(sel.quantity);
+          const lot = await inventoryRepository.findLotById(BigInt(sel.lotId), tx);
+          if (!lot) throw createHttpError(404, `Lote ${sel.lotId} no encontrado`, 'not_found');
+
+          await changeLotStock(tx, context, lot, -selQty, 0);
+          await inventoryRepository.updateLotById(lot.id, { quantity: { decrement: selQty } }, tx);
+          await createMovement(tx, context, {
+            lotId: lot.id,
+            movementType: 'OUT',
+            quantity: selQty,
+            quantityBefore: stock.before,
+            quantityAfter: stock.after,
+            reasonCode: 'ORDER_DISPATCH',
+            movementGroupId,
+            sourceType: 'order',
+            sourceId: order.id,
+            note: `Despacho de pedido ${order.id.toString()} (lote seleccionado manualmente)`,
+          });
+        }
+      } else {
+        // Normal FIFO flow using existing RESERVE allocations
+        for (const allocation of itemAllocations) {
+          let lot = null;
+          if (allocation.lotId) {
+            lot = await inventoryRepository.findLotById(allocation.lotId, tx);
+            await changeLotStock(tx, context, lot, -allocation.quantity, -allocation.quantity);
+            await inventoryRepository.updateLotById(
+              lot.id,
+              { quantity: { decrement: allocation.quantity } },
+              tx,
+            );
+          }
+          await createMovement(tx, context, {
+            lotId: allocation.lotId,
+            movementType: 'OUT',
+            quantity: allocation.quantity,
+            quantityBefore: stock.before,
+            quantityAfter: stock.after,
+            reasonCode: 'ORDER_DISPATCH',
+            movementGroupId,
+            sourceType: 'order',
+            sourceId: order.id,
+            note: `Despacho de pedido ${order.id.toString()}`,
+          });
+        }
       }
     }
 

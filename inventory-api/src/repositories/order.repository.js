@@ -170,7 +170,46 @@ async function findOrderWithAllocations(id, companyId) {
     orderBy: /** @type {any} */ ({ id: 'asc' }),
   });
 
-  return { ...order, allocations };
+  // Available lots per product in the order's warehouse so bodega can override FIFO
+  const availableLots = order.warehouseId
+    ? await prisma.warehouseLotStock.findMany({
+        where: {
+          warehouseId: order.warehouseId,
+          productId: { in: order.items.map((item) => item.productId) },
+          quantity: { gt: 0 },
+          lot: { status: 'AVAILABLE', qaStatus: 'APPROVED' },
+        },
+        include: {
+          lot: { select: { id: true, code: true, lotNumber: true, expiresAt: true } },
+        },
+        orderBy: /** @type {any} */ ([{ lot: { expiresAt: 'asc' } }, { lotId: 'asc' }]),
+      })
+    : [];
+
+  return { ...order, allocations, availableLots };
+}
+
+/**
+ * Orders that have already been dispatched (DELIVERED) — for root admin.
+ * @param {bigint} companyId
+ */
+function findDeliveredOrders(companyId) {
+  return prisma.order.findMany({
+    where: { companyId, status: 'DELIVERED' },
+    orderBy: /** @type {any} */ ({ dispatchedAt: 'desc' }),
+    include: {
+      client:      true,
+      clientStore: true,
+      user:        true,
+      approvedBy:  true,
+      warehouse:   true,
+      items: {
+        include: {
+          product: { select: { id: true, name: true, code: true } },
+        },
+      },
+    },
+  });
 }
 
 module.exports = {
@@ -184,4 +223,5 @@ module.exports = {
   deleteOrder,
   findApprovedOrdersForDispatch,
   findOrderWithAllocations,
+  findDeliveredOrders,
 };
