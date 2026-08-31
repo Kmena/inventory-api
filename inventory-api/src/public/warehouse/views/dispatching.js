@@ -87,29 +87,60 @@ function renderLotBadge(lot) {
   return `<span style="font-size:0.78rem;background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:999px;">${esc(lot.code)}${exp}</span>`;
 }
 
-/** Render allocations grouped by productId */
-function renderAllocations(allocations, items) {
-  if (!allocations?.length) {
-    return `<p class="warehouse-muted" style="font-size:0.82rem;">Sin asignaciones de lote (productos sin estrategia de lote).</p>`;
-  }
+/**
+ * Render lot allocation rows with optional override selector.
+ * Items with lotStrategy !== 'NONE' show a "Cambiar lote" toggle that
+ * exposes a <select> populated from availableLots for that product.
+ */
+function renderAllocations(allocations, items, availableLots) {
   return items.map((item) => {
-    const itemAllocs = allocations.filter((a) => String(a.productId) === String(item.productId));
-    const lots = itemAllocs.map((a) => renderLotBadge(a.lot)).join(' ');
+    const productId = String(item.productId);
+    const itemAllocs = (allocations || []).filter((a) => String(a.productId) === productId);
+    const fifoLots = itemAllocs.map((a) => renderLotBadge(a.lot)).join(' ');
+    const isLotTracked = item.product?.lotStrategy && item.product.lotStrategy !== 'NONE';
+
+    // Available lots for this product (excluding already-reserved ones as fallback)
+    const productAvailableLots = (availableLots || []).filter((ls) => String(ls.productId) === productId);
+    const lotOptions = productAvailableLots.map((ls) => {
+      const available = Number(ls.quantity) - Number(ls.reservedQuantity || 0);
+      const exp = ls.lot?.expiresAt ? ` · vence ${fmtDate(ls.lot.expiresAt)}` : '';
+      return `<option value="${esc(String(ls.lotId))}" data-available="${available}">${esc(ls.lot?.code || String(ls.lotId))}${exp} (disp: ${available})</option>`;
+    }).join('');
+
+    const overrideSection = isLotTracked && productAvailableLots.length > 0 ? `
+      <div class="lot-override-panel" data-product-id="${esc(productId)}" style="margin-top:8px;display:none;">
+        <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:4px;">Seleccionar lote manualmente:</label>
+        <select class="lot-override-select" data-product-id="${esc(productId)}" data-quantity="${esc(String(item.quantity))}"
+          style="width:100%;padding:6px;border:1px solid #bfdbfe;border-radius:6px;font-size:0.82rem;">
+          <option value="">— Usar asignación FIFO (recomendado) —</option>
+          ${lotOptions}
+        </select>
+      </div>` : '';
+
+    const changeBtn = isLotTracked && productAvailableLots.length > 0
+      ? `<button type="button" class="lot-override-toggle" data-product-id="${esc(productId)}"
+           style="font-size:0.75rem;color:#2563eb;background:none;border:none;cursor:pointer;padding:0;margin-top:2px;">⟳ Cambiar lote</button>`
+      : '';
+
     return `
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;flex-wrap:wrap;">
-        <div>
-          <span style="font-size:0.85rem;font-weight:600;">${esc(item.product?.name || '—')}</span>
-          <span class="warehouse-muted" style="font-size:0.78rem;"> · ${esc(item.product?.code || '')}</span>
+      <div style="padding:6px 0;border-bottom:1px solid #f1f5f9;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+          <div>
+            <span style="font-size:0.85rem;font-weight:600;">${esc(item.product?.name || '—')}</span>
+            <span class="warehouse-muted" style="font-size:0.78rem;"> · ${esc(item.product?.code || '')}</span>
+            <div>${changeBtn}</div>
+          </div>
+          <div style="text-align:right;">
+            <span style="font-size:0.85rem;">× ${esc(String(item.quantity))}</span>
+            <div style="margin-top:4px;">${fifoLots || '<span class="warehouse-muted" style="font-size:0.78rem;">Sin lote (FIFO)</span>'}</div>
+          </div>
         </div>
-        <div style="text-align:right;">
-          <span style="font-size:0.85rem;">× ${esc(String(item.quantity))}</span>
-          <div style="margin-top:4px;">${lots || '<span class="warehouse-muted" style="font-size:0.78rem;">Sin lote asignado</span>'}</div>
-        </div>
+        ${overrideSection}
       </div>`;
   }).join('');
 }
 
-function renderDispatchForm(order, allocations) {
+function renderDispatchForm(order, allocations, availableLots) {
   const orderId = String(order.id);
   const storeName = order.clientStore?.name || order.client?.tradeName || '—';
   const agentName = order.user?.fullName || '—';
@@ -141,7 +172,7 @@ function renderDispatchForm(order, allocations) {
           Lotes asignados (${itemCount} producto${itemCount !== 1 ? 's' : ''})
         </summary>
         <div style="margin-top:8px;padding:10px 12px;background:#f8fafc;border-radius:8px;">
-          ${renderAllocations(allocations, order.items || [])}
+          ${renderAllocations(allocations, order.items || [], availableLots || [])}
         </div>
       </details>
 
@@ -180,7 +211,7 @@ function renderOrderList(orders) {
         <button type="button" id="dispatch-refresh-btn" class="warehouse-btn warehouse-btn--secondary" style="font-size:0.82rem;">↻ Actualizar</button>
       </div>
       <div id="dispatch-orders-container">
-        ${count ? orders.map((o) => renderDispatchForm(o, o.allocations || [])).join('') : renderEmpty()}
+        ${count ? orders.map((o) => renderDispatchForm(o, o.allocations || [], o.availableLots || [])).join('') : renderEmpty()}
       </div>
     </div>`;
 }
@@ -228,15 +259,42 @@ function bindEvents(containerEl, session, reload) {
   const refreshBtn = containerEl.querySelector('#dispatch-refresh-btn');
   if (refreshBtn) refreshBtn.addEventListener('click', reload);
 
+  // Toggle lot override panels
+  containerEl.querySelectorAll('.lot-override-toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const productId = btn.getAttribute('data-product-id');
+      const panel = containerEl.querySelector(`.lot-override-panel[data-product-id="${CSS.escape(productId)}"]`);
+      if (!panel) return;
+      const isHidden = panel.style.display === 'none' || !panel.style.display;
+      panel.style.display = isHidden ? 'block' : 'none';
+      btn.textContent = isHidden ? '✕ Cancelar cambio' : '⟳ Cambiar lote';
+    });
+  });
+
   containerEl.querySelectorAll('.dispatch-form').forEach((form) => {
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const orderId = form.getAttribute('data-order-id') || '';
       const fd = new FormData(/** @type {HTMLFormElement} */ (form));
+      // Collect lot overrides from selectors (items where bodega chose a different lot)
+      const lotSelections = [];
+      const card = containerEl.querySelector(`[data-order-id="${CSS.escape(orderId)}"].dispatch-order-card`);
+      if (card) {
+        card.querySelectorAll('.lot-override-select').forEach((sel) => {
+          const selectedLotId = sel.value;
+          if (selectedLotId) {
+            const productId = sel.getAttribute('data-product-id');
+            const quantity = Number(sel.getAttribute('data-quantity') || 0);
+            lotSelections.push({ productId, selections: [{ lotId: selectedLotId, quantity }] });
+          }
+        });
+      }
+
       const payload = {
         transportMethod:       String(fd.get('transportMethod') || '').trim() || null,
         trackingNumber:        String(fd.get('trackingNumber') || '').trim() || null,
         transportResponsible:  String(fd.get('transportResponsible') || '').trim() || null,
+        ...(lotSelections.length > 0 ? { lotSelections } : {}),
       };
       const msgEl = form.querySelector('.dispatch-msg');
       const submitBtn = form.querySelector('[type="submit"]');

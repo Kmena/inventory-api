@@ -210,6 +210,11 @@ async function listOrdersForDispatch(auth) {
   return orderRepository.findApprovedOrdersForDispatch(companyId);
 }
 
+async function listDeliveredOrders(auth) {
+  const { companyId } = scope(auth);
+  return orderRepository.findDeliveredOrders(companyId);
+}
+
 /**
  * Single order for warehouse dispatch view — includes allocations (lot movements).
  * @param {bigint} id
@@ -233,5 +238,6 @@ module.exports = {
   removeOrder,
   listOrdersForDispatch,
   getOrderForDispatch,
+  listDeliveredOrders,
 };
 

@@ -15,6 +15,11 @@ router.get('/', authorizeAccessPolicy('order.list'), async (req, res, next) => {
   try { return res.json(await orderService.listOrders(req.auth, parsePaginationQuery(req.query))); } catch (error) { return next(error); }
 });
 
+// Delivered (dispatched) orders — root admin dispatch history
+router.get('/dispatched', authorizeAccessPolicy('order.list'), async (req, res, next) => {
+  try { return res.json(await orderService.listDeliveredOrders(req.auth)); } catch (error) { return next(error); }
+});
+
 router.get('/:id', authorizeAccessPolicy('order.detail'), async (req, res, next) => {
   try { return res.json(await orderService.getOrder(parseBigIntId(req.params.id), req.auth)); } catch (error) { return next(error); }
 });
