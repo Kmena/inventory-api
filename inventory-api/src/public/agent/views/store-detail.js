@@ -209,7 +209,15 @@ async function render(containerEl, session, params) {
 
   try {
     const data = await api.fetchStoreDetail(session, storeId);
-    const store = data?.store || data;
+    // fetchStoreDetail returns { store, visitHistory, purchaseHistory: { pendingBalance, orders }, sellableProducts }.
+    // Merge top-level detail fields into the store card so renderStoreDetail
+    // can access them as store.visitHistory, store.purchaseHistory, store.sellableProducts.
+    const store = {
+      ...(data?.store || data),
+      visitHistory:    data?.visitHistory    ?? [],
+      purchaseHistory: data?.purchaseHistory?.orders ?? data?.purchaseHistory ?? [],
+      sellableProducts: data?.sellableProducts ?? [],
+    };
     containerEl.innerHTML = renderStoreDetail(store, storeId);
   } catch (err) {
     const is404 = err?.message?.toLowerCase().includes('404')
