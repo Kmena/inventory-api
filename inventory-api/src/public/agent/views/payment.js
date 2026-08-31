@@ -198,9 +198,13 @@ async function render(containerEl, session, params) {
     <div class="agent-skeleton-card" style="height:260px;"></div>
   </div></div>`;
 
-  let store;
+  // fetchStoreDetail returns { store, latestVisit, visitHistory, purchaseHistory: { pendingBalance, orders }, sellableProducts }
+  let storeInfo;
+  let purchaseOrders;
   try {
-    store = await agentApi.fetchStoreDetail(session, storeId);
+    const response = await agentApi.fetchStoreDetail(session, storeId);
+    storeInfo      = response.store;
+    purchaseOrders = (response.purchaseHistory?.orders || []);
   } catch (err) {
     containerEl.innerHTML = `<div class="agent-page"><div class="agent-error-banner">
       <p style="margin:0;font-weight:700;">Error al cargar la tienda</p>
@@ -212,16 +216,16 @@ async function render(containerEl, session, params) {
     return;
   }
 
-  // Collect all invoices across purchase history, keep pending ones for payment
-  const allInvoices = (store.purchaseHistory || []).flatMap((order) => order.invoices || []);
+  // Collect all invoices across orders, keep pending ones for payment
+  const allInvoices     = purchaseOrders.flatMap((order) => order.invoices || []);
   const pendingInvoices = allInvoices.filter((inv) => Number(inv.pendingAmount || 0) > 0);
 
-  containerEl.innerHTML = renderForm(store, storeId, pendingInvoices, allInvoices);
+  containerEl.innerHTML = renderForm(storeInfo, storeId, pendingInvoices, allInvoices);
 
   const backBtn = containerEl.querySelector('#pay-back-btn');
   if (backBtn) backBtn.addEventListener('click', () => navigate('store-detail', { storeId }));
 
-  if (!pendingInvoices.length) return;
+  if (!pendingInvoices.length) return; // only the "sin saldo" message renders, no form to wire
 
   // ── Form wiring ───────────────────────────────────────────────────────────
   const form          = containerEl.querySelector('#pay-form');
