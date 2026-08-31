@@ -5,6 +5,7 @@ const audit = require('../lib/audit');
 const { attachAuthenticatedActor } = require('../lib/request-context');
 const browserSessionService = require('../services/browser-session.service');
 const { readBrowserSessionIdFromRequest } = require('../lib/browser-session');
+const { resolveLanding } = require('../security/permission-governance.service');
 
 function mapPermissions(role) {
   return role?.rolePermissions
@@ -35,15 +36,23 @@ function buildAuthenticatedContext(user) {
 }
 
 function buildBrowserSessionUser(user) {
+  const permissions = mapPermissions(user.role);
+  const roleCode = user.role?.code || null;
+  const companyId = user.companyId ? user.companyId.toString() : null;
+  // Landing must match auth.service.js buildSerializedUser so that
+  // /api/auth/me and /api/auth/login return the same shape.
+  // Without this, bootstrapSession() gets no landing → agent SPA guard fails.
+  const landing = resolveLanding(permissions, { role: roleCode, companyId });
   return {
     id: user.id.toString(),
     fullName: user.fullName,
     username: user.username,
-    companyId: user.companyId ? user.companyId.toString() : null,
+    companyId,
     role: {
-      code: user.role?.code || null,
+      code: roleCode,
     },
-    permissions: mapPermissions(user.role),
+    permissions,
+    landing,
   };
 }
 
