@@ -47,7 +47,7 @@ router.post('/company/:clientId/stores', authorizeAccessPolicy('client.store.cre
   } catch (error) { return next(error); }
 });
 
-router.patch('/company/:clientId/stores/:storeId/credit-limit', authorizeAccessPolicy('client.update'), validate(updateClientStoreCreditLimitSchema), async (req, res, next) => {
+router.patch('/company/:clientId/stores/:storeId/credit-limit', authorizeAccessPolicy('client.store.credit.manage'), validate(updateClientStoreCreditLimitSchema), async (req, res, next) => {
   try {
     return res.json(
       await clientService.updateCompanyClientStoreCreditLimit(

@@ -15,6 +15,7 @@ const PERMISSION_METADATA = Object.freeze([
   Object.freeze({ code: 'users.manage', category: 'administration', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Administrar usuarios', notes: 'Capacidad administrativa sensible' }),
   Object.freeze({ code: 'settings.manage', category: 'administration', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Administrar configuración', notes: 'Capacidad administrativa sensible' }),
   Object.freeze({ code: 'clients.manage', category: 'clients', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Gestionar clientes', notes: 'Crear, editar y actualizar clientes' }),
+  Object.freeze({ code: 'clients.credit.manage', category: 'clients', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Aprobar y modificar crédito de tiendas', notes: 'Establecer y modificar límite de crédito por tienda' }),
   Object.freeze({ code: 'clients.view', category: 'clients', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Ver clientes asignados', notes: 'Ver información de clientes asignados sin editar' }),
   Object.freeze({ code: 'clients.view.all', category: 'clients', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Ver todos los clientes', notes: 'Ver información de todos los clientes comerciales sin editar' }),
   Object.freeze({ code: 'products.manage', category: 'products', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Gestionar artículos', notes: 'Crear y actualizar artículos del catálogo' }),
