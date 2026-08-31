@@ -71,6 +71,7 @@ const VIEW_MODULE_KEYS = {
   'orders':        'views.orders',
   'goals':         'views.goals',
   'map':           'views.map',
+  'payment':       'views.payment',
 };
 
 // ─── Manejador de ruta ───────────────────────────────────────────────────────

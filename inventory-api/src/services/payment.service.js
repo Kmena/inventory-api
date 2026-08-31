@@ -125,14 +125,16 @@ function buildPaymentAuditState(payment, extraState = {}) {
   };
 }
 
-async function createPayment(payload, auth, req = null) {
-  const companyId = assertCompanyScope(auth);
-  assertHasAnyPermission(auth, PAYMENT_MANAGE_OWN_PERMISSIONS, 'No tiene permisos para registrar pagos');
+/**
+ * Core payment creation — no permission check.
+ * Callers are responsible for authorization before invoking this.
+ * @internal
+ */
+async function createPaymentCore(payload, companyId, auth, req = null) {
   const invoice = await validatePaymentInvoice(payload.invoiceId, companyId);
   assertInvoiceAllowsNewPayments(invoice);
 
   const normalizedReceiptFile = normalizeReceiptFile(payload.receiptFile);
-
   const paymentId = normalizedReceiptFile ? await paymentRepository.reservePaymentId() : null;
   /** @type {any} */
   let payment;
@@ -163,9 +165,7 @@ async function createPayment(payload, auth, req = null) {
           submittedAt: new Date(),
         });
   } catch (error) {
-    if (error?.statusCode) {
-      throw error;
-    }
+    if (error?.statusCode) throw error;
     throw createHttpError(500, 'No se pudo guardar la evidencia del pago', 'internal_server_error');
   }
 
@@ -184,6 +184,15 @@ async function createPayment(payload, auth, req = null) {
   });
 
   return serializePayment(createdPayment);
+}
+
+async function createPayment(payload, auth, req = null) {
+  const companyId = assertCompanyScope(auth);
+  assertHasAnyPermission(auth, PAYMENT_MANAGE_OWN_PERMISSIONS, 'No tiene permisos para registrar pagos');
+  const invoice = await validatePaymentInvoice(payload.invoiceId, companyId);
+  assertInvoiceAllowsNewPayments(invoice);
+
+  return createPaymentCore(payload, companyId, auth, req);
 }
 
 async function updatePayment(id, payload, auth, req = null) {
@@ -494,6 +503,7 @@ async function getPaymentReceiptDownload(paymentId, receiptId, auth) {
 }
 
 module.exports = {
+  createPaymentCore,
   listPayments,
   getPayment,
   getPaymentReceiptDownload,

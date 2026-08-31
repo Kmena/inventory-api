@@ -177,6 +177,7 @@ function renderStoreDetail(store, storeId) {
           <div>
             <div class="muted" style="font-size:0.8rem;">Saldo pendiente</div>
             <span class="agent-summary-saldo" style="color:${balanceColor};">${h.escapeHtml(balanceLabel)}</span>
+            ${pendingBalance > 0 ? `<button type="button" id="sd-pay-btn" class="btn" data-store-id="${h.escapeHtml(String(storeId))}" style="margin-top:6px;font-size:0.82rem;padding:6px 14px;background:#2563eb;">💳 Registrar cobro</button>` : ''}
           </div>
           ${store.regionName ? `<div class="muted" style="font-size:0.82rem;">${h.escapeHtml(store.regionName)}${store.subregionName ? ' · ' + h.escapeHtml(store.subregionName) : ''}</div>` : ''}
         </div>
@@ -232,6 +233,8 @@ async function render(containerEl, session, params) {
     root.querySelectorAll('[id^="sd-order-btn"]').forEach((btn) => {
       btn.addEventListener('click', () => navigate('order', { storeId }));
     });
+    const payBtn = root.querySelector('#sd-pay-btn');
+    if (payBtn) payBtn.addEventListener('click', () => navigate('payment', { storeId }));
     const homeBtn404 = root.querySelector('#sd-home-btn-404');
     if (homeBtn404) homeBtn404.addEventListener('click', () => navigate('dashboard'));
     const homeBtn = root.querySelector('#sd-home-btn');
