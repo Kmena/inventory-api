@@ -60,7 +60,7 @@
             <label><span>Correo facturacion</span><input name="emailBilling" type="email" maxlength="255" value="${rootShellUi.escapeHtml(client.emailBilling || '')}" /></label>
             <label><span>Tipo de pago</span><select name="paymentType"><option value="">Selecciona</option><option value="CASH" ${client.paymentType === 'CASH' ? 'selected' : ''}>Contado</option><option value="CREDIT" ${client.paymentType === 'CREDIT' ? 'selected' : ''}>Credito</option><option value="TRANSFER" ${client.paymentType === 'TRANSFER' ? 'selected' : ''}>Transferencia</option><option value="CARD" ${client.paymentType === 'CARD' ? 'selected' : ''}>Tarjeta</option></select></label>
             <label><span>Dias de pago</span><input name="paymentDays" type="number" min="0" value="${rootShellUi.escapeHtml(client.paymentDays || '')}" /></label>
-            <label><span>Limite de credito</span><input name="creditLimit" type="number" min="0" step="0.01" value="${rootShellUi.escapeHtml(client.creditLimit || '')}" /></label>
+
             <label class="root-form-grid__full"><span>Direccion</span><textarea name="address" rows="3" maxlength="1000">${rootShellUi.escapeHtml(client.address || '')}</textarea></label>
           </div>
           <div class="action-row compact-action-row">
@@ -84,10 +84,19 @@
         </div>
         <div id="clients-stores-list" class="inline-card-grid">
           ${renderInlineEntries(client.stores || [], 'Este cliente aun no tiene tiendas registradas.', (store) => `
-            <article class="inline-card">
+            <article class="inline-card" data-store-id="${rootShellUi.escapeHtml(store.id)}">
               <strong>${rootShellUi.escapeHtml(store.name || 'Tienda')}</strong>
               <p class="muted">${rootShellUi.escapeHtml(store.code || 'Sin codigo')} · ${rootShellUi.escapeHtml(store.subregion?.name || store.subregionName || 'Sin subzona')}</p>
               ${store.latitude && store.longitude ? `<p class="muted" style="font-size:0.78rem;">📍 ${rootShellUi.escapeHtml(String(store.latitude))}, ${rootShellUi.escapeHtml(String(store.longitude))}</p>` : '<p class="muted" style="font-size:0.78rem;">Sin coordenadas</p>'}
+              <form class="clients-store-credit-form" data-client-id="${rootShellUi.escapeHtml(client.id)}" data-store-id="${rootShellUi.escapeHtml(store.id)}" style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <label style="font-size:0.8rem;display:flex;align-items:center;gap:4px;">
+                  <span style="white-space:nowrap;">Límite crédito</span>
+                  <input name="creditLimit" type="number" min="0" step="0.01" value="${rootShellUi.escapeHtml(String(store.creditLimit ?? 0))}" style="width:100px;" />
+                </label>
+                <span class="muted" style="font-size:0.78rem;">Saldo: ${rootShellUi.escapeHtml(String(Number(store.creditBalance ?? 0).toFixed(2)))}</span>
+                <button type="submit" class="secondary-button" style="font-size:0.78rem;padding:4px 10px;">Guardar</button>
+                <span class="clients-store-credit-msg" style="font-size:0.78rem;"></span>
+              </form>
             </article>
           `)}
         </div>

@@ -411,13 +411,12 @@ async function reserveStockForOrder(orderId, auth, req = null) {
       }
     }
 
-    // Increment client creditBalance for ALL orders on approval (CASH, TRANSFER, CREDIT).
-    // creditBalance tracks the client's outstanding financial obligation regardless of payment condition.
+    // Increment store creditBalance on order approval (per-store credit tracking).
     // Uses shared calculateInvoiceAmount for formula consistency (includes Math.max(0) clamp).
     const orderAmount = calculateInvoiceAmount(order.items);
-    if (order.clientId && orderAmount > 0) {
-      await tx.client.update({
-        where: { id: order.clientId },
+    if (order.clientStoreId && orderAmount > 0) {
+      await tx.clientStore.update({
+        where: { id: order.clientStoreId },
         data: { creditBalance: { increment: orderAmount } },
       });
     }
@@ -513,13 +512,13 @@ async function releaseStockReservation(orderId, cancel, auth, req = null) {
       }
     }
 
-    // Reverse creditBalance increment when an approved order is cancelled.
+    // Reverse store creditBalance when an approved order is cancelled.
     // Mirrors the increment in reserveStockForOrder; uses the same shared formula.
-    if (cancel && order.clientId) {
+    if (cancel && order.clientStoreId) {
       const orderAmount = calculateInvoiceAmount(order.items);
       if (orderAmount > 0) {
-        await tx.client.update({
-          where: { id: order.clientId },
+        await tx.clientStore.update({
+          where: { id: order.clientStoreId },
           data: { creditBalance: { decrement: orderAmount } },
         });
       }

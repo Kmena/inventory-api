@@ -298,16 +298,23 @@ async function approvePayment(id, payload, auth, req = null) {
       throw createHttpError(409, 'El pago no pudo aprobarse', 'conflict');
     }
 
-    // TASK-015: Decrement client creditBalance when payment is approved.
+    // Decrement store creditBalance when payment is approved (per-store credit tracking).
+    // Chain: payment → invoice → order → clientStoreId.
     const approvedInvoice = await tx.invoice.findUnique({
       where: { id: transactionalPayment.invoiceId },
-      select: { clientId: true },
+      select: { orderId: true },
     });
-    if (approvedInvoice?.clientId) {
-      await tx.client.update({
-        where: { id: approvedInvoice.clientId },
-        data: { creditBalance: { decrement: transactionalPayment.amount } },
+    if (approvedInvoice?.orderId) {
+      const invoiceOrder = await tx.order.findUnique({
+        where: { id: approvedInvoice.orderId },
+        select: { clientStoreId: true },
       });
+      if (invoiceOrder?.clientStoreId) {
+        await tx.clientStore.update({
+          where: { id: invoiceOrder.clientStoreId },
+          data: { creditBalance: { decrement: transactionalPayment.amount } },
+        });
+      }
     }
 
     const synchronizedInvoiceResult = await synchronizeInvoiceFinancialState(transactionalPayment.invoiceId, companyId, tx);
@@ -403,16 +410,23 @@ async function reversePayment(id, auth, reason, req = null) {
 
     const reversedPaymentResult = await paymentRepository.findCompanyPaymentById(id, companyId, {}, tx);
 
-    // TASK-015: Increment client creditBalance when an approved payment is reversed.
+    // Increment store creditBalance when an approved payment is reversed (per-store credit tracking).
+    // Chain: payment → invoice → order → clientStoreId.
     const reversedInvoice = await tx.invoice.findUnique({
       where: { id: transactionalPayment.invoiceId },
-      select: { clientId: true },
+      select: { orderId: true },
     });
-    if (reversedInvoice?.clientId) {
-      await tx.client.update({
-        where: { id: reversedInvoice.clientId },
-        data: { creditBalance: { increment: transactionalPayment.amount } },
+    if (reversedInvoice?.orderId) {
+      const reversedOrder = await tx.order.findUnique({
+        where: { id: reversedInvoice.orderId },
+        select: { clientStoreId: true },
       });
+      if (reversedOrder?.clientStoreId) {
+        await tx.clientStore.update({
+          where: { id: reversedOrder.clientStoreId },
+          data: { creditBalance: { increment: transactionalPayment.amount } },
+        });
+      }
     }
 
     const synchronizedInvoiceResult = await synchronizeInvoiceFinancialState(transactionalPayment.invoiceId, companyId, tx);
