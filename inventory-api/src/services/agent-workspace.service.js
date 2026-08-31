@@ -367,11 +367,11 @@ async function createAgentPayment(storeId, payload, auth, req) {
   if (!store) throw createHttpError(404, 'La tienda no pertenece a la cobertura del agente', 'not_found');
 
   // Verify the invoice belongs to an order of this store within this company
+  // Invoice has no companyId — scope through order.companyId + order.clientStoreId
   const invoice = await prisma.invoice.findFirst({
     where: {
       id: BigInt(payload.invoiceId),
-      companyId: context.companyId,
-      order: { clientStoreId: storeId },
+      order: { companyId: context.companyId, clientStoreId: storeId },
     },
   });
   if (!invoice) throw createHttpError(404, 'La factura no corresponde a esta tienda', 'not_found');
