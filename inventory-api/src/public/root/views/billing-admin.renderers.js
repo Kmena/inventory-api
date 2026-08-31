@@ -169,8 +169,10 @@
     const client = ledgerData.client || {};
     const invoices = Array.isArray(ledgerData.invoices) ? ledgerData.invoices : [];
 
-    const creditLimit   = Number(client.creditLimit || 0);
-    const creditBalance = Number(client.creditBalance || 0);
+    // Credit is now per-store. Aggregate across all stores for a client-level summary.
+    const stores = Array.isArray(client.stores) ? client.stores : [];
+    const creditLimit   = stores.reduce((s, st) => s + Number(st.creditLimit || 0), 0);
+    const creditBalance = stores.reduce((s, st) => s + Number(st.creditBalance || 0), 0);
     const usageRatio    = creditLimit > 0 ? Math.min(creditBalance / creditLimit, 1) : 0;
     const barClass      = usageRatio >= 0.9
       ? 'billing-balance-bar__fill billing-balance-bar__fill--danger'
@@ -181,7 +183,7 @@
     const creditSection = creditLimit > 0
       ? `<div style="margin-bottom:16px;">
           <p class="muted" style="font-size:0.82rem;margin-bottom:4px;">
-            Crédito utilizado: <strong>${bh.formatCurrency(creditBalance)}</strong> de <strong>${bh.formatCurrency(creditLimit)}</strong>
+            Crédito utilizado (todas las tiendas): <strong>${bh.formatCurrency(creditBalance)}</strong> de <strong>${bh.formatCurrency(creditLimit)}</strong>
           </p>
           <div class="billing-balance-bar">
             <div class="${barClass}" style="width:${Math.round(usageRatio * 100)}%;"></div>

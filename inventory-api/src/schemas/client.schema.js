@@ -29,12 +29,15 @@ const createClientSchema = z.object({
   district: z.string().max(120).optional(),
   paymentType: z.enum(['CASH', 'CREDIT', 'TRANSFER', 'CARD']).optional(),
   paymentDays: z.number().int().min(0).optional(),
-  creditLimit: z.number().min(0).optional(),
-  creditBalance: z.number().min(0).optional(),
 });
 
 const createCompanyClientSchema = createClientSchema.omit({ companyId: true });
 const updateClientSchema = createCompanyClientSchema.partial();
+
+// Per-store credit limit — creditBalance is system-managed, not user-editable
+const updateClientStoreCreditLimitSchema = z.object({
+  creditLimit: z.number().min(0),
+});
 
 const optionalDateSchema = z.preprocess(
   (value) => (value === '' || value === undefined || value === null ? undefined : value),
@@ -130,4 +133,5 @@ module.exports = {
   createClientStoreSchema,
   uploadClientDocumentSchema,
   createClientReferenceSchema,
+  updateClientStoreCreditLimitSchema,
 };
