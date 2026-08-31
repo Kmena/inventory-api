@@ -44,9 +44,7 @@
             <button id="production-orders-clear-filters-button" class="secondary-button" type="button">Limpiar filtros</button>
           </div>
 
-          <div id="production-orders-filter-support-message"></div>
-
-          <div class="products-workspace-grid">
+          <div class="products-workspace-grid production-orders-workspace-grid">
             <div>
               <div id="production-orders-list-region" aria-live="polite"></div>
               <div id="production-orders-pagination-region"></div>
@@ -77,7 +75,7 @@
     const detailSubtitle = container.querySelector('#production-orders-detail-subtitle');
     const detailMessage = container.querySelector('#production-orders-detail-message');
     const detailRegion = container.querySelector('#production-orders-detail-region');
-    const filterSupportMessage = container.querySelector('#production-orders-filter-support-message');
+    // filterSupportMessage removed — confusing technical note replaced by compact list summary
     const searchInput = container.querySelector('#production-orders-search-input');
     const statusFilter = container.querySelector('#production-orders-status-filter');
     const productFilter = container.querySelector('#production-orders-product-filter');
@@ -91,7 +89,7 @@
     const clearFiltersButton = container.querySelector('#production-orders-clear-filters-button');
     const refreshButton = container.querySelector('#production-orders-refresh-button');
 
-    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !paginationRegion || !detailSubtitle || !detailMessage || !detailRegion || !filterSupportMessage || !searchInput || !statusFilter || !productFilter || !recipeFilter || !versionFilter || !responsibleFilter || !plannedFromFilter || !plannedToFilter || !createdFromFilter || !createdToFilter || !clearFiltersButton || !refreshButton) {
+    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !paginationRegion || !detailSubtitle || !detailMessage || !detailRegion || !searchInput || !statusFilter || !productFilter || !recipeFilter || !versionFilter || !responsibleFilter || !plannedFromFilter || !plannedToFilter || !createdFromFilter || !createdToFilter || !clearFiltersButton || !refreshButton) {
       return;
     }
 
@@ -131,7 +129,7 @@
       const visibleOrders = getVisibleOrders();
       metricsRegion.innerHTML = productionOrdersRenderers.renderMetrics(visibleOrders);
       listSummary.textContent = productionOrdersHelpers.buildProductionOrdersListSummary(visibleOrders, ordersDataset.pagination, filters);
-      filterSupportMessage.innerHTML = rootShellUi.renderInlineMessage('Filtros administrativos activos en esta iteracion: paginacion server-side; busqueda, estado, producto, receta, version, fechas y responsable corren client-side sobre la pagina cargada.', 'warning');
+      // no filter-support message needed — filters apply to loaded page
     }
 
     function renderList() {
