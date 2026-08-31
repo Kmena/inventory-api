@@ -45,17 +45,35 @@
       return '<p class="empty-state">No hay tiendas con coordenadas para mostrar en el mapa.</p>';
     }
 
+    const singleNote = mapModel.isSinglePoint
+      ? '<p class="muted" style="font-size:0.8rem">Una sola tienda con coordenadas — aparece centrada en el mapa.</p>'
+      : '';
+
     return `
       <div class="route-map-card" data-route-map>
         <p class="muted">${mapModel.points.length} tienda(s) con coordenadas visibles en la ruta.</p>
+        ${singleNote}
         <svg viewBox="0 0 400 240" class="route-map-svg" role="img" aria-label="Mapa simplificado de cobertura de la ruta">
           <rect x="8" y="8" width="384" height="224" rx="18" class="route-map-svg__frame"></rect>
-          ${mapModel.points.map((point) => `
-            <g transform="translate(${point.x}, ${point.y})" data-map-point="${rootShellUi.escapeHtml(point.id)}">
-              <circle r="7" class="route-map-svg__point"></circle>
-              <text x="10" y="4" class="route-map-svg__label">${rootShellUi.escapeHtml(point.code || point.name || 'Tienda')}</text>
-            </g>
-          `).join('')}
+          ${mapModel.points.map((point) => {
+            const isEdgeRight = point.x > 320;
+            const labelX = isEdgeRight ? -10 : 10;
+            const labelAnchor = isEdgeRight ? 'end' : 'start';
+            if (mapModel.isSinglePoint) {
+              // Larger, centered dot + label below
+              return `
+                <g transform="translate(${point.x}, ${point.y})" data-map-point="${rootShellUi.escapeHtml(point.id)}">
+                  <circle r="12" class="route-map-svg__point" opacity="0.2"></circle>
+                  <circle r="7" class="route-map-svg__point"></circle>
+                  <text x="0" y="24" text-anchor="middle" class="route-map-svg__label">${rootShellUi.escapeHtml(point.code || point.name || 'Tienda')}</text>
+                </g>`;
+            }
+            return `
+              <g transform="translate(${point.x}, ${point.y})" data-map-point="${rootShellUi.escapeHtml(point.id)}">
+                <circle r="7" class="route-map-svg__point"></circle>
+                <text x="${labelX}" y="4" text-anchor="${labelAnchor}" class="route-map-svg__label">${rootShellUi.escapeHtml(point.code || point.name || 'Tienda')}</text>
+              </g>`;
+          }).join('')}
         </svg>
       </div>
     `;
