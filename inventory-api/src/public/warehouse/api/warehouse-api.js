@@ -144,6 +144,20 @@ function createProductionOrder(session, payload) {
   });
 }
 
+/**
+ * POST /api/production/orders/:id/cancel
+ * Cancels a production order and optionally returns consumed materials to stock.
+ * payload.returns[] — array of { productId, quantity, targetLotId?, newLotCode?, expirationDate?, note? }
+ * Returns[] with quantity = 0 are ignored by the server.
+ * Permission: production.cancel
+ */
+function cancelProductionOrder(session, orderId, payload = {}) {
+  return safeFetch(session, `/api/production/orders/${orderId}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 // -----------------------------------------------------------------------
 // Dropdown data sources (used by the production creation form)
 // -----------------------------------------------------------------------
@@ -166,6 +180,75 @@ function listCompanyUsers(session) {
 // -----------------------------------------------------------------------
 // Register
 // -----------------------------------------------------------------------
+
+// ─── TASK-007: Stage loss API (production-stage-rejection-and-reexecution) ───
+
+/**
+ * POST /api/production/orders/:orderId/stages/:stageId/losses
+ * Registers post-rejection losses (or declares zero losses with losses:[]).
+ * Permission: production.manage
+ */
+function registerStageLosses(session, orderId, stageId, payload) {
+  return safeFetch(
+    session,
+    `/api/production/orders/${orderId}/stages/${stageId}/losses`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+/**
+ * GET /api/production/orders/:orderId/stages/:stageId/losses
+ * Returns all loss records for all executions of this stage.
+ * Permission: production.view
+ */
+function getStageLosses(session, orderId, stageId) {
+  return safeFetch(
+    session,
+    `/api/production/orders/${orderId}/stages/${stageId}/losses`,
+  );
+}
+
+/**
+ * POST /api/production/orders/:orderId/recolections/:recolectionId/confirm
+ * Confirms that the material for a recolection stage is available.
+ * Permission: production.execute
+ * @param {any} session
+ * @param {string|bigint} orderId
+ * @param {string|bigint} recolectionId
+ * @param {{notes?:string}} payload
+ */
+function confirmRecolection(session, orderId, recolectionId, payload) {
+  return safeFetch(
+    session,
+    `/api/production/orders/${orderId}/recolections/${recolectionId}/confirm`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    },
+  );
+}
+
+/**
+ * Records reconciliation outcomes for a recolection/recovery stage.
+ * TASK-007 (qa-rejection-material-reconciliation-amendment)
+ * @param {object} session
+ * @param {string|bigint} orderId
+ * @param {string|bigint} recolectionId
+ * @param {Array<{productId:string|bigint, lotId:string|bigint, quantity:number, outcome:string, notes?:string|null}>} outcomes
+ */
+function reconcileRecolection(session, orderId, recolectionId, outcomes) {
+  return safeFetch(
+    session,
+    `/api/production/orders/${orderId}/recolections/${recolectionId}/reconciliation`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ outcomes }),
+    },
+  );
+}
 
 WarehouseShell.register('warehouseApi', {
   listPendingReceipts,
@@ -191,5 +274,14 @@ WarehouseShell.register('warehouseApi', {
   listRecipes,
   listProducts,
   listCompanyUsers,
+  // TASK-007: rejection + re-execution
+  registerStageLosses,
+  getStageLosses,
+  // Cancel with optional stock returns
+  cancelProductionOrder,
+  // TASK-007 (qa-rejection-disposition): recolection confirmation
+  confirmRecolection,
+  // TASK-007 (qa-rejection-material-reconciliation-amendment): reconciliation outcomes
+  reconcileRecolection,
 });
 })();

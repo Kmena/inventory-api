@@ -35,6 +35,22 @@
       const overdue = bh.isOverdue(inv);
       const rowStyle = overdue ? ' class="billing-row--overdue"' : '';
       const pending = inv.pendingAmount ?? inv.amount ?? 0;
+
+      // Check if there's already a payment in review for this invoice
+      const inFlightPayment = (inv.payments || []).find(
+        (p) => p.status === 'PENDING_APPROVAL' || p.status === 'UNDER_REVIEW',
+      );
+      const actionCell = inFlightPayment
+        ? `<span style="font-size:0.8rem;font-weight:700;padding:4px 10px;border-radius:6px;background:#fef3c7;color:#92400e;white-space:nowrap;">
+             ⏳ Pago en revisión
+           </span>`
+        : `<button type="button" class="secondary-button billing-register-payment-btn" style="font-size:0.8rem;padding:4px 10px;"
+             data-invoice-id="${bh.escapeHtml(String(inv.id))}"
+             data-invoice-number="${bh.escapeHtml(inv.invoiceNumber || String(inv.id))}"
+             data-pending-amount="${Number(pending)}">
+             Registrar pago
+           </button>`;
+
       return `
         <tr${rowStyle}>
           <td>${bh.escapeHtml(inv.client?.name || inv.clientName || '—')}</td>
@@ -43,14 +59,7 @@
           <td class="numeric-cell" style="font-weight:700;">${bh.formatCurrency(pending)}</td>
           <td>${bh.formatDate(inv.dueAt)}</td>
           <td><span class="${bh.invoiceStatusBadgeClass(inv.status)}">${bh.escapeHtml(bh.invoiceStatusLabel(inv.status))}</span></td>
-          <td>
-            <button type="button" class="secondary-button billing-register-payment-btn" style="font-size:0.8rem;padding:4px 10px;"
-              data-invoice-id="${bh.escapeHtml(String(inv.id))}"
-              data-invoice-number="${bh.escapeHtml(inv.invoiceNumber || String(inv.id))}"
-              data-pending-amount="${Number(pending)}">
-              💰 Registrar pago
-            </button>
-          </td>
+          <td>${actionCell}</td>
         </tr>`;
     });
 
@@ -169,8 +178,10 @@
     const client = ledgerData.client || {};
     const invoices = Array.isArray(ledgerData.invoices) ? ledgerData.invoices : [];
 
-    const creditLimit   = Number(client.creditLimit || 0);
-    const creditBalance = Number(client.creditBalance || 0);
+    // Credit is now per-store. Aggregate across all stores for a client-level summary.
+    const stores = Array.isArray(client.stores) ? client.stores : [];
+    const creditLimit   = stores.reduce((s, st) => s + Number(st.creditLimit || 0), 0);
+    const creditBalance = stores.reduce((s, st) => s + Number(st.creditBalance || 0), 0);
     const usageRatio    = creditLimit > 0 ? Math.min(creditBalance / creditLimit, 1) : 0;
     const barClass      = usageRatio >= 0.9
       ? 'billing-balance-bar__fill billing-balance-bar__fill--danger'
@@ -181,7 +192,7 @@
     const creditSection = creditLimit > 0
       ? `<div style="margin-bottom:16px;">
           <p class="muted" style="font-size:0.82rem;margin-bottom:4px;">
-            Crédito utilizado: <strong>${bh.formatCurrency(creditBalance)}</strong> de <strong>${bh.formatCurrency(creditLimit)}</strong>
+            Crédito utilizado (todas las tiendas): <strong>${bh.formatCurrency(creditBalance)}</strong> de <strong>${bh.formatCurrency(creditLimit)}</strong>
           </p>
           <div class="billing-balance-bar">
             <div class="${barClass}" style="width:${Math.round(usageRatio * 100)}%;"></div>

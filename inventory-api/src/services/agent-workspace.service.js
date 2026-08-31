@@ -1,5 +1,7 @@
 const agentWorkspaceRepository = require('../repositories/agent-workspace.repository');
+const prisma = require('../lib/prisma');
 const { createHttpError } = require('../lib/errors');
+const { createPaymentCore } = require('./payment.service');
 const {
   isAgentWorkspaceUser,
   serializeGoal,
@@ -65,7 +67,6 @@ async function listAgentDashboard(auth) {
       code: route.code,
       name: route.name,
       visitFrequencyDays: route.visitFrequencyDays,
-      nearLimitDays: route.nearLimitDays,
     })),
   };
 }
@@ -351,6 +352,39 @@ async function listAgentOrders(auth) {
   };
 }
 
+/**
+ * Register a payment from the agent for a store invoice.
+ * Authorization is enforced at the route level (agent.workspace.access).
+ * Validates that the invoice belongs to an order of the agent's covered store.
+ */
+async function createAgentPayment(storeId, payload, auth, req) {
+  const context = await getAgentContext(auth);
+  const store = await agentWorkspaceRepository.findStoreByIdForAgent(
+    context.companyId,
+    context.assignedRouteIds,
+    storeId,
+  );
+  if (!store) throw createHttpError(404, 'La tienda no pertenece a la cobertura del agente', 'not_found');
+
+  // Verify the invoice belongs to an order of this store within this company
+  // Invoice has no companyId — scope through order.companyId + order.clientStoreId
+  const invoice = await prisma.invoice.findFirst({
+    where: {
+      id: BigInt(payload.invoiceId),
+      order: { companyId: context.companyId, clientStoreId: storeId },
+    },
+  });
+  if (!invoice) throw createHttpError(404, 'La factura no corresponde a esta tienda', 'not_found');
+
+  // Default reference for cash so it satisfies the payment schema
+  const normalizedPayload = {
+    ...payload,
+    reference: payload.reference?.trim() || (payload.paymentMethod === 'CASH' ? 'Cobro en efectivo' : null),
+  };
+
+  return createPaymentCore(normalizedPayload, context.companyId, auth, req);
+}
+
 module.exports = {
   listAgentDashboard,
   listAgentStores,
@@ -363,6 +397,7 @@ module.exports = {
   getAgentStoreOrderContext,
   createAgentStoreOrder,
   listAgentOrders,
+  createAgentPayment,
 };
 
 

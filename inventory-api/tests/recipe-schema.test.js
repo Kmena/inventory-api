@@ -3,6 +3,10 @@ const assert = require('node:assert/strict');
 
 const {
   qaParameterSchema,
+  recipeQuantityBasisSchema,
+  recipeStageTypeSchema,
+  recipeStageProcessCodeSchema,
+  RECIPE_STAGE_PROCESS_CODES,
   createRecipeSchema,
   createRecipeVersionSchema,
   updateRecipeVersionSchema,
@@ -45,6 +49,8 @@ test('createRecipeVersionSchema accepts stages with product-bearing inputs and f
     stages: [
       {
         name: 'Preparacion',
+        stageType: 'PROCESSING',
+        processCode: 'MIXING',
         qaMandatory: true,
         expectedParameters: [{
           name: 'pH',
@@ -63,6 +69,8 @@ test('createRecipeVersionSchema accepts stages with product-bearing inputs and f
       },
       {
         name: 'Envasado',
+        stageType: 'PROCESSING',
+        processCode: 'PACKING_PREP',
         stageInputs: [],
       },
     ],
@@ -72,6 +80,8 @@ test('createRecipeVersionSchema accepts stages with product-bearing inputs and f
   assert.equal(result.data.stages.length, 2);
   assert.equal(result.data.stages[0].stageInputs[0].productId, 11n);
   assert.equal(result.data.stages[0].stageInputs[2].name, 'Agua purificada');
+  assert.equal(result.data.stages[0].stageType, 'PROCESSING');
+  assert.equal(result.data.stages[0].processCode, 'MIXING');
 });
 
 test('createRecipeVersionSchema rejects payloads with legacy ingredients or stageOrder fields', () => {
@@ -114,6 +124,8 @@ test('createRecipeVersionSchema allows descriptive stage inputs without productI
   const result = createRecipeVersionSchema.safeParse({
     stages: [{
       name: 'Preparacion',
+      stageType: 'PROCESSING',
+      processCode: 'MIXING',
       stageInputs: [{ name: 'Indicacion operativa', quantity: 1 }],
     }],
   });
@@ -158,12 +170,213 @@ test('updateRecipeVersionSchema accepts partial stage updates without order fiel
     stages: [
       {
         name: 'Mezcla',
+        stageType: 'PROCESSING',
+        processCode: 'MIXING',
         stageInputs: [{ name: 'Base', quantity: 10 }],
       },
-      { name: 'Envasado' },
+      {
+        name: 'Envasado',
+        stageType: 'PROCESSING',
+        processCode: 'PACKING_PREP',
+      },
     ],
   });
 
   assert.equal(result.success, true);
   assert.equal(result.data.stages.length, 2);
+});
+
+// ─── TASK-002: quantityBasis field (production-size-conversion) ───────────────
+
+test('recipeQuantityBasisSchema accepts PER_OUTPUT_KG and PER_FINISHED_UNIT (TASK-002)', () => {
+  assert.equal(recipeQuantityBasisSchema.safeParse('PER_OUTPUT_KG').success, true);
+  assert.equal(recipeQuantityBasisSchema.safeParse('PER_FINISHED_UNIT').success, true);
+  assert.equal(recipeQuantityBasisSchema.safeParse('UNKNOWN').success, false);
+});
+
+test('createRecipeVersionSchema accepts quantityBasis PER_OUTPUT_KG and persists it (TASK-002)', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    quantityBasis: 'PER_OUTPUT_KG',
+    stages: [{ name: 'Mezcla', stageType: 'PROCESSING', processCode: 'MIXING', stageInputs: [] }],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.quantityBasis, 'PER_OUTPUT_KG');
+});
+
+test('createRecipeVersionSchema accepts quantityBasis PER_FINISHED_UNIT for compatibility (TASK-002)', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    quantityBasis: 'PER_FINISHED_UNIT',
+    stages: [{ name: 'Mezcla', stageType: 'PROCESSING', processCode: 'MIXING', stageInputs: [] }],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.quantityBasis, 'PER_FINISHED_UNIT');
+});
+
+test('createRecipeVersionSchema defaults quantityBasis to PER_OUTPUT_KG when omitted (TASK-002)', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{ name: 'Mezcla', stageType: 'PROCESSING', processCode: 'MIXING', stageInputs: [] }],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.quantityBasis, 'PER_OUTPUT_KG');
+});
+
+test('createRecipeVersionSchema rejects unknown quantityBasis values (TASK-002)', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    quantityBasis: 'PER_HOUR',
+    stages: [{ name: 'Mezcla', stageType: 'PROCESSING', processCode: 'MIXING', stageInputs: [] }],
+  });
+
+  assert.equal(result.success, false);
+});
+
+test('updateRecipeVersionSchema propagates quantityBasis in partial update (TASK-002)', () => {
+  const result = updateRecipeVersionSchema.safeParse({
+    quantityBasis: 'PER_OUTPUT_KG',
+    stages: [{ name: 'Mezcla', stageType: 'PROCESSING', processCode: 'MIXING' }],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.quantityBasis, 'PER_OUTPUT_KG');
+});
+
+// ─── TASK-001 (qa-rejection-material-reconciliation-amendment): stage typing ──
+
+test('recipeStageTypeSchema accepts RECOLLECTION and PROCESSING (TASK-001)', () => {
+  assert.equal(recipeStageTypeSchema.safeParse('RECOLLECTION').success, true);
+  assert.equal(recipeStageTypeSchema.safeParse('PROCESSING').success, true);
+  assert.equal(recipeStageTypeSchema.safeParse('UNKNOWN').success, false);
+});
+
+test('RECIPE_STAGE_PROCESS_CODES includes the approved catalog (TASK-001)', () => {
+  const expected = [
+    'HEATING', 'COOLING', 'FREEZING', 'DRYING', 'PASTEURIZATION', 'STERILIZATION',
+    'MIXING', 'BLENDING', 'DISSOLUTION', 'DILUTION', 'EMULSIFICATION',
+    'MILLING', 'GRINDING', 'CUTTING', 'SIEVING', 'FILTERING',
+    'FERMENTATION', 'CURING', 'RESTING', 'HYDRATION',
+    'FORMING', 'COOKING', 'BAKING',
+    'PACKING_PREP', 'LABELING_PREP', 'CAPPING', 'SEALING',
+    'OTHER',
+  ];
+
+  for (const code of expected) {
+    assert.equal(RECIPE_STAGE_PROCESS_CODES.includes(code), true, `Expected ${code} in catalog`);
+  }
+
+  assert.equal(recipeStageProcessCodeSchema.safeParse('UNKNOWN_CODE').success, false);
+});
+
+test('createRecipeVersionSchema accepts RECOLLECTION stage without processCode (TASK-001)', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{
+      name: 'Recoleccion de insumos',
+      stageType: 'RECOLLECTION',
+      stageInputs: [{ productId: '10', name: 'Glicerina', quantity: 3, unit: 'KG' }],
+    }],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.stages[0].stageType, 'RECOLLECTION');
+  assert.equal(result.data.stages[0].processCode, null);
+});
+
+test('createRecipeVersionSchema rejects PROCESSING stage without processCode (TASK-001)', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{ name: 'Mezcla', stageType: 'PROCESSING' }],
+  });
+
+  assert.equal(result.success, false);
+  const issue = result.error.issues.find((i) => i.path.includes('processCode'));
+  assert.ok(issue, 'Should have processCode issue');
+  assert.match(issue.message, /codigo de proceso/i);
+});
+
+test('createRecipeVersionSchema rejects PROCESSING stage with invalid processCode (TASK-001)', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{ name: 'Mezcla', stageType: 'PROCESSING', processCode: 'INVALID_CODE' }],
+  });
+
+  assert.equal(result.success, false);
+});
+
+test('createRecipeVersionSchema accepts OTHER processCode with processLabel (TASK-001)', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{
+      name: 'Neutralizacion',
+      stageType: 'PROCESSING',
+      processCode: 'OTHER',
+      processLabel: 'Neutralizacion quimica',
+    }],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.stages[0].processCode, 'OTHER');
+  assert.equal(result.data.stages[0].processLabel, 'Neutralizacion quimica');
+});
+
+test('createRecipeVersionSchema rejects OTHER processCode without processLabel (TASK-001)', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{
+      name: 'Neutralizacion',
+      stageType: 'PROCESSING',
+      processCode: 'OTHER',
+    }],
+  });
+
+  assert.equal(result.success, false);
+  const issue = result.error.issues.find((i) => i.path.includes('processLabel'));
+  assert.ok(issue, 'Should have processLabel issue');
+  assert.match(issue.message, /processLabel es obligatorio/i);
+});
+
+test('createRecipeVersionSchema accepts catalog processCode without processLabel (TASK-001)', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{
+      name: 'Sellado',
+      stageType: 'PROCESSING',
+      processCode: 'SEALING',
+    }],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.stages[0].processCode, 'SEALING');
+  assert.equal(result.data.stages[0].processLabel, null);
+});
+
+test('createRecipeVersionSchema rejects RECOLLECTION stage with processCode (TASK-001)', () => {
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{
+      name: 'Recoleccion',
+      stageType: 'RECOLLECTION',
+      processCode: 'MIXING',
+    }],
+  });
+
+  assert.equal(result.success, false);
+  const issue = result.error.issues.find((i) => i.path.includes('processCode'));
+  assert.ok(issue, 'Should reject processCode on RECOLLECTION stage');
+});
+
+test('createRecipeVersionSchema accepts CAPPING and SEALING as finishing codes (TASK-001)', () => {
+  const capping = createRecipeVersionSchema.safeParse({
+    stages: [{ name: 'Tapado', stageType: 'PROCESSING', processCode: 'CAPPING' }],
+  });
+  const sealing = createRecipeVersionSchema.safeParse({
+    stages: [{ name: 'Sellado plastico', stageType: 'PROCESSING', processCode: 'SEALING' }],
+  });
+
+  assert.equal(capping.success, true);
+  assert.equal(sealing.success, true);
+});
+
+test('createRecipeVersionSchema defaults stageType to PROCESSING when omitted (TASK-001 backward compat)', () => {
+  // Existing API callers that do not send stageType still work if they send processCode
+  const result = createRecipeVersionSchema.safeParse({
+    stages: [{ name: 'Mezcla', processCode: 'MIXING' }],
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.stages[0].stageType, 'PROCESSING');
 });

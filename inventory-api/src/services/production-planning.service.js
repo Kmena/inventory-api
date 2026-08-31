@@ -65,6 +65,9 @@ function buildRecipeVersionSnapshot(recipeVersion, override) {
       recipeId: recipeVersion.recipeId,
       versionNumber: recipeVersion.versionNumber,
       status: recipeVersion.status,
+      // TASK-004 (production-size-conversion): freeze basis into snapshot so the order
+      // always knows how it was calculated, even if the recipe is later updated.
+      quantityBasis: recipeVersion.quantityBasis ?? 'PER_OUTPUT_KG',
       effectiveFrom: recipeVersion.effectiveFrom,
       effectiveTo: recipeVersion.effectiveTo,
       expectedYield: recipeVersion.expectedYield,

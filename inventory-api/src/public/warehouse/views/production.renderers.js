@@ -27,11 +27,29 @@ const ORDER_STATUS_BADGE = {
 const STAGE_STATUS_LABELS = {
   PENDING: 'Pendiente', IN_PROGRESS: 'En progreso', COMPLETED: 'Completado',
   BLOCKED: 'Bloqueado ⛔', WAITING_QA: 'Esperando QA', QA_HOLD: 'Retenido QA',
+  // TASK-007: QA rejection sub-states
+  QA_REJECTED_PENDING_LOSSES: 'Rechazada por QA — registrar pérdidas',
+  QA_REJECTED_LOSSES_DONE: 'Rechazada por QA — lista para re-ejecutar',
+  // TASK-007 (qa-rejection-disposition): recolection sub-states
+  RECOLECTION_PENDING: 'Recolección de material — pendiente',
+  RECOLECTION_DONE: 'Recolección de material — completada',
+  // TASK-007 (qa-rejection-material-reconciliation-amendment): replacement recovery
+  REPLACEMENT_RECOVERY_PENDING: 'Reposición de materiales — pendiente',
+  REPLACEMENT_RECOVERY_DONE: 'Reposición de materiales — completada',
 };
 const STAGE_STATUS_BADGE = {
   PENDING: 'wh-badge--pending', IN_PROGRESS: 'wh-badge--pending',
   COMPLETED: 'wh-badge--confirmed', BLOCKED: 'wh-badge--rejected',
   WAITING_QA: 'wh-badge--hold', QA_HOLD: 'wh-badge--hold',
+  // TASK-007: QA rejection sub-states
+  QA_REJECTED_PENDING_LOSSES: 'wh-badge--rejected',
+  QA_REJECTED_LOSSES_DONE: 'wh-badge--warning',
+  // TASK-007 (qa-rejection-disposition): recolection sub-states
+  RECOLECTION_PENDING: 'wh-badge--hold',
+  RECOLECTION_DONE: 'wh-badge--confirmed',
+  // TASK-007 (qa-rejection-material-reconciliation-amendment): replacement recovery
+  REPLACEMENT_RECOVERY_PENDING: 'wh-badge--pending',
+  REPLACEMENT_RECOVERY_DONE: 'wh-badge--confirmed',
 };
 
 function renderStatusBadge(status) {
@@ -188,16 +206,19 @@ function renderLotPicker(productModel) {
  * @param {any} snapshotStage  - etapa del snapshot con expectedParameters
  * @param {string|number} stageId
  */
-function renderQaAnalysisForm(snapshotStage, stageId) {
+function renderQaAnalysisForm(order, snapshotStage, stageId) {
   const expected = Array.isArray(snapshotStage?.expectedParameters)
     ? snapshotStage.expectedParameters
     : [];
+
+  const rejectionRenderers = WarehouseShell.require('views.productionRenderersRejection');
+  const rejectionFlowHtml = rejectionRenderers.renderQaRejectionFlow(order, snapshotStage);
 
   const paramRows = expected.map((param) => `
     <div class="qa-param-row" style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:0.4rem"
          data-param-name="${escapeHtml(param.name)}">
       <label style="flex:1;min-width:160px"><span>${escapeHtml(param.name)}
-        <small class="wh-caption">(esperado: ${escapeHtml(String(param.expectedValue ?? '?'))} ± ${escapeHtml(String(param.minTolerance ?? 0))}/${escapeHtml(String(param.maxTolerance ?? 0))} ${escapeHtml(param.unit || '')})</small>
+        <small class="wh-caption">(esperado: ${escapeHtml(String(param.expectedValue ?? '?'))} ${escapeHtml(param.unit || '')} · rango: ${escapeHtml(String(Number(param.expectedValue ?? 0) - Number(param.minTolerance ?? 0)))}–${escapeHtml(String(Number(param.expectedValue ?? 0) + Number(param.maxTolerance ?? 0)))} ${escapeHtml(param.unit || '')})</small>
       </span>
         <input type="number" step="any" class="qa-result-value" required
                aria-label="Valor medido de ${escapeHtml(param.name)}" />
@@ -245,7 +266,7 @@ function renderQaAnalysisForm(snapshotStage, stageId) {
                     placeholder="Describe la accion correctiva tomada..."></textarea>
         </label>
       </div>
-
+      ${rejectionFlowHtml}
       <div class="wh-step-nav">
         <button type="button" class="primary-button qa-submit-btn"
                 data-stage-id="${escapeHtml(String(stageId))}">
@@ -284,7 +305,8 @@ function renderInlineQaCapture(snapshotStage) {
         <strong>${escapeHtml(param.name)}</strong>
         <p class="wh-caption" style="margin:0.15rem 0 0 0">
           Esperado: ${escapeHtml(String(param.expectedValue ?? '?'))} ${escapeHtml(param.unit || '')}
-          · Tolerancia -${escapeHtml(String(param.minTolerance ?? 0))} / +${escapeHtml(String(param.maxTolerance ?? 0))}
+          · Rango valido: ${escapeHtml(String(Number(param.expectedValue ?? 0) - Number(param.minTolerance ?? 0)))}
+          – ${escapeHtml(String(Number(param.expectedValue ?? 0) + Number(param.maxTolerance ?? 0)))} ${escapeHtml(param.unit || '')}
         </p>
       </div>
       <label>
@@ -445,9 +467,7 @@ function renderCompleteForm(order, warehouses) {
 function renderStageItem(order, vm, permissions) {
   const { stage, status, execution } = vm;
   const stageId = stage?.id ?? '';
-  const isExecutable = (status === 'PENDING') && permissions.canExecuteProduction;
-  const isWaitingQa = status === 'WAITING_QA';
-  const canDoQa = permissions.canInspectQa && isWaitingQa;
+
   const formId = `exec-form-${escapeHtml(String(stageId))}`;
   const qaFormId = `qa-form-${escapeHtml(String(stageId))}`;
 
@@ -460,13 +480,25 @@ function renderStageItem(order, vm, permissions) {
       </p>`;
   }
 
+  // Las acciones de etapa solo aplican cuando la orden esta activa (IN_PROGRESS o QA_HOLD).
+  // Una orden CANCELLED, COMPLETED, etc. no debe mostrar ningun boton de accion.
+  const orderIsActive = order.status === 'IN_PROGRESS' || order.status === 'QA_HOLD';
+  const isWaitingQa = status === 'WAITING_QA';
+  // TASK-007: re-executable after QA_REJECTED + lossesAcknowledged + no RECOLECTION_PENDING
+  const isExecutable = orderIsActive && (status === 'PENDING' || status === 'QA_REJECTED_LOSSES_DONE') && permissions.canExecuteProduction;
+  const canDoQa = orderIsActive && permissions.canInspectQa && isWaitingQa;
+  // TASK-007: manager must declare losses when QA_REJECTED + no losses yet
+    // TASK-007 (qa-rejection-disposition): recolection pending
+  
   let blockedMsg = '';
   if (status === 'BLOCKED') {
     blockedMsg = '<p class="wh-caption" style="color:var(--color-danger,#c00)">⛔ Complete la etapa anterior primero.</p>';
   }
   if (isWaitingQa) {
+    // QA debe aprobar esta etapa antes de continuar con las siguientes.
     blockedMsg = `<p class="wh-caption" style="color:var(--color-warning,#b86000)">
-      🔬 La ejecución quedó fuera de tolerancia. QA debe aprobar antes de liberar la siguiente etapa.
+      🔬 QA debe aprobar esta etapa. El inspector debe registrar su análisis antes de continuar.
+      Los parámetros están fuera de tolerancia o la etapa está marcada como obligatoria para QA.
     </p>`;
   }
 
@@ -493,7 +525,7 @@ function renderStageItem(order, vm, permissions) {
                    data-order-id="${escapeHtml(String(order.id))}"
                    data-form-id="${formId}"
                    aria-expanded="false" aria-controls="${formId}">
-             Ejecutar etapa
+             ${status === 'QA_REJECTED_LOSSES_DONE' ? '🔄 Re-ejecutar etapa' : 'Ejecutar etapa'}
            </button>`
         : ''}
       ${canDoQa
@@ -507,6 +539,133 @@ function renderStageItem(order, vm, permissions) {
     </div>
     <div id="${formId}-slot"></div>
     <div id="${qaFormId}-slot"></div>
+    <div id="loss-form-${escapeHtml(String(stageId))}-slot"></div>
+    <div id="recolection-form-${escapeHtml(String(stageId))}-slot"></div>
+  </li>`;
+}
+
+/**
+ * Renders the virtual recolection stage item.
+ * @param {any} order
+ * @param {{stage:any, status:string, recolection:any}} vm
+ * @param {{canExecuteProduction:boolean}} permissions
+ * @returns {string}
+ */
+function renderRecolectionStageItem(order, vm, permissions) {
+  const { stage, status, recolection } = vm;
+  const orderId = order.id ?? '';
+  const recolectionId = recolection?.id ?? '';
+  const recipeStageId = stage?.recipeStageId ?? '';
+  const requiredItems = Array.isArray(recolection?.requiredItems) ? recolection.requiredItems : [];
+
+  // Serialize required items for the controller (avoids a second API call)
+  const requiredItemsJson = escapeHtml(JSON.stringify(
+    requiredItems.map((it) => ({
+      productId: String(it.productId ?? ''),
+      quantity: Number(it.quantity ?? 0),
+      unit: it.unit || null,
+      productName: it.productName || null,
+    })),
+  ));
+
+  const itemsList = requiredItems.length
+    ? `<ul class="wh-recolection-items" style="margin:0.5rem 0 0 1rem;padding:0;list-style:disc">
+        ${requiredItems.map((it) => `<li>${escapeHtml(it.productName || `Producto #${it.productId}`)}: <strong>${escapeHtml(String(it.quantity ?? ''))}</strong> ${escapeHtml(it.unit || '')}</li>`).join('')}
+       </ul>`
+    : '';
+
+  const canConfirm = order.status === 'QA_HOLD' && status === 'RECOLECTION_PENDING' && permissions.canExecuteProduction;
+
+  return `<li class="wh-item-card wh-stage-card wh-stage-card--virtual"
+              data-recolection-id="${escapeHtml(String(recolectionId))}"
+              data-recipe-stage-id="${escapeHtml(String(recipeStageId))}"
+              data-order-id="${escapeHtml(String(orderId))}">
+    <h3 class="wh-item-card__title">&#x1F4E6; ${escapeHtml(stage?.name || 'Recolecci\u00F3n de material')}</h3>
+    <p class="wh-item-card__meta">Estado: ${renderStageBadge(status)}</p>
+    <p class="wh-caption" style="margin-top:0.5rem">
+      Selecciona los lotes disponibles para cubrir los materiales requeridos antes de re-ejecutar la etapa.
+    </p>
+    ${itemsList}
+    ${canConfirm
+      ? `<div class="wh-recolection-lot-slot" style="margin-top:0.75rem"></div>
+         <div class="wh-stage-actions" style="margin-top:0.5rem">
+           <button type="button" class="secondary-button wh-prepare-recolection-btn"
+                   data-order-id="${escapeHtml(String(orderId))}"
+                   data-recolection-id="${escapeHtml(String(recolectionId))}"
+                   data-recipe-stage-id="${escapeHtml(String(recipeStageId))}"
+                   data-required-items="${requiredItemsJson}"
+                   aria-label="Cargar lotes disponibles">
+             &#x1F4CB; Preparar recolecci\u00F3n con lotes disponibles
+           </button>
+         </div>
+         <p class="recolection-confirm-error wh-error-msg" hidden role="alert" aria-live="assertive"></p>`
+      : ''}
+  </li>`;
+}
+
+/**
+ * Renders the REPLACEMENT_RECOVERY virtual stage card.
+ * Visually distinct from the virtual recolection card (amber accent).
+ * TASK-007 (qa-rejection-material-reconciliation-amendment)
+ * @param {any} order
+ * @param {{stage:any, status:string, recolection:any}} vm
+ * @param {{canExecuteProduction:boolean}} permissions
+ * @returns {string}
+ */
+function renderReplacementRecoveryStageItem(order, vm, permissions) {
+  const { stage, status, recolection } = vm;
+  const orderId = order.id ?? '';
+  const recolectionId = recolection?.id ?? '';
+  const requiredItems = Array.isArray(recolection?.requiredItems) ? recolection.requiredItems : [];
+
+  const itemsList = requiredItems.length
+    ? `<ul class="wh-recolection-items" style="margin:0.5rem 0 0 1rem;padding:0;list-style:disc">
+        ${requiredItems.map((it) => `<li>${escapeHtml(it.productName || (it.productId ? `Producto #${it.productId}` : 'Material'))}: <strong>${escapeHtml(String(it.quantity ?? ''))}</strong> ${escapeHtml(it.unit || '')}</li>`).join('')}
+       </ul>`
+    : '';
+
+  const canConfirm = (order.status === 'QA_HOLD' || order.status === 'IN_PROGRESS')
+    && status === 'REPLACEMENT_RECOVERY_PENDING'
+    && permissions.canExecuteProduction;
+
+  const entriesForm = canConfirm && requiredItems.length
+    ? `<div class="wh-recovery-entries" style="margin-top:0.75rem">
+         <p class="wh-caption" style="margin:0 0 0.5rem">Registra los lotes realmente conseguidos para habilitar el control por lote.</p>
+         ${requiredItems.map((it, index) => `
+           <div class="wh-recovery-entry-row"
+                data-product-id="${escapeHtml(String(it.productId ?? ''))}"
+                data-default-quantity="${escapeHtml(String(it.quantity ?? ''))}"
+                data-default-unit="${escapeHtml(String(it.unit || ''))}"
+                style="border:1px solid var(--border,#ddd);border-radius:8px;padding:0.75rem;margin-bottom:0.5rem">
+             <p style="margin:0 0 0.4rem"><strong>${escapeHtml(it.productName || (it.productId ? `Producto #${it.productId}` : `Material ${index + 1}`))}</strong></p>
+             <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+               <label style="flex:1"><span>Lote ID *</span><input type="number" min="1" step="1" class="wh-recovery-entry-lot-id" placeholder="ID del lote" /></label>
+               <label style="flex:1"><span>Cantidad *</span><input type="number" min="0.001" step="0.001" class="wh-recovery-entry-qty" value="${escapeHtml(String(it.quantity ?? ''))}" /></label>
+               <label style="flex:1"><span>Unidad</span><input type="text" class="wh-recovery-entry-unit" value="${escapeHtml(String(it.unit || ''))}" maxlength="30" /></label>
+             </div>
+           </div>`).join('')}
+       </div>`
+    : '';
+
+  return `<li class="wh-item-card wh-stage-card wh-stage-card--virtual wh-stage-card--replacement">
+    <h3 class="wh-item-card__title">🔄 ${escapeHtml(stage?.name || 'Reposición de materiales')}</h3>
+    <p class="wh-item-card__meta">Estado: ${renderStageBadge(status)}</p>
+    <div class="wh-alert wh-alert--warning" role="alert" style="margin-top:0.5rem">
+      ⚠️ Los materiales del intento anterior fueron dañados o se perdieron.
+      Se requiere conseguir nuevos materiales antes de re-ejecutar la etapa.
+    </div>
+    ${itemsList}
+    ${canConfirm
+      ? `<div class="wh-stage-actions" style="margin-top:0.75rem">
+           <button type="button" class="primary-button wh-confirm-recolection-submit-btn"
+                   data-order-id="${escapeHtml(String(orderId))}"
+                   data-recolection-id="${escapeHtml(String(recolectionId))}"
+                   aria-label="Confirmar reposición de materiales">
+             ✓ Confirmar reposición de materiales
+           </button>
+           <p class="recolection-confirm-error wh-error-msg" hidden role="alert" aria-live="assertive"></p>
+         </div>`
+      : ''}
   </li>`;
 }
 
@@ -515,7 +674,35 @@ function renderOrderDetail(order, permissions, stagesVm, requirements, warehouse
   const showCompleteSection = permissions.canCompleteProduction
     && productionState.allSnapshotStagesCompleted(order);
 
-  const stagesHtml = stagesVm.map((vm) => renderStageItem(order, vm, permissions)).join('');
+  const rejectionRenderers = WarehouseShell.require('views.productionRenderersRejection');
+
+  const stagesHtml = stagesVm.map((vm) => {
+    const stageHtml = renderStageItem(order, vm, permissions);
+    const recolectionVm = ['RECOLECTION_PENDING', 'RECOLECTION_DONE'].includes(vm.status)
+      ? productionState.buildRecolectionStageViewModel(order, vm.execution)
+      : null;
+    const replacementVm = ['REPLACEMENT_RECOVERY_PENDING', 'REPLACEMENT_RECOVERY_DONE'].includes(vm.status)
+      ? productionState.buildRecolectionStageViewModel(order, vm.execution)
+      : null;
+
+    let virtualHtml = '';
+    if (recolectionVm) {
+      virtualHtml = renderRecolectionStageItem(order, recolectionVm, permissions);
+    } else if (replacementVm) {
+      virtualHtml = renderReplacementRecoveryStageItem(order, replacementVm, permissions);
+      // AUD-002: when REPLACEMENT_RECOVERY is DONE, append reconciliation panel
+      if (vm.status === 'REPLACEMENT_RECOVERY_DONE' && permissions.canExecuteProduction) {
+        const recolectionId = String(replacementVm.recolection?.id ?? '');
+        const entries = Array.isArray(replacementVm.recolection?.entries) ? replacementVm.recolection.entries : [];
+        if (recolectionId) {
+          virtualHtml += rejectionRenderers.renderReconciliationPanel(
+            order.id, recolectionId, entries, null,
+          );
+        }
+      }
+    }
+    return `${stageHtml}${virtualHtml}`;
+  }).join('');
   const requirementsHtml = renderMaterialRequirements(requirements);
 
   return `
@@ -547,6 +734,11 @@ function renderOrderDetail(order, permissions, stagesVm, requirements, warehouse
            <p id="start-production-error" class="wh-error-msg" hidden
               role="alert" aria-live="assertive"></p>`
         : ''}
+      ${['DRAFT','PENDING_APPROVAL','APPROVED','IN_PROGRESS','QA_HOLD'].includes(order.status) && permissions.canCancelProduction
+        ? `<button type="button" class="secondary-button danger wh-terminate-production-btn"
+                   data-order-id="${escapeHtml(String(order.id))}"
+                   style="margin-left:0.5rem">🛑 Cancelar orden</button>`
+        : ''}
     </div>
     ${requirementsHtml}
     <h2 class="warehouse-section__title">Etapas</h2>
@@ -566,5 +758,9 @@ WarehouseShell.register('views.productionRenderers', {
   renderStageBadge,
   renderStatusBadge,
   renderStageItem,
+  // TASK-007 (qa-rejection-disposition): virtual recolection stage renderer
+  renderRecolectionStageItem,
+  // TASK-007 (qa-rejection-material-reconciliation-amendment): replacement recovery renderer
+  renderReplacementRecoveryStageItem,
 });
 })();

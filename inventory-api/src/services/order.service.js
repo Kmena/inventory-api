@@ -201,6 +201,32 @@ async function removeOrder(id, auth, req = null) {
   return deletedOrder;
 }
 
+/**
+ * For warehouse SPA: returns only APPROVED orders with full item + lot allocation detail.
+ * @param {any} auth
+ */
+async function listOrdersForDispatch(auth) {
+  const { companyId } = scope(auth);
+  return orderRepository.findApprovedOrdersForDispatch(companyId);
+}
+
+async function listDeliveredOrders(auth) {
+  const { companyId } = scope(auth);
+  return orderRepository.findDeliveredOrders(companyId);
+}
+
+/**
+ * Single order for warehouse dispatch view — includes allocations (lot movements).
+ * @param {bigint} id
+ * @param {any} auth
+ */
+async function getOrderForDispatch(id, auth) {
+  const { companyId } = scope(auth);
+  const order = await orderRepository.findOrderWithAllocations(id, companyId);
+  if (!order) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  return order;
+}
+
 module.exports = {
   listOrders,
   getOrder,
@@ -210,5 +236,8 @@ module.exports = {
   cancelOrder,
   dispatchOrder,
   removeOrder,
+  listOrdersForDispatch,
+  getOrderForDispatch,
+  listDeliveredOrders,
 };
 

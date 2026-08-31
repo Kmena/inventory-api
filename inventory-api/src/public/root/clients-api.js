@@ -96,6 +96,14 @@
     });
   }
 
+  async function updateStoreCreditLimit(session, clientId, storeId, payload) {
+    return sendJson(session, `/api/clients/company/${encodeURIComponent(clientId)}/stores/${encodeURIComponent(storeId)}/credit-limit`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudo actualizar el límite de crédito.',
+    });
+  }
+
   async function createReference(session, clientId, payload) {
     return sendJson(session, `/api/clients/${encodeURIComponent(clientId)}/references`, {
       method: 'POST',
@@ -188,6 +196,7 @@
     reverseGeocode,
     searchPlaces,
     updateClient,
+    updateStoreCreditLimit,
     uploadDocument,
   });
 }(window));

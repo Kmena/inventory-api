@@ -9,6 +9,8 @@ const {
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const INVOICE_PENDING_DAYS = 30;
+// System-level constant — not configurable per route to prevent misconfiguration.
+const NEAR_LIMIT_DAYS = 5;
 const STATUS_PRIORITY = {
   VENCIDA: 0,
   PROXIMA_A_VENCER: 1,
@@ -33,7 +35,7 @@ function computeVisitState(store, route) {
   const referenceDate = latestVisit?.visitedAt || store.createdAt;
   const daysSinceReference = referenceDate ? daysBetween(referenceDate) : 0;
   const frequency = Number(route?.visitFrequencyDays || 15);
-  const nearLimit = Number(route?.nearLimitDays || 3);
+  const nearLimit = Math.min(NEAR_LIMIT_DAYS, Math.max(1, frequency - 1));
   const dueInDays = frequency - daysSinceReference;
   const hasVisits = Boolean(latestVisit);
 
@@ -217,7 +219,7 @@ function serializeStoreCard(store, route) {
     routeCode: route?.code || null,
     routeName: route?.name || null,
     visitFrequencyDays: route?.visitFrequencyDays || 15,
-    nearLimitDays: route?.nearLimitDays || 3,
+    nearLimitDays: NEAR_LIMIT_DAYS,
     regionName: store.subregion?.region?.name || null,
     subregionName: store.subregion?.name || null,
     representativesCount: store.representatives?.length || 0,
@@ -259,7 +261,11 @@ function serializePurchaseHistory(store) {
       orderId: order.id,
       createdAt: order.createdAt,
       status: order.status,
-      total: Number(order.total || 0),
+      // Fallback: compute from items if Order.total was not stored (legacy orders)
+      total: Number(order.total || 0) || (order.items || []).reduce(
+        (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0) - Number(item.totalDiscount || 0)),
+        0,
+      ),
       pendingBalance: toMoneyNumber(pendingBalance),
       invoiceNumbers: invoices.map((invoice) => invoice.number),
       invoices,

@@ -125,14 +125,16 @@ function buildPaymentAuditState(payment, extraState = {}) {
   };
 }
 
-async function createPayment(payload, auth, req = null) {
-  const companyId = assertCompanyScope(auth);
-  assertHasAnyPermission(auth, PAYMENT_MANAGE_OWN_PERMISSIONS, 'No tiene permisos para registrar pagos');
+/**
+ * Core payment creation — no permission check.
+ * Callers are responsible for authorization before invoking this.
+ * @internal
+ */
+async function createPaymentCore(payload, companyId, auth, req = null) {
   const invoice = await validatePaymentInvoice(payload.invoiceId, companyId);
   assertInvoiceAllowsNewPayments(invoice);
 
   const normalizedReceiptFile = normalizeReceiptFile(payload.receiptFile);
-
   const paymentId = normalizedReceiptFile ? await paymentRepository.reservePaymentId() : null;
   /** @type {any} */
   let payment;
@@ -163,9 +165,7 @@ async function createPayment(payload, auth, req = null) {
           submittedAt: new Date(),
         });
   } catch (error) {
-    if (error?.statusCode) {
-      throw error;
-    }
+    if (error?.statusCode) throw error;
     throw createHttpError(500, 'No se pudo guardar la evidencia del pago', 'internal_server_error');
   }
 
@@ -184,6 +184,15 @@ async function createPayment(payload, auth, req = null) {
   });
 
   return serializePayment(createdPayment);
+}
+
+async function createPayment(payload, auth, req = null) {
+  const companyId = assertCompanyScope(auth);
+  assertHasAnyPermission(auth, PAYMENT_MANAGE_OWN_PERMISSIONS, 'No tiene permisos para registrar pagos');
+  const invoice = await validatePaymentInvoice(payload.invoiceId, companyId);
+  assertInvoiceAllowsNewPayments(invoice);
+
+  return createPaymentCore(payload, companyId, auth, req);
 }
 
 async function updatePayment(id, payload, auth, req = null) {
@@ -298,16 +307,23 @@ async function approvePayment(id, payload, auth, req = null) {
       throw createHttpError(409, 'El pago no pudo aprobarse', 'conflict');
     }
 
-    // TASK-015: Decrement client creditBalance when payment is approved.
+    // Decrement store creditBalance when payment is approved (per-store credit tracking).
+    // Chain: payment → invoice → order → clientStoreId.
     const approvedInvoice = await tx.invoice.findUnique({
       where: { id: transactionalPayment.invoiceId },
-      select: { clientId: true },
+      select: { orderId: true },
     });
-    if (approvedInvoice?.clientId) {
-      await tx.client.update({
-        where: { id: approvedInvoice.clientId },
-        data: { creditBalance: { decrement: transactionalPayment.amount } },
+    if (approvedInvoice?.orderId) {
+      const invoiceOrder = await tx.order.findUnique({
+        where: { id: approvedInvoice.orderId },
+        select: { clientStoreId: true },
       });
+      if (invoiceOrder?.clientStoreId) {
+        await tx.clientStore.update({
+          where: { id: invoiceOrder.clientStoreId },
+          data: { creditBalance: { decrement: transactionalPayment.amount } },
+        });
+      }
     }
 
     const synchronizedInvoiceResult = await synchronizeInvoiceFinancialState(transactionalPayment.invoiceId, companyId, tx);
@@ -403,16 +419,23 @@ async function reversePayment(id, auth, reason, req = null) {
 
     const reversedPaymentResult = await paymentRepository.findCompanyPaymentById(id, companyId, {}, tx);
 
-    // TASK-015: Increment client creditBalance when an approved payment is reversed.
+    // Increment store creditBalance when an approved payment is reversed (per-store credit tracking).
+    // Chain: payment → invoice → order → clientStoreId.
     const reversedInvoice = await tx.invoice.findUnique({
       where: { id: transactionalPayment.invoiceId },
-      select: { clientId: true },
+      select: { orderId: true },
     });
-    if (reversedInvoice?.clientId) {
-      await tx.client.update({
-        where: { id: reversedInvoice.clientId },
-        data: { creditBalance: { increment: transactionalPayment.amount } },
+    if (reversedInvoice?.orderId) {
+      const reversedOrder = await tx.order.findUnique({
+        where: { id: reversedInvoice.orderId },
+        select: { clientStoreId: true },
       });
+      if (reversedOrder?.clientStoreId) {
+        await tx.clientStore.update({
+          where: { id: reversedOrder.clientStoreId },
+          data: { creditBalance: { increment: transactionalPayment.amount } },
+        });
+      }
     }
 
     const synchronizedInvoiceResult = await synchronizeInvoiceFinancialState(transactionalPayment.invoiceId, companyId, tx);
@@ -480,6 +503,7 @@ async function getPaymentReceiptDownload(paymentId, receiptId, auth) {
 }
 
 module.exports = {
+  createPaymentCore,
   listPayments,
   getPayment,
   getPaymentReceiptDownload,

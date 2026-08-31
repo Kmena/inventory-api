@@ -233,6 +233,32 @@ test('production modules keep blocked-stage and waiting-QA messaging explicit', 
   assert.match(source, /QA debe aprobar/i);
 });
 
+test('warehouse QA rejection flow renders inline disposition and continuation controls, replacing the primary legacy losses CTA', () => {
+  const renderersSource = readWarehouseFile('views/production.renderers.js');
+  const rejectionSource = readWarehouseFile('views/production.renderers.rejection.js');
+  const helpersSource = readWarehouseFile('views/production.exec-helpers.js');
+
+  assert.match(rejectionSource, /Gestión del rechazo/i);
+  assert.match(rejectionSource, /Disposición de material/i);
+  assert.match(rejectionSource, /Punto de continuación/i);
+  assert.match(rejectionSource, /Volver a una etapa previa/i);
+  assert.match(rejectionSource, /qa-invalidated-stage-card/);
+  assert.match(helpersSource, /continuationPoint/);
+  assert.match(helpersSource, /invalidatedStagesDispositions/);
+  assert.doesNotMatch(renderersSource, /wh-declare-losses-btn/);
+});
+
+test('production detail inserts the virtual recolection stage and uses the dedicated submit button path', () => {
+  const renderersSource = readWarehouseFile('views/production.renderers.js');
+  const controllersSource = readWarehouseFile('views/production.controllers.js');
+
+  assert.match(renderersSource, /buildRecolectionStageViewModel/);
+  assert.match(renderersSource, /renderRecolectionStageItem/);
+  assert.match(renderersSource, /wh-confirm-recolection-submit-btn/);
+  assert.doesNotMatch(renderersSource, /wh-confirm-recolection-btn/);
+  assert.match(controllersSource, /wh-confirm-recolection-submit-btn/);
+});
+
 test('views/recipe-consultation.js renders frozen recipe as read-only (FR-038)', () => {
   const source = readWarehouseFile('views/recipe-consultation.js');
   assert.match(source, /solo lectura/i);
@@ -568,4 +594,200 @@ test('styles.css includes warehouse SPA design tokens and layout classes', () =>
   assert.match(source, /\.photo-capture-wrapper/);
   // Navigation rail for tablet
   assert.match(source, /@media \(min-width: 768px\)[\s\S]*\.warehouse-tab-bar/);
+});
+
+// ─── TASK-007: warehouseApi loss functions registered ──────────────────────
+
+test("warehouseApi.registerStageLosses is registered in WarehouseShell (TASK-007)", () => {
+  const warehouseApiPath = path.join(publicRoot, "warehouse/api/warehouse-api.js");
+  const source = fs.readFileSync(warehouseApiPath, "utf8");
+  assert.match(
+    source,
+    /registerStageLosses/,
+    "warehouse-api.js must define and register registerStageLosses",
+  );
+  assert.match(
+    source,
+    /getStageLosses/,
+    "warehouse-api.js must define and register getStageLosses",
+  );
+});
+
+test("production.renderers.rejection.js is registered in WarehouseShell (TASK-007)", () => {
+  const rejectionRenderersPath = path.join(publicRoot, "warehouse/views/production.renderers.rejection.js");
+  const source = fs.readFileSync(rejectionRenderersPath, "utf8");
+  assert.match(
+    source,
+    /renderStageLossForm/,
+    "production.renderers.rejection.js must export renderStageLossForm",
+  );
+  assert.match(
+    source,
+    /renderPostLossActions/,
+    "production.renderers.rejection.js must export renderPostLossActions",
+  );
+  assert.match(
+    source,
+    /views.productionRenderersRejection/,
+    "production.renderers.rejection.js must register with WarehouseShell",
+  );
+});
+
+test("production.controllers.rejection.js is registered in WarehouseShell (TASK-007)", () => {
+  const rejectionControllersPath = path.join(publicRoot, "warehouse/views/production.controllers.rejection.js");
+  const source = fs.readFileSync(rejectionControllersPath, "utf8");
+  assert.match(
+    source,
+    /attachStageLossHandlers/,
+    "production.controllers.rejection.js must export attachStageLossHandlers",
+  );
+  assert.match(
+    source,
+    /attachReExecuteHandler/,
+    "production.controllers.rejection.js must export attachReExecuteHandler",
+  );
+  assert.match(
+    source,
+    /attachTerminateProductionHandler/,
+    "production.controllers.rejection.js must export attachTerminateProductionHandler",
+  );
+  assert.match(
+    source,
+    /views.productionControllersRejection/,
+    "production.controllers.rejection.js must register with WarehouseShell",
+  );
+});
+
+test("production.state.js exposes findLatestRejectedExecution and QA_REJECTED sub-states (TASK-007)", () => {
+  const statePath = path.join(publicRoot, "warehouse/views/production.state.js");
+  const source = fs.readFileSync(statePath, "utf8");
+  assert.match(source, /findLatestRejectedExecution/);
+  assert.match(source, /QA_REJECTED_PENDING_LOSSES/);
+  assert.match(source, /QA_REJECTED_LOSSES_DONE/);
+});
+
+test("state.js derivePermissions includes canManageProduction (TASK-007)", () => {
+  const statePath = path.join(publicRoot, "warehouse/state.js");
+  const source = fs.readFileSync(statePath, "utf8");
+  assert.match(
+    source,
+    /canManageProduction.*production\.manage/,
+    "state.js must expose canManageProduction from production.manage permission",
+  );
+});
+
+test("production.renderers.js renderStageItem handles QA rejection sub-states without the primary legacy losses CTA (TASK-007)", () => {
+  const renderersPath = path.join(publicRoot, "warehouse/views/production.renderers.js");
+  const source = fs.readFileSync(renderersPath, "utf8");
+  assert.match(
+    source,
+    /QA_REJECTED_PENDING_LOSSES/,
+    "production.renderers.js must handle QA_REJECTED_PENDING_LOSSES state",
+  );
+  assert.match(
+    source,
+    /QA_REJECTED_LOSSES_DONE/,
+    "production.renderers.js must handle QA_REJECTED_LOSSES_DONE state",
+  );
+  assert.doesNotMatch(
+    source,
+    /wh-declare-losses-btn/,
+    "production.renderers.js must not render the primary legacy declare-losses button",
+  );
+});
+
+test('production-new.js includes ingredient preview helpers', () => {
+  const source = readWarehouseFile('views/production-new.js');
+  assert.match(source, /function formatQty/, 'must have formatQty helper');
+  assert.match(source, /function renderIngredientsPreview/, 'must have renderIngredientsPreview');
+  assert.match(source, /function wireIngredientsPreview/, 'must have wireIngredientsPreview');
+  assert.match(source, /pn-ingredients-preview/, 'must include the preview container id');
+  assert.match(source, /wireIngredientsPreview\(container/, 'must call wireIngredientsPreview in render()');
+  assert.match(source, /aria-live/, 'preview panel must declare aria-live for screen readers');
+});
+
+test('production-new.js renderIngredientsPreview uses correct quantity formula', () => {
+  const source = readWarehouseFile('views/production-new.js');
+  // Required = ingredient.quantity (per-unit from recipe) × user quantity
+  assert.match(
+    source,
+    /Number\(ing\.quantity\)\s*\*\s*qty/,
+    'required quantity must be Number(ing.quantity) * qty',
+  );
+  // Must react to both recipe-select changes and quantity-input changes
+  assert.match(source, /recipeSelect\.addEventListener\('change'/, 'must listen to recipe change');
+  assert.match(source, /qtyInput\.addEventListener\('input'/, 'must listen to quantity input');
+});
+
+test('production-new.js shows version <select> (not hidden input) so users can choose any approved version', () => {
+  const source = readWarehouseFile('views/production-new.js');
+  assert.match(source, /select id="pn-recipe-version-id"/, 'version field must be a <select>');
+  assert.doesNotMatch(source, /input type="hidden" id="pn-recipe-version-id"/, 'must not use hidden input for version');
+  assert.match(source, /pn-version-field/, 'must have #pn-version-field wrapper');
+  assert.match(source, /status.*APPROVED|APPROVED.*status/, 'must filter by APPROVED status');
+  assert.match(source, /latestApprovedVersionId/, 'must pre-select the active version');
+});
+
+test('production-new.js wireIngredientsPreview reacts to version select changes', () => {
+  const source = readWarehouseFile('views/production-new.js');
+  assert.match(source, /versionSelect.*addEventListener|addEventListener.*versionSelect/, 'must listen to version select changes');
+  assert.match(source, /selectedVersionId/, 'must pass selectedVersionId to renderIngredientsPreview');
+});
+
+// Regression: buildStagesViewModel used `stageId` (undefined in scope) causing
+// a ReferenceError that blanked #production?id=X (statusEl hidden before the throw).
+test('production.state.js buildStagesViewModel declares stageId from stage.id before using it (blank-page fix)', () => {
+  const source = readWarehouseFile('views/production.state.js');
+  assert.match(
+    source,
+    /const stageId = String\(stage/,
+    'buildStagesViewModel must declare stageId from stage.id inside the map callback',
+  );
+});
+
+test('production.js catch block restores statusEl.hidden before showing error (blank-page fix)', () => {
+  const source = readWarehouseFile('views/production.js');
+  assert.match(
+    source,
+    /statusEl\.hidden\s*=\s*false/,
+    'catch block must un-hide statusEl before writing the error text',
+  );
+});
+
+test('production.renderers.rejection.js exports renderCancelWithReturnsPanel and aggregateOrderConsumptions', () => {
+  const source = readWarehouseFile('views/production.renderers.rejection.js');
+  assert.match(source, /renderCancelWithReturnsPanel/, 'must export renderCancelWithReturnsPanel');
+  assert.match(source, /aggregateOrderConsumptions/, 'must export aggregateOrderConsumptions');
+  assert.match(source, /wh-cancel-return-row/, 'panel must use wh-cancel-return-row class');
+  assert.match(source, /wh-cancel-lot-mode/, 'panel must include lot-mode radios');
+  assert.match(source, /wh-cancel-new-lot-fields/, 'panel must include new-lot fields block');
+  assert.match(source, /wh-cancel-with-returns-btn/, 'panel must have confirm-with-returns button');
+  assert.match(source, /wh-cancel-no-returns-btn/, 'panel must have cancel-without-returns button');
+});
+
+test('production.controllers.rejection.js wires cancel-with-returns flow', () => {
+  const source = readWarehouseFile('views/production.controllers.rejection.js');
+  assert.match(source, /attachCancelWithReturnsHandlers/, 'must export attachCancelWithReturnsHandlers');
+  assert.match(source, /collectCancelPayload/, 'must export collectCancelPayload');
+  assert.match(source, /cancelProductionOrder/, 'must call cancelProductionOrder with payload');
+  assert.match(source, /targetLotId/, 'must support returning to original lot via targetLotId');
+  assert.match(source, /newLotCode/, 'must support creating a new lot via newLotCode');
+});
+
+test('state.js includes canCancelProduction derived from production.cancel permission', () => {
+  const source = fs.readFileSync(path.join(warehousePath, 'state.js'), 'utf8');
+  assert.match(source, /canCancelProduction/, 'state must include canCancelProduction flag');
+  assert.match(source, /production\.cancel/, 'canCancelProduction must check production.cancel permission');
+});
+
+test('production.renderers.js shows cancel button for all cancellable states guarded by canCancelProduction', () => {
+  const source = readWarehouseFile('views/production.renderers.js');
+  assert.match(source, /canCancelProduction/, 'renderer must gate cancel on canCancelProduction');
+  assert.match(source, /wh-terminate-production-btn/, 'renderer must render wh-terminate-production-btn');
+});
+
+test('warehouse-api.js cancelProductionOrder forwards payload with returns to backend', () => {
+  const source = fs.readFileSync(path.join(warehousePath, 'api', 'warehouse-api.js'), 'utf8');
+  assert.match(source, /function cancelProductionOrder/, 'must define cancelProductionOrder');
+  assert.match(source, /JSON\.stringify\(payload\)/, 'must stringify payload including returns');
 });

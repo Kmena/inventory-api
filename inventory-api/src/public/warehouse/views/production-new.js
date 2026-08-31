@@ -46,6 +46,108 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Round to 3 decimal places, strip trailing zeros
+function formatQty(num) {
+  if (!Number.isFinite(num) || num === 0) { return '0'; }
+  return parseFloat(num.toFixed(3)).toString();
+}
+
+// -----------------------------------------------------------------------
+// Ingredients preview — computed client-side from already-loaded recipe data
+// -----------------------------------------------------------------------
+
+/**
+ * Build the inner HTML of the ingredient preview panel.
+ * Returns empty string when there is nothing to show.
+ *
+ * @param {object|undefined} recipe - full recipe object from loadFormData
+ * @param {number} qty - user-entered production quantity
+ * @returns {string}
+ */
+function renderIngredientsPreview(recipe, qty, selectedVersionId) {
+  if (!recipe || !qty || qty <= 0) { return ''; }
+
+  // Use the explicitly-selected version; fall back to latestApprovedVersionId
+  const vId = selectedVersionId || recipe.latestApprovedVersionId;
+  const approvedVersion = (recipe.versions || []).find(
+    (v) => String(v.id) === String(vId),
+  );
+  if (!approvedVersion) { return ''; }
+
+  const ingredients = approvedVersion.ingredients || [];
+  if (!ingredients.length) {
+    return `
+      <div style="background:#f0f7ff;border:1px solid #bcd;border-radius:8px;padding:12px 14px">
+        <p style="margin:0;font-size:.9em;color:#555">Esta receta no tiene insumos de materia prima definidos.</p>
+      </div>`;
+  }
+
+  const rows = ingredients.map((ing) => {
+    const p = ing.product;
+    const name   = p ? p.name : `Insumo #${ing.productId}`;
+    const code   = p?.code   ? ` (${escapeHtml(p.code)})` : '';
+    const unit   = p?.unit   ? ` <span style="color:#666;font-size:.85em">${escapeHtml(p.unit)}</span>` : '';
+    const needed = formatQty(Number(ing.quantity) * qty);
+    return `<tr>
+      <td style="padding:4px 0">${escapeHtml(name)}${code}</td>
+      <td style="text-align:right;padding:4px 0;font-variant-numeric:tabular-nums">
+        <strong>${escapeHtml(needed)}</strong>${unit}
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div style="background:#f0f7ff;border:1px solid #bcd;border-radius:8px;padding:12px 14px">
+      <p style="margin:0 0 8px;font-weight:600;font-size:.9em">
+        📦 Materias primas para <strong>${escapeHtml(String(qty))}</strong> unidades
+      </p>
+      <table style="width:100%;border-collapse:collapse;font-size:.9em">
+        <thead>
+          <tr style="border-bottom:1px solid #bcd">
+            <th style="text-align:left;padding:3px 0;color:#555">Insumo</th>
+            <th style="text-align:right;padding:3px 0;color:#555">Cantidad requerida</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+/**
+ * Wire the live ingredient preview.
+ * Reacts to recipe-select and quantity-input changes.
+ *
+ * @param {HTMLElement} container
+ * @param {Array<object>} recipes - full recipe list (with .versions[].ingredients[])
+ */
+function wireIngredientsPreview(container, recipes) {
+  const recipeSelect  = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-recipe'));
+  const versionSelect = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-recipe-version-id'));
+  const qtyInput      = /** @type {HTMLInputElement|null}  */ (container.querySelector('#pn-quantity'));
+  const preview       = /** @type {HTMLElement|null}       */ (container.querySelector('#pn-ingredients-preview'));
+  if (!recipeSelect || !qtyInput || !preview) { return; }
+
+  function update() {
+    const recipe            = recipes.find((r) => String(r.id) === recipeSelect.value);
+    const qty               = Number(qtyInput.value);
+    const selectedVersionId = versionSelect?.value || null;
+    const html              = renderIngredientsPreview(recipe, qty, selectedVersionId);
+    if (html) {
+      preview.style.display = '';
+      preview.innerHTML = html;
+    } else {
+      preview.style.display = 'none';
+      preview.innerHTML = '';
+    }
+  }
+
+  recipeSelect.addEventListener('change', update);
+  versionSelect?.addEventListener('change', update); // re-render when version changes
+  qtyInput.addEventListener('input', update);
+  // Fire immediately if the user navigated back with values already set
+  if (recipeSelect.value && qtyInput.value) { update(); }
+}
+
 // -----------------------------------------------------------------------
 // Data loader — fetch every dropdown source in parallel
 // -----------------------------------------------------------------------
@@ -80,9 +182,15 @@ function renderForm(container, data) {
         <div class="field">
           <label for="pn-recipe">Receta *</label>
           <select id="pn-recipe" required aria-required="true">
-            ${toOptions(recipes, 'id', (r) => `${r.code || r.name} — ${r.name} (v${r.latestApprovedVersionNumber})`, 'Seleccione una receta aprobada')}
+            ${toOptions(recipes, 'id', (r) => `${r.code || r.name} — ${r.name}`, 'Seleccione una receta aprobada')}
           </select>
-          <input type="hidden" id="pn-recipe-version-id" />
+        </div>
+
+        <div class="field" id="pn-version-field" style="display:none" aria-live="polite">
+          <label for="pn-recipe-version-id">Version aprobada *</label>
+          <select id="pn-recipe-version-id" required aria-required="true">
+            <option value="">Seleccione version...</option>
+          </select>
         </div>
 
         <div class="field">
@@ -96,6 +204,8 @@ function renderForm(container, data) {
           <label for="pn-quantity">Cantidad a producir *</label>
           <input type="number" id="pn-quantity" min="0.001" step="0.001" required aria-required="true" placeholder="Ej. 100" />
         </div>
+
+        <div id="pn-ingredients-preview" class="field" style="display:none" aria-live="polite"></div>
 
         <div class="field">
           <label for="pn-lot-code">Codigo de lote de produccion *</label>
@@ -150,13 +260,33 @@ function renderForm(container, data) {
 // -----------------------------------------------------------------------
 
 function wireRecipeVersionAutoFill(container, recipes) {
-  const recipeSelect = /** @type {HTMLSelectElement} */ (container.querySelector('#pn-recipe'));
-  const versionHidden = /** @type {HTMLInputElement} */ (container.querySelector('#pn-recipe-version-id'));
-  if (!recipeSelect || !versionHidden) { return; }
-  recipeSelect.addEventListener('change', () => {
-    const selected = recipes.find((r) => String(r.id) === recipeSelect.value);
-    versionHidden.value = selected ? String(selected.latestApprovedVersionId) : '';
-  });
+  const recipeSelect  = /** @type {HTMLSelectElement} */ (container.querySelector('#pn-recipe'));
+  const versionSelect = /** @type {HTMLSelectElement} */ (container.querySelector('#pn-recipe-version-id'));
+  const versionField  = /** @type {HTMLElement}       */ (container.querySelector('#pn-version-field'));
+  if (!recipeSelect || !versionSelect || !versionField) { return; }
+
+  function populateVersions() {
+    const recipe   = recipes.find((r) => String(r.id) === recipeSelect.value);
+    const approved = (recipe?.versions || []).filter((v) => v.status === 'APPROVED');
+    if (!approved.length) {
+      versionField.style.display = 'none';
+      versionSelect.innerHTML    = '<option value="">Sin versiones aprobadas</option>';
+      versionSelect.required     = false;
+      return;
+    }
+    const opts = approved.map((v) => {
+      const isLatest   = String(v.id) === String(recipe.latestApprovedVersionId);
+      const stageCount = Array.isArray(v.stages) ? v.stages.length : '?';
+      const label = `v${v.versionNumber} — ${stageCount} etapa(s)${isLatest ? ' · activa ✓' : ''}`;
+      return `<option value="${escapeHtml(String(v.id))}">${escapeHtml(label)}</option>`;
+    });
+    versionSelect.innerHTML = opts.join('');
+    versionSelect.value     = String(recipe.latestApprovedVersionId); // pre-selecciona la activa
+    versionSelect.required  = true;
+    versionField.style.display = '';
+  }
+
+  recipeSelect.addEventListener('change', populateVersions);
 }
 
 function collectPayload(container) {
@@ -301,6 +431,7 @@ async function render(container, session, _params) {
 
   renderForm(container, data);
   wireRecipeVersionAutoFill(container, data.recipes);
+  wireIngredientsPreview(container, data.recipes);
   wireSubmit(container, api, session);
 }
 

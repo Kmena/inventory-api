@@ -37,6 +37,15 @@ router.post('/company', authorizeAccessPolicy('role.company.create'), validate(c
   }
 });
 
+router.get('/company/:roleId', authorizeAccessPolicy('role.company.list'), async (req, res, next) => {
+  try {
+    const role = await roleService.getAssignableRoleById(req.params.roleId, req.auth);
+    return res.json(role);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.put('/company/:roleId', authorizeAccessPolicy('role.company.update'), validate(updateCompanyRoleSchema), async (req, res, next) => {
   try {
     const role = await roleService.updateCompanyRole(req.params.roleId, req.body, req.auth, req);

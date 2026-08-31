@@ -69,8 +69,8 @@
             <div class="root-form-grid">
               <label><span>Codigo *</span><input name="code" type="text" required minlength="2" maxlength="40" /></label>
               <label><span>Nombre *</span><input name="name" type="text" required minlength="2" maxlength="120" /></label>
-              <label><span>Frecuencia de visita *</span><input name="visitFrequencyDays" type="number" min="1" required /></label>
-              <label><span>Umbral de alerta *</span><input name="nearLimitDays" type="number" min="0" required /></label>
+              <label><span>Frecuencia de visita (días) *</span><input name="visitFrequencyDays" type="number" min="5" required /></label>
+              
               <label><span>Activa</span><input name="isActive" type="checkbox" checked /></label>
             </div>
           </fieldset>
@@ -115,6 +115,58 @@
     let selectedRouteId = null;
     let selectedGoalsAgentId = null;
     let goalRows = [];
+    /** @type {any | null} Leaflet map instance — destroyed on each re-render */
+    let routeLeafletMap = null;
+
+    function destroyRouteLeafletMap() {
+      if (routeLeafletMap) {
+        routeLeafletMap.remove();
+        routeLeafletMap = null;
+      }
+    }
+
+    function initRouteLeafletMap(route) {
+      destroyRouteLeafletMap();
+      const L = /** @type {any} */ (globalScope).L;
+      const mapContainer = detailRegion.querySelector('#routes-leaflet-map');
+      if (!mapContainer || !L) { return; }
+
+      const stores = (route?.stores || []).filter(
+        (s) => s.latitude !== null && s.longitude !== null
+          && Number.isFinite(Number(s.latitude)) && Number.isFinite(Number(s.longitude)),
+      );
+      if (!stores.length) { return; }
+
+      // Init after DOM paint so container has dimensions (ADR-004)
+      setTimeout(() => {
+        routeLeafletMap = L.map(mapContainer, { zoomControl: true });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '\u00a9 <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: 19,
+        }).addTo(routeLeafletMap);
+
+        const pin = L.divIcon({
+          className: 'store-map-pin',
+          html: '<div class="route-map-pin__dot"></div>',
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        });
+
+        stores.forEach((s) => {
+          L.marker([Number(s.latitude), Number(s.longitude)], { icon: pin })
+            .bindTooltip(rootShellUi.escapeHtml(s.code || s.name || 'Tienda'), { permanent: false, direction: 'top' })
+            .addTo(routeLeafletMap);
+        });
+
+        if (stores.length === 1) {
+          routeLeafletMap.setView([Number(stores[0].latitude), Number(stores[0].longitude)], 14);
+        } else {
+          const bounds = L.latLngBounds(stores.map((s) => [Number(s.latitude), Number(s.longitude)]));
+          routeLeafletMap.fitBounds(bounds, { padding: [32, 32] });
+        }
+        routeLeafletMap.invalidateSize();
+      }, 50);
+    }
 
     function renderMetrics() {
       const summary = routesHelpers.summarizeOverview(overview);
@@ -143,6 +195,7 @@
       listRegion.innerHTML = routesRenderers.renderRouteList(filteredRoutes, selectedRouteId);
       detailTitle.textContent = selectedRoute?.name || selectedRoute?.code || 'Selecciona una ruta';
       detailRegion.innerHTML = routesRenderers.renderRouteDetail(selectedRoute, overview?.zones || [], overview?.agents || [], selectedGoalsAgentId, goalRows);
+      initRouteLeafletMap(selectedRoute);
     }
 
     async function loadOverview() {

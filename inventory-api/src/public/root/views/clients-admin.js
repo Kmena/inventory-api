@@ -96,7 +96,7 @@
               <label><span>Correo facturacion</span><input name="emailBilling" type="email" maxlength="255" /></label>
               <label><span>Tipo de pago</span><select name="paymentType"><option value="">Selecciona</option><option value="CASH">Contado</option><option value="CREDIT">Credito</option><option value="TRANSFER">Transferencia</option><option value="CARD">Tarjeta</option></select></label>
               <label><span>Dias de pago</span><input name="paymentDays" type="number" min="0" /></label>
-              <label><span>Limite de credito</span><input name="creditLimit" type="number" min="0" step="0.01" /></label>
+              
               <label class="root-form-grid__full"><span>Direccion</span><textarea name="address" rows="3" maxlength="1000"></textarea></label>
             </div>
           </fieldset>
@@ -408,6 +408,19 @@
           await loadClientDetail(clientId);
           detailMessage.innerHTML = rootShellUi.renderInlineMessage('Cliente actualizado correctamente.');
           setShellStatus('Cliente actualizado correctamente.');
+          return;
+        }
+
+        if (form.classList.contains('clients-store-credit-form')) {
+          const storeId = form.getAttribute('data-store-id') || '';
+          const creditLimit = parseFloat(String(formData.get('creditLimit') || '0'));
+          const msgEl = form.querySelector('.clients-store-credit-msg');
+          try {
+            await clientsApi.updateStoreCreditLimit(session, clientId, storeId, { creditLimit });
+            if (msgEl) { msgEl.textContent = '✓ Guardado'; }
+          } catch (err) {
+            if (msgEl) { msgEl.textContent = err.message || 'Error'; }
+          }
           return;
         }
 

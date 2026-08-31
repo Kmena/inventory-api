@@ -51,8 +51,8 @@ test('prisma schema exposes QualityInspection model with correct relations', () 
 
   assert.ok(schema.includes('model QualityInspection'), 'Must declare QualityInspection model');
   assert.ok(schema.includes('enum QualityInspectionResult'), 'Must declare QualityInspectionResult enum');
-  assert.ok(schema.includes('result             QualityInspectionResult'), 'Must use the enum type');
-  assert.ok(schema.includes('productionOrder    ProductionOrder'), 'Must relate to ProductionOrder');
-  assert.ok(schema.includes('stageExecution     ProductionStageExecution'), 'Must relate to ProductionStageExecution');
+  assert.ok(/result\s+QualityInspectionResult/.test(schema), 'Must use the enum type');
+  assert.ok(/productionOrder\s+ProductionOrder/.test(schema), 'Must relate to ProductionOrder');
+  assert.ok(/stageExecution\s+ProductionStageExecution/.test(schema), 'Must relate to ProductionStageExecution');
   assert.ok(schema.includes('@@map("quality_inspections")'), 'Must map to quality_inspections table');
 });

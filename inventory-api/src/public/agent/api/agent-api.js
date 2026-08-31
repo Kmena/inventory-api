@@ -87,6 +87,21 @@ async function postOrder(session, storeId, payload) {
   });
 }
 
+/**
+ * POST /api/agent/stores/:storeId/payments
+ * @param {any} session
+ * @param {string|number} storeId
+ * @param {any} payload
+ */
+async function postPayment(session, storeId, payload) {
+  return inventoryAuth.fetchJson(session, `${BASE}/stores/${encodeURIComponent(storeId)}/payments`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
 AgentShell.register('api.agentApi', {
   fetchDashboard,
   fetchStores,
@@ -96,6 +111,7 @@ AgentShell.register('api.agentApi', {
   fetchOrders,
   postVisit,
   postOrder,
+  postPayment,
 });
 
 })();

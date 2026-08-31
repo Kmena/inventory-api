@@ -28,6 +28,14 @@ function isAgentWorkspaceUser(user) {
     return true;
   }
 
+  // Explicit landing permission is the canonical signal — mirrors resolveLanding().
+  // A role with agent.access is always an agent workspace user regardless of
+  // which other operational permissions it carries.
+  if (hasPermission(user, 'agent.access')) {
+    return true;
+  }
+
+  // Legacy heuristic for roles created before the landing-permission system.
   return Boolean(
     hasPermission(user, 'sales.routes.view.own')
     && hasPermission(user, 'sales.orders.create')
@@ -119,7 +127,6 @@ function serializeRoute(route) {
     code: route.code,
     name: route.name,
     visitFrequencyDays: route.visitFrequencyDays,
-    nearLimitDays: route.nearLimitDays,
     isActive: route.isActive,
     subzonesCount: subzones.length,
     storesCount: uniqueStoreIds.size,
@@ -156,27 +163,28 @@ function serializeZones(regions) {
   }));
 }
 
+const MIN_VISIT_FREQUENCY_DAYS = 5;
+
 function normalizeRoutePayload(payload) {
   const code = payload.code?.trim();
   const name = payload.name?.trim();
   const visitFrequencyDays = Number(payload.visitFrequencyDays || 0);
-  const nearLimitDays = Number(payload.nearLimitDays || 0);
 
   if (!code || !name) {
     throw createHttpError(400, 'La ruta debe incluir codigo y nombre', 'validation_error');
   }
-  if (!Number.isInteger(visitFrequencyDays) || visitFrequencyDays <= 0) {
-    throw createHttpError(400, 'La frecuencia minima de visita debe ser un numero entero mayor a cero', 'validation_error');
-  }
-  if (!Number.isInteger(nearLimitDays) || nearLimitDays < 0) {
-    throw createHttpError(400, 'El umbral de alerta debe ser un numero entero igual o mayor a cero', 'validation_error');
+  if (!Number.isInteger(visitFrequencyDays) || visitFrequencyDays < MIN_VISIT_FREQUENCY_DAYS) {
+    throw createHttpError(
+      400,
+      `La frecuencia de visita debe ser minimo ${MIN_VISIT_FREQUENCY_DAYS} dias`,
+      'validation_error',
+    );
   }
 
   return {
     code,
     name,
     visitFrequencyDays,
-    nearLimitDays,
     isActive: payload.isActive !== false,
   };
 }

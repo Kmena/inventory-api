@@ -69,7 +69,8 @@ function renderOrderRow(order) {
   const agentName = order.user?.fullName || order.responsible || '—';
   const paymentLabel = PAYMENT_LABELS[order.paymentCondition] || order.paymentCondition || '—';
   const itemCount = (order.items || []).length;
-  const isDraft = order.status === 'DRAFT';
+  const isDraft    = order.status === 'DRAFT';
+  const isApproved  = order.status === 'APPROVED';
 
   const itemsSummary = (order.items || []).slice(0, 5).map((item) =>
     `<div style="display:flex;justify-content:space-between;gap:8px;font-size:0.8rem;padding:2px 0;">
@@ -104,6 +105,10 @@ function renderOrderRow(order) {
         <button type="button" class="btn approvals-approve-btn" data-order-id="${escapeHtml(String(order.id))}" style="background:#16A34A;flex:1;min-width:120px;">✓ Aprobar</button>
         <button type="button" class="secondary-button approvals-reject-btn" data-order-id="${escapeHtml(String(order.id))}" style="color:#DC2626;border-color:#DC2626;flex:1;min-width:120px;">✗ Rechazar</button>
       </div>` : ''}
+      ${isApproved ? `
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button type="button" class="btn approvals-dispatch-btn" data-order-id="${escapeHtml(String(order.id))}" style="background:#2563EB;flex:1;min-width:120px;">🚚 Despachar</button>
+      </div>` : ''}
     </div>`;
 }
 
@@ -114,6 +119,48 @@ function renderEmptyState() {
       <h3 style="margin:0 0 8px;">Sin pedidos pendientes</h3>
       <p class="muted">No hay pedidos esperando aprobación en este momento.</p>
     </div>`;
+}
+
+function renderDispatchedRow(order) {
+  const total = calculateOrderTotal(order);
+  const storeName = order.clientStore?.name || order.client?.tradeName || order.client?.legalName || '—';
+  const agentName = order.user?.fullName || order.responsible || '—';
+  const transportLabel = { PRIVATE: '🚛 Privado', MAIL: '📮 Correo', COURIER: '📦 Courier', OWN: '🏍️ Propio', PICKUP: '🏪 Retiro' };
+  const transport = order.transportMethod ? (transportLabel[order.transportMethod] || order.transportMethod) : '—';
+  return `
+    <div style="border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div>
+          <strong style="font-size:1rem;">#${escapeHtml(String(order.orderNumber || order.id))}</strong>
+          <span style="margin-left:8px;">${statusBadge(order.status)}</span>
+        </div>
+        <span style="font-size:0.82rem;color:#64748b;">Despachado: ${escapeHtml(formatDate(order.dispatchedAt))}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;font-size:0.85rem;">
+        <div><span style="color:#64748b;">Tienda:</span> <strong>${escapeHtml(storeName)}</strong></div>
+        <div><span style="color:#64748b;">Agente:</span> ${escapeHtml(agentName)}</div>
+        <div><span style="color:#64748b;">Total:</span> <strong>${currency(total)}</strong></div>
+        <div><span style="color:#64748b;">Transporte:</span> ${escapeHtml(transport)}</div>
+        ${order.transportResponsible ? `<div><span style="color:#64748b;">Responsable:</span> ${escapeHtml(order.transportResponsible)}</div>` : ''}
+        ${order.trackingNumber ? `<div><span style="color:#64748b;">Guía:</span> ${escapeHtml(order.trackingNumber)}</div>` : ''}
+        <div><span style="color:#64748b;">Bodega:</span> ${escapeHtml(order.warehouse?.name || '—')}</div>
+      </div>
+    </div>`;
+}
+
+function renderDispatchesTab(orders) {
+  return `
+    <section class="root-hero" aria-labelledby="approvals-title">
+      <p class="root-hero__eyebrow">Gestión</p>
+      <h2 id="approvals-title">Despachos</h2>
+      <p class="muted">${orders.length} pedido${orders.length !== 1 ? 's' : ''} despachado${orders.length !== 1 ? 's' : ''}</p>
+    </section>
+    <section class="commercial-page">
+      <div id="approvals-message" role="status" aria-live="polite"></div>
+      <div id="dispatches-list">
+        ${orders.length ? orders.map(renderDispatchedRow).join('') : '<div style="text-align:center;padding:48px 24px;"><div style="font-size:3rem;">📦</div><h3>Sin despachos registrados</h3></div>'}
+      </div>
+    </section>`;
 }
 
 function renderOrdersList(orders, filterStatus) {
@@ -157,17 +204,22 @@ async function render(session, _item) {
 
   const ordersApi = rootShell.require('ordersApi');
   let filterStatus = 'DRAFT';
+  let activeTab = 'approvals'; // 'approvals' | 'dispatches'
 
   containerEl.innerHTML = renderSkeleton();
 
   let allOrders = [];
+  let deliveredOrders = [];
 
   async function loadOrders() {
     try {
-      const result = await ordersApi.listOrders(session);
-      allOrders = Array.isArray(result) ? result : (result?.items || result?.orders || []);
-      // Sort by created date descending
+      const [ordersResult, dispatchedResult] = await Promise.all([
+        ordersApi.listOrders(session),
+        ordersApi.listDispatchedOrders(session),
+      ]);
+      allOrders = Array.isArray(ordersResult) ? ordersResult : (ordersResult?.items || ordersResult?.orders || []);
       allOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      deliveredOrders = Array.isArray(dispatchedResult) ? dispatchedResult : [];
     } catch (err) {
       containerEl.innerHTML = `
         <section class="root-hero"><h2>Aprobaciones</h2></section>
@@ -186,7 +238,18 @@ async function render(session, _item) {
   }
 
   function renderView() {
-    containerEl.innerHTML = renderOrdersList(allOrders, filterStatus);
+    const tabBar = `<div style="display:flex;gap:8px;margin-bottom:20px;">
+      <button type="button" class="tab-button main-tab-btn ${activeTab === 'approvals' ? 'active' : ''}" data-tab="approvals">📋 Aprobaciones</button>
+      <button type="button" class="tab-button main-tab-btn ${activeTab === 'dispatches' ? 'active' : ''}" data-tab="dispatches">🚚 Despachos (${deliveredOrders.length})</button>
+    </div>`;
+    if (activeTab === 'dispatches') {
+      const inner = renderDispatchesTab(deliveredOrders);
+      // Inject tab bar after root-hero
+      containerEl.innerHTML = inner.replace('<section class="commercial-page">', `<section class="commercial-page">${tabBar}`);
+    } else {
+      const inner = renderOrdersList(allOrders, filterStatus);
+      containerEl.innerHTML = inner.replace('<section class="commercial-page" id="approvals-page">', `<section class="commercial-page" id="approvals-page">${tabBar}`);
+    }
     bindEvents();
   }
 
@@ -218,6 +281,25 @@ async function render(session, _item) {
       });
     });
 
+    // Dispatch buttons
+    containerEl.querySelectorAll('.approvals-dispatch-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const orderId = btn.getAttribute('data-order-id');
+        btn.disabled = true;
+        btn.textContent = 'Despachando…';
+        try {
+          await ordersApi.dispatchOrder(session, orderId);
+          showToast(containerEl, `Pedido #${orderId} despachado correctamente.`, false);
+          await loadOrders();
+          renderView();
+        } catch (err) {
+          showToast(containerEl, err.message || 'Error al despachar el pedido.', true);
+          btn.disabled = false;
+          btn.textContent = '🚚 Despachar';
+        }
+      });
+    });
+
     // Reject buttons
     containerEl.querySelectorAll('.approvals-reject-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -240,6 +322,16 @@ async function render(session, _item) {
 
   const loaded = await loadOrders();
   if (loaded) renderView();
+
+  containerEl.addEventListener('click', (e) => {
+    const btn = /** @type {HTMLElement} */ (e.target)?.closest('.main-tab-btn');
+    if (!btn) return;
+    const tab = btn.getAttribute('data-tab');
+    if (tab && tab !== activeTab) {
+      activeTab = tab;
+      renderView();
+    }
+  });
 }
 
 rootShell.register('views.approvalsAdmin', { render });

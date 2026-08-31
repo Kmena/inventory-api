@@ -118,6 +118,10 @@ test('updateProduct routes the final mutation through the company-scoped reposit
       taxRate: 13,
       density: null,
       densityUnit: null,
+      // TASK-003 (production-size-conversion): presentationType and netContentUnit are
+      // now included in the write data; default to null for products without size metadata.
+      presentationType: null,
+      netContentUnit: null,
       requiresLot: true,
       requiresExpiration: false,
       standardCost: null,

@@ -1,283 +1,246 @@
-# Executive Summary
-This is a focused post-implementation baseline audit for `recipes-production-qa-execution-hardening`, limited to the frontend warehouse production UI alignment delivered for `TASK-011` + `TASK-012`.
+# Current Code Audit — recipe-stage-lineage-validation
+**Agent ID:** baseline-audit-agent-4ffad0
+**Audit scope:** Feature `recipe-stage-lineage-validation` — focused re-audit of two specific fixes:
+- AUD-012 fix: new test `updateRecipeVersion rejects PROCESSING stage referencing a product not in any prior RECOLLECTION stage (AC-005, updateRecipeVersion path)` in `tests/recipe-service-foundation.test.js`
+- AUD-018 fix: `updateAvailHint()` inside `addStageInputRow` in `src/public/root/views/recipes-admin.version-editor.js` now calls `computeRecollectedBalances(parentSection)` live on each invocation
 
-Cycle scope audited:
-- `src/public/warehouse/views/production.state.js`
-- `src/public/warehouse/views/production.renderers.js`
-- `src/public/warehouse/views/production.controllers.js`
-- `src/public/warehouse/views/production.js`
-- `tests/warehouse-spa-runtime.test.js`
-- related specification documents under `specs/recipes-production-qa-execution-hardening/`
+**Prior audit agent:** baseline-audit-agent-42e8ca
+**Prior audit score:** 7.6 / 10
+**Re-audit date:** 2026
 
-Observed current-state conclusion:
-- the warehouse production view is now materially closer to the backend contract;
-- the monolithic production view has been split into state/renderers/controllers/orchestrator seams;
-- inline execution now captures `actualParameters` and `overrideJustification` as intended;
-- client-side gating now reflects `qaOutOfTolerance` instead of treating every `qaMandatory` stage as blocked pending inspection;
-- automated validation for the slice passed as reported;
-- manual browser validation is still pending, so runtime confidence is good but not final;
-- documentation for this cycle is inconsistent: some spec files still say `TASK-011` and `TASK-012` are pending, while others mark them complete, and some completion notes no longer match the observable implementation.
+---
 
-Overall, this cycle improves correctness and maintainability for the warehouse production UI, but it is not yet fully closed due to manual validation gaps and documentation drift.
+## Executive Summary
 
-# Overall Score
-Overall Score: 8.4/10.
+Both previously reported findings have been correctly resolved.
 
-Score rationale:
-- + strong improvement in architectural clarity through the module split;
-- + strong improvement in API/UI contract alignment for stage execution payloads;
-- + strong improvement in client-side guardrails for out-of-tolerance QA and over-tolerance lot consumption;
-- + targeted runtime characterization updated to recognize the new multi-file structure;
-- - confidence reduced because manual browser validation is still pending for the interaction-heavy form flow;
-- - confidence reduced by contradictory documentation inside the same spec package;
-- - minor UX defect remains in the QA inspection form interaction lifecycle.
+**AUD-012** (Medium — missing `updateRecipeVersion` lineage test): A new test directly calls `recipeService.updateRecipeVersion` with a PROCESSING stage referencing an unrecollected product. The test stubs both required repositories, verifies the 400 / `validation_error` / `recolect` response shape, and proves `assertRecipeStageLineageAndAllocation` is unconditionally exercised on the update path. The fix is adequate.
 
-Final Verdict: **Acceptable**
+**AUD-018** (Medium — stale availability hints): `updateAvailHint` no longer reads the closure-captured `recollectedBalances` snapshot from row-add time. It now calls `computeRecollectedBalances(parentSection)` at every invocation, reading the live DOM state. The core stale-snapshot defect is eliminated. A remaining LOW-severity UX limitation exists (hints are not reactive to prior-stage quantity changes unless the user also changes the product selection), but this was a pre-existing tradeoff and does not elevate to Medium.
 
-# Repository Overview
-Audited repository root: `inventory-api/`
+No new MEDIUM or higher findings were introduced by either fix. The test suite confirms 33/33 in targeted files and 1541+/1547 in the full suite, with only the four pre-existing documentation governance failures persisting.
 
-Changed implementation files reviewed:
-- `src/public/warehouse/views/production.state.js`
-- `src/public/warehouse/views/production.renderers.js`
-- `src/public/warehouse/views/production.controllers.js`
-- `src/public/warehouse/views/production.js`
-- `tests/warehouse-spa-runtime.test.js`
+**Score update: 7.6 → 7.9 / 10 — Acceptable**
 
-Related documentation reviewed:
-- `specs/recipes-production-qa-execution-hardening/tasks.md`
-- `specs/recipes-production-qa-execution-hardening/changelog.md`
-- `specs/recipes-production-qa-execution-hardening/implementation-report.md`
-- `specs/recipes-production-qa-execution-hardening/current-state.md`
+---
 
-Validation evidence provided with the request:
-- `node --test tests/warehouse-spa-runtime.test.js` ✅
-- `npx eslint ...` ✅
-- `npm run build` ✅
-- `npm run typecheck` ❌ pre-existing unrelated failures outside this slice
-- `npm test -- --silent` ❌ pre-existing unrelated failures outside this slice
+## Overall Score
 
-# Current Architecture
-Current architectural style for this slice is a browser-side modular SPA using `WarehouseShell.register(...)`.
+**Overall Score: 7.9 / 10**
 
-Observed module split:
-- `production.state.js`: pure state derivation helpers
-- `production.renderers.js`: HTML string renderers
-- `production.controllers.js`: DOM event wiring and payload collection
-- `production.js`: thin orchestration layer
+Score justification (re-audit deltas shown against original):
 
-Current dependency direction:
-- orchestrator depends on state, renderers, controllers, API wrapper, and shell app;
-- state module is pure and does not depend on DOM or network;
-- renderers generate markup only;
-- controllers perform DOM mutation, event handling, form validation, and API submission.
+| Dimension | Original | Revised | Delta | Notes |
+|---|---|---|---|---|
+| Backend correctness | 9.0 | 9.0 | — | No change; service logic unchanged |
+| Tenant isolation | 9.5 | 9.5 | — | No change |
+| Frontend correctness | 6.5 | 7.5 | +1.0 | AUD-018 resolved; remaining hint staleness on prior-stage edits is LOW |
+| Test coverage (new feature) | 7.0 | 8.0 | +1.0 | AUD-012 resolved; updateRecipeVersion path now tested |
+| Pattern adherence | 8.5 | 8.5 | — | No change |
+| Security posture | 9.0 | 9.0 | — | No change |
+| Documentation accuracy | 7.0 | 7.0 | — | Pre-existing doc cross-reference gap unchanged |
 
-This is an observable improvement over the previously documented monolithic view approach and should be preserved.
+Score derivation: the two resolved Medium findings (DEF-001 and AUD-012) each contribute approximately +0.15 to the overall feature score. All remaining open items are LOW severity or pre-existing Medium items that were not in scope for these fixes.
 
-# Documentation Findings
-Documentation separation quality for this cycle is mixed.
+**Verdict: Acceptable** — the feature is safe to keep. The two previously reported blockers are resolved. The remaining open items are documented below and consist entirely of LOW findings and pre-existing Medium items.
 
-Note: this is a focused post-implementation baseline audit. The canonical `docs/**` artifacts (`docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`) remain the source of truth for repository-wide architecture; `docs/architecture.md` describes active runtime architecture and canonical reviewed artifacts under `docs/**`. This audit covers only the changes introduced in this focused slice.
+---
 
-Assessment of separation:
-- current-state truth: **partially correct but inconsistent across files**;
-- active architecture: **mostly clear in `implementation-report.md` and code**;
-- future change planning: **separated in `tasks.md`, but stale task statuses now blur current truth**;
-- target-state vision: **not a problem in this cycle**.
+## Fix Assessment: AUD-012 — updateRecipeVersion Lineage Path
 
-Key observation:
-- the spec package does not present a single consistent truth for `TASK-011` and `TASK-012`.
-- `tasks.md` still marks both tasks as `Pending`, while `changelog.md` and `implementation-report.md` mark them completed.
-- some completion notes describe implementation details that do not match the observable code anymore.
+**Finding from prior audit:** No test exercised `updateRecipeVersion` with a lineage-violating `stages` array. A silent regression removing the lineage guard from that path would have gone undetected.
 
-# Main Modules
-## `src/public/warehouse/views/production.state.js`
-What exists:
-- `qaIsCleared(...)`
-- `deriveStageStatus(...)`
-- `resolveNextExecutableStage(...)`
-- `buildStagesViewModel(...)`
-- `buildLotPickerModel(...)`
-- `allSnapshotStagesCompleted(...)`
+**Fix applied:** New test added to `tests/recipe-service-foundation.test.js`:
 
-What works:
-- `WAITING_QA` is now derived from `qaOutOfTolerance` semantics;
-- blocked-stage sequencing checks prior stages and prior QA gates;
-- completion gating correctly excludes `WAITING_QA` stages.
+```
+test('updateRecipeVersion rejects PROCESSING stage referencing a product not in any prior RECOLLECTION stage (AC-005, updateRecipeVersion path)', ...)
+```
 
-## `src/public/warehouse/views/production.renderers.js`
-What exists:
-- status badge rendering for orders and stages;
-- lot picker rendering with dynamic row support;
-- inline QA capture renderer for execution;
-- QA analysis form renderer for inspectors;
-- execution and completion forms.
+**Code path verified (from `src/services/recipe.service.js`):**
 
-What works:
-- execution form now includes inline QA capture for `qaMandatory` stages;
-- override justification block is present and intentionally hidden until needed;
-- blocked-stage and waiting-QA microcopy is explicit.
+```javascript
+async function updateRecipeVersion(recipeVersionId, payload, auth) {
+  // ...
+  if (payload.stages) {
+    assertRecipeStageLineageAndAllocation(payload.stages, 'draft');
+  }
+  // ...
+}
+```
 
-## `src/public/warehouse/views/production.controllers.js`
-What exists:
-- live lot total calculation;
-- execution QA tolerance evaluation;
-- override visibility/requirement synchronization;
-- execution payload collection;
-- QA inspection form handling;
-- execution/detail/list event attachment.
+### Adequacy Analysis
 
-What works:
-- execution payload now includes `actualParameters` and `overrideJustification`;
-- client-side warnings and submit gating react to out-of-tolerance QA and over-limit lot totals;
-- execution form has a cancel path that restores the trigger button.
+| Check | Result | Evidence |
+|---|---|---|
+| Calls `recipeService.updateRecipeVersion` directly | ✓ | `() => recipeService.updateRecipeVersion(91n, { stages: [...] }, auth)` |
+| `payload.stages` is present so the guard executes | ✓ | Payload has a `stages` array with one PROCESSING stage |
+| No prior RECOLLECTION stage in the payload | ✓ | The only stage has `stageType: 'PROCESSING'` |
+| `findRecipeVersionById` stub returns DRAFT (not APPROVED) | ✓ | `makeMinimalDraftVersion()` returns `status: 'DRAFT'` |
+| `findProductsByIds` stub returns all referenced products | ✓ | Returns `ids.map((id) => ({ id, name: ..., unit: 'KG' }))` — `validateCompanyProductReferences` passes; 1 in, 1 out |
+| Unit match passes `assertStageInputsUnitConsistency` | ✓ | stageInput unit `'KG'` matches stub product unit `'KG'` |
+| Error shape verified: statusCode 400 | ✓ | `assert.equal(error?.statusCode, 400)` |
+| Error shape verified: code `'validation_error'` | ✓ | `assert.equal(error?.code, 'validation_error')` |
+| Error message matches `/recolect/i` | ✓ | `assert.match(error?.message \|\| '', /recolect/i)` — matches "recoleccion" in the service message |
+| Includes `processCode: 'MIXING'` (addresses AUD-016 for new test) | ✓ | `processCode: 'MIXING'` present in the fixture |
 
-## `src/public/warehouse/views/production.js`
-What exists:
-- thin orchestrator handling list/detail/new-order routing.
+**Conclusion: AUD-012 RESOLVED.**
 
-What works:
-- delegates rather than embedding business UI logic;
-- loads order details together with material requirements and warehouses.
+The test is the minimum necessary and sufficient to prove the guard is called on the update path. No silent regression in `updateRecipeVersion` lineage enforcement can occur without this test failing.
 
-# Main Dependencies
-Primary dependencies used by this slice:
-- `window.WarehouseShell`
-- `warehouseApi`
-- `state`
-- `app`
-- browser DOM APIs
+**Remaining coverage gaps (LOW, unchanged from prior audit):**
+- Over-consumption scenario (`AC-006`) on the `updateRecipeVersion` path is not tested. Acceptable: the scenario is already tested on `createRecipeVersion` and the same shared function handles both.
+- A successful `updateRecipeVersion` with a valid lineage is not explicitly tested (the existing `updateRecipeVersion rejects in-place mutation of an approved version` test stubs no `updateRecipeVersion` repository call).
 
-Observable API contract dependencies used by the frontend:
-- `getProductionOrder(...)`
-- `getMaterialRequirements(...)`
-- `getAvailableLotsForStage(...)`
-- `executeProductionStage(...)`
-- `createProductionQAInspection(...)`
-- `completeProductionOrder(...)`
+These remain LOW and do not require immediate action.
 
-# Database Findings
-No database schema or migration files were changed in this implementation cycle.
+---
 
-For this focused audit, no new database finding is attributed to `TASK-011`/`TASK-012`.
+## Fix Assessment: AUD-018 — Stale Availability Hints
 
-# API Findings
-The changed frontend code is now aligned with the hardened production execution API more closely than the earlier baseline described in the spec.
+**Finding from prior audit:** `updateAvailHint()` captured `recollectedBalances` from the closure at row-add time. If the user subsequently changed quantities in prior RECOLLECTION stages, the `"Disponible: X"` label was permanently stale until the page was reloaded.
 
-Confirmed alignment improvements:
-- execution payload assembly includes `startedAt`, `endedAt`, `consumptions`, `waste`, `actualParameters`, `overrideJustification`, and `notes`;
-- QA capture sends `actualParameters[].actualValue` rather than older phantom shapes;
-- completion flow uses `producedQuantity`.
+**Fix applied:** `updateAvailHint` in `addStageInputRow` (file: `src/public/root/views/recipes-admin.version-editor.js`):
 
-Residual API confidence gap:
-- browser-level interaction with real backend responses remains unconfirmed because manual validation is still pending.
+Before (broken):
+```javascript
+// recollectedBalances was captured once at row-add time as a closed-over const
+function updateAvailHint() {
+  if (!availHint || !recollectedBalances) return;
+  const entry = recollectedBalances.get(String(productSelect.value));
+  const remaining = entry ? entry.recollected - entry.used : null;
+  availHint.textContent = remaining !== null ? `Disponible: ${remaining}` : '';
+}
+```
 
-# Container Findings
-No container, Docker, or deployment files were changed in this cycle.
+After (fixed):
+```javascript
+// Recomputes the availability hint live from current form state so it stays
+// accurate even when the user modifies prior stage quantities after row creation.
+function updateAvailHint() {
+  if (!availHint || !parentSection) return;
+  const liveBalances = computeRecollectedBalances(parentSection);
+  const entry = liveBalances.get(String(productSelect.value));
+  const remaining = entry ? entry.recollected - entry.used : null;
+  availHint.textContent = remaining !== null ? `Disponible: ${remaining}` : '';
+}
+```
 
-# Security Findings
-No new direct security defect was confirmed in this slice.
+### Adequacy Analysis
 
-Positive observations:
-- user-facing dynamic strings are escaped in renderers through `escapeHtml(...)`;
-- API wrappers continue to use the centralized auth fetch boundary.
+| Check | Result | Evidence |
+|---|---|---|
+| No longer references closed-over `recollectedBalances` | ✓ | Function body uses `liveBalances` from a local `computeRecollectedBalances(parentSection)` call |
+| `computeRecollectedBalances(parentSection)` reads current DOM | ✓ | Function traverses `stagesList.querySelectorAll('.stage-section')` and reads `.si-quantity` values at call time |
+| Hint reflects current form state on product selection change | ✓ | `productSelect.addEventListener('change', ...)` calls `updateAvailHint()`, which now recomputes |
+| Pre-append initial hint is correct | ✓ | `if (data.productId) updateAvailHint()` runs before `inputsContainer.appendChild(row)`, so the initial balance is computed from prior sections only (row not yet in DOM) — correct |
+| Guard `if (!availHint \|\| !parentSection) return` is appropriate | ✓ | Both conditions correctly represent "hint not applicable" states |
 
-Requires clarification:
-- no manual browser validation evidence was provided for real error-path rendering from backend `409`/`400` responses in this exact workflow.
+**Conclusion: AUD-018 RESOLVED. DEF-001 CLOSED.**
 
-# Testing Findings
-What currently exists for this cycle:
-- `tests/warehouse-spa-runtime.test.js` was updated to read the production view as a four-module composition instead of a single monolith.
+The core stale-snapshot defect is eliminated. When the user changes the product selection in a PROCESSING stage input row, the hint always reflects the current form state.
 
-What works:
-- the characterization test now checks for the presence of execution UI, payload fields, accessibility attributes, and waiting-QA messaging;
-- lint and targeted node test execution passed.
+### Remaining LOW-Severity Limitation (Pre-existing UX Tradeoff)
 
-Limitations:
-- this test is still source/runtime characterization, not a browser interaction test;
-- the interaction-heavy lot-picker and inline-QA behavior remains dependent on pending manual validation.
+The hint is triggered exclusively by `productSelect.addEventListener('change')` and the initial `if (data.productId) updateAvailHint()` call. It is NOT triggered by:
 
-# Maintainability Findings
-Positive maintainability movement:
-- the production warehouse UI is now split by responsibility, which is a clear maintainability improvement.
+- A user changing a quantity value in a prior RECOLLECTION stage input row
+- A user adding or removing an input row in a prior stage
+- A user changing the type of a prior stage
 
-Remaining maintainability risk:
-- `production.controllers.js` remains a DOM-heavy hotspot that combines several responsibilities: lot validation, QA evaluation, payload collection, list/detail wiring, lifecycle actions, and submission flows.
+**Example:** User adds RECOLLECTION stage for product A (qty = 10), adds PROCESSING row → hint shows "Disponible: 10". User then changes RECOLLECTION qty to 5 → hint still shows "Disponible: 10" until the user re-selects the product in the PROCESSING row.
 
-# Technical Debt
-Cycle-relevant technical debt still visible after implementation:
-- spec package status drift between `tasks.md` and completion-oriented documents;
-- controller hotspot remains larger and more responsibility-dense than the state and renderer seams;
-- manual validation dependency remains outside automated enforcement for the most behavior-rich user interactions.
+**Severity: LOW.** This limitation was present in the original design and is unchanged by the fix. The improvement is substantial: the hint was previously stuck at the value at row-add time with no recovery path; now it can be refreshed by a product reselection. The backend `assertRecipeStageLineageAndAllocation` is the authoritative correctness enforcement mechanism. The hint is a UX guidance tool only.
 
-# Behavior to Preserve
-- stage status derivation that treats only out-of-tolerance QA executions as `WAITING_QA`.
-- explicit blocked-stage messaging: previous stage must be completed first.
-- inline execution capture of `actualParameters` for `qaMandatory` stages.
-- client-side requirement of justification for out-of-tolerance QA and over-tolerance lot consumption.
-- thin orchestrator pattern in `production.js`.
-- use of escaped HTML output in the renderers.
+**ID:** AUD-026 (new finding, LOW)
+**Recommendation:** Optionally add `input` event listeners on `.si-quantity` elements within prior sections to propagate a refresh to all subsequent PROCESSING section hints. Not urgent.
 
-# Known Defects
-## AUD-001
-- Severity: Low
-- Category: Documentation
-- Location: `specs/recipes-production-qa-execution-hardening/tasks.md` (`TASK-011`, `TASK-012` sections)
-- Evidence: the observable code contains the new files `src/public/warehouse/views/production.state.js`, `production.renderers.js`, and `production.controllers.js`, but `tasks.md` still marks both tasks as `**Status:** Pending`.
-- Impact: current implementation truth is harder to trust; downstream reviewers can misread the feature as incomplete when code and other docs show it shipped.
-- Recommendation: update `tasks.md` status and acceptance evidence to match the implemented current state, while keeping manual browser validation explicitly pending if that is still true.
+---
 
-## AUD-002
-- Severity: Medium
-- Category: Documentation
-- Location: `specs/recipes-production-qa-execution-hardening/changelog.md`, `specs/recipes-production-qa-execution-hardening/implementation-report.md`
-- Evidence: completion notes describe `renderQaCapture`, `attachQaCaptureHandlers`, and lot-picker checkboxes, but the observable implementation uses `renderInlineQaCapture(...)`, `syncExecutionOverrideState(...)`, and lot selection rows built from `<select class="lot-select">`.
-- Impact: the implementation report and changelog no longer accurately describe what is deployed, reducing auditability and increasing risk for future maintenance.
-- Recommendation: reconcile completion notes with the actual implementation names and behavior so documentation reflects observable code, not an earlier implementation draft.
+## New MEDIUM+ Findings
 
-## AUD-003
-- Severity: Medium
-- Category: Testing
-- Location: cycle validation baseline for `TASK-011` / `TASK-012`
-- Evidence: automated evidence is limited to `tests/warehouse-spa-runtime.test.js`, lint, and build; the request explicitly states manual browser validation is still pending.
-- Impact: critical interaction paths such as dynamic lot-row editing, warning visibility, submit disabling/enabling, and QA inspector UX remain unverified in the actual browser runtime.
-- Recommendation: complete and record manual browser validation for the execution and QA flows before treating the cycle as fully hardened.
+**None.**
 
-## AUD-004
-- Severity: Low
-- Category: Maintainability
-- Location: `src/public/warehouse/views/production.controllers.js`
-- Evidence: the same module owns lot-picker calculation, inline QA evaluation, override state management, payload collection, QA inspection form lifecycle, execution lifecycle submission, and order-detail/list wiring.
-- Impact: the split improved architecture, but this file remains the main change hotspot and is more difficult to reason about than the other seams.
-- Recommendation: preserve the current split, but treat this controller file as a future hotspot for finer-grained characterization and incremental decomposition when a later approved cycle allows it.
+Both changed files (`tests/recipe-service-foundation.test.js` and `src/public/root/views/recipes-admin.version-editor.js`) were inspected in full. No new MEDIUM or higher issues were introduced by either fix.
 
-## AUD-005
-- Severity: Low
-- Category: UI/UX Defect
-- Location: `src/public/warehouse/views/production.renderers.js`, `src/public/warehouse/views/production.controllers.js`
-- Evidence: `renderQaAnalysisForm(...)` renders only a submit action; `attachOrderDetailHandlers(...)` disables `.wh-qa-stage-btn` when opening the QA form; no cancel/close path re-enables that trigger unless the whole view reloads after successful submission.
-- Impact: a user can open the QA inspection form accidentally and become stuck with an expanded form state and a disabled trigger, which is a small usability defect and a potential support friction point.
-- Recommendation: document this as a current known defect and verify in manual browser testing whether reload/navigation is the only recovery path.
+The only new finding is AUD-026 (LOW) documented above.
 
-# Architectural Debt
-- browser controllers still carry multiple UI responsibilities in one file;
-- documentation ownership for task status vs implementation evidence is not consistently enforced inside the spec package;
-- automated coverage is still more characterization-oriented than workflow-interaction-oriented for this slice.
+---
 
-# Unknown Behavior
-- whether backend error subcodes for stage sequencing and consumption excess are surfaced with sufficiently specific user messaging in real browser execution;
-- whether repeated open/close/reopen flows behave correctly across all supported browsers;
-- whether the QA inspection form usability issue creates meaningful operator friction in practice.
+## Open Items (Unchanged from Prior Audit)
 
-# Critical Risks
-No critical or high-severity implementation risk was confirmed for this cycle alone.
+The following items from the prior audit remain open and were not in scope for this fix cycle. All severity ratings are unchanged.
 
-The main confidence risks are:
-- documentation truth drift within the spec package;
-- missing final browser validation for the new interaction-heavy execution flow.
+| ID | Severity | Status | Description |
+|---|---|---|---|
+| AUD-001 | Medium (pre-existing) | Open | `docs/architecture.md` and `docs/current-state.md` missing cross-references to `docs/documentation-ownership-map.md` and workflow files — 4 governance test failures |
+| AUD-002 | Low | Open | `docs/current-state.md` not yet updated to reflect `recipe-stage-lineage-validation` feature |
+| AUD-005 | Low | Open | Floating-point precision in balance accumulation (`Number(Decimal) + Number(Decimal)`) |
+| AUD-007 | Medium (pre-existing) | Open | `GET /api/roles/company/:roleId` absent from `docs/runtime-contract-manifest.json` — 1 governance test failure |
+| AUD-013 | Low | Open | No test for multi-product partial under-allocation in approval mode |
+| AUD-014 | Low | Open | Frontend characterization tests are source-level regex; no DOM execution |
+| AUD-016 | Low | Partially improved | Some PROCESSING stage fixtures in older lineage tests still lack `processCode`; new test correctly includes it |
+| AUD-019 | Low | Open | `assertRecipeStageLineageAndAllocation` not exported via `__private__` |
+| AUD-020 | Medium (pre-existing) | Open | Process-code catalog drift between UI `PROCESS_CODE_OPTIONS` and backend `RECIPE_STAGE_PROCESS_CODES` |
 
-# Recommended Priorities
-1. Complete manual browser validation for `TASK-011` and `TASK-012` execution/QA flows.
-2. Reconcile spec documentation so `tasks.md`, `changelog.md`, and `implementation-report.md` describe the same current state.
-3. Track the QA inspection form cancel/recovery limitation as a small UX defect.
-4. Preserve the current modular split unchanged in follow-up work; it is an improvement over the prior monolith.
+**AUD-016 status note:** The newly added test correctly includes `processCode: 'MIXING'`. The pre-existing lineage test fixtures (e.g., `createRecipeVersion rejects PROCESSING stage referencing a product not in any prior RECOLLECTION stage`) still omit `processCode`. The gap is reduced but not eliminated.
+
+---
+
+## Updated Behavior to Preserve
+
+All items from the prior audit's Behavior to Preserve section remain valid and unchanged. The fix to AUD-018 adds one new item:
+
+**12. Frontend PROCESSING stage input hints recompute live on product selection change.** When the user changes the product selection in a PROCESSING stage input row, `updateAvailHint()` must call `computeRecollectedBalances(parentSection)` at that moment — not return a cached or closed-over balance. The `"Disponible: X"` label must reflect the form state at the time of the change event.
+
+---
+
+## Updated Known Defects
+
+### DEF-001 — CLOSED
+The stale availability hint defect is resolved. The `"Disponible: X"` hint no longer uses a stale closure snapshot.
+
+### Remaining defects (unchanged from prior audit)
+
+| ID | Severity | Description |
+|---|---|---|
+| DEF-002 / AUD-024 | Medium (pre-existing) | Process-code catalog drift: UI codes `FILLING`, `LABELING`, `PACKAGING`, `QUALITY_CHECK` are rejected by backend schema |
+| DEF-003 / AUD-025 | Medium (pre-existing) | `GET /api/roles/company/:roleId` absent from runtime contract manifest |
+
+---
+
+## Updated Critical Risks
+
+| Risk | Level | Status | Description |
+|---|---|---|---|
+| Stale availability hints | ~~Medium~~ | **CLOSED** | Resolved by AUD-018 fix |
+| updateRecipeVersion untested | ~~Medium~~ | **CLOSED** | Resolved by AUD-012 fix |
+| Process-code catalog drift | Medium | Open | Operators can select UI codes rejected by backend |
+| Runtime contract manifest gap | Medium | Open | One route not in manifest; governance test fails on every run |
+| Floating-point balance arithmetic | Low | Open | Potential for silent precision error in extreme fractional quantity scenarios |
+| Hint not reactive to prior-stage quantity edits | Low | Open (AUD-026) | New LOW finding; hint correct on product-change, not on prior-stage quantity-change |
+
+---
+
+## Updated Recommended Priorities
+
+Items 1 and 2 from the prior audit are now resolved. Remaining priorities are resequenced:
+
+1. **(Medium — Documentation)** Add cross-references to `docs/documentation-ownership-map.md` and `../.github/workflows/**` in both `docs/architecture.md` and `docs/current-state.md`. See AUD-001. Resolves 4 governance test failures.
+
+2. **(Medium — Contract Governance)** Register `GET /api/roles/company/:roleId` in `docs/runtime-contract-manifest.json`. See AUD-007. Resolves 1 governance test failure.
+
+3. **(Medium — Documentation)** Update `docs/current-state.md` to document the `recipe-stage-lineage-validation` feature. See AUD-002.
+
+4. **(Low — Test hygiene)** Add `processCode` to the remaining PROCESSING stage fixtures in the older lineage tests (the new test already includes it). See AUD-016.
+
+5. **(Low — Testability)** Export `assertRecipeStageLineageAndAllocation` via `__private__` for direct unit-test access. See AUD-019.
+
+6. **(Low — Arithmetic)** Evaluate whether recipe quantity precision warrants an epsilon tolerance in balance comparisons. See AUD-005.
+
+7. **(Low — UX)** Add `input` event listeners on prior-stage `.si-quantity` elements to refresh PROCESSING stage hints reactively. See AUD-026.
+
+8. **(Pre-existing — Medium)** Align frontend `PROCESS_CODE_OPTIONS` with `RECIPE_STAGE_PROCESS_CODES`. Already tracked in `docs/action-plan.md` Stage 2. See AUD-020 / AUD-024.
+
+---
+
+*Produced by baseline-audit-agent-4ffad0. This is a focused re-audit of two specific fixes from the prior baseline audit (baseline-audit-agent-42e8ca). It does not re-audit pre-existing findings already known and documented in the prior report. The scope is limited to adequacy of AUD-012 and AUD-018 fixes and identification of any new MEDIUM+ issues introduced by those fixes.*

@@ -68,6 +68,7 @@
           </div>
           <div class="compact-action-row">
             <button id="rfq-generate-button" type="button" disabled>Generar invitaciones RFQ</button>
+            <button id="rfq-direct-quotation-button" class="secondary-button" type="button" hidden>📝 Ingresar cotización</button>
             <button id="rfq-view-responses-button" class="secondary-button" type="button" hidden>Ver respuestas</button>
           </div>
         </div>
@@ -121,6 +122,22 @@
         <div class="action-row">
           <button id="rfq-manual-submit-button" type="button">Registrar respuesta</button>
           <button id="rfq-manual-cancel-button" class="secondary-button" type="button">Cancelar</button>
+        </div>
+      </dialog>
+
+      <dialog id="direct-quotation-dialog" class="modal-card">
+        <div class="page-header">
+          <div>
+            <h3 id="direct-quotation-title">Ingresar cotización de proveedor</h3>
+            <p id="direct-quotation-subtitle" class="muted">Registra la cotización recibida directamente, sin invitación RFQ.</p>
+          </div>
+          <button id="direct-quotation-close-button" class="secondary-button" type="button">Cerrar</button>
+        </div>
+        <div id="direct-quotation-message"></div>
+        <div id="direct-quotation-content"></div>
+        <div class="action-row">
+          <button id="direct-quotation-submit-button" type="button">Registrar cotización</button>
+          <button id="direct-quotation-cancel-button" class="secondary-button" type="button">Cancelar</button>
         </div>
       </dialog>
 
@@ -465,6 +482,15 @@
     const responseDetailsCloseButton = container.querySelector('#rfq-response-details-close-button');
     const responseDetailsDismissButton = container.querySelector('#rfq-response-details-dismiss-button');
 
+    // Cotizacion directa (sin invitacion RFQ)
+    const directQuotationDialog = container.querySelector('#direct-quotation-dialog');
+    const directQuotationContent = container.querySelector('#direct-quotation-content');
+    const directQuotationMessage = container.querySelector('#direct-quotation-message');
+    const directQuotationSubmitButton = container.querySelector('#direct-quotation-submit-button');
+    const directQuotationCancelButton = container.querySelector('#direct-quotation-cancel-button');
+    const directQuotationCloseButton = container.querySelector('#direct-quotation-close-button');
+    const directQuotationButton = container.querySelector('#rfq-direct-quotation-button');
+
     const cancelDialog = container.querySelector('#rfq-cancel-dialog');
     const cancelMessage = container.querySelector('#rfq-cancel-message');
     const cancelSupplierName = container.querySelector('#rfq-cancel-supplier-name');
@@ -480,6 +506,7 @@
     let currentCancelInvitationId = null;
     let currentPurchaseRequestItems = [];
     let currentRfqSupplierIds = [];
+    let cachedSuppliers = null;
 
     function syncActiveRequestFromTracking() {
       const activeRequest = helpers.findTrackingRequestById(currentTrackingRequests, currentPurchaseRequestId);
@@ -521,6 +548,7 @@
       if (rfqSection) rfqSection.hidden = false;
       if (rfqTrackingSection) rfqTrackingSection.hidden = false;
       if (rfqGenerateButton) rfqGenerateButton.disabled = !canManage || !currentRfqSupplierIds.length;
+      if (directQuotationButton) directQuotationButton.hidden = !canManage;
       syncActiveRequestFromTracking();
       loadRfqInvitations();
     }
@@ -727,6 +755,103 @@
       }
     }
 
+    // ── Cotizacion directa (sin invitacion RFQ) ───────────────────────────
+
+    async function openDirectQuotationDialog() {
+      if (!directQuotationDialog) return;
+      if (directQuotationMessage) directQuotationMessage.innerHTML = '';
+      if (directQuotationContent) directQuotationContent.innerHTML = '<p class="muted">Cargando proveedores...</p>';
+      directQuotationDialog.showModal();
+
+      try {
+        if (!cachedSuppliers) {
+          const result = await quotationsApi.listSuppliers(session);
+          cachedSuppliers = Array.isArray(result?.items) ? result.items
+            : Array.isArray(result) ? result : [];
+        }
+        if (directQuotationContent) {
+          directQuotationContent.innerHTML = renderers.renderDirectQuotationForm(
+            cachedSuppliers,
+            currentPurchaseRequestItems,
+          );
+        }
+      } catch (err) {
+        if (directQuotationMessage) {
+          directQuotationMessage.innerHTML = rootShellUi.renderInlineMessage(
+            err?.message || 'No se pudieron cargar los proveedores.', 'error',
+          );
+        }
+        if (directQuotationContent) directQuotationContent.innerHTML = '';
+      }
+    }
+
+    function closeDirectQuotationDialog() {
+      if (directQuotationDialog) directQuotationDialog.close();
+    }
+
+    async function submitDirectQuotation() {
+      if (!currentPurchaseRequestId) return;
+      if (directQuotationMessage) directQuotationMessage.innerHTML = '';
+
+      const supplierId = directQuotationContent?.querySelector('#direct-q-supplier')?.value?.trim();
+      const currency   = directQuotationContent?.querySelector('#direct-q-currency')?.value || 'CRC';
+      const reference  = directQuotationContent?.querySelector('#direct-q-reference')?.value?.trim() || null;
+      const notes      = directQuotationContent?.querySelector('#direct-q-notes')?.value?.trim() || null;
+
+      if (!supplierId) {
+        if (directQuotationMessage) {
+          directQuotationMessage.innerHTML = rootShellUi.renderInlineMessage('Selecciona un proveedor.', 'warning');
+        }
+        return;
+      }
+
+      const itemRows = directQuotationContent?.querySelectorAll('#direct-q-items-body tr') || [];
+      const items = Array.from(itemRows).map((row) => ({
+        productId: Number(row.getAttribute('data-product-id')),
+        unitPrice: Number(row.querySelector('[name="unitPrice"]')?.value || 0),
+        quantity:  Number(row.querySelector('[name="quantity"]')?.value || 0),
+        leadTimeDays: row.querySelector('[name="leadTimeDays"]')?.value
+          ? Number(row.querySelector('[name="leadTimeDays"]').value) : null,
+      })).filter((item) => item.unitPrice > 0 && item.quantity > 0);
+
+      if (!items.length) {
+        if (directQuotationMessage) {
+          directQuotationMessage.innerHTML = rootShellUi.renderInlineMessage(
+            'Ingresa precio unitario y cantidad para al menos un producto.', 'warning',
+          );
+        }
+        return;
+      }
+
+      const payload = { supplierId: Number(supplierId), currency, reference, notes, items };
+
+      if (directQuotationSubmitButton) { directQuotationSubmitButton.disabled = true; directQuotationSubmitButton.textContent = 'Registrando...'; }
+
+      try {
+        await quotationsApi.createDirectQuotation(session, currentPurchaseRequestId, payload);
+        closeDirectQuotationDialog();
+        if (pageMessage) {
+          pageMessage.innerHTML = rootShellUi.renderInlineMessage(
+            'Cotización registrada. Revisa la sección "Comparación de cotizaciones" más abajo.',
+            'success',
+          );
+        }
+        // Refresca la seccion de comparacion para mostrar la nueva cotizacion directa
+        await comparison.refreshForRequest(currentPurchaseRequestId);
+        await loadRfqTracking();
+      } catch (err) {
+        if (directQuotationMessage) {
+          directQuotationMessage.innerHTML = rootShellUi.renderInlineMessage(
+            err?.message || 'No se pudo registrar la cotización.', 'error',
+          );
+        }
+      } finally {
+        if (directQuotationSubmitButton) { directQuotationSubmitButton.disabled = false; directQuotationSubmitButton.textContent = 'Registrar cotización'; }
+      }
+    }
+
+    // ── Respuesta manual via invitacion RFQ ────────────────────────────────
+
     function openManualResponseDialog(invitationId, supplierName) {
       currentManualInvitation = rfqInvitations.find((i) => String(i.id) === String(invitationId)) || { id: invitationId, supplierName };
       manualTitle.textContent = `Registrar respuesta — ${supplierName || 'Proveedor'}`;
@@ -796,6 +921,12 @@
     if (manualCloseButton) manualCloseButton.addEventListener('click', closeManualDialog);
     if (manualCancelButton) manualCancelButton.addEventListener('click', closeManualDialog);
     if (manualSubmitButton) manualSubmitButton.addEventListener('click', submitManualResponseAction);
+
+    // Cotizacion directa
+    if (directQuotationButton) directQuotationButton.addEventListener('click', openDirectQuotationDialog);
+    if (directQuotationCloseButton) directQuotationCloseButton.addEventListener('click', closeDirectQuotationDialog);
+    if (directQuotationCancelButton) directQuotationCancelButton.addEventListener('click', closeDirectQuotationDialog);
+    if (directQuotationSubmitButton) directQuotationSubmitButton.addEventListener('click', submitDirectQuotation);
     if (responseDetailsCloseButton) responseDetailsCloseButton.addEventListener('click', () => responseDetailsDialog?.close());
     if (responseDetailsDismissButton) responseDetailsDismissButton.addEventListener('click', () => responseDetailsDialog?.close());
     if (cancelCloseButton) cancelCloseButton.addEventListener('click', () => cancelDialog.close());
@@ -815,8 +946,10 @@
     await loadProducts();
     await loadRfqTracking();
 
+    // Montar comparacion: RFQ respondidas O cotizaciones directas
     const requestWithResponses = currentTrackingRequests.find(
-      (r) => Number(r.respondedInvitationCount || 0) > 0,
+      (r) => Number(r.respondedInvitationCount || 0) > 0 ||
+             Number(r.quotationCount || 0) > 0,
     );
     await comparison.mountComparisonSection(
       container,

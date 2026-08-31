@@ -87,6 +87,18 @@ async function listPermissions(auth) {
   return enriched.filter((p) => p.scope !== 'platform');
 }
 
+async function getAssignableRoleById(roleId, auth) {
+  assertCompanyAdmin(auth);
+  const role = await roleRepository.findAssignableRoleByIdForCompany(
+    BigInt(roleId),
+    BigInt(auth.companyId),
+  );
+  if (!role) {
+    throw createHttpError(404, 'Rol no encontrado.', 'not_found');
+  }
+  return serializeRole(role);
+}
+
 async function listAssignableRoles(auth, pagination = null) {
   assertCompanyAdmin(auth);
   const roles = await roleRepository.findAssignableRoles(BigInt(auth.companyId), pagination);
@@ -324,6 +336,7 @@ async function updateCompanyRole(roleId, payload, auth, req = null) {
 module.exports = {
   listPermissions,
   listAssignableRoles,
+  getAssignableRoleById,
   createCompanyRole,
   updateCompanyRole,
 };

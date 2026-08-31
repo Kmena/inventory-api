@@ -21,6 +21,11 @@ function readStoredSession() {
 // ── Legacy heuristics (DEC-007: kept as fallback during transition) ──
 
 function hasOperationalAgentPermissions(permissions) {
+  // Canonical: explicit landing permission (mirrors access-policy-actor-scope.js)
+  if (permissions.includes('agent.access')) {
+    return true;
+  }
+  // Legacy heuristic for roles predating the landing-permission system
   return permissions.includes('sales.routes.view.own')
     && permissions.includes('sales.orders.create')
     && permissions.includes('customer.activities.manage')

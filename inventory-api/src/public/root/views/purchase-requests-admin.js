@@ -110,16 +110,95 @@
 
     function renderDetail(request) {
       detailRegion.innerHTML = renderers.renderRequestDetail(request);
-      bindDetailActions();
+      bindDetailActions(request);
     }
 
-    function bindDetailActions() {
+    function bindDetailActions(request) {
+      // Navegar al workspace de cotizaciones.
       const goToQuotationsBtn = detailRegion.querySelector('.purchase-requests-go-to-quotations-button');
       if (goToQuotationsBtn) {
         goToQuotationsBtn.addEventListener('click', () => {
           window.location.hash = '#cotizaciones';
         });
       }
+
+      // Machotes de correo: toggle + carga lazy de invitaciones RFQ.
+      const emailDraftsBtn = detailRegion.querySelector('.purchase-requests-show-email-drafts-button');
+      const emailDraftsSection = detailRegion.querySelector('#purchase-requests-email-drafts-section');
+      const emailDraftsContent = detailRegion.querySelector('#purchase-requests-email-drafts-content');
+
+      if (!emailDraftsBtn || !emailDraftsSection || !emailDraftsContent) return;
+
+      let draftsLoaded = false;
+
+      emailDraftsBtn.addEventListener('click', async () => {
+        const isExpanded = emailDraftsBtn.getAttribute('aria-expanded') === 'true';
+
+        if (isExpanded) {
+          // Contraer.
+          emailDraftsSection.hidden = true;
+          emailDraftsBtn.setAttribute('aria-expanded', 'false');
+          emailDraftsBtn.textContent = '✉ Machotes de correo';
+          return;
+        }
+
+        // Expandir.
+        emailDraftsSection.hidden = false;
+        emailDraftsBtn.setAttribute('aria-expanded', 'true');
+        emailDraftsBtn.textContent = '✉ Ocultar machotes';
+
+        // Solo cargar invitaciones la primera vez.
+        if (draftsLoaded) return;
+        draftsLoaded = true;
+
+        emailDraftsContent.innerHTML = renderers.renderEmailDrafts([], request, 'loading');
+
+        try {
+          const invitations = await quotationsApi.listRfqInvitations(session, request.id);
+          emailDraftsContent.innerHTML = renderers.renderEmailDrafts(
+            Array.isArray(invitations) ? invitations : [],
+            request,
+            'ready',
+          );
+          bindCopyButtons(emailDraftsContent);
+        } catch (_err) {
+          // Si falla la carga de invitaciones, derivamos machotes desde request.quotations.
+          emailDraftsContent.innerHTML = renderers.renderEmailDrafts([], request, 'ready');
+          bindCopyButtons(emailDraftsContent);
+        }
+      });
+    }
+
+    /**
+     * Wires "Copiar texto" buttons inside a container.
+     * Uses navigator.clipboard when available; falls back to execCommand.
+     *
+     * @param {HTMLElement} container
+     */
+    function bindCopyButtons(container) {
+      container.querySelectorAll('.purchase-request-copy-email-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const targetId = btn.getAttribute('data-target');
+          const textarea = targetId ? container.querySelector(`#${CSS.escape(targetId)}`) : null;
+          if (!textarea) return;
+
+          const text = textarea.value;
+          try {
+            await navigator.clipboard.writeText(text);
+            const original = btn.textContent;
+            btn.textContent = '✓ Copiado';
+            btn.disabled = true;
+            setTimeout(() => {
+              btn.textContent = original;
+              btn.disabled = false;
+            }, 2000);
+          } catch (_err) {
+            // Fallback para navegadores sin permiso clipboard.
+            textarea.select();
+            document.execCommand('copy');
+          }
+        });
+      });
     }
 
     refreshButton.addEventListener('click', loadRequests);

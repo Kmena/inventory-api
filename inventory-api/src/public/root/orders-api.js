@@ -55,11 +55,20 @@ async function dispatchOrder(session, orderId) {
   });
 }
 
+/**
+ * GET /api/orders/dispatched — orders already delivered (dispatch history).
+ * @param {any} session
+ */
+async function listDispatchedOrders(session) {
+  return inventoryAuth.fetchJson(session, `${BASE}/dispatched`, { credentials: 'same-origin' });
+}
+
 rootShell.register('ordersApi', {
   listOrders,
   approveOrder,
   cancelOrder,
   dispatchOrder,
+  listDispatchedOrders,
 });
 
 })(typeof globalThis !== 'undefined' ? globalThis : window);

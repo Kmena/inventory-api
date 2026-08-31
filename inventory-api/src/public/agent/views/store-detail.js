@@ -114,6 +114,36 @@ function renderSellableProducts(products) {
   </ul>`;
 }
 
+/** @param {any[]} history @returns {{ drafts: any[], inTransit: any[] }} */
+function classifyActiveOrders(history) {
+  const orders = Array.isArray(history) ? history : [];
+  return {
+    drafts:    orders.filter((o) => o.status === 'DRAFT'),
+    inTransit: orders.filter((o) => o.status === 'APPROVED' || o.status === 'IN_PRODUCTION'),
+  };
+}
+
+function renderActiveOrdersBanner(history) {
+  const h = AgentShell.require('helpers');
+  const { drafts, inTransit } = classifyActiveOrders(history);
+  if (!drafts.length && !inTransit.length) return '';
+
+  const parts = [];
+  if (drafts.length) {
+    const ids = drafts.map((o) => `#${h.escapeHtml(String(o.orderId || '?'))}`).join(', ');
+    parts.push(`<div class="agent-info-banner" style="background:#fef9c3;border-color:#eab308;">
+      🕐 <strong>${drafts.length} pedido${drafts.length > 1 ? 's' : ''} pendiente${drafts.length > 1 ? 's' : ''} de aprobación:</strong> ${ids}
+    </div>`);
+  }
+  if (inTransit.length) {
+    const ids = inTransit.map((o) => `#${h.escapeHtml(String(o.orderId || '?'))}`).join(', ');
+    parts.push(`<div class="agent-info-banner" style="background:#dbeafe;border-color:#3b82f6;">
+      🚚 <strong>${inTransit.length} pedido${inTransit.length > 1 ? 's' : ''} en tránsito:</strong> ${ids}
+    </div>`);
+  }
+  return parts.join('');
+}
+
 function renderStoreDetail(store, storeId) {
   const h = AgentShell.require('helpers');
   const isVencida = store.status === 'VENCIDA';
@@ -133,6 +163,7 @@ function renderStoreDetail(store, storeId) {
       </header>
 
       ${isVencida ? '<div class="agent-alert-banner">⚠️ Esta tienda tiene saldo vencido. Gestiona el cobro antes de tomar un pedido.</div>' : ''}
+      ${renderActiveOrdersBanner(store.purchaseHistory)}
 
       <div class="detail-item">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -146,6 +177,7 @@ function renderStoreDetail(store, storeId) {
           <div>
             <div class="muted" style="font-size:0.8rem;">Saldo pendiente</div>
             <span class="agent-summary-saldo" style="color:${balanceColor};">${h.escapeHtml(balanceLabel)}</span>
+            ${pendingBalance > 0 ? `<button type="button" id="sd-pay-btn" class="btn" data-store-id="${h.escapeHtml(String(storeId))}" style="margin-top:6px;font-size:0.82rem;padding:6px 14px;background:#2563eb;">💳 Registrar cobro</button>` : ''}
           </div>
           ${store.regionName ? `<div class="muted" style="font-size:0.82rem;">${h.escapeHtml(store.regionName)}${store.subregionName ? ' · ' + h.escapeHtml(store.subregionName) : ''}</div>` : ''}
         </div>
@@ -201,6 +233,8 @@ async function render(containerEl, session, params) {
     root.querySelectorAll('[id^="sd-order-btn"]').forEach((btn) => {
       btn.addEventListener('click', () => navigate('order', { storeId }));
     });
+    const payBtn = root.querySelector('#sd-pay-btn');
+    if (payBtn) payBtn.addEventListener('click', () => navigate('payment', { storeId }));
     const homeBtn404 = root.querySelector('#sd-home-btn-404');
     if (homeBtn404) homeBtn404.addEventListener('click', () => navigate('dashboard'));
     const homeBtn = root.querySelector('#sd-home-btn');
@@ -209,7 +243,15 @@ async function render(containerEl, session, params) {
 
   try {
     const data = await api.fetchStoreDetail(session, storeId);
-    const store = data?.store || data;
+    // fetchStoreDetail returns { store, visitHistory, purchaseHistory: { pendingBalance, orders }, sellableProducts }.
+    // Merge top-level detail fields into the store card so renderStoreDetail
+    // can access them as store.visitHistory, store.purchaseHistory, store.sellableProducts.
+    const store = {
+      ...(data?.store || data),
+      visitHistory:    data?.visitHistory    ?? [],
+      purchaseHistory: data?.purchaseHistory?.orders ?? data?.purchaseHistory ?? [],
+      sellableProducts: data?.sellableProducts ?? [],
+    };
     containerEl.innerHTML = renderStoreDetail(store, storeId);
   } catch (err) {
     const is404 = err?.message?.toLowerCase().includes('404')

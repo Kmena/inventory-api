@@ -44,10 +44,34 @@ const createAgentOrderSchema = z.object({
   }
 });
 
+// Agent payment: only CASH and TRANSFER, receipt required for transfers
+const createAgentPaymentSchema = z.object({
+  invoiceId: z.coerce.bigint(),
+  amount: z.number().positive(),
+  paymentMethod: z.enum(['CASH', 'TRANSFER']),
+  reference: z.string().trim().max(255).optional().nullable(),
+  receiptFile: z.object({
+    fileName: z.string().min(1).max(255),
+    mimeType: z.string().min(1),
+    fileContentBase64: z.string().min(1),
+    note: z.string().max(500).optional().nullable(),
+  }).optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.paymentMethod === 'TRANSFER') {
+    if (!data.reference?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reference'], message: 'El número de transferencia es requerido' });
+    }
+    if (!data.receiptFile) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['receiptFile'], message: 'El comprobante es requerido para transferencias' });
+    }
+  }
+});
+
 module.exports = {
   listAgentStoresQuerySchema,
   createAgentVisitSchema,
   createAgentOrderSchema,
+  createAgentPaymentSchema,
 };
 
 

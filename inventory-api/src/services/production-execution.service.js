@@ -15,6 +15,7 @@ const { toSnapshotValue } = productionPlanningPrivate;
 const {
   normalizeOptionalText,
   assertStagePrerequisites,
+  assertRecolectionCoverageForConsumption,
   validateConsumptionAgainstRequirement,
   validateQaMeasurements,
   recordStageOverrideAuditEvent,
@@ -64,6 +65,9 @@ function serializeStageExecution(execution) {
     responsibleUserId: execution.responsibleUserId,
     startedAt: execution.startedAt,
     endedAt: execution.endedAt,
+    status: execution.status ?? 'COMPLETED',
+    lossesAcknowledged: execution.lossesAcknowledged ?? false,
+    lossesAcknowledgedAt: execution.lossesAcknowledgedAt ?? null,
     actualParameters: execution.actualParameters,
     qaOutOfTolerance: execution.qaOutOfTolerance,
     overrideJustification: execution.overrideJustification,
@@ -77,6 +81,7 @@ function serializeStageExecution(execution) {
     returns: Array.isArray(execution.returns)
       ? execution.returns.map(serializeProductionReturn)
       : [],
+    losses: execution.losses ?? [],
     qualityInspections,
     qaApproved,
   };
@@ -234,7 +239,13 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
       throw createHttpError(404, 'Orden de producción no encontrada', 'not_found');
     }
 
-    assertTransition(order, ['IN_PROGRESS'], 'ejecutar etapas');
+    // QA_HOLD is also allowed: re-executing a QA-rejected stage brings the order
+    // back to IN_PROGRESS so the normal stage-gate flow resumes.
+    assertTransition(order, ['IN_PROGRESS', 'QA_HOLD'], 'ejecutar etapas');
+
+    if (order.status === 'QA_HOLD') {
+      await productionRepository.updateProductionOrder(order.id, scope.companyId, { status: 'IN_PROGRESS' }, tx);
+    }
 
     if (!order.originWarehouseId) {
       throw createHttpError(409, 'La orden de producción debe tener bodega origen para registrar consumo y merma', 'conflict');
@@ -247,9 +258,22 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
 
     assertStagePrerequisites(order, stageId);
 
-    // El operador registra consumos y notas. Los parametros QA los registra
-    // por separado un inspector de calidad mediante POST .../inspections.
-    // La validacion de sobre-consumo usa la tolerancia configurada en la empresa (DEC-002).
+    // FR-010/BR-004: if this stage was preceded by a completed recovery/recolection stage with lot-level entries,
+    // proposed consumptions must stay within the recovered balance for the same product+lot pairs.
+    const relatedRecolectionStage = Array.isArray(order.recolectionStages)
+      ? order.recolectionStages.find((stage) => String(stage.recipeStageId) === String(stageId) && stage.status === 'COMPLETED')
+      : null;
+    if (relatedRecolectionStage) {
+      assertRecolectionCoverageForConsumption(
+        Array.isArray(relatedRecolectionStage.recolectionEntries) ? relatedRecolectionStage.recolectionEntries : [],
+        Array.isArray(order.stageExecutions)
+          ? order.stageExecutions.flatMap((execution) => Array.isArray(execution.consumptions) ? execution.consumptions : [])
+          : [],
+        payload.consumptions ?? [],
+      );
+    }
+
+    // DEC-002: El inspector de calidad registra QA por separado. El operador solo registra consumos.
     const consumptionValidation = validateConsumptionAgainstRequirement(
       order,
       payload.consumptions ?? [],
@@ -425,9 +449,7 @@ async function recordProductionReturn(id, stageId, payload, auth) {
 }
 
 async function reconcileProductionOrderAggregates(id, auth) {
-  const scope = {
-    companyId: BigInt(auth.companyId),
-  };
+  const scope = { companyId: BigInt(auth.companyId) };
 
   const order = await productionRepository.findProductionOrderById(id, scope.companyId);
   if (!order) {

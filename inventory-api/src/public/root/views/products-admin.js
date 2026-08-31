@@ -74,8 +74,7 @@
               <label class="products-field-wide"><span>Nombre *</span><input id="products-form-name" name="name" type="text" required minlength="2" maxlength="255" /></label>
               <label><span>Codigo</span><input name="code" type="text" maxlength="50" /></label>
               <label><span>Subcategoria</span><select id="products-form-subcategory" name="subcategoryId"><option value="">Sin subcategoria</option></select></label>
-              <label><span>Unidad</span><input name="unit" type="text" maxlength="30" placeholder="UN" /></label>
-              <label><span>Moneda</span><input name="currency" type="text" maxlength="10" placeholder="CRC" /></label>
+              <label><span>Moneda</span><select name="currency"><option value="">— Seleccionar —</option><option value="CRC">CRC — Colón</option><option value="USD">USD — Dólar</option><option value="EUR">EUR — Euro</option></select></label>
               <label><span>Precio</span><input name="price" type="number" min="0" step="0.01" /></label>
               <label><span>Stock minimo</span><input name="minStock" type="number" min="0" step="0.01" /></label>
               <label><span>Stock maximo</span><input name="maxStock" type="number" min="0" step="0.01" /></label>
@@ -85,6 +84,42 @@
                 <span class="products-field-hint">Cuando esta activo, el producto aparece en el catalogo de pedidos del agente.</span>
               </label>
               <label class="products-field-full"><span>Descripcion</span><textarea name="description" rows="4" maxlength="2000"></textarea></label>
+            </div>
+          </fieldset>
+          <fieldset class="root-form__section" id="products-size-fieldset">
+            <legend>Presentación comercial</legend>
+            <div class="products-form-grid">
+              <label class="products-field-wide">
+                <span>Tipo de presentación</span>
+                <select name="presentationType" id="products-form-presentation-type">
+                  <option value="">— Sin presentación (legado) —</option>
+                  <option value="VOLUME">Volumen</option>
+                  <option value="MASS">Masa</option>
+                  <option value="LENGTH">Longitud</option>
+                  <option value="COUNT">Cantidad</option>
+                </select>
+                <span class="products-field-hint">Opcional. Cuando se selecciona, habilita la conversión automática a kg en planificación de producción.</span>
+              </label>
+              <label id="products-form-net-content-group" style="display:none">
+                <span>Contenido neto *</span>
+                <input name="netContent" id="products-form-net-content" type="number" min="0.001" step="any" />
+              </label>
+              <label id="products-form-net-content-unit-group">
+                <span>Unidad *</span>
+                <select name="netContentUnit" id="products-form-net-content-unit" required>
+                  <option value="">— Selecciona unidad —</option>
+                </select>
+              </label>
+              <label id="products-form-density-group" style="display:none">
+                <span>Densidad (kg/L) *</span>
+                <input name="density" id="products-form-density" type="number" min="0.001" step="any" placeholder="Ej. 1.05" />
+                <span class="products-field-hint">Masa por litro. Agua pura = 1.000 kg/L.</span>
+              </label>
+              <label id="products-form-kg-factor-group" style="display:none">
+                <span id="products-form-kg-factor-label">Factor de conversión *</span>
+                <input name="kgConversionFactor" id="products-form-kg-factor" type="number" min="0.001" step="any" />
+                <span id="products-form-kg-factor-hint" class="products-field-hint"></span>
+              </label>
             </div>
           </fieldset>
           <div class="action-row products-modal-actions">
@@ -184,6 +219,19 @@
     const closeCategoriesButton = container.querySelector('#products-close-categories-button');
     const cancelCategoriesButton = container.querySelector('#products-cancel-categories-button');
 
+    // --- TASK-006: refs de campos de tamaño/presentación ---
+    const presentationTypeSelect = container.querySelector('#products-form-presentation-type');
+    const netContentGroup = container.querySelector('#products-form-net-content-group');
+    const netContentInput = container.querySelector('#products-form-net-content');
+    const netContentUnitGroup = container.querySelector('#products-form-net-content-unit-group');
+    const netContentUnitSelect = container.querySelector('#products-form-net-content-unit');
+    const densityGroup = container.querySelector('#products-form-density-group');
+    const densityInput = container.querySelector('#products-form-density');
+    const kgFactorGroup = container.querySelector('#products-form-kg-factor-group');
+    const kgFactorInput = container.querySelector('#products-form-kg-factor');
+    const kgFactorLabel = container.querySelector('#products-form-kg-factor-label');
+    const kgFactorHint = container.querySelector('#products-form-kg-factor-hint');
+
     if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !paginationRegion || !detailSubtitle || !detailMessage || !detailRegion || !searchInput || !categoryFilter || !clearFiltersButton || !refreshButton || !openCreateButton || !openCategoriesButton || !formDialog || !form || !formTitle || !formMessage || !formSubcategoryInput || !formNameInput || !closeFormButton || !cancelFormButton || !formSubmitButton || !deactivateDialog || !deactivateMessage || !deactivateSummary || !closeDeactivateButton || !cancelDeactivateButton || !confirmDeactivateButton || !categoriesDialog || !categoriesForm || !categoriesMessage || !categoriesListRegion || !categoryNameInput || !createCategoryButton || !closeCategoriesButton || !cancelCategoriesButton) {
       return;
     }
@@ -205,6 +253,93 @@
     let editingProductId = null;
     let lastDialogTrigger = null;
     let categoryWarning = '';
+
+    // --- TASK-006: opciones de unidad por tipo de presentación ---
+    // La clave '' muestra todas las unidades cuando no hay tipo definido.
+    const NET_CONTENT_UNIT_OPTIONS = {
+      '': [
+        { value: 'UN', label: 'UN — Unidades' },
+        { value: 'KG', label: 'KG — Kilogramos' },
+        { value: 'G',  label: 'G — Gramos' },
+        { value: 'L',  label: 'L — Litros' },
+        { value: 'ML', label: 'ML — Mililitros' },
+        { value: 'M',  label: 'M — Metros' },
+      ],
+      VOLUME: [
+        { value: 'ML', label: 'ML — Mililitros' },
+        { value: 'L',  label: 'L — Litros' },
+      ],
+      MASS: [
+        { value: 'G',  label: 'G — Gramos' },
+        { value: 'KG', label: 'KG — Kilogramos' },
+      ],
+      LENGTH: [
+        { value: 'M', label: 'M — Metros' },
+      ],
+      COUNT: [
+        { value: 'UN', label: 'UN — Unidades' },
+      ],
+    };
+
+    /**
+     * Muestra u oculta los campos condicionales de presentación comercial.
+     * También gestiona `required` e inicializa las opciones del select de unidad.
+     *
+     * @param {string} type - Valor de presentationType (VOLUME|MASS|LENGTH|COUNT|'')
+     * @param {string} [preselectedUnit] - Unidad a preseleccionar en el select (modo edición)
+     */
+    function syncSizeFields(type, preselectedUnit) {
+      // Oculta un grupo label+input y limpia su valor para evitar validación stale.
+      function hideGroup(groupEl, inputEl) {
+        groupEl.style.display = 'none';
+        if (inputEl) {
+          inputEl.required = false;
+          inputEl.value = '';
+        }
+      }
+      // Muestra un grupo label+input y activa o desactiva required.
+      function showGroup(groupEl, inputEl, makeRequired) {
+        groupEl.style.display = '';
+        if (inputEl) inputEl.required = Boolean(makeRequired);
+      }
+
+      // Resetear campos condicionales (NO netContentUnit — siempre visible).
+      hideGroup(netContentGroup, netContentInput);
+      hideGroup(densityGroup, densityInput);
+      hideGroup(kgFactorGroup, kgFactorInput);
+
+      // netContentUnit es siempre visible y siempre requerido.
+      // Las opciones se filtran según el tipo; sin tipo se muestran todas.
+      const unitOpts = NET_CONTENT_UNIT_OPTIONS[type] || NET_CONTENT_UNIT_OPTIONS[''];
+      netContentUnitSelect.innerHTML = '<option value="">— Selecciona unidad —</option>'
+        + unitOpts.map((opt) =>
+            `<option value="${opt.value}"${preselectedUnit === opt.value ? ' selected' : ''}>${opt.label}</option>`
+          ).join('');
+      netContentUnitSelect.required = true;
+
+      if (!type) return;
+
+      // Campos comunes a VOLUME, MASS y LENGTH: contenido neto.
+      if (type === 'VOLUME' || type === 'MASS' || type === 'LENGTH') {
+        showGroup(netContentGroup, netContentInput, true);
+      }
+
+      // Campo exclusivo de VOLUME: densidad.
+      if (type === 'VOLUME') {
+        showGroup(densityGroup, densityInput, true);
+      }
+
+      // Factor de conversión: requerido en LENGTH, opcional en COUNT.
+      if (type === 'LENGTH') {
+        showGroup(kgFactorGroup, kgFactorInput, true);
+        if (kgFactorLabel) kgFactorLabel.textContent = 'Factor kg/m *';
+        if (kgFactorHint) kgFactorHint.textContent = 'Kilogramos por metro lineal de producto terminado.';
+      } else if (type === 'COUNT') {
+        showGroup(kgFactorGroup, kgFactorInput, false);
+        if (kgFactorLabel) kgFactorLabel.textContent = 'Factor kg/unidad';
+        if (kgFactorHint) kgFactorHint.textContent = 'Kilogramos por unidad (opcional). Necesario si la receta opera en kg.';
+      }
+    }
 
     function syncActionVisibility() {
       openCreateButton.hidden = !canManageProducts;
@@ -348,6 +483,10 @@
       formTitle.textContent = 'Nuevo producto';
       formSubmitButton.textContent = 'Guardar producto';
       if (formSubcategoryInput) formSubcategoryInput.value = '';
+      // TASK-006: ocultar campos de presentación al resetear
+      // form.reset() ya devuelve el select a su estado vacío,
+      // pero los grupos condicionales deben ocultarse visualmente.
+      syncSizeFields('', '');
     }
 
     function openFormDialog(mode, product = null, trigger = null) {
@@ -367,13 +506,32 @@
         if (form.elements.subcategoryId) {
           form.elements.subcategoryId.value = product.subcategoryId ? String(product.subcategoryId) : '';
         }
-        form.elements.unit.value = product.unit || '';
         form.elements.currency.value = product.currency || '';
         form.elements.price.value = product.price ?? '';
         form.elements.minStock.value = product.minStock ?? '';
         form.elements.maxStock.value = product.maxStock ?? '';
         if (form.elements.inCatalog) {
           form.elements.inCatalog.checked = product.inCatalog !== false;
+        }
+        // TASK-006: poblar campos de presentación comercial en modo edición.
+        // netContentUnit se rellena siempre (campo obligatorio). Se prioriza
+        // netContentUnit del producto; si no existe se intenta product.unit
+        // como valor legado para preseleccionar la opción correcta.
+        if (presentationTypeSelect) {
+          const pt = product.presentationType || '';
+          const existingUnit = product.netContentUnit || product.unit || '';
+          presentationTypeSelect.value = pt;
+          // syncSizeFields popula las opciones del select de unidad y pre-selecciona.
+          syncSizeFields(pt, existingUnit);
+          if (pt && netContentInput) {
+            netContentInput.value = product.netContent != null ? String(product.netContent) : '';
+          }
+          if (pt === 'VOLUME' && densityInput) {
+            densityInput.value = product.density != null ? String(product.density) : '';
+          }
+          if ((pt === 'LENGTH' || pt === 'COUNT') && kgFactorInput) {
+            kgFactorInput.value = product.kgConversionFactor != null ? String(product.kgConversionFactor) : '';
+          }
         }
       }
       formDialog.showModal();
@@ -723,6 +881,14 @@
         createCategoryButton.textContent = 'Crear categoria';
       }
     });
+
+    // TASK-006: reacción al cambio de tipo de presentación.
+    // Cuando el usuario cambia el tipo, se limpian y ocultan los campos anteriores.
+    if (presentationTypeSelect) {
+      presentationTypeSelect.addEventListener('change', () => {
+        syncSizeFields(presentationTypeSelect.value, '');
+      });
+    }
 
     await loadCategories();
     await loadProducts({ page: 1 });

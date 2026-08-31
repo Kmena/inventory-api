@@ -2576,28 +2576,23 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   gap: 10px;
 }
 
-.route-map-svg {
-  width: 100%;
-  height: auto;
+/* Leaflet container for route coverage map */
+.route-leaflet-map {
+  height: 300px;
+  border-radius: 14px;
+  overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 18px;
-  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
 }
 
-.route-map-svg__frame {
-  fill: transparent;
-  stroke: rgba(148, 163, 184, 0.6);
-  stroke-width: 2;
-}
-
-.route-map-svg__point {
-  fill: #4f46e5;
-  opacity: 0.9;
-}
-
-.route-map-svg__label {
-  font-size: 10px;
-  fill: #1f2937;
+/* Read-only pin for route map (no grab cursor) */
+.route-map-pin__dot {
+  width: 20px;
+  height: 20px;
+  background: #4f46e5;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  cursor: default;
 }
 
 .rfq-tracking-sidebar-list {
@@ -2681,6 +2676,75 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   }
 }
 
+
+/* Machotes de correo — solicitudes de compra */
+.purchase-request-email-drafts-list {
+  display: grid;
+  gap: 16px;
+}
+
+.purchase-request-email-draft {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+  background: #fafbfc;
+}
+
+.purchase-request-email-draft-header {
+  font-size: 1.05em;
+}
+
+.purchase-request-email-draft-to {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: .9em;
+}
+
+.purchase-request-email-draft-to-label {
+  font-weight: 600;
+  color: #4338ca;
+  white-space: nowrap;
+}
+
+.purchase-request-email-draft-to-address {
+  color: #1e40af;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.purchase-request-email-draft-subject {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: .9em;
+  color: var(--text-muted, #555);
+}
+
+.purchase-request-email-draft-subject-label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.purchase-request-email-body {
+  width: 100%;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: .85em;
+  line-height: 1.55;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  resize: vertical;
+  color: var(--text);
+  box-sizing: border-box;
+}
 
 /* Productos administrativos */
 .products-admin-shell {
@@ -2818,6 +2882,11 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
   gap: 18px;
   align-items: start;
+}
+
+/* Production orders: list is compact, detail needs the space */
+.production-orders-workspace-grid {
+  grid-template-columns: minmax(240px, 0.6fr) minmax(0, 2fr);
 }
 
 .products-detail-card {
@@ -3788,6 +3857,15 @@ dialog.root-dialog::backdrop {
   font-size: 0.9rem;
 }
 
+.agent-info-banner {
+  padding: 12px 16px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  color: #1e293b;
+}
+
 .agent-action-bar {
   position: sticky;
   bottom: 0;
@@ -4459,6 +4537,13 @@ dialog.root-dialog::backdrop {
 .wh-badge--rejected  { background: var(--wh-rejected-bg);  color: var(--wh-rejected);  }
 .wh-badge--partial   { background: var(--wh-partial-bg);   color: var(--wh-partial);   }
 .wh-badge--hold      { background: var(--wh-hold-bg);      color: var(--wh-hold);      }
+/* TASK-007: warning badge (QA_REJECTED_LOSSES_DONE) — pre-existente en refs, faltaba definición */
+.wh-badge--warning   { background: var(--wh-partial-bg);   color: var(--wh-partial);   }
+/* TASK-007 (qa-rejection-material-reconciliation-amendment): replacement recovery card accent */
+.wh-stage-card--replacement {
+  background: var(--wh-pending-bg);
+  border-left: 3px solid var(--wh-pending);
+}
 
 /* Stepper */
 .wh-stepper {
@@ -4628,6 +4713,14 @@ dialog.root-dialog::backdrop {
 .wh-step-section {
   display: grid;
   gap: 14px;
+}
+
+.wh-step-section[hidden],
+.qa-rejection-flow[hidden],
+.qa-prior-stage-selector[hidden],
+.qa-invalidated-stages-section[hidden],
+.qa-invalidated-stage-card[hidden] {
+  display: none !important;
 }
 
 .wh-step-section__title {

@@ -7,7 +7,9 @@ const { parseBigIntId } = require('../lib/parse');
 const {
   createAgentVisitSchema,
   createAgentOrderSchema,
+  createAgentPaymentSchema,
 } = require('../schemas/agent-workspace.schema');
+const { highPayloadParsers } = require('../middlewares/request-payload');
 const agentWorkspaceService = require('../services/agent-workspace.service');
 
 const router = express.Router();
@@ -100,5 +102,27 @@ router.post('/stores/:storeId/orders', authorizeAccessPolicy('agent.workspace.ac
     return next(error);
   }
 });
+
+// Register a payment collected from a client store
+router.post(
+  '/stores/:storeId/payments',
+  ...highPayloadParsers,
+  authorizeAccessPolicy('agent.workspace.access'),
+  validate(createAgentPaymentSchema),
+  async (req, res, next) => {
+    try {
+      return res.status(201).json(
+        await agentWorkspaceService.createAgentPayment(
+          parseBigIntId(req.params.storeId, 'storeId'),
+          req.body,
+          req.auth,
+          req,
+        ),
+      );
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 module.exports = router;

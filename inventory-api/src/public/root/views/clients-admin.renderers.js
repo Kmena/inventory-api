@@ -2,6 +2,24 @@
   const rootShell = /** @type {any} */ (globalScope).RootShell;
   const rootShellUi = rootShell.require('ui');
 
+  const ORDER_STATUS_LABEL = Object.freeze({
+    DRAFT:         { emoji: '🕐', label: 'Pendiente de aprobación', color: '#92400e', bg: '#fef3c7', border: '#fcd34d' },
+    APPROVED:      { emoji: '🚚', label: 'En tránsito',             color: '#1e40af', bg: '#dbeafe', border: '#93c5fd' },
+    IN_PRODUCTION: { emoji: '🏭', label: 'En producción',           color: '#065f46', bg: '#d1fae5', border: '#6ee7b7' },
+  });
+
+  /** @param {{ id: string|number, status: string }[]} orders */
+  function renderStoreActiveOrdersBadges(orders) {
+    if (!orders.length) return '';
+    return orders.map((o) => {
+      const meta = ORDER_STATUS_LABEL[o.status];
+      if (!meta) return '';
+      return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.75rem;padding:2px 8px;border-radius:999px;background:${meta.bg};color:${meta.color};border:1px solid ${meta.border};margin-top:4px;">
+        ${meta.emoji} #${rootShellUi.escapeHtml(String(o.id))} &mdash; ${meta.label}
+      </span>`;
+    }).join(' ');
+  }
+
   function renderInlineEntries(items, emptyCopy, renderer) {
     if (!Array.isArray(items) || !items.length) {
       return `<p class="empty-state">${rootShellUi.escapeHtml(emptyCopy)}</p>`;
@@ -60,7 +78,7 @@
             <label><span>Correo facturacion</span><input name="emailBilling" type="email" maxlength="255" value="${rootShellUi.escapeHtml(client.emailBilling || '')}" /></label>
             <label><span>Tipo de pago</span><select name="paymentType"><option value="">Selecciona</option><option value="CASH" ${client.paymentType === 'CASH' ? 'selected' : ''}>Contado</option><option value="CREDIT" ${client.paymentType === 'CREDIT' ? 'selected' : ''}>Credito</option><option value="TRANSFER" ${client.paymentType === 'TRANSFER' ? 'selected' : ''}>Transferencia</option><option value="CARD" ${client.paymentType === 'CARD' ? 'selected' : ''}>Tarjeta</option></select></label>
             <label><span>Dias de pago</span><input name="paymentDays" type="number" min="0" value="${rootShellUi.escapeHtml(client.paymentDays || '')}" /></label>
-            <label><span>Limite de credito</span><input name="creditLimit" type="number" min="0" step="0.01" value="${rootShellUi.escapeHtml(client.creditLimit || '')}" /></label>
+
             <label class="root-form-grid__full"><span>Direccion</span><textarea name="address" rows="3" maxlength="1000">${rootShellUi.escapeHtml(client.address || '')}</textarea></label>
           </div>
           <div class="action-row compact-action-row">
@@ -84,10 +102,20 @@
         </div>
         <div id="clients-stores-list" class="inline-card-grid">
           ${renderInlineEntries(client.stores || [], 'Este cliente aun no tiene tiendas registradas.', (store) => `
-            <article class="inline-card">
+            <article class="inline-card" data-store-id="${rootShellUi.escapeHtml(store.id)}">
               <strong>${rootShellUi.escapeHtml(store.name || 'Tienda')}</strong>
               <p class="muted">${rootShellUi.escapeHtml(store.code || 'Sin codigo')} · ${rootShellUi.escapeHtml(store.subregion?.name || store.subregionName || 'Sin subzona')}</p>
               ${store.latitude && store.longitude ? `<p class="muted" style="font-size:0.78rem;">📍 ${rootShellUi.escapeHtml(String(store.latitude))}, ${rootShellUi.escapeHtml(String(store.longitude))}</p>` : '<p class="muted" style="font-size:0.78rem;">Sin coordenadas</p>'}
+              ${renderStoreActiveOrdersBadges(store.orders || [])}
+              <form class="clients-store-credit-form" data-client-id="${rootShellUi.escapeHtml(client.id)}" data-store-id="${rootShellUi.escapeHtml(store.id)}" style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <label style="font-size:0.8rem;display:flex;align-items:center;gap:4px;">
+                  <span style="white-space:nowrap;">Límite crédito</span>
+                  <input name="creditLimit" type="number" min="0" step="0.01" value="${rootShellUi.escapeHtml(String(store.creditLimit ?? 0))}" style="width:100px;" />
+                </label>
+                <span class="muted" style="font-size:0.78rem;">Saldo: ${rootShellUi.escapeHtml(String(Number(store.creditBalance ?? 0).toFixed(2)))}</span>
+                <button type="submit" class="secondary-button" style="font-size:0.78rem;padding:4px 10px;">Guardar</button>
+                <span class="clients-store-credit-msg" style="font-size:0.78rem;"></span>
+              </form>
             </article>
           `)}
         </div>

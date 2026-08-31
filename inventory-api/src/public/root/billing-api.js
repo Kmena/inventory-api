@@ -104,7 +104,7 @@
   async function approvePayment(session, paymentId, note) {
     return sendJson(session, `${BASE_PAYMENTS}/${encodeURIComponent(paymentId)}/approve`, {
       method: 'POST',
-      body: JSON.stringify({ note: note || null }),
+      body: JSON.stringify(note ? { note } : {}),  // omit note if empty — schema rejects null
       fallbackMessage: 'No se pudo aprobar el pago.',
     });
   }

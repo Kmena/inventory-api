@@ -119,7 +119,8 @@ function selectContentSecurityPolicy(pathName) {
   }
 
   // Warehouse/QA SPA: permite blob: para thumbnails de fotos en evidencia de recepciones.
-  // No requiere `unsafe-inline`; los estilos vienen de `/styles.css`.
+  // 'unsafe-inline' en style-src es requerido por los renderers de produccion que
+  // aplican estilos inline dinamicamente (lot-picker, QA rows, etc.).
   if (pathName.startsWith('/warehouse/')) {
     return buildContentSecurityPolicy([
       "default-src 'self'",
@@ -128,7 +129,7 @@ function selectContentSecurityPolicy(pathName) {
       "frame-ancestors 'none'",
       "form-action 'self'",
       "script-src 'self'",
-      "style-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
       "connect-src 'self'",
@@ -247,6 +248,7 @@ app.use('/api/invoices', ...mediumPayloadParsers, invoiceRouter);
 app.use('/api/payments', ...mediumPayloadParsers, paymentRouter);
 app.use('/api/inventory', ...mediumPayloadParsers, inventoryRouter);
 app.use('/api/warehouses', ...mediumPayloadParsers, warehouseRouter);
+app.use('/api/warehouse-orders', ...mediumPayloadParsers, require('./routes/warehouse-orders.routes'));
 app.use('/api/regions', ...mediumPayloadParsers, regionRouter);
 app.use('/api/sales-routes', ...mediumPayloadParsers, salesRouteRouter);
 app.use('/api/agent', ...mediumPayloadParsers, agentRouter);
