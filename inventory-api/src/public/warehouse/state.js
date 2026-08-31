@@ -29,6 +29,9 @@ function derivePermissions(session) {
     canViewProduction:     permissions.includes('production.view'),
     canCreateProduction:   permissions.includes('production.create'),
     canApproveProduction:  permissions.includes('production.approve'),
+    // TASK-007: loss registration requires production.manage permission
+    canManageProduction:   permissions.includes('production.manage'),
+    canCancelProduction:   permissions.includes('production.cancel'),
     canConfirm:            permissions.includes('receipts.confirm'),
     canViewReceipts:       permissions.includes('receipts.view'),
     raw:                   permissions,

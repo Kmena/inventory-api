@@ -53,16 +53,60 @@ function assertStageOverrideAllowed(auth, overrideJustification, violationSubCod
   return justification;
 }
 
-function findCompletedExecutionForStage(order, stageId) {
-  return (order.stageExecutions || []).find((execution) => (
-    String(execution.recipeStageId) === stageId.toString()
-    && execution.endedAt
-  )) || null;
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-005: Multi-execution support for stage rejection + re-execution
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns the most recent finished execution (endedAt != null) for a stage,
+ * regardless of status. Ordered by createdAt DESC.
+ * @param {object} order
+ * @param {bigint} stageId
+ */
+function findLatestExecutionForStage(order, stageId) {
+  const all = (order.stageExecutions || [])
+    .filter((ex) =>
+      String(ex.recipeStageId) === stageId.toString() && ex.endedAt,
+    )
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return all[0] || null;
 }
+
+/**
+ * Returns the most recent execution with status=COMPLETED (not QA_REJECTED).
+ * Used for the gate of subsequent stages.
+ * @param {object} order
+ * @param {bigint} stageId
+ */
+function findLatestCompletedExecutionForStage(order, stageId) {
+  const latest = findLatestExecutionForStage(order, stageId);
+  return latest && latest.status === 'COMPLETED' ? latest : null;
+}
+
+/**
+ * @deprecated Use findLatestExecutionForStage / findLatestCompletedExecutionForStage.
+ * Kept for backward compat with any direct callers outside this module.
+ */
 
 function executionHasApprovedQa(execution) {
   const inspections = Array.isArray(execution?.qualityInspections) ? execution.qualityInspections : [];
   return inspections.some((insp) => insp.result === 'APPROVED' || insp.result === 'CONDITIONALLY_ACCEPTED');
+}
+
+/**
+ * Returns the pending recolection stage linked to a given rejected execution, if any.
+ * The order object must have recolectionStages included (TASK-002).
+ * @param {object} order
+ * @param {bigint} rejectedExecutionId
+ * @returns {object|null}
+ */
+function findPendingRecolectionForExecution(order, rejectedExecutionId) {
+  const recol = (order.recolectionStages || []).find(
+    (r) =>
+      String(r.rejectedExecutionId) === String(rejectedExecutionId) &&
+      r.status === 'PENDING',
+  );
+  return recol || null;
 }
 
 function assertStagePrerequisites(order, stageId) {
@@ -74,17 +118,45 @@ function assertStagePrerequisites(order, stageId) {
     return;
   }
 
-  // DEC-016 / AC-016: guard against idempotent re-execution of the same stage.
-  // Since ended_at is NOT NULL in current schema, any existing execution for this stage
-  // represents a completed run. Reject to prevent double-consumption of materials.
-  const existingExecution = findCompletedExecutionForStage(order, BigInt(stageId));
-  if (existingExecution) {
-    throw createSubcodedHttpError(
-      409,
-      `La etapa ya fue ejecutada (ejecucion ${existingExecution.id}). No se puede ejecutar dos veces la misma etapa.`,
-      'conflict',
-      'stage_execution_in_progress',
-    );
+  // TASK-005: Support multi-execution (rejection + re-execution)
+  // DEC-016 guard is updated: only block re-execution if the latest execution is COMPLETED.
+  // If QA_REJECTED: allow re-execution provided losses have been acknowledged (DEC-003).
+  const latestExecution = findLatestExecutionForStage(order, BigInt(stageId));
+  if (latestExecution) {
+    if (latestExecution.status === 'QA_REJECTED') {
+      // BR-003: re-execution allowed only when losses have been declared
+      if (!latestExecution.lossesAcknowledged) {
+        throw createSubcodedHttpError(
+          409,
+          'Debe registrar las pérdidas del intento fallido antes de re-ejecutar la etapa',
+          'conflict',
+          'stage_losses_required',
+        );
+      }
+      // TASK-005 / DEC-003: block re-execution if there is a PENDING recolection/recovery stage.
+      // TASK-006 (qa-rejection-material-reconciliation-amendment): includes REPLACEMENT_RECOVERY
+      const pendingRecolection = findPendingRecolectionForExecution(order, latestExecution.id);
+      if (pendingRecolection) {
+        const isReplacement = pendingRecolection.recoveryType === 'REPLACEMENT_RECOVERY';
+        throw createSubcodedHttpError(
+          409,
+          isReplacement
+            ? 'Debe completar la etapa de reposicion de materiales antes de re-ejecutar la etapa'
+            : 'Debe confirmar la recoleccion de materiales antes de re-ejecutar la etapa',
+          'conflict',
+          isReplacement ? 'replacement_recovery_pending' : 'recolection_pending',
+        );
+      }
+      // lossesAcknowledged === true AND no pending recolection → allow re-execution
+    } else {
+      // status === 'COMPLETED' — DEC-016 preserved for successful executions
+      throw createSubcodedHttpError(
+        409,
+        `La etapa ya fue ejecutada (ejecucion ${latestExecution.id}). No se puede ejecutar dos veces la misma etapa.`,
+        'conflict',
+        'stage_execution_in_progress',
+      );
+    }
   }
 
   for (const priorStage of stages) {
@@ -92,7 +164,8 @@ function assertStagePrerequisites(order, stageId) {
       break;
     }
 
-    const priorExecution = findCompletedExecutionForStage(order, BigInt(priorStage.id));
+    // BR-005: gate uses the latest COMPLETED execution (not QA_REJECTED)
+    const priorExecution = findLatestCompletedExecutionForStage(order, BigInt(priorStage.id));
     if (!priorExecution) {
       throw createSubcodedHttpError(
         409,
@@ -296,6 +369,79 @@ function validateQaMeasurements(snapshotStage, actualParameters, auth, overrideJ
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK-005: Same-lot recolection-before-use validation
+// (qa-rejection-material-reconciliation-amendment)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Builds a balance map for recolected vs used quantities per (productId:lotId).
+ * Input is an array of ProductionRecolectionEntry records.
+ *
+ * @param {Array<{productId:bigint|string, lotId:bigint|string, quantity:any}>} entries
+ * @returns {Map<string, number>}  key = "productId:lotId"
+ */
+function buildRecolectionBalanceMap(entries) {
+  const balanceMap = new Map();
+  for (const entry of entries || []) {
+    const key = `${entry.productId}:${entry.lotId}`;
+    balanceMap.set(key, (balanceMap.get(key) || 0) + Number(entry.quantity));
+  }
+  return balanceMap;
+}
+
+/**
+ * Validates that a proposed set of new consumption records do not violate
+ * same-lot recolection coverage rules (TASK-005, FR-010, FR-011, BR-004, BR-006).
+ *
+ * Only enforced when the stage/recovery context has explicit recolection entries.
+ * Legacy flows without entries are allowed to proceed (backward compat).
+ *
+ * @param {Array<{productId:bigint|string, lotId:bigint|string, quantity:any}>} recolectionEntries
+ * @param {Array<{productId:bigint|string, lotId:bigint|string, quantity:any}>} existingConsumptions
+ * @param {Array<{productId:bigint|string, lotId:bigint|string, quantity:number}>} proposedConsumptions
+ */
+function assertRecolectionCoverageForConsumption(recolectionEntries, existingConsumptions, proposedConsumptions) {
+  // If no recolection entries exist, this is a legacy flow — skip validation (backward compat)
+  if (!recolectionEntries || recolectionEntries.length === 0) {
+    return;
+  }
+
+  const recolectedMap = buildRecolectionBalanceMap(recolectionEntries);
+  const existingUsedMap = buildRecolectionBalanceMap(existingConsumptions);
+
+  for (const proposed of proposedConsumptions || []) {
+    if (!proposed.lotId) {
+      continue;
+    }
+
+    const key = `${proposed.productId}:${proposed.lotId}`;
+    const recolected = recolectedMap.get(key);
+
+    // FR-010: usage must reference a previously recolected lot (BR-004)
+    if (recolected === undefined) {
+      throw createSubcodedHttpError(
+        400,
+        `El lote ${proposed.lotId} del producto ${proposed.productId} no fue recolectado para esta etapa/recuperación. Registre primero la recolección del lote antes de usarlo.`,
+        'validation_error',
+        'lot_not_recolected_for_stage',
+      );
+    }
+
+    // FR-011: usage cannot exceed recolected quantity (BR-006)
+    const alreadyUsed = existingUsedMap.get(key) || 0;
+    const totalAfterProposed = alreadyUsed + Number(proposed.quantity);
+    if (totalAfterProposed > recolected + 0.0001) {
+      throw createSubcodedHttpError(
+        400,
+        `La cantidad a usar (${totalAfterProposed}) supera la cantidad recolectada (${recolected}) para el lote ${proposed.lotId} del producto ${proposed.productId}.`,
+        'validation_error',
+        'recolection_overuse',
+      );
+    }
+  }
+}
+
 async function recordStageOverrideAuditEvent(req, auth, order, stageExecution, overrideMetadata) {
   if (!overrideMetadata || overrideMetadata.violationCodes.length === 0) {
     return null;
@@ -329,6 +475,14 @@ module.exports = {
   validateConsumptionAgainstRequirement,
   validateQaMeasurements,
   recordStageOverrideAuditEvent,
+  // TASK-005: exported for use in production.state.js (warehouse SPA)
+  findLatestExecutionForStage,
+  findLatestCompletedExecutionForStage,
+  // TASK-005: recolection gate check
+  findPendingRecolectionForExecution,
+  // TASK-005 (qa-rejection-material-reconciliation-amendment): same-lot validation
+  buildRecolectionBalanceMap,
+  assertRecolectionCoverageForConsumption,
   /** @deprecated Use companies.production_consumption_tolerance_percent via company.repository */
   CONSUMPTION_TOLERANCE_PERCENT: CONSUMPTION_TOLERANCE_PERCENT_FALLBACK,
   CONSUMPTION_TOLERANCE_PERCENT_FALLBACK,

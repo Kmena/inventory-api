@@ -6,7 +6,11 @@ const recipeRepository = require('../repositories/recipe.repository');
 const inventoryRepository = require('../repositories/inventory.repository');
 const productionPlanningService = require('./production-planning.service');
 const productionExecutionService = require('./production-execution.service');
+const productionCancelService     = require('./production-cancel.service');
+const recolectionService = require('./production-recolection.service');
 const audit = require('../lib/audit');
+// TASK-005 (production-size-conversion): kg conversion for PER_OUTPUT_KG recipe orders.
+const { derivePlannedOutputKg } = require('./product-size-conversion.helper');
 const { permissionRequiresJustification } = require('../security/permission-governance.service');
 
 const ALLOWED_PRODUCTION_SOURCING_METHODS = new Set(['PRODUCTION_ONLY', 'PRODUCTION_OR_PURCHASE']);
@@ -248,6 +252,8 @@ function serializeProductionOrder(order) {
     destinationWarehouseId: order.destinationWarehouseId,
     responsibleUserId: order.responsibleUserId,
     quantity: order.quantity,
+    // TASK-005 (production-size-conversion): pre-computed kg equivalent for PER_OUTPUT_KG orders.
+    plannedOutputKg: order.plannedOutputKg ?? null,
     status: order.status,
     priority: order.priority,
     responsible: order.responsible,
@@ -270,8 +276,20 @@ function serializeProductionOrder(order) {
     destinationWarehouse: order.destinationWarehouse,
     responsibleUser: order.responsibleUser,
     items: order.items,
+    materialRequirements: Array.isArray(order.materialRequirements)
+      ? order.materialRequirements.map((r) => ({
+          id:               r.id,
+          productId:        r.productId,
+          requiredQuantity: r.requiredQuantity,
+          unit:             r.unit,
+          product:          r.product ? { id: r.product.id, name: r.product.name, unit: r.product.unit } : null,
+        }))
+      : undefined,
     stageExecutions: Array.isArray(order.stageExecutions)
       ? order.stageExecutions.map(serializeStageExecution)
+      : undefined,
+    recolectionStages: Array.isArray(order.recolectionStages)
+      ? order.recolectionStages.map(recolectionService.serializeRecolectionStage)
       : undefined,
   };
 }
@@ -338,13 +356,41 @@ async function getProductionOrder(id, auth) {
   return serializeProductionOrder(order);
 }
 
+/**
+ * Selects the quantity used to scale material requirements:
+ * - PER_OUTPUT_KG recipes scale by plannedOutputKg (total kg of finished product).
+ * - PER_FINISHED_UNIT recipes (legacy) scale by the commercial unit count.
+ *
+ * @param {any} recipeVersion
+ * @param {any} product
+ * @param {number} orderQuantity
+ * @returns {{ scalingQuantity: number, plannedOutputKg: number|null }}
+ */
+function resolveOrderScalingQuantity(recipeVersion, product, orderQuantity) {
+  const quantityBasis = recipeVersion?.quantityBasis ?? 'PER_OUTPUT_KG';
+
+  if (quantityBasis !== 'PER_OUTPUT_KG') {
+    return { scalingQuantity: Number(orderQuantity), plannedOutputKg: null };
+  }
+
+  // derivePlannedOutputKg handles backward-compatible products without presentationType
+  // by falling back to kgConversionFactor (default 1), so existing orders are unaffected.
+  const { plannedOutputKg } = derivePlannedOutputKg(product, Number(orderQuantity));
+  return { scalingQuantity: plannedOutputKg, plannedOutputKg };
+}
+
 async function createProductionOrder(payload, auth, req = null) {
   const { scope, product, recipeVersion, override } = await getValidatedProductionContext(payload, auth);
+
+  // TASK-005: compute scaling quantity for material requirements.
+  const { scalingQuantity, plannedOutputKg } = resolveOrderScalingQuantity(
+    recipeVersion, product, payload.quantity,
+  );
 
   const createProductionOrderResult = await inventoryRepository.transaction(async (tx) => {
     await inventoryRepository.acquireCompanyInventoryAdvisoryLock(scope.companyId, tx);
 
-    const requirements = buildMaterialRequirements(recipeVersion, payload.quantity);
+    const requirements = buildMaterialRequirements(recipeVersion, scalingQuantity);
     const stockCheckOverride = createStockCheckOverride(auth, payload.overrideJustification, override);
     const availabilityRows = await assertStockAvailability(
       tx,
@@ -367,6 +413,8 @@ async function createProductionOrder(payload, auth, req = null) {
       destinationWarehouseId: payload.destinationWarehouseId,
       responsibleUserId: payload.responsibleUserId,
       quantity: payload.quantity,
+      // TASK-005: persist the kg equivalent so downstream services do not need to recompute.
+      plannedOutputKg: plannedOutputKg ?? null,
       status: 'DRAFT',
       priority: payload.priority ?? 0,
       responsible: null,
@@ -453,7 +501,12 @@ async function approveProductionOrder(id, payload, auth, req = null) {
     }));
 
     if (requirements.length === 0 && recipeVersion) {
-      requirements = buildMaterialRequirements(recipeVersion, order.quantity);
+      // TASK-005: use the pre-computed plannedOutputKg for PER_OUTPUT_KG recipes.
+      // Falls back to order.quantity for PER_FINISHED_UNIT or legacy orders.
+      const approveScaling = (/** @type {any} */ (order.recipeVersionSnapshot)?.recipeVersion?.quantityBasis ?? 'PER_OUTPUT_KG') === 'PER_OUTPUT_KG'
+        ? Number(order.plannedOutputKg ?? order.quantity)
+        : Number(order.quantity);
+      requirements = buildMaterialRequirements(recipeVersion, approveScaling);
     }
 
     const stockCheckOverride = createStockCheckOverride(
@@ -535,21 +588,20 @@ async function completeProductionOrder(id, payload, auth) {
   return serializeProductionOrder(completedOrder);
 }
 
-async function cancelProductionOrder(id, auth) {
+async function cancelProductionOrder(id, payload, auth) {
   const scope = assertCompanyScope(auth);
-  const order = await productionRepository.findProductionOrderById(id, scope.companyId);
-  if (!order) {
-    throw createHttpError(404, 'Orden de producción no encontrada', 'not_found');
-  }
-
-  assertTransition(order, ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'IN_PROGRESS', 'QA_HOLD'], 'cancelarse');
-
-  const updatedOrder = await productionRepository.updateProductionOrder(id, scope.companyId, {
-    status: 'CANCELLED',
-    cancelledAt: new Date(),
+  const result = await inventoryRepository.transaction(async (tx) => {
+    await inventoryRepository.acquireCompanyInventoryAdvisoryLock(scope.companyId, tx);
+    const order = await productionRepository.findProductionOrderById(id, scope.companyId, tx);
+    if (!order) { throw createHttpError(404, 'Orden de producción no encontrada', 'not_found'); }
+    assertTransition(order, ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'IN_PROGRESS', 'QA_HOLD'], 'cancelarse');
+    const activeReturns = (Array.isArray(payload?.returns) ? payload.returns : []).filter((r) => Number(r.quantity) > 0);
+    if (activeReturns.length > 0) {
+      await productionCancelService.processReturns(tx, auth, order, activeReturns, scope.companyId);
+    }
+    return productionRepository.updateProductionOrder(id, scope.companyId, { status: 'CANCELLED', cancelledAt: new Date() }, tx);
   });
-
-  return serializeProductionOrder(updatedOrder);
+  return serializeProductionOrder(result);
 }
 
 module.exports = {

@@ -50,6 +50,11 @@ test('procurement quotation workspace convergence keeps migrations, backend rout
   assert.match(quotationsApiSource, /\/api\/procurement\/products\/\$\{productId\}\/suppliers-pricing/);
   assert.match(quotationsApiSource, /\/api\/procurement\/products\/\$\{products\[0\]\.productId\}\/request-quotations/);
   assert.match(quotationsApiSource, /\/api\/procurement\/rfq-tracking/);
+  // Flujo de cotizacion directa (sin invitacion RFQ)
+  assert.match(quotationsApiSource, /\/api\/procurement\/requests\/\$\{purchaseRequestId\}\/quotations/);
+  assert.match(quotationsApiSource, /createDirectQuotation/);
+  assert.match(quotationsApiSource, /'\/api\/suppliers\/company'/);
+  assert.match(quotationsApiSource, /listSuppliers/);
 
   assert.match(procurementRfqServiceSource, /serializeQuotationResponseSummary/);
   assert.match(procurementRfqServiceSource, /manualResponseCount/);

@@ -434,6 +434,88 @@
     `;
   }
 
+  /**
+   * Renderiza el formulario del modal de cotizacion directa.
+   * @param {any[]} suppliers   - Lista de proveedores activos de la empresa
+   * @param {any[]} requestItems - Items de la solicitud de compra activa
+   */
+  function renderDirectQuotationForm(suppliers, requestItems) {
+    const ui = rootShell.require('ui');
+    const esc = ui.escapeHtml.bind(ui);
+
+    const supplierOptions = (Array.isArray(suppliers) ? suppliers : [])
+      .map((s) => `<option value="${esc(String(s.id))}">${esc(s.name)}</option>`)
+      .join('');
+
+    const itemRows = (Array.isArray(requestItems) ? requestItems : []).map((item) => `
+      <tr data-product-id="${esc(String(item.productId))}">
+        <td>${esc(item.product?.name || item.productName || String(item.productId))}</td>
+        <td>${esc(String(Number(item.quantity || 0).toFixed(3)))} ${esc(item.product?.unit || item.unit || '')}</td>
+        <td><input type="number" name="unitPrice" min="0.01" step="0.01" required
+                   style="width:100px" placeholder="0.00"
+                   aria-label="Precio unitario de ${esc(item.productName || String(item.productId))}" /></td>
+        <td><input type="number" name="quantity" min="0.001" step="0.001"
+                   value="${esc(String(Number(item.quantity || 0)))}" required
+                   style="width:90px"
+                   aria-label="Cantidad ofertada" /></td>
+        <td><input type="number" name="leadTimeDays" min="0" step="1"
+                   style="width:70px" placeholder="0"
+                   aria-label="Dias de entrega" /></td>
+      </tr>
+    `).join('');
+
+    return `
+      <div style="display:flex;flex-direction:column;gap:0.75rem">
+        <label style="display:block">
+          <span>Proveedor <strong style="color:var(--color-danger,#c00)">*</strong></span>
+          <select id="direct-q-supplier" required style="width:100%;margin-top:0.25rem">
+            <option value="">Selecciona un proveedor...</option>
+            ${supplierOptions}
+          </select>
+        </label>
+
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+          <label style="flex:1;min-width:120px">
+            <span>Moneda</span>
+            <select id="direct-q-currency" style="width:100%;margin-top:0.25rem">
+              <option value="CRC" selected>CRC</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </label>
+          <label style="flex:2;min-width:200px">
+            <span>Referencia (opcional)</span>
+            <input type="text" id="direct-q-reference" maxlength="120"
+                   placeholder="Ej: Cotización #123" style="width:100%;margin-top:0.25rem" />
+          </label>
+        </div>
+
+        <label style="display:block">
+          <span>Notas del proveedor (opcional)</span>
+          <textarea id="direct-q-notes" rows="2" maxlength="2000"
+                    style="width:100%;margin-top:0.25rem"
+                    placeholder="Condiciones, vigencia, etc."></textarea>
+        </label>
+
+        <div style="overflow-x:auto">
+          <table class="wh-table" style="width:100%;min-width:520px">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Requerido</th>
+                <th>Precio unitario *</th>
+                <th>Cantidad ofertada *</th>
+                <th>Días entrega</th>
+              </tr>
+            </thead>
+            <tbody id="direct-q-items-body">${itemRows}</tbody>
+          </table>
+        </div>
+        ${!itemRows ? '<p class="muted">No hay productos en la solicitud activa.</p>' : ''}
+      </div>
+    `;
+  }
+
   rootShell.register('views.quotationsAdminRenderers', {
     renderEmptyState,
     renderGenerationSummary,
@@ -449,5 +531,6 @@
     renderRfqStatusSummary,
     renderOpenRequestsTable,
     renderSelectionSummary,
+    renderDirectQuotationForm,
   });
 }(window));

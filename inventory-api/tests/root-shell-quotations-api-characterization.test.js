@@ -136,3 +136,39 @@ test('quotationsApi exposes getComparisonData and selectQuotation with expected 
   assert.equal(calls[1].options.method, 'POST');
   assert.equal(calls[1].options.body, JSON.stringify({ quotationId: 2001, justification: null }));
 });
+
+test('quotationsApi exposes createDirectQuotation and listSuppliers with expected endpoint shape', async () => {
+  const calls = [];
+  const { browserWindow, context } = createBrowserContext(async (session, url, options = {}) => {
+    calls.push({ session, url, options });
+    return { id: 99 };
+  });
+
+  executeRootScript('registry.js', context);
+  executeRootScript('quotations-api.js', context);
+
+  const quotationsApi = browserWindow.RootShell.require('quotationsApi');
+  const session = { user: { id: 12 } };
+
+  const directPayload = {
+    supplierId: 5,
+    currency: 'CRC',
+    reference: 'COT-001',
+    notes: 'Precio valido 30 dias',
+    items: [{ productId: 11, quantity: 10, unitPrice: 1500, leadTimeDays: 3 }],
+  };
+
+  await quotationsApi.createDirectQuotation(session, 1001, directPayload);
+  await quotationsApi.listSuppliers(session);
+
+  assert.equal(calls.length, 2);
+
+  assert.equal(calls[0].url, '/api/procurement/requests/1001/quotations');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.body, JSON.stringify(directPayload));
+  assert.ok(calls[0].options.fallbackMessage, 'createDirectQuotation debe tener fallbackMessage');
+
+  assert.equal(calls[1].url, '/api/suppliers/company');
+  assert.equal(calls[1].options?.method, undefined, 'listSuppliers es GET (sin method explicito)');
+  assert.ok(calls[1].options.fallbackMessage, 'listSuppliers debe tener fallbackMessage');
+});

@@ -105,6 +105,31 @@
     });
   }
 
+  /**
+   * Crea una cotizacion de proveedor directamente en una solicitud de compra,
+   * sin pasar por el flujo de invitacion RFQ.
+   * POST /api/procurement/requests/:id/quotations
+   * Requiere: procurement.manage
+   */
+  async function createDirectQuotation(session, purchaseRequestId, payload) {
+    return inventoryAuth.fetchJson(session, `/api/procurement/requests/${purchaseRequestId}/quotations`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudo registrar la cotizacion del proveedor.',
+    });
+  }
+
+  /**
+   * Lista los proveedores activos de la empresa.
+   * GET /api/suppliers/company
+   * Requiere: suppliers.view o suppliers.manage
+   */
+  async function listSuppliers(session) {
+    return inventoryAuth.fetchJson(session, '/api/suppliers/company', {
+      fallbackMessage: 'No se pudieron cargar los proveedores.',
+    });
+  }
+
   rootShell.register('quotationsApi', {
     listQuotableProducts,
     getProductSuppliersPricing,
@@ -120,5 +145,7 @@
     selectQuotation,
     approveSelection,
     createPurchaseOrder,
+    createDirectQuotation,
+    listSuppliers,
   });
 }(window));

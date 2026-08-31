@@ -168,6 +168,11 @@ function acquireCompanyInventoryAdvisoryLock(companyId, db = prisma) {
   return db.$executeRaw`SELECT pg_advisory_xact_lock(${companyId})`;
 }
 
+async function tryAcquireCompanyInventoryAdvisoryLock(companyId, db = prisma) {
+  const rows = await db.$queryRaw`SELECT pg_try_advisory_xact_lock(${companyId}) AS acquired`;
+  return Boolean(rows?.[0]?.acquired);
+}
+
 function loadInventoryContext(companyId, warehouseId, productId, db = prisma) {
   return Promise.all([
     db.inventory.findUnique({ where: { companyId } }),
@@ -402,6 +407,7 @@ module.exports = {
   findInventoryAlertById,
   updateInventoryAlert,
   acquireCompanyInventoryAdvisoryLock,
+  tryAcquireCompanyInventoryAdvisoryLock,
   loadInventoryContext,
   findWarehouseStockRecord,
   createWarehouseStockRecord,

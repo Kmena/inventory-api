@@ -104,6 +104,14 @@
               <label><span>Tolerancia merma %</span><input name="wasteTolerancePercent" type="number" min="0" max="100" step="0.01" /></label>
               <label class="products-field-full"><span>Instrucciones</span><textarea name="instructions" rows="4" maxlength="5000"></textarea></label>
               <label class="products-field-full"><span>Notas</span><textarea name="notes" rows="3" maxlength="2000"></textarea></label>
+              <label class="products-field-wide">
+                <span>Base de cantidades de insumos</span>
+                <select name="quantityBasis" id="recipes-version-quantity-basis">
+                  <option value="PER_OUTPUT_KG">Por kg de salida (PER_OUTPUT_KG)</option>
+                  <option value="PER_FINISHED_UNIT">Por unidad terminada · legado (PER_FINISHED_UNIT)</option>
+                </select>
+                <span id="recipes-version-quantity-basis-hint" class="products-field-hint">Las cantidades de insumos representan material por 1 kg de producto terminado.</span>
+              </label>
             </div>
           </fieldset>
           <fieldset class="root-form__section">

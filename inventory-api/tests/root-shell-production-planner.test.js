@@ -108,6 +108,59 @@ test('views/production-planner.js includes a dialog to generate a production ord
 });
 
 // -----------------------------------------------------------------------
+// Ingredient availability preview
+// -----------------------------------------------------------------------
+
+test('views/production-planner.js has renderIngredientAvailability and productStockMap (availability feature)', () => {
+  const source = fs.readFileSync(path.join(rootPath, 'views', 'production-planner.js'), 'utf8');
+  assert.match(source, /function renderIngredientAvailability/, 'must declare renderIngredientAvailability');
+  assert.match(source, /productStockMap/, 'must use productStockMap for stock lookups');
+  assert.match(source, /planner-ingredients-preview/, 'dialog must include #planner-ingredients-preview container');
+  assert.match(source, /currentQtyListener/, 'dialogState must track currentQtyListener to avoid duplicate listeners');
+  assert.match(source, /updatePreview/, 'must call updatePreview to refresh availability on qty change');
+});
+
+test('views/production-planner.js ingredient availability uses correct formula (ingredient.quantity * qty)', () => {
+  const source = fs.readFileSync(path.join(rootPath, 'views', 'production-planner.js'), 'utf8');
+  assert.match(
+    source,
+    /Number\(ing\.quantity\)\s*\*\s*qty/,
+    'required quantity must be Number(ing.quantity) * qty (per-unit from recipe)',
+  );
+  // Must listen to qty input changes for live update
+  assert.match(source, /qtyInput.*addEventListener.*input/, 'must listen to quantity input events');
+  // Preview must have aria-live for accessibility
+  assert.match(source, /aria-live/, 'preview panel must declare aria-live');
+});
+
+test('views/production-planner.js loadPlannerData returns productStockMap alongside rows', () => {
+  const source = fs.readFileSync(path.join(rootPath, 'views', 'production-planner.js'), 'utf8');
+  assert.match(source, /return \{ rows, productStockMap \}/, 'loadPlannerData must return { rows, productStockMap }');
+  assert.match(source, /result\.productStockMap/, 'mount must read productStockMap from loadPlannerData result');
+});
+
+test('views/production-planner.js caches approvedVersions array (not just a single versionId)', () => {
+  const source = fs.readFileSync(path.join(rootPath, 'views', 'production-planner.js'), 'utf8');
+  assert.match(source, /approvedVersions/, 'cache must store approvedVersions array');
+  assert.match(source, /defaultVersionId/, 'cache must store defaultVersionId for pre-selection');
+});
+
+test('views/production-planner.js dialog has a version <select> so users can pick any approved version', () => {
+  const source = fs.readFileSync(path.join(rootPath, 'views', 'production-planner.js'), 'utf8');
+  assert.match(source, /planner-field-recipe-version/, 'dialog must have #planner-field-recipe-version select');
+  assert.match(source, /planner-version-field/, 'dialog must have #planner-version-field label wrapper');
+});
+
+test('views/production-planner.js collectDialogPayload reads recipeVersionId from version select', () => {
+  const source = fs.readFileSync(path.join(rootPath, 'views', 'production-planner.js'), 'utf8');
+  assert.match(
+    source,
+    /value\('#planner-field-recipe-version'\)/,
+    'collectDialogPayload must read recipeVersionId from the select element',
+  );
+});
+
+// -----------------------------------------------------------------------
 // index.html script tag
 // -----------------------------------------------------------------------
 
@@ -125,6 +178,42 @@ test('root/index.html loads views/production-planner.js before router.js', () =>
 // for sibling APIs at the top level; those calls must happen lazily inside
 // mount() (or a helper invoked from mount()).
 // -----------------------------------------------------------------------
+
+// -----------------------------------------------------------------------
+// TASK-006: kg preview in the planner dialog
+// -----------------------------------------------------------------------
+
+test('views/production-planner.js has deriveKgPerUnitClient for kg preview (TASK-006)', () => {
+  const source = fs.readFileSync(path.join(rootPath, 'views', 'production-planner.js'), 'utf8');
+  assert.match(source, /function deriveKgPerUnitClient/, 'must declare deriveKgPerUnitClient');
+  // Must handle all four presentation types
+  assert.match(source, /'VOLUME'/, 'must handle VOLUME presentation');
+  assert.match(source, /'MASS'/, 'must handle MASS presentation');
+  assert.match(source, /'LENGTH'/, 'must handle LENGTH presentation');
+  assert.match(source, /'COUNT'/, 'must handle COUNT presentation');
+  // Backward-compatible fallback
+  assert.match(source, /kgConversionFactor != null/, 'must fall back to kgConversionFactor for legacy products');
+});
+
+test('views/production-planner.js dialog has #planner-kg-preview element for estimated kg display (TASK-006)', () => {
+  const source = fs.readFileSync(path.join(rootPath, 'views', 'production-planner.js'), 'utf8');
+  assert.match(source, /planner-kg-preview/, 'dialog must include #planner-kg-preview element');
+  assert.match(source, /planner-kg-preview-value/, 'dialog must include #planner-kg-preview-value for the numeric display');
+  assert.match(source, /Kg planeados/, 'dialog must label the preview as "Kg planeados"');
+  // Must be hidden when no presentationType is available
+  assert.match(source, /style\.display.*none|style.*display.*none/,
+    'preview must be hidden by default when kg cannot be derived');
+});
+
+test('views/production-planner.js productStockMap includes presentationType and density fields (TASK-006)', () => {
+  const source = fs.readFileSync(path.join(rootPath, 'views', 'production-planner.js'), 'utf8');
+  // The product data stored in productStockMap must carry the size metadata
+  // so deriveKgPerUnitClient can compute the conversion without a second API call.
+  assert.match(source, /presentationType: p\.presentationType/, 'productStockMap must store presentationType');
+  assert.match(source, /netContent: toNum\(p\.netContent\)/, 'productStockMap must store netContent');
+  assert.match(source, /netContentUnit: p\.netContentUnit/, 'productStockMap must store netContentUnit');
+  assert.match(source, /kgConversionFactor: toNum\(p\.kgConversionFactor\)/, 'productStockMap must store kgConversionFactor');
+});
 
 test('views/production-planner.js resolves API deps lazily inside mount (no top-level require of sibling APIs)', () => {
   const source = fs.readFileSync(path.join(rootPath, 'views', 'production-planner.js'), 'utf8');
