@@ -2576,28 +2576,23 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   gap: 10px;
 }
 
-.route-map-svg {
-  width: 100%;
-  height: auto;
+/* Leaflet container for route coverage map */
+.route-leaflet-map {
+  height: 300px;
+  border-radius: 14px;
+  overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 18px;
-  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
 }
 
-.route-map-svg__frame {
-  fill: transparent;
-  stroke: rgba(148, 163, 184, 0.6);
-  stroke-width: 2;
-}
-
-.route-map-svg__point {
-  fill: #4f46e5;
-  opacity: 0.9;
-}
-
-.route-map-svg__label {
-  font-size: 10px;
-  fill: #1f2937;
+/* Read-only pin for route map (no grab cursor) */
+.route-map-pin__dot {
+  width: 20px;
+  height: 20px;
+  background: #4f46e5;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  cursor: default;
 }
 
 .rfq-tracking-sidebar-list {

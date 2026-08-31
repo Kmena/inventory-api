@@ -39,42 +39,24 @@
     `;
   }
 
-  function renderSvgMap(route) {
-    const mapModel = routesHelpers.buildMapModel(route?.stores || []);
-    if (!mapModel.hasMapData) {
+  /**
+   * Renders the Leaflet map container. The actual map tiles + markers are
+   * initialized imperatively in routes-admin.js after innerHTML is set.
+   */
+  function renderLeafletMap(route) {
+    const mappableCount = (route?.stores || []).filter(
+      (s) => s.latitude !== null && s.longitude !== null
+        && Number.isFinite(Number(s.latitude)) && Number.isFinite(Number(s.longitude)),
+    ).length;
+
+    if (!mappableCount) {
       return '<p class="empty-state">No hay tiendas con coordenadas para mostrar en el mapa.</p>';
     }
 
-    const singleNote = mapModel.isSinglePoint
-      ? '<p class="muted" style="font-size:0.8rem">Una sola tienda con coordenadas — aparece centrada en el mapa.</p>'
-      : '';
-
     return `
-      <div class="route-map-card" data-route-map>
-        <p class="muted">${mapModel.points.length} tienda(s) con coordenadas visibles en la ruta.</p>
-        ${singleNote}
-        <svg viewBox="0 0 400 240" class="route-map-svg" role="img" aria-label="Mapa simplificado de cobertura de la ruta">
-          <rect x="8" y="8" width="384" height="224" rx="18" class="route-map-svg__frame"></rect>
-          ${mapModel.points.map((point) => {
-            const isEdgeRight = point.x > 320;
-            const labelX = isEdgeRight ? -10 : 10;
-            const labelAnchor = isEdgeRight ? 'end' : 'start';
-            if (mapModel.isSinglePoint) {
-              // Larger, centered dot + label below
-              return `
-                <g transform="translate(${point.x}, ${point.y})" data-map-point="${rootShellUi.escapeHtml(point.id)}">
-                  <circle r="12" class="route-map-svg__point" opacity="0.2"></circle>
-                  <circle r="7" class="route-map-svg__point"></circle>
-                  <text x="0" y="24" text-anchor="middle" class="route-map-svg__label">${rootShellUi.escapeHtml(point.code || point.name || 'Tienda')}</text>
-                </g>`;
-            }
-            return `
-              <g transform="translate(${point.x}, ${point.y})" data-map-point="${rootShellUi.escapeHtml(point.id)}">
-                <circle r="7" class="route-map-svg__point"></circle>
-                <text x="${labelX}" y="4" text-anchor="${labelAnchor}" class="route-map-svg__label">${rootShellUi.escapeHtml(point.code || point.name || 'Tienda')}</text>
-              </g>`;
-          }).join('')}
-        </svg>
+      <div class="route-map-card">
+        <p class="muted">${mappableCount} tienda(s) con coordenadas en la ruta.</p>
+        <div id="routes-leaflet-map" class="route-leaflet-map"></div>
       </div>
     `;
   }
@@ -194,7 +176,7 @@
 
       <section class="stack-section">
         <h4>Mapa de cobertura</h4>
-        ${renderSvgMap(route)}
+        ${renderLeafletMap(route)}
       </section>
     `;
   }
@@ -202,8 +184,8 @@
   rootShell.register('views.routesAdminRenderers', {
     renderCoverage,
     renderGoalsEditor,
+    renderLeafletMap,
     renderRouteDetail,
     renderRouteList,
-    renderSvgMap,
   });
 }(window));
