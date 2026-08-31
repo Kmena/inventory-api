@@ -69,7 +69,8 @@ function renderOrderRow(order) {
   const agentName = order.user?.fullName || order.responsible || '—';
   const paymentLabel = PAYMENT_LABELS[order.paymentCondition] || order.paymentCondition || '—';
   const itemCount = (order.items || []).length;
-  const isDraft = order.status === 'DRAFT';
+  const isDraft    = order.status === 'DRAFT';
+  const isApproved  = order.status === 'APPROVED';
 
   const itemsSummary = (order.items || []).slice(0, 5).map((item) =>
     `<div style="display:flex;justify-content:space-between;gap:8px;font-size:0.8rem;padding:2px 0;">
@@ -103,6 +104,10 @@ function renderOrderRow(order) {
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
         <button type="button" class="btn approvals-approve-btn" data-order-id="${escapeHtml(String(order.id))}" style="background:#16A34A;flex:1;min-width:120px;">✓ Aprobar</button>
         <button type="button" class="secondary-button approvals-reject-btn" data-order-id="${escapeHtml(String(order.id))}" style="color:#DC2626;border-color:#DC2626;flex:1;min-width:120px;">✗ Rechazar</button>
+      </div>` : ''}
+      ${isApproved ? `
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button type="button" class="btn approvals-dispatch-btn" data-order-id="${escapeHtml(String(order.id))}" style="background:#2563EB;flex:1;min-width:120px;">🚚 Despachar</button>
       </div>` : ''}
     </div>`;
 }
@@ -214,6 +219,25 @@ async function render(session, _item) {
           showToast(containerEl, err.message || 'Error al aprobar el pedido.', true);
           btn.disabled = false;
           btn.textContent = '✓ Aprobar';
+        }
+      });
+    });
+
+    // Dispatch buttons
+    containerEl.querySelectorAll('.approvals-dispatch-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const orderId = btn.getAttribute('data-order-id');
+        btn.disabled = true;
+        btn.textContent = 'Despachando…';
+        try {
+          await ordersApi.dispatchOrder(session, orderId);
+          showToast(containerEl, `Pedido #${orderId} despachado correctamente.`, false);
+          await loadOrders();
+          renderView();
+        } catch (err) {
+          showToast(containerEl, err.message || 'Error al despachar el pedido.', true);
+          btn.disabled = false;
+          btn.textContent = '🚚 Despachar';
         }
       });
     });
