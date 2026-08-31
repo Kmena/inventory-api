@@ -35,6 +35,22 @@
       const overdue = bh.isOverdue(inv);
       const rowStyle = overdue ? ' class="billing-row--overdue"' : '';
       const pending = inv.pendingAmount ?? inv.amount ?? 0;
+
+      // Check if there's already a payment in review for this invoice
+      const inFlightPayment = (inv.payments || []).find(
+        (p) => p.status === 'PENDING_APPROVAL' || p.status === 'UNDER_REVIEW',
+      );
+      const actionCell = inFlightPayment
+        ? `<span style="font-size:0.8rem;font-weight:700;padding:4px 10px;border-radius:6px;background:#fef3c7;color:#92400e;white-space:nowrap;">
+             ⏳ Pago en revisión
+           </span>`
+        : `<button type="button" class="secondary-button billing-register-payment-btn" style="font-size:0.8rem;padding:4px 10px;"
+             data-invoice-id="${bh.escapeHtml(String(inv.id))}"
+             data-invoice-number="${bh.escapeHtml(inv.invoiceNumber || String(inv.id))}"
+             data-pending-amount="${Number(pending)}">
+             Registrar pago
+           </button>`;
+
       return `
         <tr${rowStyle}>
           <td>${bh.escapeHtml(inv.client?.name || inv.clientName || '—')}</td>
@@ -43,14 +59,7 @@
           <td class="numeric-cell" style="font-weight:700;">${bh.formatCurrency(pending)}</td>
           <td>${bh.formatDate(inv.dueAt)}</td>
           <td><span class="${bh.invoiceStatusBadgeClass(inv.status)}">${bh.escapeHtml(bh.invoiceStatusLabel(inv.status))}</span></td>
-          <td>
-            <button type="button" class="secondary-button billing-register-payment-btn" style="font-size:0.8rem;padding:4px 10px;"
-              data-invoice-id="${bh.escapeHtml(String(inv.id))}"
-              data-invoice-number="${bh.escapeHtml(inv.invoiceNumber || String(inv.id))}"
-              data-pending-amount="${Number(pending)}">
-              💰 Registrar pago
-            </button>
-          </td>
+          <td>${actionCell}</td>
         </tr>`;
     });
 
