@@ -114,6 +114,36 @@ function renderSellableProducts(products) {
   </ul>`;
 }
 
+/** @param {any[]} history @returns {{ drafts: any[], inTransit: any[] }} */
+function classifyActiveOrders(history) {
+  const orders = Array.isArray(history) ? history : [];
+  return {
+    drafts:    orders.filter((o) => o.status === 'DRAFT'),
+    inTransit: orders.filter((o) => o.status === 'APPROVED' || o.status === 'IN_PRODUCTION'),
+  };
+}
+
+function renderActiveOrdersBanner(history) {
+  const h = AgentShell.require('helpers');
+  const { drafts, inTransit } = classifyActiveOrders(history);
+  if (!drafts.length && !inTransit.length) return '';
+
+  const parts = [];
+  if (drafts.length) {
+    const ids = drafts.map((o) => `#${h.escapeHtml(String(o.orderId || '?'))}`).join(', ');
+    parts.push(`<div class="agent-info-banner" style="background:#fef9c3;border-color:#eab308;">
+      🕐 <strong>${drafts.length} pedido${drafts.length > 1 ? 's' : ''} pendiente${drafts.length > 1 ? 's' : ''} de aprobación:</strong> ${ids}
+    </div>`);
+  }
+  if (inTransit.length) {
+    const ids = inTransit.map((o) => `#${h.escapeHtml(String(o.orderId || '?'))}`).join(', ');
+    parts.push(`<div class="agent-info-banner" style="background:#dbeafe;border-color:#3b82f6;">
+      🚚 <strong>${inTransit.length} pedido${inTransit.length > 1 ? 's' : ''} en tránsito:</strong> ${ids}
+    </div>`);
+  }
+  return parts.join('');
+}
+
 function renderStoreDetail(store, storeId) {
   const h = AgentShell.require('helpers');
   const isVencida = store.status === 'VENCIDA';
@@ -133,6 +163,7 @@ function renderStoreDetail(store, storeId) {
       </header>
 
       ${isVencida ? '<div class="agent-alert-banner">⚠️ Esta tienda tiene saldo vencido. Gestiona el cobro antes de tomar un pedido.</div>' : ''}
+      ${renderActiveOrdersBanner(store.purchaseHistory)}
 
       <div class="detail-item">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
