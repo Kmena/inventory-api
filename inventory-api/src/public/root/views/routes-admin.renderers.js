@@ -118,8 +118,8 @@
           <div class="root-form-grid">
             <label><span>Codigo *</span><input name="code" type="text" required minlength="2" maxlength="40" value="${rootShellUi.escapeHtml(route.code || '')}" /></label>
             <label><span>Nombre *</span><input name="name" type="text" required minlength="2" maxlength="120" value="${rootShellUi.escapeHtml(route.name || '')}" /></label>
-            <label><span>Frecuencia *</span><input name="visitFrequencyDays" type="number" min="1" required value="${rootShellUi.escapeHtml(route.visitFrequencyDays || 1)}" /></label>
-            <label><span>Alerta *</span><input name="nearLimitDays" type="number" min="0" required value="${rootShellUi.escapeHtml(route.nearLimitDays || 0)}" /></label>
+            <label><span>Frecuencia (días) *</span><input name="visitFrequencyDays" type="number" min="5" required value="${rootShellUi.escapeHtml(route.visitFrequencyDays || 15)}" /></label>
+            
             <label><span>Activa</span><input name="isActive" type="checkbox" ${route.isActive !== false ? 'checked' : ''} /></label>
           </div>
           <div class="action-row compact-action-row"><button type="submit">Guardar ruta</button></div>

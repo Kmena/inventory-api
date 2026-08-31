@@ -65,7 +65,6 @@ async function listAgentDashboard(auth) {
       code: route.code,
       name: route.name,
       visitFrequencyDays: route.visitFrequencyDays,
-      nearLimitDays: route.nearLimitDays,
     })),
   };
 }

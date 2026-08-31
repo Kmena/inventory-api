@@ -9,6 +9,8 @@ const {
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const INVOICE_PENDING_DAYS = 30;
+// System-level constant — not configurable per route to prevent misconfiguration.
+const NEAR_LIMIT_DAYS = 5;
 const STATUS_PRIORITY = {
   VENCIDA: 0,
   PROXIMA_A_VENCER: 1,
@@ -33,10 +35,7 @@ function computeVisitState(store, route) {
   const referenceDate = latestVisit?.visitedAt || store.createdAt;
   const daysSinceReference = referenceDate ? daysBetween(referenceDate) : 0;
   const frequency = Number(route?.visitFrequencyDays || 15);
-  // Cap nearLimit so it never equals or exceeds frequency — otherwise
-  // Math.max(0, frequency - nearLimit) collapses to 0 and the store
-  // is permanently PROXIMA_A_VENCER regardless of when it was visited.
-  const nearLimit = Math.min(Number(route?.nearLimitDays || 3), Math.max(1, frequency - 1));
+  const nearLimit = Math.min(NEAR_LIMIT_DAYS, Math.max(1, frequency - 1));
   const dueInDays = frequency - daysSinceReference;
   const hasVisits = Boolean(latestVisit);
 
@@ -220,7 +219,7 @@ function serializeStoreCard(store, route) {
     routeCode: route?.code || null,
     routeName: route?.name || null,
     visitFrequencyDays: route?.visitFrequencyDays || 15,
-    nearLimitDays: route?.nearLimitDays || 3,
+    nearLimitDays: NEAR_LIMIT_DAYS,
     regionName: store.subregion?.region?.name || null,
     subregionName: store.subregion?.name || null,
     representativesCount: store.representatives?.length || 0,
