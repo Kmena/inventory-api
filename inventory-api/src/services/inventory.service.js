@@ -549,7 +549,13 @@ async function releaseStockReservation(orderId, cancel, auth, req = null) {
   return updatedOrder;
 }
 
-async function dispatchOrder(orderId, auth, req = null) {
+/**
+ * @param {bigint} orderId
+ * @param {any} auth
+ * @param {{ transportMethod?: string, trackingNumber?: string, transportResponsible?: string } | null} [transportPayload]
+ * @param {any} [req]
+ */
+async function dispatchOrder(orderId, auth, transportPayload = null, req = null) {
   const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const scope = authScope(auth);
     const order = /** @type {any} */ (await inventoryRepository.findOrderForCompany(
@@ -617,9 +623,17 @@ async function dispatchOrder(orderId, auth, req = null) {
       }
     }
 
+    const dispatchUserId = auth?.sub ? BigInt(auth.sub) : null;
     return inventoryRepository.updateOrderById(
       orderId,
-      { status: 'DELIVERED' },
+      {
+        status: 'DELIVERED',
+        dispatchedAt: new Date(),
+        ...(dispatchUserId ? { dispatchedById: dispatchUserId } : {}),
+        ...(transportPayload?.transportMethod    ? { transportMethod:      transportPayload.transportMethod }    : {}),
+        ...(transportPayload?.trackingNumber     ? { trackingNumber:       transportPayload.trackingNumber }     : {}),
+        ...(transportPayload?.transportResponsible ? { transportResponsible: transportPayload.transportResponsible } : {}),
+      },
       { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } },
       tx,
     );

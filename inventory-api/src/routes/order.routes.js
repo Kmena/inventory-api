@@ -36,7 +36,7 @@ router.post('/:id/cancel', authorizeAccessPolicy('order.cancel'), async (req, re
 });
 
 router.post('/:id/dispatch', authorizeAccessPolicy('order.dispatch'), async (req, res, next) => {
-  try { return res.json(await orderService.dispatchOrder(parseBigIntId(req.params.id), req.auth, req)); } catch (error) { return next(error); }
+  try { return res.json(await orderService.dispatchOrder(parseBigIntId(req.params.id), req.auth, req.body || null, req)); } catch (error) { return next(error); }
 });
 
 router.delete('/:id', authorizeAccessPolicy('order.delete'), async (req, res, next) => {
