@@ -259,7 +259,11 @@ function serializePurchaseHistory(store) {
       orderId: order.id,
       createdAt: order.createdAt,
       status: order.status,
-      total: Number(order.total || 0),
+      // Fallback: compute from items if Order.total was not stored (legacy orders)
+      total: Number(order.total || 0) || (order.items || []).reduce(
+        (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0) - Number(item.totalDiscount || 0)),
+        0,
+      ),
       pendingBalance: toMoneyNumber(pendingBalance),
       invoiceNumbers: invoices.map((invoice) => invoice.number),
       invoices,
