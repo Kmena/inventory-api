@@ -244,6 +244,9 @@ async function render(containerEl, session, params) {
         if (nextFieldEl) nextFieldEl.hidden = true;
 
         if (toastEl) helpers.showToast('Visita registrada correctamente', toastEl);
+
+        // Volver al detalle de la tienda para que el status se recalcule desde la API
+        setTimeout(() => navigate('store-detail', { storeId }), 1500);
       } catch (err) {
         // Preserva datos del formulario; muestra banner
         if (errorBanner) {
