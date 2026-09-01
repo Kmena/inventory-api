@@ -42,7 +42,7 @@
    * Renders the Leaflet map container. The actual map tiles + markers are
    * initialized imperatively in routes-admin.js after innerHTML is set.
    */
-  function renderLeafletMap(route) {
+  function renderSvgMap(route) {
     const mappableCount = (route?.stores || []).filter(
       (s) => s.latitude !== null && s.longitude !== null
         && Number.isFinite(Number(s.latitude)) && Number.isFinite(Number(s.longitude)),
@@ -175,7 +175,7 @@
 
       <section class="stack-section">
         <h4>Mapa de cobertura</h4>
-        ${renderLeafletMap(route)}
+        ${renderSvgMap(route)}
       </section>
     `;
   }
@@ -183,7 +183,7 @@
   rootShell.register('views.routesAdminRenderers', {
     renderCoverage,
     renderGoalsEditor,
-    renderLeafletMap,
+    renderSvgMap,
     renderRouteDetail,
     renderRouteList,
   });
