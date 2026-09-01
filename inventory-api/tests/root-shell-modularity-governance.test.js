@@ -134,7 +134,7 @@ test('sensitive root-shell modules keep isolated characterization coverage and e
   assert.match(routesAdminSource, /views\.routesAdminState/);
   assert.match(routesAdminSource, /routesRenderers\.renderRouteDetail\(/);
   assert.match(routesAdminSource, /routesState\.resolveGoalRows\(/);
-  assert.match(routesRenderersSource, /function renderSvgMap\(route\)/);
+  assert.match(routesRenderersSource, /function renderLeafletMap\(route\)/);
   assert.match(routesRenderersSource, /function renderRouteDetail\(route, zones, agents, selectedGoalsAgentId, goalRows\)/);
   assert.match(routesStateSource, /function getSelectedRoute\(overview, detailByRouteId, selectedRouteId\)/);
 
