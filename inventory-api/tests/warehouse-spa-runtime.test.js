@@ -708,15 +708,19 @@ test('production-new.js includes ingredient preview helpers', () => {
 
 test('production-new.js renderIngredientsPreview uses correct quantity formula', () => {
   const source = readWarehouseFile('views/production-new.js');
-  // Required = ingredient.quantity (per-unit from recipe) × user quantity
+  // For PER_OUTPUT_KG recipes the scaling factor is plannedOutputKg (kgPerUnit × qty),
+  // not raw qty. The formula must multiply by scalingQty to match the backend.
   assert.match(
     source,
-    /Number\(ing\.quantity\)\s*\*\s*qty/,
-    'required quantity must be Number(ing.quantity) * qty',
+    /Number\(ing\.quantity\)\s*\*\s*scalingQty/,
+    'required quantity must be Number(ing.quantity) * scalingQty (accounts for PER_OUTPUT_KG basis)',
   );
-  // Must react to both recipe-select changes and quantity-input changes
+  assert.match(source, /clientKgPerUnit/, 'must define clientKgPerUnit for kg conversion');
+  assert.match(source, /quantityBasis/, 'must read quantityBasis from recipe version');
+  // Must react to recipe-select, product-select, and quantity-input changes
   assert.match(source, /recipeSelect\.addEventListener\('change'/, 'must listen to recipe change');
   assert.match(source, /qtyInput\.addEventListener\('input'/, 'must listen to quantity input');
+  assert.match(source, /productSelect.*addEventListener|addEventListener.*productSelect/, 'must listen to product change for kg conversion');
 });
 
 test('production-new.js shows version <select> (not hidden input) so users can choose any approved version', () => {

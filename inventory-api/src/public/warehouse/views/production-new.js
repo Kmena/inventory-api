@@ -57,14 +57,49 @@ function formatQty(num) {
 // -----------------------------------------------------------------------
 
 /**
+ * Client-side mirror of the backend's deriveKgPerUnit helper.
+ * Computes kg per commercial unit so we can scale PER_OUTPUT_KG recipes correctly.
+ * Returns 1 as a safe fallback when conversion data is missing.
+ *
+ * @param {object|null|undefined} product
+ * @returns {number}
+ */
+function clientKgPerUnit(product) {
+  if (!product) { return 1; }
+  const type    = product.presentationType;
+  const content = Number(product.netContent ?? 0);
+  const unit    = product.netContentUnit;
+  const density = Number(product.density ?? 0);
+  const factor  = Number(product.kgConversionFactor ?? 1);
+
+  if (!type) { return factor || 1; }
+  if (type === 'VOLUME') {
+    const liters = unit === 'ML' ? content * 0.001 : content;
+    return liters * density || 1;
+  }
+  if (type === 'MASS') {
+    return (unit === 'G' ? content * 0.001 : content) || 1;
+  }
+  if (type === 'LENGTH') { return content * factor || 1; }
+  if (type === 'COUNT')  { return factor || 1; }
+  return 1;
+}
+
+/**
  * Build the inner HTML of the ingredient preview panel.
  * Returns empty string when there is nothing to show.
  *
- * @param {object|undefined} recipe - full recipe object from loadFormData
- * @param {number} qty - user-entered production quantity
+ * For PER_OUTPUT_KG recipes the scaling factor is plannedOutputKg
+ * (kg of finished product), NOT the raw unit count. Without this
+ * correction the preview overstates or understates requirements.
+ *
+ * @param {object|undefined} recipe
+ * @param {number} qty            - units ordered
+ * @param {string|null} selectedVersionId
+ * @param {object|null} selectedProduct  - full product record (may be null before selection)
  * @returns {string}
  */
-function renderIngredientsPreview(recipe, qty, selectedVersionId) {
+function renderIngredientsPreview(recipe, qty, selectedVersionId, selectedProduct) {
   if (!recipe || !qty || qty <= 0) { return ''; }
 
   // Use the explicitly-selected version; fall back to latestApprovedVersionId
@@ -82,12 +117,20 @@ function renderIngredientsPreview(recipe, qty, selectedVersionId) {
       </div>`;
   }
 
+  // PER_OUTPUT_KG: scale by total kg of finished product, not by unit count.
+  const quantityBasis = approvedVersion.quantityBasis ?? 'PER_OUTPUT_KG';
+  const kgPerUnit     = quantityBasis === 'PER_OUTPUT_KG' ? clientKgPerUnit(selectedProduct) : 1;
+  const scalingQty    = quantityBasis === 'PER_OUTPUT_KG' ? kgPerUnit * qty : qty;
+  const plannedKgNote = quantityBasis === 'PER_OUTPUT_KG'
+    ? ` (≈ <strong>${escapeHtml(formatQty(scalingQty))}</strong> kg de producto terminado)`
+    : '';
+
   const rows = ingredients.map((ing) => {
     const p = ing.product;
     const name   = p ? p.name : `Insumo #${ing.productId}`;
-    const code   = p?.code   ? ` (${escapeHtml(p.code)})` : '';
-    const unit   = p?.unit   ? ` <span style="color:#666;font-size:.85em">${escapeHtml(p.unit)}</span>` : '';
-    const needed = formatQty(Number(ing.quantity) * qty);
+    const code   = p?.code ? ` (${escapeHtml(p.code)})` : '';
+    const unit   = p?.unit ? ` <span style="color:#666;font-size:.85em">${escapeHtml(p.unit)}</span>` : '';
+    const needed = formatQty(Number(ing.quantity) * scalingQty);
     return `<tr>
       <td style="padding:4px 0">${escapeHtml(name)}${code}</td>
       <td style="text-align:right;padding:4px 0;font-variant-numeric:tabular-nums">
@@ -99,7 +142,7 @@ function renderIngredientsPreview(recipe, qty, selectedVersionId) {
   return `
     <div style="background:#f0f7ff;border:1px solid #bcd;border-radius:8px;padding:12px 14px">
       <p style="margin:0 0 8px;font-weight:600;font-size:.9em">
-        📦 Materias primas para <strong>${escapeHtml(String(qty))}</strong> unidades
+        📦 Materias primas para <strong>${escapeHtml(String(qty))}</strong> unidades${plannedKgNote}
       </p>
       <table style="width:100%;border-collapse:collapse;font-size:.9em">
         <thead>
@@ -115,23 +158,26 @@ function renderIngredientsPreview(recipe, qty, selectedVersionId) {
 
 /**
  * Wire the live ingredient preview.
- * Reacts to recipe-select and quantity-input changes.
+ * Reacts to recipe-select, product-select, and quantity-input changes.
  *
  * @param {HTMLElement} container
- * @param {Array<object>} recipes - full recipe list (with .versions[].ingredients[])
+ * @param {Array<object>} recipes  - full recipe list (with .versions[].ingredients[])
+ * @param {Array<object>} products - full product list (needed for PER_OUTPUT_KG kg conversion)
  */
-function wireIngredientsPreview(container, recipes) {
-  const recipeSelect  = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-recipe'));
-  const versionSelect = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-recipe-version-id'));
-  const qtyInput      = /** @type {HTMLInputElement|null}  */ (container.querySelector('#pn-quantity'));
-  const preview       = /** @type {HTMLElement|null}       */ (container.querySelector('#pn-ingredients-preview'));
+function wireIngredientsPreview(container, recipes, products) {
+  const recipeSelect   = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-recipe'));
+  const productSelect  = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-product'));
+  const versionSelect  = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-recipe-version-id'));
+  const qtyInput       = /** @type {HTMLInputElement|null}  */ (container.querySelector('#pn-quantity'));
+  const preview        = /** @type {HTMLElement|null}       */ (container.querySelector('#pn-ingredients-preview'));
   if (!recipeSelect || !qtyInput || !preview) { return; }
 
   function update() {
     const recipe            = recipes.find((r) => String(r.id) === recipeSelect.value);
     const qty               = Number(qtyInput.value);
     const selectedVersionId = versionSelect?.value || null;
-    const html              = renderIngredientsPreview(recipe, qty, selectedVersionId);
+    const selectedProduct   = (products || []).find((p) => String(p.id) === productSelect?.value) || null;
+    const html              = renderIngredientsPreview(recipe, qty, selectedVersionId, selectedProduct);
     if (html) {
       preview.style.display = '';
       preview.innerHTML = html;
@@ -142,7 +188,8 @@ function wireIngredientsPreview(container, recipes) {
   }
 
   recipeSelect.addEventListener('change', update);
-  versionSelect?.addEventListener('change', update); // re-render when version changes
+  versionSelect?.addEventListener('change', update);
+  productSelect?.addEventListener('change', update); // product affects PER_OUTPUT_KG scaling
   qtyInput.addEventListener('input', update);
   // Fire immediately if the user navigated back with values already set
   if (recipeSelect.value && qtyInput.value) { update(); }
@@ -431,7 +478,7 @@ async function render(container, session, _params) {
 
   renderForm(container, data);
   wireRecipeVersionAutoFill(container, data.recipes);
-  wireIngredientsPreview(container, data.recipes);
+  wireIngredientsPreview(container, data.recipes, data.products);
   wireSubmit(container, api, session);
 }
 
