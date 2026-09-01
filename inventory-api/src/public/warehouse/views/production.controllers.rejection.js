@@ -177,8 +177,23 @@ function attachCancelWithReturnsHandlers(container, session, deps) {
 
     try {
       await deps.warehouseApi.cancelProductionOrder(session, orderId, payload);
-      deps.app.showToast('Orden de produccion cancelada.');
-      deps.app.navigate('production');
+
+      // Show inline success state so the user has a guaranteed escape hatch
+      // even if auto-navigation fails (e.g. web-vitals SPA timing issues).
+      panel.innerHTML = `
+        <p style="color:var(--color-success,#1a7f4b);font-weight:600;margin:0 0 0.75rem">✓ Orden cancelada correctamente.</p>
+        <button type="button" class="secondary-button wh-cancel-back-btn">← Volver a produccion</button>
+      `;
+      panel.querySelector('.wh-cancel-back-btn')?.addEventListener('click', () => {
+        deps.app.navigate('production');
+      });
+
+      try {
+        deps.app.showToast?.('Orden de produccion cancelada.');
+        deps.app.navigate('production');
+      } catch (_navErr) {
+        // navigate failed — user can still use the button above
+      }
     } catch (err) {
       confirmBtns.forEach((b) => { b.disabled = false; });
       if (errorEl) {
@@ -228,23 +243,22 @@ function attachTerminateProductionHandler(container, session, deps) {
     // Replace the current panel/section with the cancel-with-returns form
     const panelHtml = rejection.renderCancelWithReturnsPanel(order || {}, orderId);
 
-    // Find the closest section/container to replace, fall back to appending
+    // Replace the nearest section ancestor. Using outerHTML means the element
+    // itself is swapped, so we must re-query from document afterwards.
     const targetSection = btn.closest('section') || btn.closest('[class*="panel"]') || container;
     targetSection.outerHTML = panelHtml;
 
-    // Re-query after DOM replacement
-    const newPanel = container.querySelector('.wh-cancel-returns-panel')
-      || document.querySelector('.wh-cancel-returns-panel');
+    // After outerHTML replacement the old reference is detached — always
+    // query from document to find the new panel reliably.
+    const newPanel = document.querySelector('.wh-cancel-returns-panel');
 
     if (newPanel) {
-      attachCancelWithReturnsHandlers(newPanel.parentElement || container, session, {
+      // Pass the panel itself as the root so querySelector inside
+      // attachCancelWithReturnsHandlers finds elements without ambiguity.
+      attachCancelWithReturnsHandlers(newPanel.parentElement ?? document.body, session, {
         warehouseApi: deps.warehouseApi,
         app:          deps.app,
-        onDismiss:    () => {
-          if (typeof deps.app.refreshCurrentOrder === 'function') {
-            deps.app.refreshCurrentOrder();
-          }
-        },
+        onDismiss:    () => { deps.app.navigate('production'); },
       });
     }
   });
