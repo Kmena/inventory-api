@@ -69,6 +69,7 @@
       'district',
       'paymentType',
       'paymentDays',
+      'creditLimit',
     ];
 
     return allowedFields.reduce((payload, fieldName) => {

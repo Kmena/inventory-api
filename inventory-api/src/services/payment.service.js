@@ -307,12 +307,18 @@ async function approvePayment(id, payload, auth, req = null) {
       throw createHttpError(409, 'El pago no pudo aprobarse', 'conflict');
     }
 
-    // Decrement store creditBalance when payment is approved (per-store credit tracking).
-    // Chain: payment → invoice → order → clientStoreId.
+    // TASK-015: Decrement client creditBalance when payment is approved.
+    // Chain: payment → invoice.clientId → client.update.
     const approvedInvoice = await tx.invoice.findUnique({
       where: { id: transactionalPayment.invoiceId },
-      select: { orderId: true },
+      select: { orderId: true, clientId: true },
     });
+    if (approvedInvoice?.clientId) {
+      await tx.client.update({
+        where: { id: approvedInvoice.clientId },
+        data: { creditBalance: { decrement: transactionalPayment.amount } },
+      });
+    }
     if (approvedInvoice?.orderId) {
       const invoiceOrder = await tx.order.findUnique({
         where: { id: approvedInvoice.orderId },
@@ -419,12 +425,18 @@ async function reversePayment(id, auth, reason, req = null) {
 
     const reversedPaymentResult = await paymentRepository.findCompanyPaymentById(id, companyId, {}, tx);
 
-    // Increment store creditBalance when an approved payment is reversed (per-store credit tracking).
-    // Chain: payment → invoice → order → clientStoreId.
+    // TASK-015: Increment client creditBalance when an approved payment is reversed.
+    // Chain: payment → invoice.clientId → client.update.
     const reversedInvoice = await tx.invoice.findUnique({
       where: { id: transactionalPayment.invoiceId },
-      select: { orderId: true },
+      select: { orderId: true, clientId: true },
     });
+    if (reversedInvoice?.clientId) {
+      await tx.client.update({
+        where: { id: reversedInvoice.clientId },
+        data: { creditBalance: { increment: transactionalPayment.amount } },
+      });
+    }
     if (reversedInvoice?.orderId) {
       const reversedOrder = await tx.order.findUnique({
         where: { id: reversedInvoice.orderId },
