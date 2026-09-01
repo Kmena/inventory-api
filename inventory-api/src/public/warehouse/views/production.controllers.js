@@ -785,8 +785,24 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
         const unit = row.dataset.defaultUnit || '';
 
         if (!lots.length) {
-          select.innerHTML = '<option value="">Sin lotes disponibles en bodega</option>';
-          select.disabled = false;
+          // No stock in origin warehouse for this product. Replace the select with a
+          // plain text input so the operator can enter the incoming lot ID manually.
+          // This covers the common replacement scenario where new material arrives and
+          // hasn't been received into the warehouse system yet.
+          const fallbackInput = document.createElement('input');
+          fallbackInput.type = 'number';
+          fallbackInput.min = '1';
+          fallbackInput.step = '1';
+          fallbackInput.className = 'wh-recovery-entry-lot-id';
+          fallbackInput.required = true;
+          fallbackInput.placeholder = 'ID del lote a reponer';
+          fallbackInput.setAttribute('aria-label', 'ID del lote de reposición');
+          const hint = document.createElement('p');
+          hint.className = 'wh-caption wh-caption--warning';
+          hint.style.margin = '0.25rem 0 0';
+          hint.textContent = '⚠️ No hay lotes con stock en bodega. Ingresa el ID del lote de reposición manualmente, o recibí el material primero desde Recepciones.';
+          select.replaceWith(fallbackInput);
+          fallbackInput.insertAdjacentElement('afterend', hint);
           continue;
         }
 
