@@ -119,8 +119,7 @@ function selectContentSecurityPolicy(pathName) {
   }
 
   // Warehouse/QA SPA: permite blob: para thumbnails de fotos en evidencia de recepciones.
-  // 'unsafe-inline' en style-src es requerido por los renderers de produccion que
-  // aplican estilos inline dinamicamente (lot-picker, QA rows, etc.).
+  // No requiere `unsafe-inline`; los estilos vienen de `/styles.css`.
   if (pathName.startsWith('/warehouse/')) {
     return buildContentSecurityPolicy([
       "default-src 'self'",
@@ -129,7 +128,7 @@ function selectContentSecurityPolicy(pathName) {
       "frame-ancestors 'none'",
       "form-action 'self'",
       "script-src 'self'",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
       "connect-src 'self'",
