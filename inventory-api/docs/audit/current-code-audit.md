@@ -174,10 +174,10 @@ The following items from the prior audit remain open and were not in scope for t
 
 | ID | Severity | Status | Description |
 |---|---|---|---|
-| AUD-001 | Medium (pre-existing) | Open | `docs/architecture.md` and `docs/current-state.md` missing cross-references to `docs/documentation-ownership-map.md` and workflow files — 4 governance test failures |
+| AUD-001 | Medium (pre-existing) | **RESOLVED** | Cross-references to `docs/documentation-ownership-map.md` and `../.github/workflows/` added to both `docs/architecture.md` and `docs/current-state.md` |
 | AUD-002 | Low | Open | `docs/current-state.md` not yet updated to reflect `recipe-stage-lineage-validation` feature |
 | AUD-005 | Low | Open | Floating-point precision in balance accumulation (`Number(Decimal) + Number(Decimal)`) |
-| AUD-007 | Medium (pre-existing) | Open | `GET /api/roles/company/:roleId` absent from `docs/runtime-contract-manifest.json` — 1 governance test failure |
+| AUD-007 | Medium (pre-existing) | **INVALIDATED** | `GET /api/roles/company/:roleId` is already covered by OpenAPI spec at `/api/roles/company/{roleId}` — finding was a false positive from stale audit context |
 | AUD-013 | Low | Open | No test for multi-product partial under-allocation in approval mode |
 | AUD-014 | Low | Open | Frontend characterization tests are source-level regex; no DOM execution |
 | AUD-016 | Low | Partially improved | Some PROCESSING stage fixtures in older lineage tests still lack `processCode`; new test correctly includes it |
@@ -217,7 +217,7 @@ The stale availability hint defect is resolved. The `"Disponible: X"` hint no lo
 | Stale availability hints | ~~Medium~~ | **CLOSED** | Resolved by AUD-018 fix |
 | updateRecipeVersion untested | ~~Medium~~ | **CLOSED** | Resolved by AUD-012 fix |
 | Process-code catalog drift | Medium | Open | Operators can select UI codes rejected by backend |
-| Runtime contract manifest gap | Medium | Open | One route not in manifest; governance test fails on every run |
+| Runtime contract manifest gap | Medium | **CLOSED** | AUD-007 was a false positive; route was already in OpenAPI spec |
 | Floating-point balance arithmetic | Low | Open | Potential for silent precision error in extreme fractional quantity scenarios |
 | Hint not reactive to prior-stage quantity edits | Low | Open (AUD-026) | New LOW finding; hint correct on product-change, not on prior-stage quantity-change |
 
@@ -227,9 +227,9 @@ The stale availability hint defect is resolved. The `"Disponible: X"` hint no lo
 
 Items 1 and 2 from the prior audit are now resolved. Remaining priorities are resequenced:
 
-1. **(Medium — Documentation)** Add cross-references to `docs/documentation-ownership-map.md` and `../.github/workflows/**` in both `docs/architecture.md` and `docs/current-state.md`. See AUD-001. Resolves 4 governance test failures.
+1. ~~**(Medium — Documentation)** AUD-001 RESOLVED.~~
 
-2. **(Medium — Contract Governance)** Register `GET /api/roles/company/:roleId` in `docs/runtime-contract-manifest.json`. See AUD-007. Resolves 1 governance test failure.
+2. ~~**(Medium — Contract Governance)** AUD-007 INVALIDATED (false positive).~~
 
 3. **(Medium — Documentation)** Update `docs/current-state.md` to document the `recipe-stage-lineage-validation` feature. See AUD-002.
 
