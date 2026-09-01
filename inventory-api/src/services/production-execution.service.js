@@ -303,8 +303,23 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
     // PROCESSING stages consume materials already pulled from the warehouse by a
     // preceding RECOLLECTION stage. Calling reduceStageInventory would cause a
     // double warehouse deduction for the same lot. Only non-PROCESSING stages
-    // (i.e. RECOLLECTION or stages without an explicit type) touch inventory.
-    const isProcessingStage = snapshotStage?.stageType === 'PROCESSING';
+    // (i.e. RECOLLECTION or stages without an explicit type) deduct inventory.
+    //
+    // stageType is frozen in the snapshot for orders created after the fix was
+    // deployed. For older orders the snapshot lacks stageType — fall back to a
+    // live DB lookup so the guard still fires on legacy order snapshots.
+    let isProcessingStage = snapshotStage?.stageType === 'PROCESSING';
+    // stageType was added to the snapshot after initial deployment; older orders
+    // won't have it. Fall back to a live DB lookup so the guard still fires on
+    // legacy order snapshots. tx.recipeStage may be absent in test environments
+    // that mock the Prisma client partially — guard before calling.
+    if (!isProcessingStage && snapshotStage?.stageType == null && snapshotStage?.id && tx.recipeStage) {
+      const liveStage = await tx.recipeStage.findUnique({
+        where: { id: BigInt(snapshotStage.id) },
+        select: { stageType: true },
+      });
+      isProcessingStage = liveStage?.stageType === 'PROCESSING';
+    }
     const consumptions = isProcessingStage
       ? []
       : await reduceStageInventory(
