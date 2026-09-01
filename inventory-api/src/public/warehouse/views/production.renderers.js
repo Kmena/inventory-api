@@ -659,29 +659,33 @@ function renderReplacementRecoveryStageItem(order, vm, permissions) {
        </div>`
     : '';
 
-  // data-recipe-stage-id is used by the controller to auto-populate lot dropdowns for each recovery entry.
-  return `<li class="wh-item-card wh-stage-card wh-stage-card--virtual wh-stage-card--replacement"
-              data-recipe-stage-id="${escapeHtml(String(stage?.id ?? ''))}">
-    <h3 class="wh-item-card__title">🔄 ${escapeHtml(stage?.name || 'Reposición de materiales')}</h3>
-    <p class="wh-item-card__meta">Estado: ${renderStageBadge(status)}</p>
-    <div class="wh-alert wh-alert--warning" role="alert" style="margin-top:0.5rem">
-      ⚠️ Los materiales del intento anterior fueron dañados o se perdieron.
-      Se requiere conseguir nuevos materiales antes de re-ejecutar la etapa.
-    </div>
-    ${itemsList}
-    ${entriesForm}
-    ${canConfirm
-      ? `<div class="wh-stage-actions" style="margin-top:0.75rem">
-           <button type="button" class="primary-button wh-confirm-recolection-submit-btn"
-                   data-order-id="${escapeHtml(String(orderId))}"
-                   data-recolection-id="${escapeHtml(String(recolectionId))}"
-                   aria-label="Confirmar reposición de materiales">
-             ✓ Confirmar reposición de materiales
-           </button>
-           <p class="recolection-confirm-error wh-error-msg" hidden role="alert" aria-live="assertive"></p>
-         </div>`
-      : ''}
-  </li>`;
+  // stage.id is a synthetic virtual id ("recolection-N"); stage.recipeStageId is the real
+  // recipe stage id used by the controller to call available-lots for lot dropdown population.
+  const recipeStageId = escapeHtml(String(stage?.recipeStageId ?? ''));
+  return [
+    `<li class="wh-item-card wh-stage-card wh-stage-card--virtual wh-stage-card--replacement"`,
+    `    data-recipe-stage-id="${recipeStageId}">`,
+    `  <h3 class="wh-item-card__title">🔄 ${escapeHtml(stage?.name || 'Reposición de materiales')}</h3>`,
+    `  <p class="wh-item-card__meta">Estado: ${renderStageBadge(status)}</p>`,
+    `  <div class="wh-alert wh-alert--warning" role="alert" style="margin-top:0.5rem">`,
+    `    ⚠️ Los materiales del intento anterior fueron dañados o se perdieron.`,
+    `    Se requiere conseguir nuevos materiales antes de re-ejecutar la etapa.`,
+    `  </div>`,
+    itemsList,
+    entriesForm,
+    canConfirm
+      ? [`<div class="wh-stage-actions" style="margin-top:0.75rem">`,
+         `  <button type="button" class="primary-button wh-confirm-recolection-submit-btn"`,
+         `          data-order-id="${escapeHtml(String(orderId))}"`,
+         `          data-recolection-id="${escapeHtml(String(recolectionId))}"`,
+         `          aria-label="Confirmar reposición de materiales">`,
+         `    ✓ Confirmar reposición de materiales`,
+         `  </button>`,
+         `  <p class="recolection-confirm-error wh-error-msg" hidden role="alert" aria-live="assertive"></p>`,
+         `</div>`].join('\n')
+      : '',
+    `</li>`,
+  ].join('\n');
 }
 
 function renderOrderDetail(order, permissions, stagesVm, requirements, warehouses) {
