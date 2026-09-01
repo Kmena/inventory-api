@@ -643,8 +643,9 @@ test('commercial views E2E: routes shows map coverage and persists assignment pl
   await page.locator('[data-route-select="501"]').click();
   await page.waitForFunction(() => globalThis.document.getElementById('routes-detail-title')?.textContent?.includes('Ruta Norte'));
   await page.waitForFunction(() => globalThis.document.querySelector('[data-route-select="501"]')?.classList.contains('active'));
-  await page.waitForFunction(() => globalThis.document.querySelectorAll('[data-map-point]').length === 2);
-  assert.equal(await page.locator('[data-route-map]').isVisible(), true);
+  // Map is now rendered with Leaflet (routes-map migration). [data-map-point] SVG elements no longer exist.
+  await page.waitForFunction(() => !!globalThis.document.getElementById('routes-leaflet-map'));
+  assert.equal(await page.locator('#routes-leaflet-map').count(), 1);
   assert.equal(await page.getByText('Mapa de cobertura').isVisible(), true);
   assert.equal(state.counters.loadDetail, 1);
 
