@@ -138,6 +138,15 @@ async function processReturns(tx, auth, order, returns, companyId) {
       tx,
     );
 
+    // Restore the lot-level quantity that was decremented during consumption.
+    // Missing this call left lots.quantity permanently understated after
+    // every cancellation, causing spurious constraint violations on later orders.
+    await inventoryRepository.updateLotById(
+      lot.id,
+      { quantity: { increment: quantity } },
+      tx,
+    );
+
     await inventoryTransactionSupport.createMovement(tx, context, {
       lotId:          lot.id,
       movementType:   'IN',
