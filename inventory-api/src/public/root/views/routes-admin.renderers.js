@@ -55,7 +55,7 @@
     return `
       <div class="route-map-card">
         <p class="muted">${mappableCount} tienda(s) con coordenadas en la ruta.</p>
-        <div id="routes-leaflet-map" class="route-leaflet-map"></div>
+        <div id="routes-leaflet-map" class="route-leaflet-map" data-route-map></div>
       </div>
     `;
   }
