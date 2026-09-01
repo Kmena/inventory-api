@@ -547,7 +547,15 @@
       const qty    = Number(qtyInput?.value || 0);
       const selVer = cached.approvedVersions.find((v) => String(v.id) === (versionSelect?.value || cached.defaultVersionId));
       const ings   = selVer?.ingredients || [];
-      if (ingPreview) { ingPreview.innerHTML = renderIngredientAvailability(ings, qty, productStockMap); }
+
+      // PER_OUTPUT_KG recipes express ingredient quantities per kg of finished
+      // product, so we must scale by (kgPerUnit × qty), not by unit count alone.
+      // Passing raw qty would multiply by units and over-report requirements.
+      const quantityBasis = selVer?.quantityBasis ?? 'PER_OUTPUT_KG';
+      const kgPerUnit     = deriveKgPerUnitClient(plannerProduct) ?? 1;
+      const scalingQty    = quantityBasis === 'PER_OUTPUT_KG' ? kgPerUnit * qty : qty;
+
+      if (ingPreview) { ingPreview.innerHTML = renderIngredientAvailability(ings, scalingQty, productStockMap); }
       updateKgPreview();
     }
     if (dialogState.currentQtyListener && qtyInput) {
