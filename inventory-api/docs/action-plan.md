@@ -50,7 +50,6 @@ Problems already corrected in code:
 - server-side same-lot validation was not active
 
 Problems still open:
-- root-shell recipe editor process-code catalog appears misaligned with backend-approved values
 - manual evidence for full warehouse operator flow remains incomplete in repository docs
 - architecture is still service-heavy rather than domain/port oriented
 
@@ -73,9 +72,8 @@ Problems still open:
 
 ## 8. Defects to correct
 ### Remaining follow-up defects
-1. UI/backend process-code catalog drift in root recipe editor
-2. missing stronger manual/integration evidence for the full recovery/reconciliation workflow
-3. ongoing architectural coupling across services, repositories, and browser DTOs
+1. missing stronger manual/integration evidence for the full recovery/reconciliation workflow
+2. ongoing architectural coupling across services, repositories, and browser DTOs
 
 ## 9. Future architectural changes
 ### Near-term follow-up
@@ -138,7 +136,6 @@ Follow-up security posture:
 ### Remaining recommended coverage
 - browser/E2E flow covering replacement recovery capture and reconciliation submission
 - integration test proving enriched QA inspection envelope and order read-model interaction together
-- root-shell recipe editor catalog alignment tests
 
 ## 15. Migration stages
 ### Stage 1 — Implemented
@@ -152,7 +149,6 @@ Follow-up security posture:
 - production order serialization updates
 
 ### Stage 2 — Proposed follow-up
-- align root-shell process-code catalog with backend contract
 - add stronger end-to-end and manual evidence
 - refresh operational docs/runbooks if warehouse workflow language changed
 
@@ -164,7 +160,7 @@ Follow-up security posture:
 | Risk | Level | Mitigation |
 |---|---|---|
 | Overstating feature completeness beyond available evidence | High | keep docs explicit about automated vs manual validation depth |
-| Root-shell recipe editor submitting process codes rejected by backend | Medium | align UI catalog with backend schema and add characterization tests |
+| Root-shell recipe editor process-code catalog | ~~Medium~~ | **RESOLVED** — UI catalog aligned with backend `RECIPE_STAGE_PROCESS_CODES` (DEF-002) |
 | Regressions in full warehouse operator flow not covered by current service tests | Medium | add E2E/integration coverage and operator validation evidence |
 | Further service-layer growth reducing maintainability | Medium | schedule policy extraction without rewriting public routes |
 
@@ -180,7 +176,7 @@ Still recommended despite implemented automated tests:
 3. Confirm replacement recovery with lot-level entries.
 4. Attempt to execute with a non-recovered lot and verify server rejection.
 5. Reconcile recovered balances with `USED`, `RETURNED`, and `DISCARDED` outcomes.
-6. Verify root-shell recipe editor only offers backend-supported process codes after the follow-up alignment task is completed.
+6. ~~Verify root-shell recipe editor only offers backend-supported process codes~~ — **DONE**: `PROCESS_CODE_OPTIONS` now matches backend catalog exactly.
 
 ## 19. Approval status
 **Status:** Documentation refresh completed for the implemented feature.

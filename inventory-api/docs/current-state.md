@@ -258,15 +258,6 @@ This document records that evidence as repository/user-reported validation. It d
 - production order read model including recolection stages, entries, and reconciliations
 
 ## 14. Known defects
-### DEF-PRD-001 Root recipe editor process catalog drift — Medium
-Observed in current code:
-- backend recipe validation in `src/schemas/recipe.schema.js` accepts the full approved processing catalog including `PACKING_PREP` and `LABELING_PREP`
-- root-shell UI file `src/public/root/views/recipes-admin.version-editor.js` exposes a shorter/different `PROCESS_CODE_OPTIONS` list that includes values such as `FILLING`, `LABELING`, `PACKAGING`, and `QUALITY_CHECK`
-
-Impact:
-- UI options may not align with backend-accepted values
-- recipe authoring can fail or become misleading even though backend rules are stricter and broader
-
 ### DEF-PRD-002 Manual end-to-end evidence gap for amended warehouse flow — Medium
 Observed in repository evidence:
 - implementation report lists manual validation as pending for replacement recovery, reconciliation, and recipe-editor UX
