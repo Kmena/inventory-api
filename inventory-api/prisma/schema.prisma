@@ -538,6 +538,8 @@ model Client {
   district       String?
   paymentType    PaymentType     @default(CASH) @map("payment_type")
   paymentDays    Int?            @map("payment_days")
+  creditLimit    Decimal         @default(0) @db.Decimal(14, 2) @map("credit_limit")
+  creditBalance  Decimal         @default(0) @db.Decimal(14, 2) @map("credit_balance")
   visitAt        DateTime?       @map("visit_at")
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
