@@ -781,6 +781,7 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
       try {
         // First try the rejected stage itself
         let lotsResponse = await api.getAvailableLotsForStage(session, order.id, recipeStageId);
+        console.debug('[recovery-lots] stage', recipeStageId, 'products', JSON.stringify(lotsResponse.products?.map((p) => ({ id: p.productId, lots: p.lots?.length }))));
 
         // If the processing stage has no productId inputs, fall back to the
         // RECOLLECTION stage whose inputs cover the required products.
@@ -792,8 +793,10 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
                 (inp) => inp.productId && requiredProductIds.has(String(inp.productId)),
               ),
           );
+          console.debug('[recovery-lots] requiredProductIds', [...requiredProductIds], 'recolStage found', recolStage?.id, 'stageType', recolStage?.stageType);
           if (recolStage) {
             lotsResponse = await api.getAvailableLotsForStage(session, order.id, String(recolStage.id));
+            console.debug('[recovery-lots] recolStage', recolStage.id, 'products', JSON.stringify(lotsResponse.products?.map((p) => ({ id: p.productId, lots: p.lots?.length }))));
           }
         }
 
@@ -806,7 +809,10 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
             productLots[String(p.productId)] = sorted;
           }
         }
-      } catch (_) { /* leave selects in loading state on error */ continue; }
+      } catch (err) {
+        console.error('[recovery-lots] error', err?.message || err);
+        continue;
+      }
 
       for (const row of entryRows) {
         const productId = row.dataset.productId;
