@@ -1,67 +1,85 @@
-# Current Code Audit — credit-and-catalog-alignment cycle
-**Agent ID:** baseline-audit-agent-20ddf6
-**Audit scope:** Full repository re-audit following six fixes applied since the prior baseline:
-- DEF-002: `PROCESS_CODE_OPTIONS` in root-shell version editor aligned with backend `RECIPE_STAGE_PROCESS_CODES`
-- AUD-026: `input` event listeners added to prior RECOLLECTION `.si-quantity` elements for live availability-hint refresh
-- TASK-015: `paymentService.approvePayment` and `reversePayment` now update `Client.creditBalance` (decrement / increment) inside the payment Prisma transaction via `tx.client.update`
-- `creditLimit` added to `buildClientPayload` `allowedFields` in `clients-admin.helpers.js`
-- `getClientLedger` now exposes `creditLimit` and `creditBalance` on the returned `client` object
-- Migration `20260924020000_add_credit_fields_to_client`: `credit_limit DECIMAL(14,2) NOT NULL DEFAULT 0` and `credit_balance DECIMAL(14,2) NOT NULL DEFAULT 0` added to the `clients` table
+# Current Code Audit — post-audit-hardening cycle
+**Agent ID:** baseline-audit-agent-748380
+**Audit scope:** Full repository re-audit following seven fixes applied since the prior baseline (score 8.1/10):
+- AUD-025 (Medium): `GET /api/roles/company/:roleId` added to `docs/runtime-endpoint-catalog.md`
+- AUD-002 (Low): `docs/current-state.md` §7 updated with `Client.creditLimit`, `Client.creditBalance`, `ClientStore.creditLimit`, `ClientStore.creditBalance`; §8 updated with `GET /api/clients/:id/ledger` and TASK-015 credit lifecycle description
+- AUD-005 (Low): Comment added to `computeRecollectedBalances` in `recipes-admin.version-editor.js` documenting floating-point precision limitation and Decimal.js upgrade path
+- AUD-013 (Low): New test added — `approveRecipeVersion` rejects when one product is fully allocated but another is partially allocated (multi-product under-allocation)
+- AUD-014 (Low): Comment added to `root-shell-recipes-admin-view-characterization.test.js` documenting the DOM execution gap and E2E future path
+- AUD-016 (Low): Comment added clarifying that legacy fixtures without `stageType` are intentional backward-compat cases
+- AUD-019 (Low): `assertRecipeStageLineageAndAllocation` exported via `__private__` in `recipe.service.js`
 
-**Prior audit agent:** baseline-audit-agent-4ffad0
-**Prior audit score:** 7.9 / 10 — Acceptable
+**Prior audit agent:** baseline-audit-agent-20ddf6
+**Prior audit score:** 8.1 / 10 — Acceptable
 **Audit date:** 2026
-**Test suite at audit time:** 1 539 pass · 0 fail · 3 skipped (DB-gated) · 1 542 total
+**Test suite at audit time:** 1 542 pass · 0 fail · 3 skipped (DB-gated) · 1 545 total
 **ESLint:** 0 warnings. **TypeScript typecheck:** clean.
-**Canonical docs:** `docs/current-state.md` describes implemented reality; `docs/architecture.md` describes active runtime architecture. canonical docs under `docs/**` are the authoritative reference for runtime contracts.
-**Coverage posture:** focused post-implementation baseline audit — intentionally partial coverage limited to the six fixes in scope. Partial OpenAPI baseline coverage is intentional for this amendment scope.
+**Canonical docs:** `docs/current-state.md` describes implemented reality; `docs/architecture.md` describes active runtime architecture.
+**Coverage posture:** focused post-implementation baseline audit under the bounded runtime governance model; test suite exercises the observable runtime surface, not exhaustive OpenAPI contract coverage.
 
 ---
 
 ## Executive Summary
 
-All six declared fixes have been verified against the live source code. Four resolve previously open findings; two implement new correct business behaviour.
+All seven declared fixes have been verified against the live source code and all are correctly implemented. Additionally, three findings open from the prior audit (AUD-027, AUD-028, AUD-029) were resolved between audit cycles and are confirmed closed in this pass. One new Low-severity finding is identified (AUD-030).
 
-**DEF-002 / AUD-020 (Medium — CLOSED):** `PROCESS_CODE_OPTIONS` in `recipes-admin.version-editor.js` now contains only values that exist in the backend `RECIPE_STAGE_PROCESS_CODES` catalog (`MIXING`, `HEATING`, `COOLING`, `CAPPING`, `SEALING`, `LABELING_PREP`, `PACKING_PREP`, `OTHER`). The previously invalid codes `FILLING`, `QUALITY_CHECK`, `LABELING`, and `PACKAGING` are absent. The frontend list is a curated subset of the 31-value backend catalog; this is intentional and safe.
+**AUD-025 (Medium — CLOSED):** `GET /api/roles/company/:roleId` is present at line 89 of `docs/runtime-endpoint-catalog.md` with the entry `| GET | /api/roles/company/:roleId | Sí | authorizeAccessPolicy('role.company.list') | Obtener rol de compañía por ID | Tenant isolation; devuelve 404 si el rol no pertenece a la compañía |`. The only remaining Medium-severity finding in the prior audit is now closed.
 
-**AUD-026 (Low — CLOSED):** `input` event listeners are wired to all `.si-quantity` inputs inside prior RECOLLECTION sections at the moment a PROCESSING stage input row is added. A `data-hint-wired = '1'` flag prevents duplicate listener registration. The `updateAvailHint()` function (already fixed in the prior cycle for the `productSelect` change path) is now also called reactively whenever prior-stage quantities change.
+**AUD-002 (Low — CLOSED):** `docs/current-state.md` §7 now lists `Client.creditLimit`, `Client.creditBalance` (migration `20260924020000_add_credit_fields_to_client`), `ClientStore.creditLimit`, and `ClientStore.creditBalance`. Section §8 now includes `GET /api/clients/:id/ledger` and the full TASK-015 credit lifecycle description covering `approvePayment`/`reversePayment` logic at both client and store levels.
 
-**TASK-015 (new correct behaviour):** `approvePayment` now calls `tx.client.update({ data: { creditBalance: { decrement: transactionalPayment.amount } } })` after approving the payment. `reversePayment` calls the symmetric `{ increment: ... }`. Both also update `ClientStore.creditBalance` when the invoice is linked to an order that carries a `clientStoreId`. All operations run inside `executePaymentFinancialSyncTransaction`, which wraps the work in a single Prisma `$transaction`. Characterization tests in `credit-balance-update-characterization.test.js` cover the client-level paths; the store-level path (orderId → clientStoreId branch) is not yet independently tested (AUD-028, Low).
+**AUD-005 (Low — ACKNOWLEDGED):** Comment block added above `computeRecollectedBalances` in `recipes-admin.version-editor.js` documenting the JavaScript floating-point limitation and the `Decimal.js` upgrade path. Technical debt is now documented in-line; the underlying arithmetic has not changed.
 
-**Supporting changes (all confirmed):** `creditLimit` is present in `buildClientPayload` `allowedFields`; `creditBalance` is intentionally absent (managed programmatically only). `getClientLedger` serializes both `creditLimit` and `creditBalance` as `Number()` from the Prisma `Decimal`. The `Client` Prisma model carries both fields (`DECIMAL(14,2) NOT NULL DEFAULT 0`). Migration `20260924020000` is additive and safe.
+**AUD-013 (Low — CLOSED):** New test `approveRecipeVersion rejects when one product is fully allocated but another is partially allocated (AUD-013, multi-product under-allocation)` confirmed at line 673 of `tests/recipe-service-foundation.test.js`. The test uses productId 20 (Agua: 10 recollected, 10 used → OK) and productId 21 (Sal: 5 recollected, 3 used → fails) and asserts `statusCode 400`, `code 'validation_error'`, and that the error message matches `/Sal/i` (the under-allocated product, not the OK one). The test is precise and meaningful.
 
-**Documentation lag (two findings):** `docs/current-state.md` still lists `DEF-PRD-001` (process-code catalog drift) as an active open defect and contains no mention of the credit-balance fields or TASK-015. `docs/action-plan.md` still lists process-code drift as an "open problem." The CHANGELOG has no entry for this cycle. These are AUD-027 and AUD-029 (both Low). No MEDIUM or higher regressions were introduced by any of the six changes.
+**AUD-014 (Low — ACKNOWLEDGED):** Two-line comment added at the top of `root-shell-recipes-admin-view-characterization.test.js` (`AUD-014: These tests exercise source-level structural contracts (regex over source text) and Node vm-sandboxed execution where possible. Full DOM execution would require a headless browser environment (e.g. Playwright) and is tracked as a future E2E concern.`). Gap is now documented; underlying limitation remains.
 
-**Score update: 7.9 → 8.1 / 10 — Acceptable**
+**AUD-016 (Low — ACKNOWLEDGED):** Comment added at lines 4–6 of `root-shell-recipes-admin-view-characterization.test.js` (`AUD-016: All PROCESSING stage fixtures in this file intentionally omit stageType where they test the legacy backward-compat path (stageType defaults to PROCESSING). All explicitly typed PROCESSING stages include processCode, verified by linting the fixtures.`). The legacy-fixture pattern is now explicitly documented as intentional backward-compat behavior, not an oversight.
+
+**AUD-019 (Low — CLOSED):** `assertRecipeStageLineageAndAllocation` is exported via the `__private__` block at line 629 of `src/services/recipe.service.js`. The export block reads `__private__: { assertAllStageInputsHaveProductId, assertRecipeStageLineageAndAllocation }`. The function is now directly accessible to unit tests without reaching through the full service API.
+
+**Between-cycle resolutions (confirmed in this audit, not in the seven stated fixes):**
+- **AUD-027 (Low — CLOSED):** `docs/current-state.md` §14 no longer lists `DEF-PRD-001`. Only `DEF-PRD-002` (manual E2E evidence gap) remains as a known defect. `docs/action-plan.md` §16 Risks marks the process-code catalog item `~~Medium~~ | RESOLVED`. Both stale entries from the prior audit are gone.
+- **AUD-028 (Low — CLOSED):** Two AUD-028-labeled tests confirmed in `tests/credit-balance-update-characterization.test.js` at lines 440 and 460: one asserts `tx.clientStore.update` is called once with `{ creditBalance: { decrement: 200 } }` when `clientStoreId` is populated; the other asserts `tx.clientStore.update` is NOT called when the order has no `clientStoreId`. Both branches are now covered.
+- **AUD-029 (Low — CLOSED):** `CHANGELOG.md` entry `2026-09-01 — credit-and-catalog-alignment` covers DEF-002, AUD-026, TASK-015, the credit-fields migration, `creditLimit` in `allowedFields`, ledger exposure, and the AUD-028 tests. The prior cycle's operational history is documented.
+
+**Test count:** 1 542 pass vs 1 539 in the prior audit (+3 new passing tests: 1 from AUD-013 multi-product under-allocation + 2 from AUD-028 store-level credit path). Zero failures. Zero ESLint warnings. Clean TypeScript typecheck.
+
+**New finding — AUD-030 (Low):** The seven fixes applied in this cycle (AUD-025, AUD-002, AUD-005, AUD-013, AUD-014, AUD-016, AUD-019) have no corresponding CHANGELOG.md entry. The CHANGELOG's most recent dated entry (`2026-09-01`) covers the prior cycle. This is a Low-severity documentation gap consistent with prior AUD-029.
+
+**Score update: 8.1 → 8.4 / 10 — Acceptable**
 
 ---
 
 ## Overall Score
 
-**Overall Score: 8.1 / 10**
+**Overall Score: 8.4 / 10**
 
-| Dimension | Prior (7.9) | Current (8.1) | Δ | Notes |
+| Dimension | Prior (8.1) | Current (8.4) | Δ | Notes |
 |---|---|---|---|---|
-| Backend correctness | 9.0 | 9.2 | +0.2 | TASK-015 credit lifecycle fully active inside Prisma transaction |
-| Tenant isolation | 9.5 | 9.5 | — | No change |
-| Frontend correctness | 7.5 | 8.0 | +0.5 | DEF-002 catalog alignment + AUD-026 qty-input listeners |
-| Test coverage | 8.0 | 8.2 | +0.2 | 16 new tests (TASK-015 + ledger); store-level credit path still untested (AUD-028) |
-| Pattern adherence | 8.5 | 8.5 | — | No regressions in layering or structural patterns |
-| Security posture | 9.0 | 9.0 | — | No change |
-| Documentation accuracy | 7.0 | 6.9 | −0.1 | DEF-PRD-001 still listed as open in current-state.md and action-plan.md; CHANGELOG absent; AUD-002 still open |
+| Backend correctness | 9.2 | 9.2 | — | No backend logic changes in this cycle |
+| Tenant isolation | 9.5 | 9.5 | — | Unchanged |
+| Frontend correctness | 8.0 | 8.0 | — | AUD-005 comment only; arithmetic unchanged |
+| Test coverage | 8.2 | 8.5 | +0.3 | AUD-013 (multi-product under-alloc) + AUD-028 (store-level credit) both resolved |
+| Pattern adherence | 8.5 | 8.5 | — | No regressions; structural debt unchanged |
+| Security posture | 9.0 | 9.0 | — | No changes |
+| Documentation accuracy | 6.9 | 7.8 | +0.9 | AUD-025, AUD-002, AUD-027, AUD-029 all closed; minus AUD-030 (new CHANGELOG gap −0.1) |
 
 **Score derivation:**
-- DEF-002 (Medium) resolved: +0.15
-- TASK-015 new correct feature with characterization tests: +0.10
-- AUD-026 (Low) confirmed resolved: +0.05
-- Supporting credit infrastructure (schema, ledger, allowedFields): +0.05
-- AUD-027 documentation staleness (new finding): −0.05
-- AUD-028 store-level credit path untested (new finding): −0.05
-- AUD-029 CHANGELOG not updated (new finding): −0.03
+- AUD-025 (Medium, closed): +0.10 — the only remaining Medium finding eliminated; endpoint catalog now complete
+- AUD-013 (Low, closed via test): +0.05 — multi-product under-allocation edge case now verified
+- AUD-028 (Low, closed between cycles): +0.04 — store-level credit path now tested with two targeted assertions
+- AUD-019 (Low, closed via export): +0.03 — `assertRecipeStageLineageAndAllocation` now independently testable
+- AUD-002 (Low, closed via doc update): +0.03 — credit fields and TASK-015 now in current-state.md
+- AUD-027 (Low, closed between cycles): +0.03 — stale DEF-PRD-001 removed from current-state and action-plan
+- AUD-029 (Low, closed between cycles): +0.02 — prior cycle operational history now in CHANGELOG
+- AUD-005 (Low, acknowledged): +0.01 — floating-point debt now documented in-line
+- AUD-014 (Low, acknowledged): +0.01 — DOM execution gap now documented in test file
+- AUD-016 (Low, acknowledged): +0.01 — legacy fixture intent now documented in test file
+- AUD-030 (Low, new CHANGELOG gap): −0.02 — current cycle's fixes not in CHANGELOG
 
-Net Δ = +0.22 → rounded to +0.2 → **8.1**
+**Net Δ = +0.29 → rounded to +0.3 → 8.4**
 
-**Verdict: Acceptable.** The codebase is in good health. All six declared fixes are correctly implemented. The single remaining Medium open item (DEF-003 / AUD-025 — `GET /api/roles/company/:roleId` missing from `docs/runtime-endpoint-catalog.md`) is a documentation gap only; the route is implemented in code and covered by the OpenAPI spec. All other open items are Low severity.
+**Verdict: Acceptable.** The codebase continues in good health. All seven declared fixes are correctly implemented. The sole remaining Medium item from the prior audit (AUD-025) is closed. Zero Medium or higher open findings remain. All open items are Low severity: one new finding (AUD-030), two acknowledged technical debts (AUD-005, AUD-014), and two pre-existing structural constraints (DB-001, DB-003). The structural architectural debt of the layered monolith is well-understood and fully documented.
 
 ---
 
@@ -74,12 +92,12 @@ Net Δ = +0.22 → rounded to +0.2 → **8.1**
 | ORM | Prisma 5.22 + PostgreSQL |
 | Session | Redis (production) / in-memory (dev/test) |
 | Test runner | `node:test` (built-in) |
-| Total migrations | 67 committed |
+| Total migrations | 68 committed |
 | Total test files | 198 |
-| Total passing tests | 1 539 (0 fail, 3 DB-gated skipped) |
+| Total passing tests | 1 542 (0 fail, 3 DB-gated skipped) |
 | ESLint warnings | 0 |
 | TypeScript errors | 0 |
-| Docker | Multi-stage, non-root user, healthcheck present |
+| Docker | Multi-stage, non-root user `inventory`, healthcheck on `/health/ready` |
 
 ---
 
@@ -100,7 +118,7 @@ Browser SPAs (src/public/root/, src/public/warehouse/, src/public/agent/)
        └── same backend routes via HTTP
 ```
 
-Active module groupings: Identity & Access · Customer / Company · Products / Recipes · Inventory / Warehouses / Lots · Production / QA · Procurement / Receipts · Sales / Orders / Billing / Payments · Supplier Quotations.
+Active module groupings: Identity & Access · Customer / Company / Roles / Users · Products / Recipes · Inventory / Warehouses / Lots · Production / QA · Procurement / Receipts · Sales / Orders / Billing / Payments · Supplier Quotations.
 
 No event bus, no message queue, no async workers. All writes are synchronous request/response.
 
@@ -108,52 +126,28 @@ No event bus, no message queue, no async workers. All writes are synchronous req
 
 ## Documentation Findings
 
-### DOC-001 — docs/current-state.md is stale for this cycle
-**Severity:** Low
-**Category:** Outdated documentation
-**Location:** `docs/current-state.md` §14 Known Defects
-**Evidence:** Section 14 still lists `DEF-PRD-001` ("Root recipe editor process catalog drift") as an active Medium defect with specific evidence of the old invalid codes. The defect was resolved in this cycle. The document contains no mention of `creditLimit`/`creditBalance` on the `Client` model, TASK-015 credit lifecycle, or migration `20260924020000`.
-**Concern type:** Outdated documentation — current-state truth is not accurate.
-**Impact:** A reader of `docs/current-state.md` will believe the process-code catalog is still misaligned and will not know the credit balance lifecycle exists. Downstream agents relying on this document may model the wrong current state.
-**Recommendation:** Update §14 to remove `DEF-PRD-001` (mark resolved). Add a new §14.x entry for the credit fields and TASK-015 cycle. Update §7 to include `clients.credit_limit` and `clients.credit_balance` in the schema element list.
-
----
-
-### DOC-002 — docs/action-plan.md still lists process-code drift as an open problem
-**Severity:** Low
-**Category:** Outdated documentation
-**Location:** `docs/action-plan.md` §5 "Problems still open"
-**Evidence:** First bullet reads "root-shell recipe editor process-code catalog appears misaligned with backend-approved values." This was resolved in this cycle.
-**Concern type:** Outdated documentation — current-state truth is not accurate.
-**Impact:** Same as DOC-001 for readers of the action plan.
-**Recommendation:** Remove the bullet or mark it resolved with the cycle date.
-
----
-
-### DOC-003 — CHANGELOG.md not updated for this cycle
+### DOC-001 — Current cycle fixes absent from CHANGELOG.md
+**ID:** AUD-030
 **Severity:** Low
 **Category:** Missing documentation
 **Location:** `CHANGELOG.md`
-**Evidence:** The most recent entry is dated 2026-08-04. The current cycle (migration `20260924020000`, TASK-015, DEF-002, AUD-026) has no changelog entry.
+**Evidence:** The most recent CHANGELOG entry is `2026-09-01 — credit-and-catalog-alignment`, which covers the prior audit cycle. The seven fixes applied in this cycle (AUD-025 endpoint catalog, AUD-002 current-state doc, AUD-005 FP comment, AUD-013 new test, AUD-014 DOM comment, AUD-016 legacy-fixture comment, AUD-019 `__private__` export) have no corresponding CHANGELOG entry. Test count grew from 1 539 to 1 542 (net +3 new passing tests).
 **Concern type:** Missing documentation.
-**Impact:** Operational history is incomplete. Engineers performing incident triage will not find the credit-lifecycle changes in the changelog.
-**Recommendation:** Add a dated entry describing DEF-002, AUD-026, TASK-015, the credit fields migration, `creditLimit` in `allowedFields`, and the ledger exposure.
+**Impact:** Operational history is incomplete for this cycle. Engineers performing triage will not find the AUD-013 test addition or the AUD-019 export in the changelog.
+**Recommendation:** Add a dated CHANGELOG entry covering AUD-025 catalog addition, AUD-002 doc refresh, AUD-005/AUD-014/AUD-016 comments, AUD-013 test, and AUD-019 export. Include test-suite delta (1 539 → 1 542).
 
 ---
 
-### DOC-004 — docs/runtime-endpoint-catalog.md missing `GET /api/roles/company/:roleId`
-**Severity:** Medium (pre-existing, unchanged)
-**Category:** Missing documentation
-**Location:** `docs/runtime-endpoint-catalog.md` §Roles section
-**Evidence:** The catalog lists `GET /api/roles/company` (list), `POST /api/roles/company` (create), and `PUT /api/roles/company/:roleId` (update) but has no row for `GET /api/roles/company/:roleId`. The route is confirmed implemented in `src/routes/role.routes.js` (line ~40) and is present in `docs/openapi/runtime-baseline.openapi.json` at path `/api/roles/company/{roleId}`.
-**Concern type:** Missing documentation (endpoint catalog only; code and OpenAPI are correct).
-**Impact:** The endpoint catalog is incomplete, reducing its utility as an operational reference.
-**Recommendation:** Add `GET /api/roles/company/:roleId — authorizeAccessPolicy('role.company.list') — Obtener rol de compañía por ID` to the catalog.
-
----
-
-**Documentation separation assessment:**
-`docs/current-state.md` is designated for observable current truth and generally upholds that responsibility, but carries stale defect entries from this cycle. `docs/architecture.md` correctly describes the active runtime architecture. `docs/action-plan.md` is the active follow-up tracker; the drift item is stale. `docs/future-architecture.md` (not present — no target-state vision has been written). The separation of concerns between files remains acceptable; no current/future conflation is detected. The only issue is staleness within `current-state.md` and `action-plan.md`, not mixed states across files.
+### DOC-002 — Documentation separation assessment (positive)
+**Severity:** Informational
+**Location:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
+**Assessment:** Documentation separation is in very good shape in this cycle.
+- `docs/current-state.md` correctly describes observable current truth. §14 now contains only `DEF-PRD-002` (manual E2E evidence gap); the stale `DEF-PRD-001` entry has been removed. §7 and §8 now accurately reflect the credit lifecycle.
+- `docs/architecture.md` correctly describes the active runtime architecture, including known limitations (no domain layer, no formal ports, service-layer coupling). Future proposals are absent from this document.
+- `docs/action-plan.md` is the forward-looking tracker. §16 Risks correctly marks the process-code catalog item as `RESOLVED`. §5 Problems-still-open correctly lists only unresolved items (manual E2E evidence gap and service-heavy coupling). No current/future conflation detected.
+- `docs/future-architecture.md` is not present, which is correct — no target-state vision has been approved.
+- `docs/documentation-ownership-map.md` defines clear canonical vs auxiliary ownership with auto-validated artifacts called out.
+**Conclusion:** No penalty. The concern separation is clean and internally consistent. The only documentation gap is AUD-030 (CHANGELOG omission for this cycle).
 
 ---
 
@@ -161,13 +155,13 @@ No event bus, no message queue, no async workers. All writes are synchronous req
 
 | Module area | Files | Primary responsibility |
 |---|---|---|
-| Routes | `src/routes/*.routes.js` (27 files) | HTTP adapter; validation middleware; no business logic |
+| Routes | `src/routes/*.routes.js` (27 files) | HTTP adapter; Zod validation middleware; no business logic |
 | Services | `src/services/*.service.js` (40+ files) | Business orchestration, permission checks, serialization |
 | Repositories | `src/repositories/*.repository.js` (22 files) | Prisma queries; no business logic |
 | Schemas | `src/schemas/*.schema.js` (24 files) | Zod request validation |
 | Security | `src/security/` | Permission governance, access policies, role bundles |
 | Middleware | `src/middlewares/` | authenticate, authorize, throttle, payload governance |
-| Lib | `src/lib/` | money, pagination, audit, prisma singleton, logging |
+| Lib | `src/lib/` | money, pagination, audit, Prisma singleton, logging |
 | Root SPA | `src/public/root/` | Admin SPA (vanilla JS, no bundler) |
 | Warehouse SPA | `src/public/warehouse/` | Operator SPA |
 | Agent SPA | `src/public/agent/` | Field-agent mobile SPA |
@@ -189,87 +183,76 @@ No event bus, no message queue, no async workers. All writes are synchronous req
 | `body-parser` override | 1.20.6 | CVE mitigation | Pinned via overrides |
 | `brace-expansion` override | 1.1.18 | CVE mitigation | Pinned via overrides |
 
-**Dependency hygiene:** `npm audit` baseline is governed. No known unfixed critical CVEs at time of prior audit; `body-parser` and `brace-expansion` are overridden for known issues.
+**Dependency hygiene:** `npm audit` baseline is governed. No known unfixed critical CVEs at time of audit; `body-parser` and `brace-expansion` are overridden for known issues. `validate:dependency-hygiene` script is wired into the `verify` pipeline.
 
 ---
 
 ## Database Findings
 
-### DB-001 — Dual credit balance at client and store levels
+### DB-001 — Dual credit balance at client and store levels (pre-existing, unchanged)
+**ID:** AUD-DB-001
 **Severity:** Low
-**Category:** Schema design, consistency risk
-**Location:** `prisma/schema.prisma` — `Client` model (lines 541–542) and `ClientStore` model (lines 628–629); `src/services/payment.service.js`
+**Category:** Schema design / consistency risk
+**Location:** `prisma/schema.prisma` — `Client` model; `ClientStore` model; `src/services/payment.service.js`
 **Evidence:**
-- `Client.creditBalance` increments on order APPROVED (billing-trigger), decrements on payment APPROVED, increments on payment REVERSED.
-- `ClientStore.creditBalance` follows the same decrement/increment on payment lifecycle BUT only when `invoice.orderId → order.clientStoreId` chain is navigable.
-- An invoice WITHOUT an `orderId` (which is nullable in the schema) will update `Client.creditBalance` but not `ClientStore.creditBalance`, creating a structural asymmetry.
-- No `CHECK (credit_balance >= 0)` constraint exists on either table.
-**Impact:** If the business creates invoices outside the order flow (or if the orderId → clientStoreId chain is broken), store-level and client-level balances diverge silently. `creditBalance` can also go negative in the DB if payment approval precedes order approval.
-**Recommendation:** Document the intended credit-flow sequencing in `docs/current-state.md`. Consider a DB-level `CHECK (credit_balance >= 0)` or application-level guard. Add explicit test coverage for the invoice-without-orderId path and the invoice-with-orderId path.
+- `Client.creditBalance` and `ClientStore.creditBalance` are updated independently in `approvePayment` and `reversePayment`.
+- The `ClientStore.creditBalance` path is conditional on `invoice.orderId → order.clientStoreId` being navigable.
+- An invoice without `orderId` (nullable in the schema) updates only `Client.creditBalance`, creating a structural asymmetry between client-level and store-level balances.
+- No `CHECK (credit_balance >= 0)` constraint exists on either `clients` or `client_stores` tables.
+- No enforced relationship ensures `sum(store.creditBalance) == client.creditBalance`.
+**Impact:** Silent divergence possible if the invoice-without-orderId path is exercised in production. `creditBalance` can go negative in the database if payment approval precedes order approval.
+**Recommendation:** Consider adding a `CHECK (credit_balance >= 0)` DB constraint in a future migration. Document the intended credit-flow sequencing assumption in `docs/current-state.md`. Consider an application-level guard before the decrement.
 
 ---
 
-### DB-002 — Additive migration `20260924020000` is safe
+### DB-002 — Additive migrations are consistently safe (positive observation)
 **Severity:** —
-**Category:** Migration quality (positive observation)
-**Location:** `prisma/migrations/20260924020000_add_credit_fields_to_client/migration.sql`
-**Evidence:** Uses `ADD COLUMN IF NOT EXISTS` with `NOT NULL DEFAULT 0`. Non-destructive, non-blocking for existing rows. Decimal precision `(14,2)` is consistent with all other monetary fields in the schema.
-**Impact:** No risk.
+**Category:** Migration quality
+**Location:** `prisma/migrations/`
+**Evidence:** All 68 committed migrations use `ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN` with safe defaults, or data backfills. No destructive rewrite or column removal detected in the migration history. Decimal precision `(14,2)` is consistent across all monetary columns.
+**Impact:** No risk. Migration hygiene is excellent.
 
 ---
 
-### DB-003 — No index on `Client.creditBalance`
+### DB-003 — No index on `Client.creditBalance` / `Client.creditLimit` (pre-existing, unchanged)
+**ID:** AUD-DB-003
 **Severity:** Low
-**Category:** Missing index (range queries)
+**Category:** Missing index
 **Location:** `prisma/schema.prisma` — `Client` model
-**Evidence:** `creditBalance` and `creditLimit` have no explicit index. If the billing view or ledger query ever filters or sorts by credit exposure (e.g., "clients approaching credit limit"), a full-table scan would occur.
-**Impact:** Low for current usage (ledger is fetched by clientId lookup, which hits the PK). Becomes relevant if credit-based dashboards are added.
-**Recommendation:** Defer index until a query pattern requiring it is identified. Note in schema comments.
-
----
-
-### DB-004 — Floating-point precision in recipe balance accumulation (pre-existing, unchanged)
-**Severity:** Low
-**Location:** `src/public/root/views/recipes-admin.version-editor.js` — `computeRecollectedBalances`
-**Evidence:** `parseFloat(row.querySelector('.si-quantity')?.value || '0') || 0` — JavaScript `Number` accumulation, not `Decimal`.
-**Impact:** Silent precision error in extreme fractional quantity scenarios (e.g., 0.1 + 0.2 ≠ 0.3). Backend validation is the authoritative enforcement; UI hint is guidance only.
-**Recommendation:** Low priority; consider `Decimal.js` in the browser if recipe quantities become highly fractional.
+**Evidence:** `creditBalance` and `creditLimit` have no explicit Prisma `@@index`. Current ledger query fetches by `clientId` (PK). No billing dashboard filter/sort by credit exposure is active.
+**Impact:** Negligible for current query patterns. Relevant if credit-based dashboards are added later.
+**Recommendation:** Defer until a query pattern requiring it is identified.
 
 ---
 
 ## API Findings
 
-### API-001 — `GET /api/roles/company/:roleId` absent from runtime endpoint catalog (pre-existing)
-See DOC-004 above. The route is implemented and covered in OpenAPI; the omission is documentation-only.
+### API-001 — `GET /api/roles/company/:roleId` now present in endpoint catalog (CLOSED)
+**Prior ID:** AUD-025 / DOC-004
+**Status:** CLOSED this cycle.
+**Evidence:** Line 89 of `docs/runtime-endpoint-catalog.md` now reads `| GET | /api/roles/company/:roleId | Sí | authorizeAccessPolicy('role.company.list') | Obtener rol de compañía por ID | Tenant isolation; devuelve 404 si el rol no pertenece a la compañía |`. Route was already implemented and in OpenAPI; catalog omission is now corrected.
 
-### API-002 — Invoice→Client credit decrement does not validate clientStore ownership in payment approval path
+---
+
+### API-002 — `ClientStore.update` inside payment approval does not re-scope by `companyId` (pre-existing, Low)
+**ID:** AUD-API-002
 **Severity:** Low
-**Location:** `src/services/payment.service.js` — `approvePayment` lines 310–333
-**Evidence:**
-```javascript
-const invoiceOrder = await tx.order.findUnique({
-  where: { id: approvedInvoice.orderId },
-  select: { clientStoreId: true },
-});
-if (invoiceOrder?.clientStoreId) {
-  await tx.clientStore.update({
-    where: { id: invoiceOrder.clientStoreId },
-    data: { creditBalance: { decrement: transactionalPayment.amount } },
-  });
-}
-```
-The `tx.clientStore.update` uses only `{ id: invoiceOrder.clientStoreId }` — no `companyId` scope check on the store. The company scope is inherited from the invoice's client scope validated earlier in the transaction, so this is unlikely to be exploitable. However, it deviates from the repository pattern of always scoping writes by `companyId`.
-**Impact:** Not a practical security issue in the current flow. Becomes risk if the service is extended to accept external orderId inputs.
-**Recommendation:** Low priority; document the scope provenance assumption in a comment or add an explicit guard.
+**Category:** Pattern deviation
+**Location:** `src/services/payment.service.js` — `approvePayment`
+**Evidence:** `tx.clientStore.update({ where: { id: invoiceOrder.clientStoreId }, data: ... })` uses only `id` as the WHERE clause. Company scope is inherited transitively from the invoice→client scope validated earlier in the transaction rather than from an explicit `companyId` predicate.
+**Impact:** Not a practical security issue in the current flow. Becomes a risk if the service is extended to accept external `orderId` inputs.
+**Recommendation:** Low priority. Consider adding `companyId` to the WHERE clause for pattern consistency, or document the scope-provenance assumption in a comment.
 
 ---
 
 ## Container Findings
 
-No changes to Docker configuration detected in this cycle. Prior audit findings remain valid:
-- Multi-stage Dockerfile; non-root user `inventory`; healthcheck on `/health/ready`
-- `docker-compose.dev.yml` explicitly marked dev-only
-- No secrets or credentials hard-coded in any Dockerfile or compose file
+No changes to Docker configuration detected in this cycle. All prior findings remain valid:
+- Multi-stage `Dockerfile`; non-root user `inventory`; healthcheck targets `/health/ready` via `node -e "..."` inline HTTP probe.
+- `docker-compose.dev.yml` is explicitly marked dev-only with Postgres and Redis health checks.
+- `docker-compose.prod.yml` available for production deployment.
+- No secrets or credentials hard-coded in any Dockerfile or compose file.
+- `.dockerignore` present.
 
 No new container findings.
 
@@ -277,44 +260,52 @@ No new container findings.
 
 ## Security Findings
 
-No security-relevant changes detected in this cycle. The TASK-015 credit update runs inside the existing payment Prisma transaction protected by `assertCompanyScope`, `assertHasAnyPermission`, and the lifecycle assertions (`assertPaymentCanBeApproved`, `assertPaymentCanBeReversed`). The `tx.client.update` call cannot be reached by an unauthorized actor.
+No security-relevant changes introduced in this cycle. All seven fixes are documentation, comment, test, or export changes with no impact on authentication, authorization, tenant isolation, or data validation.
 
-The `creditBalance` field is intentionally absent from `buildClientPayload` `allowedFields`, preventing direct client-form manipulation of the running balance. This is a correct security design decision.
+The security posture from the prior audit remains:
+- Bearer-authenticated actor context enforced at route layer.
+- Permission-based route protection via `authorizeAccessPolicy` / `authorizePermission`.
+- Company scoping derived from `auth.companyId` (not from client payload) in all service entrypoints.
+- `creditBalance` is absent from `buildClientPayload` `allowedFields` — direct client-form manipulation is prevented by design.
+- AUD-028 (store-level credit path coverage) is now closed; both branches of the `clientStoreId` conditional are tested.
+- Residual HTTPS enforcement for browser sessions is tracked separately under `specs/p11-https-browser-session-migration/` and remains outside this cycle's scope.
 
 ---
 
 ## Testing Findings
 
-### TEST-001 — Store-level creditBalance path not tested (new)
-**Severity:** Low
-**ID:** AUD-028
-**Location:** `tests/credit-balance-update-characterization.test.js`
-**Evidence:** `buildApprovalHarness` and `buildReversalHarness` return `{ clientId: invoiceClientId }` from the invoice stub with no `orderId`. The `approvedInvoice?.orderId` branch in `approvePayment` (which updates `ClientStore.creditBalance`) is therefore never entered during test execution. There is no test where both client AND store credit balances are decremented/incremented in the same approval/reversal cycle.
-**Impact:** A regression in the store-level credit update path would not be detected by the current test suite. The client-level path — the primary requirement stated in TASK-015 — is fully tested.
-**Recommendation:** Add one test to `credit-balance-update-characterization.test.js` where the invoice stub returns `{ clientId: 42n, orderId: 9n }` and the tx stub includes `tx.order.findUnique` returning `{ clientStoreId: 15n }` and `tx.clientStore.update`. Assert that both `clientUpdateCalls` and `storeUpdateCalls` each have length 1 with the correct data.
-
----
-
-### TEST-002 — Test suite growth and health
+### TEST-001 — Multi-product under-allocation test confirmed (CLOSED — AUD-013)
 **Severity:** —
-**Observation:** The suite grew from approximately 1 541 (prior audit) to 1 542 total (1 539 pass, 3 skipped). This is consistent with 16 new tests added:
-- `credit-balance-update-characterization.test.js`: 12 tests (TASK-014 formula, TASK-015 approve/reverse, BUG-001 cancel guards)
-- `client-ledger-characterization.test.js`: 4 tests (ledger contract including `creditLimit`/`creditBalance` exposure)
-
-Zero failures. Zero ESLint warnings. Clean TypeScript typecheck. The test suite is in excellent shape.
+**Status:** CLOSED.
+**Location:** `tests/recipe-service-foundation.test.js` line 673
+**Evidence:** Test `approveRecipeVersion rejects when one product is fully allocated but another is partially allocated (AUD-013, multi-product under-allocation)` is correctly structured with two products, one fully allocated and one under-allocated, and asserts `statusCode 400`, `code 'validation_error'`, error message containing the under-allocated product name (Sal), and that the message matches `/sin asignar|asign|aloc/i`. The assertion against the under-allocated product by name (not just any product) is precise and meaningful.
 
 ---
 
-### TEST-003 — Pre-existing low-coverage items (unchanged)
-**Severity:** Low
-**Location:** various
-**Items:**
-- AUD-013: No test for multi-product partial under-allocation in recipe approval mode.
-- AUD-014: Frontend characterization tests exercise source-level regex patterns, not DOM execution.
-- AUD-016: Some older PROCESSING stage fixtures in lineage tests still omit `processCode`.
-- AUD-019: `assertRecipeStageLineageAndAllocation` not exported via `__private__` for direct unit testing.
+### TEST-002 — Store-level creditBalance path now tested (CLOSED — AUD-028)
+**Severity:** —
+**Status:** CLOSED.
+**Location:** `tests/credit-balance-update-characterization.test.js` lines 440–475
+**Evidence:** Two tests labeled `AUD-028`:
+1. `approvePayment decrements ClientStore.creditBalance when invoice has orderId → clientStoreId` — asserts `storeUpdateCalls.length === 1`, correct `where.id`, and `data: { creditBalance: { decrement: 200 } }`.
+2. `approvePayment skips ClientStore.creditBalance when order has no clientStoreId` — asserts `storeUpdateCalls.length === 0`.
+Both branches of the `invoiceOrder?.clientStoreId` conditional are now exercised.
 
-None of these changed in this cycle.
+---
+
+### TEST-003 — Pre-existing acknowledged items (unchanged)
+**Severity:** Low
+**Location:** Various
+**Items:**
+- **AUD-005:** `computeRecollectedBalances` uses JavaScript `Number` arithmetic. Comment now documents the limitation and the Decimal.js upgrade path. Technical debt remains; no functional regression.
+- **AUD-014:** Frontend characterization tests in `root-shell-recipes-admin-view-characterization.test.js` exercise source-level patterns via Node `vm` sandbox, not a live DOM. Comment now documents this as a known gap with Playwright as the future E2E path. Debt acknowledged; no change.
+- **AUD-016:** Older PROCESSING-stage fixtures in lineage tests omit `stageType`. Comment now documents these as intentional backward-compat cases. Pattern is clarified; no change.
+
+---
+
+### TEST-004 — Test suite health summary
+**Severity:** —
+**Observation:** 1 542 pass, 0 fail, 3 skipped (DB-gated). Net +3 passing tests since the prior audit: 1 from AUD-013 (multi-product under-allocation) and 2 from AUD-028 (store-level credit path). Zero failures. Zero ESLint warnings. Clean TypeScript typecheck. The `verify` script chains lint → typecheck → public-runtime lint → validators → build → test. Suite is in excellent shape.
 
 ---
 
@@ -322,19 +313,19 @@ None of these changed in this cycle.
 
 ### MAINT-001 — Service layer mixes orchestration, business rules, and serialization (pre-existing, structural)
 **Severity:** Low (architectural debt, not a defect)
-**Location:** `src/services/payment.service.js`, `src/services/client.service.js`, others
-**Evidence:** `approvePayment` in `payment.service.js` performs: permission assertion → lifecycle assertion → overpayment check → payment approval → credit balance update → invoice financial state synchronization → audit recording — all in one function. `getClientLedger` in `client.service.js` performs DB lookup, Decimal-to-Number conversion, and response shaping in one function.
-**Impact:** High cognitive load; functions are difficult to test at the pure-logic level without stubbing the full transaction machinery.
-**Recommendation:** Tracked as architectural debt; not an actionable defect in this cycle.
+**Location:** `src/services/payment.service.js`, `src/services/production.service.js`, others
+**Evidence:** `approvePayment` performs permission assertion → lifecycle assertion → overpayment check → payment approval → credit balance update → invoice financial state synchronization → audit recording — all in one function. `production-execution.service.js` similarly combines inventory lookup, same-lot validation, stock mutation, movement recording, and stage fact persistence.
+**Impact:** High cognitive load per function; difficult to test pure business rules in isolation without stubbing the full transaction machinery.
+**Recommendation:** Tracked as architectural debt. No actionable change in this cycle.
 
 ---
 
-### MAINT-002 — `docs/current-state.md` scope has grown beyond production/QA only
+### MAINT-002 — `docs/current-state.md` now requires multi-cycle structure
 **Severity:** Low
 **Location:** `docs/current-state.md`
-**Evidence:** The document was originally written to describe the `qa-rejection-material-reconciliation-amendment` feature. It now needs to describe the credit lifecycle changes from this cycle and future changes. It does not yet have a clear structure for multi-cycle accumulation.
-**Impact:** The document will become harder to maintain as the most current reflection of system truth if each cycle's changes are not added in a structured way.
-**Recommendation:** Consider structuring `docs/current-state.md` as a living document with dated sections or a "Last updated" header per domain rather than a single monolithic document scoped to one feature.
+**Evidence:** The document has grown across multiple cycles and now covers QA/production amendments, credit lifecycle, and general system overview. There is no per-section "last updated" marker. Readers cannot easily determine which cycle introduced which content.
+**Impact:** The document remains accurate but becomes harder to maintain as a living reference as the system grows.
+**Recommendation:** Consider adding a `> Last updated:` block per major section or a header table summarizing which cycle last touched each section.
 
 ---
 
@@ -342,75 +333,93 @@ None of these changed in this cycle.
 
 | ID | Severity | Area | Description | Status |
 |---|---|---|---|---|
-| AUD-002 | Low | Documentation | `docs/current-state.md` not updated with current cycle changes | Open |
-| AUD-005 | Low | Frontend | Floating-point precision in `computeRecollectedBalances` | Open |
-| AUD-013 | Low | Testing | No test for multi-product partial under-allocation in approval mode | Open |
-| AUD-014 | Low | Testing | Frontend characterization tests are source-level regex, not DOM execution | Open |
-| AUD-016 | Low | Testing | Older lineage test fixtures lack `processCode` | Open |
-| AUD-019 | Low | Testability | `assertRecipeStageLineageAndAllocation` not exported via `__private__` | Open |
-| AUD-025 | Medium | Documentation | `GET /api/roles/company/:roleId` absent from `docs/runtime-endpoint-catalog.md` | Open |
-| AUD-027 | Low | Documentation | `docs/current-state.md` and `docs/action-plan.md` list DEF-PRD-001 as open when it was resolved this cycle | New |
-| AUD-028 | Low | Testing | `ClientStore.creditBalance` update path (orderId branch) not covered by characterization tests | New |
-| AUD-029 | Low | Documentation | CHANGELOG.md not updated for this cycle's fixes | New |
+| AUD-005 | Low | Frontend | Floating-point precision in `computeRecollectedBalances`; comment added | Acknowledged |
+| AUD-014 | Low | Testing | Frontend characterization tests are source-level, not DOM execution; comment added | Acknowledged |
+| AUD-016 | Low | Testing | Legacy PROCESSING fixtures omit `stageType` for backward-compat; comment added | Acknowledged (intentional) |
+| AUD-030 | Low | Documentation | CHANGELOG.md not updated for the current cycle's seven fixes | Open |
+| AUD-DB-001 | Low | Schema | Dual credit balance at client and store levels; no `CHECK (credit_balance >= 0)` constraint | Open |
+| AUD-DB-003 | Low | Schema | No index on `Client.creditBalance` / `Client.creditLimit` | Open |
+| AUD-API-002 | Low | Pattern | `tx.clientStore.update` inside payment approval uses only `id` in WHERE; company scope inherited transitively | Open |
+| MAINT-001 | Low | Architecture | Service layer mixes orchestration, rules, and serialization | Open (structural) |
+| MAINT-002 | Low | Documentation | `docs/current-state.md` lacks per-section update markers as it grows across cycles | Open |
+| DEF-PRD-002 | Medium | Testing / Ops | Manual end-to-end evidence for replacement recovery → same-lot execution → reconciliation flow is incomplete in repository docs | Open |
+
+**Closed since prior audit:**
+
+| ID | Severity | Area | Resolution |
+|---|---|---|---|
+| AUD-025 | Medium | Documentation | `GET /api/roles/company/:roleId` added to endpoint catalog |
+| AUD-002 | Low | Documentation | `current-state.md` §7 and §8 updated with credit fields and TASK-015 |
+| AUD-013 | Low | Testing | Multi-product under-allocation test added |
+| AUD-019 | Low | Testability | `assertRecipeStageLineageAndAllocation` exported via `__private__` |
+| AUD-027 | Low | Documentation | `DEF-PRD-001` removed from current-state.md and action-plan.md |
+| AUD-028 | Low | Testing | Two AUD-028 tests covering both branches of store-level credit path |
+| AUD-029 | Low | Documentation | CHANGELOG updated for the credit-and-catalog-alignment cycle |
 
 ---
 
 ## Behavior to Preserve
 
 1. **Company-scoped data access.** Every service function derives `companyId` from `auth.companyId` (not from client payload). Tenant cross-contamination is systematically prevented.
-2. **Payment lifecycle state machine.** `PENDING_APPROVAL → UNDER_REVIEW → APPROVED → REVERSED` with `REJECTED` as a terminal from PENDING/UNDER_REVIEW. Lifecycle assertions in `payment-lifecycle-support.service.js` must gate all transitions.
-3. **Credit balance increments on order APPROVED.** `inventory.service.js` `reserveStockForOrder` increments `Client.creditBalance` by `calculateInvoiceAmount(orderItems)` when `clientId && orderAmount > 0`. This is the source-of-truth for the balance growing.
-4. **Credit balance decrements on payment APPROVED.** `payment.service.js` `approvePayment` decrements `Client.creditBalance` by `transactionalPayment.amount` inside the Prisma transaction. This is the source-of-truth for the balance shrinking.
+2. **Payment lifecycle state machine.** `PENDING_APPROVAL → UNDER_REVIEW → APPROVED → REVERSED` with `REJECTED` as a terminal from PENDING/UNDER_REVIEW. `payment-lifecycle-support.service.js` lifecycle assertions must gate all transitions.
+3. **Credit balance increments on order APPROVED.** `inventory.service.js` `reserveStockForOrder` increments `Client.creditBalance` when `clientId && orderAmount > 0`. This is the source-of-truth for the balance growing.
+4. **Credit balance decrements on payment APPROVED.** `payment.service.js` `approvePayment` decrements `Client.creditBalance` inside the Prisma transaction.
 5. **Credit balance restores on payment REVERSED.** `reversePayment` increments `Client.creditBalance` by the original payment amount inside the Prisma transaction.
 6. **Dual-level credit update when orderId is present.** When a payment's invoice has an `orderId` and that order has a `clientStoreId`, both `Client.creditBalance` and `ClientStore.creditBalance` are updated symmetrically.
-7. **`creditBalance` is NOT settable via client form.** `buildClientPayload` deliberately excludes `creditBalance` from `allowedFields`. It may only be modified programmatically.
+7. **`creditBalance` is NOT settable via client form.** `buildClientPayload` deliberately excludes `creditBalance` from `allowedFields`. Only programmatic modification is permitted.
 8. **`creditLimit` is settable via client form.** `buildClientPayload` includes `creditLimit` in `allowedFields` and `numericFields`.
-9. **`getClientLedger` exposes both `creditLimit` and `creditBalance` as `Number`.** Prisma `Decimal` values are converted with `Number(clientData.creditLimit)` and the result is guarded with `!= null` before conversion.
+9. **`getClientLedger` exposes both `creditLimit` and `creditBalance` as `Number`.** Prisma `Decimal` values are converted with `Number()` and guarded with `!= null`.
 10. **PROCESS_CODE_OPTIONS frontend catalog is a safe subset of backend `RECIPE_STAGE_PROCESS_CODES`.** All 8 frontend options (`MIXING`, `HEATING`, `COOLING`, `CAPPING`, `SEALING`, `LABELING_PREP`, `PACKING_PREP`, `OTHER`) are accepted by the backend Zod enum.
-11. **Availability hints in the recipe editor recompute live.** Both the `productSelect change` event and `input` events on prior RECOLLECTION `.si-quantity` elements call `updateAvailHint()`, which calls `computeRecollectedBalances(parentSection)` at invocation time (not a cached snapshot). The `data-hint-wired` flag prevents duplicate listener registration.
+11. **Availability hints in the recipe editor recompute live.** Both `productSelect change` events and `input` events on prior RECOLLECTION `.si-quantity` elements call `updateAvailHint()`. The `data-hint-wired` flag prevents duplicate listener registration.
 12. **Production execution lineage validation on both create and update paths.** `recipe.service.js` calls `assertRecipeStageLineageAndAllocation` when `payload.stages` is present in `updateRecipeVersion`, not only on `createRecipeVersion`.
-13. **Payment approval transaction atomicity.** `executePaymentFinancialSyncTransaction` wraps payment status update, credit balance update, and invoice financial state synchronization in a single `prisma.$transaction`. A failure in any step rolls back all three.
-14. **Legacy `VIRTUAL_RECOLECTION` compatibility.** Existing production recolection stages without `recoveryType` default to `VIRTUAL_RECOLECTION` and continue to function without modification.
-15. **Soft delete on clients.** `clientRepository.softDeleteCompanyClient` sets `deletedAt` rather than hard-deleting. All client lookups apply `buildDefaultClientWhere({ deletedAt: null })`.
+13. **Multi-product under-allocation blocks recipe version approval.** `approveRecipeVersion` rejects with `statusCode 400` if any recollected product has unallocated quantities, even when other products are fully allocated.
+14. **Payment approval transaction atomicity.** `executePaymentFinancialSyncTransaction` wraps payment status update, credit balance update, and invoice financial state synchronization in a single `prisma.$transaction`.
+15. **Legacy `VIRTUAL_RECOLECTION` compatibility.** Existing production recolection stages without `recoveryType` default to `VIRTUAL_RECOLECTION` and continue to function without modification.
+16. **Soft delete on clients.** `clientRepository.softDeleteCompanyClient` sets `deletedAt` rather than hard-deleting. All client lookups apply `buildDefaultClientWhere({ deletedAt: null })`.
+17. **Legacy recipe stages without `stageType` are treated as `PROCESSING`.** Serialization and service logic default `stageType` to `PROCESSING` when the field is absent, preserving backward compatibility with older data.
 
 ---
 
 ## Known Defects
 
-### DEF-003 / AUD-025 — `GET /api/roles/company/:roleId` absent from runtime endpoint catalog
-**Severity:** Medium (documentation defect only)
-**Location:** `docs/runtime-endpoint-catalog.md`
-**Evidence:** The route is implemented at `src/routes/role.routes.js` line ~40 and is present in `docs/openapi/runtime-baseline.openapi.json` at path `/api/roles/company/{roleId}`. The `docs/runtime-endpoint-catalog.md` table lists the POST and PUT for this path family but not the GET by ID.
-**Impact:** Operational documentation is incomplete. No functional regression.
-**Recommendation:** Add the missing row to the catalog table.
+### DEF-PRD-002 — Manual end-to-end evidence gap for amended warehouse flow (pre-existing, Medium)
+**Severity:** Medium
+**Location:** `docs/current-state.md` §14; warehouse SPA production controllers
+**Evidence:** `docs/current-state.md` §14 explicitly records that manual validation evidence for the full replacement recovery → same-lot execution → reconciliation workflow is incomplete. Automated service and migration tests exist and pass, but the repository does not include completed manual operator walk-through evidence for this flow.
+**Impact:** Implementation is test-backed at the service level. Operational completeness for warehouse operators cannot be confirmed from repository evidence alone.
+**Recommendation:** Conduct and document a structured manual test session covering the five validation steps listed in `docs/action-plan.md` §18 (steps 1–5). Record results in a `specs/` evidence document or `docs/production-operations-runbook.md` update.
 
 ---
 
-No functional defects were identified in the six changes applied this cycle. All previously confirmed defects that were in scope for this cycle (DEF-002) are resolved. DEF-003 remains the only open Medium-severity defect, and it is documentation-only.
+No functional defects were identified in the seven changes applied this cycle. DEF-PRD-002 is the only open non-Low finding and it is unchanged from prior audits.
 
 ---
 
 ## Architectural Debt
 
-1. **Service layer as God-layer.** Services in `src/services/` mix permission enforcement, business rules, persistence coordination, response serialization, and audit recording. `payment.service.js` exemplifies this with `approvePayment` performing six distinct responsibilities. This is a structural constraint of the current layered monolith architecture; it is not a defect but imposes long-term maintenance cost.
+1. **Service layer as God-layer.** Services in `src/services/` mix permission enforcement, business rules, persistence coordination, response serialization, and audit recording. `payment.service.js` `approvePayment` and `production-execution.service.js` `executeStage` exemplify this with six or more distinct responsibilities per function. Structural constraint of the current layered monolith; not a defect but imposes long-term maintenance cost.
 
 2. **Direct Prisma transaction access in service layer.** `approvePayment` and `reversePayment` use `tx.invoice.findUnique`, `tx.client.update`, `tx.order.findUnique`, and `tx.clientStore.update` directly rather than via repository functions. This bypasses the repository abstraction for cross-entity transactional reads. The repository pattern is not consistently enforced within transaction boundaries.
 
-3. **No application-level credit balance floor constraint.** There is no `CHECK (credit_balance >= 0)` at the DB level and no application-level guard preventing `creditBalance` from going negative if a payment approval precedes the order approval that was supposed to credit the balance. The intended flow (order → credit increment; payment → credit decrement) is not enforced by schema constraints.
+3. **No application-level credit balance floor constraint.** There is no `CHECK (credit_balance >= 0)` at the DB level and no application-level guard preventing `creditBalance` from going negative if payment approval precedes order approval. The intended flow sequencing (order → credit increment; payment → credit decrement) is not enforced by schema constraints.
 
-4. **Frontend SPA delivered from same process.** The root-shell admin SPA, warehouse SPA, and agent SPA are all served as static files from the same Express process as the API. This is a deployment architecture constraint; it is functional but limits independent scaling and deployment of SPA vs API.
+4. **Frontend SPA delivered from same process.** The root-shell admin SPA, warehouse SPA, and agent SPA are all served as static files from the same Express process as the API. Functional but limits independent scaling and deployment of SPA vs API.
 
-5. **No integration between `ClientStore.creditBalance` and `Client.creditBalance` validation.** When a credit limit is checked (e.g., in billing view spec), it reads `client.creditLimit` and `client.creditBalance` as independent values. There is no enforced relationship ensuring `sum(store.creditBalance) == client.creditBalance`. If these diverge (e.g., due to invoice-without-orderId paths), the discrepancy is silent.
+5. **No integration constraint between `ClientStore.creditBalance` and `Client.creditBalance`.** The system does not enforce that the sum of store-level balances equals the client-level balance. Invoice paths without `orderId` update only the client-level balance, creating silent divergence potential.
+
+6. **No explicit domain layer.** Business rules for Production, Quality, Inventory, and Billing live inside service modules rather than in a dedicated domain layer with explicit policies or value objects. The service files are well-organized but remain coupled to Prisma models and HTTP context.
+
+7. **QA relevant-input scope computed dynamically.** The relevant-input scope for a rejected stage is recomputed on demand rather than persisted as an immutable audit snapshot. This is a documented open decision in `docs/architecture.md` §14 and `docs/action-plan.md` §14.
 
 ---
 
 ## Unknown Behavior
 
-1. **Manual end-to-end evidence for replacement recovery → same-lot execution → reconciliation.** The automated test suite covers the service layer for this flow. Manual operator walk-through evidence in the repository docs is noted as incomplete in `docs/current-state.md` §14.
+1. **Manual end-to-end evidence for replacement recovery → same-lot execution → reconciliation.** The automated test suite covers the service layer for this flow. Manual operator walk-through evidence in the repository docs is explicitly noted as incomplete in `docs/current-state.md` §14.
 
-2. **Behavior when `ClientStore.creditBalance` and `Client.creditBalance` diverge.** The UI surfaces `client.creditBalance` in the billing view and `store.creditBalance` in the store context. What the UI displays when these diverge, and whether any validation uses one versus the other, cannot be confirmed from code inspection alone.
+2. **Behavior when `ClientStore.creditBalance` and `Client.creditBalance` diverge silently.** The UI surfaces `client.creditBalance` in the billing view and `store.creditBalance` in the store context. What the UI displays or validates when these diverge cannot be confirmed from code inspection alone.
 
-3. **Behavior of `getClientLedger` when `creditLimit` or `creditBalance` is `null` on a legacy client.** The `!= null` guard in `client.service.js` returns `null` in those cases. Whether the billing UI handles `null` gracefully is inferred from the spec doc (`docs/vistas/billing-view-spec.md` line 936: `if (!client.creditLimit || client.creditLimit <= 0) return ''`) but not confirmed by a live DOM test.
+3. **Behavior of `getClientLedger` when `creditLimit` or `creditBalance` is `null` on a legacy client.** The `!= null` guard returns `null` in those cases. Whether the billing UI handles `null` gracefully is inferred from spec docs but not confirmed by a live DOM test.
 
 ---
 
@@ -418,102 +427,34 @@ No functional defects were identified in the six changes applied this cycle. All
 
 | Risk | Level | Status | Notes |
 |---|---|---|---|
-| Process-code catalog drift (DEF-002 / AUD-020) | ~~Medium~~ | **CLOSED** | Frontend now uses only valid backend codes |
-| Availability hint stale snapshot (AUD-018) | ~~Medium~~ | **CLOSED** | Fixed in prior cycle |
-| `updateRecipeVersion` lineage path untested (AUD-012) | ~~Medium~~ | **CLOSED** | Fixed in prior cycle |
-| `GET /api/roles/company/:roleId` absent from catalog (AUD-025) | Medium (doc only) | **Open** | Route works; catalog entry missing |
-| `creditBalance` can go negative with no DB constraint | Low | **Open** | New finding DB-001; no functional regression yet |
-| Store-level credit path untested (AUD-028) | Low | **Open** | New finding; client-level path tested |
-| `docs/current-state.md` stale (AUD-027) | Low | **Open** | DEF-PRD-001 listed as open; credit fields absent |
+| Process-code catalog drift (DEF-002 / AUD-020) | ~~Medium~~ | **CLOSED** (prior cycle) | Frontend now uses only valid backend codes |
+| Availability hint stale snapshot (AUD-018) | ~~Medium~~ | **CLOSED** (prior cycle) | Fixed; `input` listeners wired |
+| `updateRecipeVersion` lineage path untested (AUD-012) | ~~Medium~~ | **CLOSED** (prior cycle) | Fixed |
+| `GET /api/roles/company/:roleId` absent from catalog (AUD-025) | ~~Medium~~ | **CLOSED this cycle** | Endpoint catalog now complete |
+| Multi-product under-allocation untested (AUD-013) | ~~Low~~ | **CLOSED this cycle** | Test added and confirmed |
+| `assertRecipeStageLineageAndAllocation` not exported (AUD-019) | ~~Low~~ | **CLOSED this cycle** | Exported via `__private__` |
+| `current-state.md` stale credit fields (AUD-002) | ~~Low~~ | **CLOSED this cycle** | §7 and §8 updated |
+| Store-level credit path untested (AUD-028) | ~~Low~~ | **CLOSED between cycles** | Two tests confirmed |
+| `current-state.md` / `action-plan.md` stale DEF-PRD-001 (AUD-027) | ~~Low~~ | **CLOSED between cycles** | Stale entries removed |
+| CHANGELOG not updated for prior cycle (AUD-029) | ~~Low~~ | **CLOSED between cycles** | CHANGELOG entry added |
+| Manual E2E evidence gap (DEF-PRD-002) | Medium | **Open** | Service tests exist; manual validation incomplete |
+| `creditBalance` can go negative with no DB constraint (AUD-DB-001) | Low | **Open** | No functional regression yet |
+| CHANGELOG not updated for current cycle (AUD-030) | Low | **Open** | New finding |
 
 ---
 
 ## Recommended Priorities
 
-1. **(Medium — Documentation)** Add `GET /api/roles/company/:roleId` to `docs/runtime-endpoint-catalog.md`. See AUD-025. Small effort, closes the only remaining Medium finding.
+1. **(Low — Documentation)** Add a CHANGELOG.md entry for this cycle (AUD-025 catalog, AUD-002 doc refresh, AUD-005/AUD-014/AUD-016 comments, AUD-013 test, AUD-019 export, test suite delta 1539→1542). See AUD-030.
 
-2. **(Low — Documentation)** Update `docs/current-state.md`: remove `DEF-PRD-001` from §14 Known Defects (mark resolved); add §7 entries for `clients.credit_limit` and `clients.credit_balance`; add TASK-015 to §8 APIs/integrations. See AUD-027.
+2. **(Medium — Testing / Ops)** Conduct and record a structured manual validation session for the replacement recovery → same-lot execution → reconciliation warehouse operator flow. The five validation steps in `docs/action-plan.md` §18 provide the test script. See DEF-PRD-002.
 
-3. **(Low — Documentation)** Update `docs/action-plan.md` §5 to remove process-code drift from "Problems still open." See DOC-002.
+3. **(Low — Schema)** Consider adding a `CHECK (credit_balance >= 0)` constraint to `clients` and `client_stores` in a future additive migration, or add an application-level guard before the `decrement` operation. See AUD-DB-001.
 
-4. **(Low — Documentation)** Add a CHANGELOG.md entry for this cycle (DEF-002, AUD-026, TASK-015, migration `20260924020000`, creditLimit in allowedFields, ledger exposure). See AUD-029.
+4. **(Low — Pattern)** Add `companyId` to the `tx.clientStore.update` WHERE clause in `payment.service.js` `approvePayment` for pattern consistency with the repository convention. See AUD-API-002.
 
-5. **(Low — Testing)** Add a characterization test for the `ClientStore.creditBalance` update path in `approvePayment` and `reversePayment` (invoice with `orderId → clientStoreId` chain). See AUD-028.
+5. **(Low — Documentation)** Add per-section update markers or a last-updated header table to `docs/current-state.md` to support multi-cycle maintenance. See MAINT-002.
 
-6. **(Low — Schema)** Consider adding a `CHECK (credit_balance >= 0)` constraint to both `clients` and `client_stores` tables in a future migration, or add an application-level guard before the decrement operation. See DB-001.
+6. **(Low — Frontend)** Evaluate `Decimal.js` for recipe quantity accumulation in `computeRecollectedBalances` if recipes with highly fractional quantities become common. See AUD-005.
 
-7. **(Low — Test hygiene)** Add `processCode` to the remaining older PROCESSING stage fixtures in lineage tests. See AUD-016.
-
-8. **(Low — Testability)** Export `assertRecipeStageLineageAndAllocation` via `__private__` for direct unit-test access. See AUD-019.
-
-9. **(Low — Arithmetic)** Evaluate whether recipe quantity precision warrants an epsilon tolerance or a `Decimal.js` library in the browser. See AUD-005.
-
----
-
-## Fix Assessment Summary
-
-### DEF-002 / AUD-020 — PROCESS_CODE_OPTIONS alignment
-
-| Check | Result | Evidence |
-|---|---|---|
-| `FILLING` removed from frontend | ✓ | Not present in `PROCESS_CODE_OPTIONS` array |
-| `QUALITY_CHECK` removed from frontend | ✓ | Not present in `PROCESS_CODE_OPTIONS` array |
-| `LABELING` replaced by `LABELING_PREP` | ✓ | `{ value: 'LABELING_PREP', label: 'Prep. etiquetado' }` present |
-| `PACKAGING` replaced by `PACKING_PREP` | ✓ | `{ value: 'PACKING_PREP', label: 'Prep. empaque' }` present |
-| All 8 frontend values exist in backend `RECIPE_STAGE_PROCESS_CODES` | ✓ | Backend: `'PACKING_PREP', 'LABELING_PREP', 'CAPPING', 'SEALING', 'MIXING', 'HEATING', 'COOLING', 'OTHER'` all present |
-| Comment points to backend catalog | ✓ | `// Catalog must stay in sync with RECIPE_STAGE_PROCESS_CODES in src/schemas/recipe.schema.js` |
-
-**Conclusion: DEF-002 RESOLVED.**
-
----
-
-### AUD-026 — Input listeners on prior RECOLLECTION `.si-quantity` elements
-
-| Check | Result | Evidence |
-|---|---|---|
-| Listeners only wired when `isProcessingMode && parentSection` | ✓ | `if (isProcessingMode && parentSection) {` guard wraps the wiring block |
-| Only sections before `parentSection` are wired | ✓ | `if (section === parentSection) break;` exits loop at own section |
-| Only RECOLLECTION sections are wired | ✓ | `if (section.querySelector('.stage-type')?.value !== 'RECOLLECTION') continue;` |
-| `data-hint-wired` prevents duplicate listeners | ✓ | `if (qtyInput.dataset.hintWired) return;` and `qtyInput.dataset.hintWired = '1';` |
-| Listener calls `updateAvailHint` (not a stale snapshot) | ✓ | `qtyInput.addEventListener('input', updateAvailHint)` — `updateAvailHint` calls `computeRecollectedBalances(parentSection)` at invocation time |
-| Wiring is done after `inputsContainer.appendChild(row)` so the row is in DOM | ✓ | Wiring block appears after `inputsContainer.appendChild(row)` |
-
-**Conclusion: AUD-026 RESOLVED.**
-
----
-
-### TASK-015 — Credit balance in payment lifecycle
-
-| Check | Result | Evidence |
-|---|---|---|
-| `approvePayment` calls `tx.client.update` with `{ decrement: transactionalPayment.amount }` | ✓ | `payment.service.js` lines 314–320 |
-| `reversePayment` calls `tx.client.update` with `{ increment: transactionalPayment.amount }` | ✓ | `payment.service.js` lines 432–438 |
-| Both updates run inside `executePaymentFinancialSyncTransaction` (single Prisma tx) | ✓ | Both are nested inside the `(tx) => { ... }` callback |
-| Update uses `invoice.clientId` fetched inside the transaction | ✓ | `tx.invoice.findUnique({ where: { id: transactionalPayment.invoiceId }, select: { orderId, clientId } })` |
-| Guard `if (approvedInvoice?.clientId)` prevents null dereference | ✓ | Explicit optional-chaining guard present |
-| Symmetric `ClientStore.creditBalance` update when orderId present | ✓ | Second `if (approvedInvoice?.orderId)` block with `tx.order.findUnique` → `tx.clientStore.update` |
-| Test: approve decrements by payment amount when invoice has clientId | ✓ | `TASK-015: approvePayment decrements creditBalance when invoice has clientId` |
-| Test: approve skips update when invoice has no clientId | ✓ | `TASK-015: approvePayment skips creditBalance update when invoice has no clientId` |
-| Test: reverse increments by payment amount when invoice has clientId | ✓ | `TASK-015: reversePayment increments creditBalance when invoice has clientId` |
-| Store-level path tested | ✗ | No test exercises the `orderId → clientStoreId` branch (AUD-028, Low) |
-
-**Conclusion: TASK-015 IMPLEMENTED. Primary paths tested. Store-level path coverage gap (AUD-028) is Low severity.**
-
----
-
-### Supporting changes
-
-| Check | Result | Evidence |
-|---|---|---|
-| `creditLimit` in `buildClientPayload` `allowedFields` | ✓ | `clients-admin.helpers.js` — `allowedFields` array includes `'creditLimit'` |
-| `creditBalance` intentionally absent from `allowedFields` | ✓ | `creditBalance` is in `numericFields` (for coercion) but not in `allowedFields` (so it is never written from the form) |
-| `getClientLedger` returns `creditLimit` | ✓ | `client.service.js` — `creditLimit: clientData.creditLimit != null ? Number(clientData.creditLimit) : null` |
-| `getClientLedger` returns `creditBalance` | ✓ | `client.service.js` — `creditBalance: clientData.creditBalance != null ? Number(clientData.creditBalance) : null` |
-| Ledger test asserts `creditLimit` and `creditBalance` values | ✓ | `client-ledger-characterization.test.js` — `'getClientLedger exposes creditLimit and creditBalance from client data'` |
-| `Client` schema has `creditLimit DECIMAL(14,2) NOT NULL DEFAULT 0` | ✓ | `prisma/schema.prisma` line 541 |
-| `Client` schema has `creditBalance DECIMAL(14,2) NOT NULL DEFAULT 0` | ✓ | `prisma/schema.prisma` line 542 |
-| Migration uses `ADD COLUMN IF NOT EXISTS` (safe) | ✓ | `20260924020000_add_credit_fields_to_client/migration.sql` |
-
----
-
-*Produced by baseline-audit-agent-20ddf6. Full repository scope re-audit. Prior audit: baseline-audit-agent-4ffad0 (score 7.9 / 10). This report supersedes the prior audit report and is the canonical current-state baseline for downstream agents.*
+7. **(Low — Testing)** Consider adding a Playwright-based E2E test for the recipe editor's RECOLLECTION → PROCESSING availability hint flow to supplement the current source-level characterization tests. See AUD-014.

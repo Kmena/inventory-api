@@ -1,4 +1,12 @@
 # Current State
+
+<!-- MAINT-002: per-section update log — append a row when a section is materially changed -->
+| Section | Last updated | Change summary |
+|---|---|---|
+| §7 Database and persistence | 2026-09-01 | Added Client.creditLimit/creditBalance and ClientStore credit fields |
+| §8 APIs and integrations | 2026-09-01 | Added GET /api/clients/:id/ledger and TASK-015 credit lifecycle |
+| §14 Known defects | 2026-09-01 | Removed DEF-PRD-001 (resolved); DEF-PRD-002 remains open |
+
 ## 1. System overview
 The implemented system is a Node.js 24 + Express + Prisma modular monolith that serves both JSON APIs and browser-delivered SPAs from one runtime.
 

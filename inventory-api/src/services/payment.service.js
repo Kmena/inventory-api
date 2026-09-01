@@ -325,8 +325,9 @@ async function approvePayment(id, payload, auth, req = null) {
         select: { clientStoreId: true },
       });
       if (invoiceOrder?.clientStoreId) {
-        await tx.clientStore.update({
-          where: { id: invoiceOrder.clientStoreId },
+        // AUD-API-002: scope by companyId through the client relation to prevent cross-tenant mutation.
+        await tx.clientStore.updateMany({
+          where: { id: invoiceOrder.clientStoreId, client: { companyId: BigInt(companyId) } },
           data: { creditBalance: { decrement: transactionalPayment.amount } },
         });
       }
@@ -443,8 +444,9 @@ async function reversePayment(id, auth, reason, req = null) {
         select: { clientStoreId: true },
       });
       if (reversedOrder?.clientStoreId) {
-        await tx.clientStore.update({
-          where: { id: reversedOrder.clientStoreId },
+        // AUD-API-002: scope by companyId through the client relation to prevent cross-tenant mutation.
+        await tx.clientStore.updateMany({
+          where: { id: reversedOrder.clientStoreId, client: { companyId: BigInt(companyId) } },
           data: { creditBalance: { increment: transactionalPayment.amount } },
         });
       }

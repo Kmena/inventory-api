@@ -411,7 +411,8 @@ function buildApprovalHarnessWithStore({ clientStoreId }) {
       },
       client: { update: async () => null },
       clientStore: {
-        update: async (args) => { storeUpdateCalls.push(args); return null; },
+        // AUD-API-002: service now uses updateMany with company scope
+        updateMany: async (args) => { storeUpdateCalls.push(args); return { count: 1 }; },
       },
     };
     return work(tx);

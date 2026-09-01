@@ -59,10 +59,11 @@
     // of { productId → { recollected, used } } so PROCESSING stage inputs can be
     // filtered to only products with remaining availability.
     // Descriptive inputs without productId are ignored (BR-009).
-    // AUD-005: uses native JS floating-point arithmetic. Adequate for typical recipe
-    // quantities (integer or 1-2 decimal places). For high-precision fractional inputs,
-    // consider replacing the accumulation with integer math (multiply by 1000, divide at display)
-    // or a Decimal.js dependency.
+    // AUD-005: quantities are accumulated with 4-decimal rounding to avoid floating-point drift
+    // (e.g. 0.1 + 0.2 = 0.30000000000000004). Rounding to 4 places is adequate for recipe
+    // quantities. A Decimal.js dependency would be needed for arbitrary precision.
+    function roundQty(n) { return Math.round(n * 10000) / 10000; }
+
     function computeRecollectedBalances(upToSection) {
       const balance = new Map(); // productId string → { recollected, used }
       const sections = Array.from(stagesList.querySelectorAll('.stage-section'));
@@ -76,11 +77,11 @@
           if (!productId || !qty) continue;
           if (sectionType === 'RECOLLECTION') {
             const entry = balance.get(productId) || { recollected: 0, used: 0 };
-            entry.recollected += qty;
+            entry.recollected = roundQty(entry.recollected + qty);
             balance.set(productId, entry);
           } else if (sectionType === 'PROCESSING') {
             const entry = balance.get(productId);
-            if (entry) entry.used += qty;
+            if (entry) entry.used = roundQty(entry.used + qty);
           }
         }
       }

@@ -560,6 +560,8 @@ model Client {
   @@index([companyId, deletedAt])
   @@index([clientClassificationId])
   @@index([legalEntityId])
+  @@index([creditBalance])
+  @@index([creditLimit])
   @@map("clients")
 }
 
@@ -639,6 +641,7 @@ model ClientStore {
   @@unique([clientId, code])
   @@index([legalEntityId])
   @@index([subregionId])
+  @@index([creditBalance])
   @@map("client_stores")
 }
 
