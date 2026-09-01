@@ -301,7 +301,7 @@ Assumptions used in this refresh:
 - documentation intentionally avoids claiming full operational completeness beyond the automated and recorded evidence currently present
 
 ## 18. Documentation governance
-The canonical runtime-contract governance lives under `docs/**`. This includes `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/audit/`.
+The canonical runtime-contract governance lives under `docs/**`. This includes `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/audit/`. Documentation ownership boundaries are defined in `docs/documentation-ownership-map.md`. CI workflow definitions live under `../.github/workflows/` and are the authoritative hosted source consumed by workflow-baseline validators.
 
 authoritative hosted workflow location for local validators/tests: `../.github/workflows/`. Governance and characterization tests read CI workflow truth from that parent-root directory.
 

@@ -238,6 +238,8 @@ Current limitation:
 ## 15. Documentation governance
 The canonical reviewed artifacts under `docs/**` represent implemented reality and are the authoritative reference for runtime contracts. The workflow-baseline validators and characterization tests intentionally read hosted workflow truth from that parent-root workflow tree.
 
+Documentation ownership boundaries are defined in `docs/documentation-ownership-map.md`. CI workflow definitions live under `../.github/workflows/` and are the authoritative hosted source for workflow-baseline validators.
+
 Supported runtime company-role update flow now exists. Company-role list/create/update operations are implemented and tracked in current-state docs.
 
 This feature operates under a p34-bounded-governance-coverage-expansion posture: partial OpenAPI baseline coverage is intentional for this amendment scope. bounded governance evidence is preserved through characterization tests and contract docs rather than full integration-test suites.
