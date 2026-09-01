@@ -755,9 +755,16 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
   });
 
   // Auto-populate lot dropdowns for REPLACEMENT_RECOVERY cards.
-  // Each card carries data-recipe-stage-id; we fetch available lots once per card
-  // and pre-select the lot with the highest available quantity (the recommended one).
+  // Each card carries data-recipe-stage-id (the rejected PROCESSING stage).
+  // PROCESSING stages often have no productId inputs — the productIds live in the
+  // prior RECOLLECTION stage. We try the processing stage first; if it returns no
+  // products, we fall back to any RECOLLECTION stage in the snapshot that covers
+  // the required products (identified via data-product-id on entry rows).
   (async () => {
+    const snapshotStages = Array.isArray(
+      order?.recipeVersionSnapshot?.recipeVersion?.stages,
+    ) ? order.recipeVersionSnapshot.recipeVersion.stages : [];
+
     const recoveryCards = container.querySelectorAll('.wh-stage-card--replacement');
     for (const card of recoveryCards) {
       const recipeStageId = card.dataset.recipeStageId;
@@ -765,15 +772,39 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
       const entryRows = card.querySelectorAll('.wh-recovery-entry-row');
       if (!entryRows.length) { continue; }
 
+      // Collect required productIds from the entry rows
+      const requiredProductIds = new Set(
+        Array.from(entryRows).map((r) => r.dataset.productId).filter(Boolean),
+      );
+
       let productLots = {}; // productId string → sorted lot array
       try {
-        const lotsResponse = await api.getAvailableLotsForStage(session, order.id, recipeStageId);
-        for (const p of (lotsResponse.products || [])) {
-          // Sort descending by available quantity so index-0 is the recommended lot
-          const sorted = (p.lots || []).slice().sort(
-            (a, b) => Number(b.availableQuantity ?? 0) - Number(a.availableQuantity ?? 0),
+        // First try the rejected stage itself
+        let lotsResponse = await api.getAvailableLotsForStage(session, order.id, recipeStageId);
+
+        // If the processing stage has no productId inputs, fall back to the
+        // RECOLLECTION stage whose inputs cover the required products.
+        if (!(lotsResponse.products || []).length && requiredProductIds.size > 0) {
+          const recolStage = snapshotStages.find(
+            (s) => s.stageType === 'RECOLLECTION'
+              && Array.isArray(s.stageInputs)
+              && s.stageInputs.some(
+                (inp) => inp.productId && requiredProductIds.has(String(inp.productId)),
+              ),
           );
-          productLots[String(p.productId)] = sorted;
+          if (recolStage) {
+            lotsResponse = await api.getAvailableLotsForStage(session, order.id, String(recolStage.id));
+          }
+        }
+
+        // Filter response to only the products actually needed in this recovery
+        for (const p of (lotsResponse.products || [])) {
+          if (!requiredProductIds.size || requiredProductIds.has(String(p.productId))) {
+            const sorted = (p.lots || []).slice().sort(
+              (a, b) => Number(b.availableQuantity ?? 0) - Number(a.availableQuantity ?? 0),
+            );
+            productLots[String(p.productId)] = sorted;
+          }
         }
       } catch (_) { /* leave selects in loading state on error */ continue; }
 
