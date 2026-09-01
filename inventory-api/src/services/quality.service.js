@@ -391,9 +391,9 @@ async function createInspectionForStage(orderId, stageId, payload, auth) {
     }
 
     if (recoveryStage && dispositionsSummary) {
-      dispositionsSummary.recoveryStage = recolectionService.serializeRecolectionStage(recoveryStage);
+      /** @type {any} */ (dispositionsSummary).recoveryStage = recolectionService.serializeRecolectionStage(recoveryStage);
     } else if (recoveryStage) {
-      dispositionsSummary = { lossesAcknowledged: false, invalidatedExecutions: [], returned: [], discarded: [], recolection: null, recoveryStage: recolectionService.serializeRecolectionStage(recoveryStage) };
+      dispositionsSummary = /** @type {any} */ ({ lossesAcknowledged: false, invalidatedExecutions: [], returned: [], discarded: [], recolection: null, recoveryStage: recolectionService.serializeRecolectionStage(recoveryStage) });
     }
 
     return { inspection: serializeQualityInspection(inspection), dispositionsSummary, relevantInputScope };

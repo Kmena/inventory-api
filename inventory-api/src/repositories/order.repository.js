@@ -165,7 +165,7 @@ async function findOrderWithAllocations(id, companyId) {
       movementType: 'RESERVE',
     },
     include: {
-      lot: { select: { id: true, code: true, expiresAt: true } },
+      lot: { select: /** @type {any} */ ({ id: true, code: true, expiresAt: true }) },
     },
     orderBy: /** @type {any} */ ({ id: 'asc' }),
   });
@@ -180,7 +180,7 @@ async function findOrderWithAllocations(id, companyId) {
           lot: { status: 'AVAILABLE', qaStatus: 'APPROVED' },
         },
         include: {
-          lot: { select: { id: true, code: true, lotNumber: true, expiresAt: true } },
+          lot: { select: /** @type {any} */ ({ id: true, code: true, lotNumber: true, expiresAt: true }) },
         },
         orderBy: /** @type {any} */ ([{ lot: { expiresAt: 'asc' } }, { lotId: 'asc' }]),
       })

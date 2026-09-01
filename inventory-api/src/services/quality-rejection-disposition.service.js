@@ -58,11 +58,11 @@ async function validateDispositions(stageExecutionId, dispositions, optionAConsu
   // Use direct execution consumptions first; fall back to Option A scope when empty.
   let consumptions = await productionRepository.findConsumptionsByExecutionId(stageExecutionId);
   if (consumptions.length === 0 && Array.isArray(optionAConsumptions) && optionAConsumptions.length > 0) {
-    consumptions = optionAConsumptions.map((e) => ({
+    consumptions = /** @type {any} */ (optionAConsumptions.map((e) => ({
       productId: e.productId,
       lotId: e.lotId,
       quantity: e.quantity,
-    }));
+    })));
   }
 
   const consumedMap = new Map();

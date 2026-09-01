@@ -162,9 +162,9 @@ async function cancelOrder(id, auth, req = null) {
   return cancelledOrder;
 }
 
-async function dispatchOrder(id, auth, req = null) {
+async function dispatchOrder(id, auth, body = null, req = null) {
   await getOrder(id, auth);
-  return inventoryService.dispatchOrder(id, auth, req);
+  return inventoryService.dispatchOrder(id, auth, body, req);
 }
 
 async function removeOrder(id, auth, req = null) {

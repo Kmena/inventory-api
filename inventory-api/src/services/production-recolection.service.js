@@ -156,7 +156,7 @@ async function confirmRecolection(orderId, recolectionId, payload, auth) {
 
   // AUD-001: persist lot-level entries when provided (REPLACEMENT_RECOVERY or VIRTUAL_RECOLECTION with lot info)
   if (lotEntries.length > 0) {
-    await productionRepository.createRecolectionEntries(recolectionId, lotEntries);
+    await productionRepository.createRecolectionEntries(recolectionId, /** @type {any} */ (lotEntries));
   }
 
   return {

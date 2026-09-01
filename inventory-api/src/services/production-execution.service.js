@@ -260,8 +260,9 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
 
     // FR-010/BR-004: if this stage was preceded by a completed recovery/recolection stage with lot-level entries,
     // proposed consumptions must stay within the recovered balance for the same product+lot pairs.
-    const relatedRecolectionStage = Array.isArray(order.recolectionStages)
-      ? order.recolectionStages.find((stage) => String(stage.recipeStageId) === String(stageId) && stage.status === 'COMPLETED')
+    const _orderAny = /** @type {any} */ (order);
+    const relatedRecolectionStage = Array.isArray(_orderAny.recolectionStages)
+      ? _orderAny.recolectionStages.find((stage) => String(stage.recipeStageId) === String(stageId) && stage.status === 'COMPLETED')
       : null;
     if (relatedRecolectionStage) {
       assertRecolectionCoverageForConsumption(
