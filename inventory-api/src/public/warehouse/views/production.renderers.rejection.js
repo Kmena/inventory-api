@@ -310,15 +310,15 @@ function renderDispositionRows(consumptions, productNames, rowGroupName) {
            data-unit="${escapeHtml(String(unit || ''))}"
            style="border:1px solid var(--border,#ddd);border-radius:8px;padding:0.75rem;margin-bottom:0.5rem">
         ${stageLabel}
-        <p style="margin:0 0 0.5rem"><strong>${escapeHtml(productName)}</strong> \u00B7 ${escapeHtml(lotLabel)}</p>
+        <p style="margin:0 0 0.5rem"><strong>${escapeHtml(productName)}</strong> · ${escapeHtml(lotLabel)}</p>
         <p class="wh-caption" style="margin:0 0 0.5rem">Consumido: ${escapeHtml(String(consumedQuantity))} ${escapeHtml(String(unit || ''))}</p>
         <label style="display:block;margin-bottom:0.5rem">
-          <span>Disposici\u00F3n *</span>
-          <select class="qa-disposition-select" aria-label="Disposici\u00F3n para ${escapeHtml(productName)}" data-row-group="${escapeHtml(rowGroupName)}-${index}">
-            <option value="">Selecciona una disposici\u00F3n</option>
+          <span>Disposición *</span>
+          <select class="qa-disposition-select" aria-label="Disposición para ${escapeHtml(productName)}" data-row-group="${escapeHtml(rowGroupName)}-${index}">
+            <option value="">Selecciona una disposición</option>
             <option value="REUSE">Seguir usando (reutilizar)</option>
             <option value="RETURN">Devolver a inventario</option>
-            <option value="DISCARD">Descartar (da\u00F1ado / contaminado)</option>
+            <option value="DISCARD">Descartar (dañado / contaminado)</option>
             <option value="RECOLLECT">Recolectar nuevamente</option>
           </select>
         </label>
@@ -438,11 +438,11 @@ function renderQaRejectionFlow(order, snapshotStage) {
   );
 
   const dispositionLegend = hasDirectConsumptions
-    ? 'Disposici\u00F3n de material \u2014 etapa rechazada'
-    : 'Disposici\u00F3n de material \u2014 materiales en alcance del rechazo';
+    ? 'Disposición de material — etapa rechazada'
+    : 'Disposición de material — materiales en alcance del rechazo';
 
   const priorStagesNote = !hasDirectConsumptions && optionAEntries.length > 0
-    ? '<p class="wh-caption wh-caption--info" style="margin-bottom:0.5rem">\u26A0\uFE0F Esta etapa no tiene insumos directos. Se muestran los materiales consumidos en etapas previas incluidas en el alcance del rechazo.</p>'
+    ? '<p class="wh-caption wh-caption--info" style="margin-bottom:0.5rem">⚠️ Esta etapa no tiene insumos directos. Se muestran los materiales consumidos en etapas previas incluidas en el alcance del rechazo.</p>'
     : '';
 
   const dispositionContent = optionAEntries.length > 0
@@ -450,9 +450,9 @@ function renderQaRejectionFlow(order, snapshotStage) {
     : '<p class="wh-caption">No hay consumos registrados en ninguna etapa del alcance.</p>';
 
   return `
-    <section class="wh-step-section qa-rejection-flow" hidden aria-label="Gesti\u00F3n del rechazo">
-      <h4 class="wh-step-section__title">\u274C Gesti\u00F3n del rechazo</h4>
-      <p class="qa-rejection-intro wh-caption">Define qu\u00E9 pasa con el material consumido y desde d\u00F3nde debe continuar la producci\u00F3n.</p>
+    <section class="wh-step-section qa-rejection-flow" hidden aria-label="Gestión del rechazo">
+      <h4 class="wh-step-section__title">❌ Gestión del rechazo</h4>
+      <p class="qa-rejection-intro wh-caption">Define qué pasa con el material consumido y desde dónde debe continuar la producción.</p>
       <fieldset class="qa-material-disposition-section" style="border:none;padding:0;margin:0 0 1rem 0">
         <legend style="font-weight:600">${dispositionLegend}</legend>
         ${priorStagesNote}
@@ -480,13 +480,13 @@ function renderQaRejectionFlow(order, snapshotStage) {
           </fieldset>`).join('')}
       </div>
       <fieldset class="qa-replacement-recovery-section" style="border:none;padding:0;margin:0 0 1rem 0">
-        <legend style="font-weight:600">Reposici\u00F3n de materiales</legend>
+        <legend style="font-weight:600">Reposición de materiales</legend>
         <label style="display:block;margin-bottom:0.35rem">
           <input type="checkbox" class="qa-requires-replacement-stage" />
-          Crear etapa de reposici\u00F3n de materiales antes de re-ejecutar
+          Crear etapa de reposición de materiales antes de re-ejecutar
         </label>
         <p class="qa-replacement-auto-note wh-caption" style="margin:0;color:var(--color-muted,#888)">
-          Se activa autom\u00E1ticamente cuando hay materiales marcados como Descartar o Recolectar nuevamente.
+          Se activa automáticamente cuando hay materiales marcados como Descartar o Recolectar nuevamente.
         </p>
       </fieldset>
       <p class="qa-rejection-error wh-error-msg" hidden role="alert" aria-live="assertive"></p>
