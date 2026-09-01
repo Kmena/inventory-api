@@ -320,6 +320,8 @@ async function getClientLedger(clientId, auth, options = {}) {
       name: clientData.name,
       paymentType: clientData.paymentType,
       paymentDays: clientData.paymentDays,
+      creditLimit: clientData.creditLimit != null ? Number(clientData.creditLimit) : null,
+      creditBalance: clientData.creditBalance != null ? Number(clientData.creditBalance) : null,
     },
     invoices: (clientData.invoices || []).map((invoice) => ({
       ...invoice,
