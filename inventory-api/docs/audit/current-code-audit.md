@@ -6,6 +6,8 @@
 
 **Prior audit agent:** baseline-audit-agent-42e8ca
 **Prior audit score:** 7.6 / 10
+**Canonical docs:** `docs/current-state.md` describes implemented reality; `docs/architecture.md` describes active runtime architecture. canonical docs under `docs/**` are the authoritative reference for runtime contracts.
+**Coverage posture:** focused post-implementation baseline audit — intentionally partial coverage limited to the two specific findings in scope.
 **Re-audit date:** 2026
 
 ---

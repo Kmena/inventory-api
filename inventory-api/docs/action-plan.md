@@ -194,3 +194,5 @@ The governance test suite reads hosted workflow truth from `../.github/workflows
 Runtime company-role update flow now exists. Company-role list/create/update flows are implemented and the action plan acknowledges their presence.
 
 Browser session HTTPS enforcement is a residual risk tracked under `specs/p11-https-browser-session-migration/` and remains a follow-up dependency outside this feature's approved scope.
+
+This plan operates under the p34-bounded-governance-coverage-expansion posture: partial OpenAPI/typecheck coverage posture bounded by the approved governance baseline. bounded governance evidence is preserved through characterization tests and contract docs.

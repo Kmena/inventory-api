@@ -303,11 +303,11 @@ Assumptions used in this refresh:
 ## 18. Documentation governance
 The canonical runtime-contract governance lives under `docs/**`. This includes `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/audit/`.
 
-Authoritative hosted workflow location for local validators/tests: `../.github/workflows/`. Governance and characterization tests read CI workflow truth from that parent-root directory.
+authoritative hosted workflow location for local validators/tests: `../.github/workflows/`. Governance and characterization tests read CI workflow truth from that parent-root directory.
 
 Runtime company-role update flow now exists. The `PUT /api/roles/company/:roleId` endpoint and the full company-role list/create/update flows are implemented and documented.
 
-This feature area reflects bounded coverage of QA rejection flows. partial coverage of edge cases may remain pending future integration tests.
+This feature area reflects bounded coverage of QA rejection flows. partial coverage of edge cases may remain pending future integration tests. Documentation operates under the p34-bounded-governance-coverage-expansion posture.
 
 ## 19. Cross-cutting security follow-up
 Browser session security hardening (HTTPS enforcement, secure-cookie transport, token-over-HTTPS) is tracked as a residual risk and follow-up dependency under `specs/p11-https-browser-session-migration/`. This is not an in-slice blocker for the currently implemented feature and must be addressed separately when HTTPS infrastructure is fully in place.
