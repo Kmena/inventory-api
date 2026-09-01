@@ -114,8 +114,24 @@ function assertRecipeStageLineageAndAllocation(stages, mode) {
 
 function aggregateIngredientsFromStages(stages) {
   const aggregated = new Map();
+  const allStages = stages || [];
 
-  for (const stage of stages || []) {
+  // RECOLLECTION stages define what gets pulled FROM the warehouse.
+  // PROCESSING stages consume already-collected material and must NOT be
+  // counted again as additional warehouse requirements — that would double
+  // the demand for any product that appears in both stage types.
+  // Fall back to all stages only when the recipe has no RECOLLECTION stage
+  // with productId inputs (backward-compatible with legacy single-stage recipes).
+  const hasRecollectionInputs = allStages.some(
+    (s) => s.stageType === 'RECOLLECTION'
+      && Array.isArray(s.stageInputs)
+      && s.stageInputs.some((i) => i.productId),
+  );
+  const sourcingStages = hasRecollectionInputs
+    ? allStages.filter((s) => s.stageType === 'RECOLLECTION')
+    : allStages;
+
+  for (const stage of sourcingStages) {
     for (const input of stage.stageInputs || []) {
       if (!input.productId || !input.quantity) {
         continue;

@@ -128,8 +128,22 @@ function buildRecipeVersionSnapshot(recipeVersion, override) {
 
 function buildMaterialRequirements(recipeVersion, quantity) {
   const requirementsByProductId = new Map();
+  const allStages = recipeVersion?.stages || [];
 
-  for (const stage of recipeVersion?.stages || []) {
+  // Mirror the same deduplication logic as aggregateIngredientsFromStages:
+  // PROCESSING stages consume already-collected material — counting them again
+  // would inflate warehouse requirements for products that also appear in a
+  // RECOLLECTION stage. Only fall back to all stages for legacy recipes that
+  // have no RECOLLECTION stage with productId inputs.
+  const hasRecollectionInputs = allStages.some(
+    (s) => s.stageType === 'RECOLLECTION'
+      && s.stageInputs?.some((i) => i.productId),
+  );
+  const sourcingStages = hasRecollectionInputs
+    ? allStages.filter((s) => s.stageType === 'RECOLLECTION')
+    : allStages;
+
+  for (const stage of sourcingStages) {
     for (const stageInput of stage?.stageInputs || []) {
       if (!stageInput?.productId) {
         continue;
