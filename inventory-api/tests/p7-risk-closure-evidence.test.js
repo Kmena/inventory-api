@@ -16,7 +16,7 @@ test('P7 risk closure evidence document stays linked from README and lists the g
   const evidenceSource = read(evidenceDocPath);
 
   assert.match(readmeSource, /docs\/p7-risk-closure-evidence\.md/);
-  assert.match(readmeSource, /2 skipped.*P2_CONSTRAINTS_DATABASE_URL.*P2_AUDIT_DATABASE_URL/s);
+  assert.match(readmeSource, /3 skipped.*P2_CONSTRAINTS_DATABASE_URL.*P2_AUDIT_DATABASE_URL/s);
 
   assert.match(evidenceSource, /docs\/heavy-endpoints-baseline\.json/);
   assert.match(evidenceSource, /docs\/runtime-contract-manifest\.json/);

@@ -11,8 +11,16 @@
  */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { PrismaClient } = require('@prisma/client');
 
-const prisma = require('../src/lib/prisma');
+const databaseUrl = process.env.P2_CONSTRAINTS_DATABASE_URL;
+
+if (!databaseUrl) {
+  test('production-stage-rejection migration tests require P2_CONSTRAINTS_DATABASE_URL', { skip: true }, () => {});
+  return;
+}
+
+const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
 
 test('production_stage_executions has status column with default COMPLETED', async () => {
   const result = await prisma.$queryRaw`

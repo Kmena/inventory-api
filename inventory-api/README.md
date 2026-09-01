@@ -667,7 +667,7 @@ npm run test -- --silent
 ```
 
 Notas:
-- la suite completa puede mostrar `2 skipped` esperados cuando faltan `P2_CONSTRAINTS_DATABASE_URL` y `P2_AUDIT_DATABASE_URL`;
+- la suite completa puede mostrar `3 skipped` esperados cuando faltan `P2_CONSTRAINTS_DATABASE_URL` y `P2_AUDIT_DATABASE_URL`;
 - esos skips corresponden a pruebas de integración environment-gated y no invalidan la evidencia P7 cerrada en esta fase.
 
 ## Endpoints
