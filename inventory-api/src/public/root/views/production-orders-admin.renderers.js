@@ -65,7 +65,7 @@
                 <tr ${isSelected ? 'class="is-selected"' : ''}>
                   <td>
                     <strong>${rootShellUi.escapeHtml(order?.orderId || `ORD-${order?.id || ''}`)}</strong><br>
-                    <span class="muted" style="font-size:0.8rem">${rootShellUi.escapeHtml(order?.product?.name || '—')}</span>
+                    <span class="muted" style="font-size:0.8rem">${rootShellUi.escapeHtml(order?.product?.name || '—')}${order?.recipe?.name ? ` · ${rootShellUi.escapeHtml(order.recipe.name)}` : ''}</span>
                   </td>
                   <td>${productionOrdersState.renderStatusBadge(order, rootShellUi)}</td>
                   <td style="white-space:nowrap;font-size:0.85rem">${rootShellUi.escapeHtml(rootShellUi.formatDate(order?.plannedDate))}</td>
@@ -73,7 +73,7 @@
                     <button class="secondary-button" type="button"
                             data-production-order-detail="${rootShellUi.escapeHtml(order?.id)}"
                             style="padding:0.2rem 0.6rem;font-size:0.8rem">
-                      ${isSelected ? '✓' : '→'}
+                      ${isSelected ? 'Detalle abierto' : 'Ver detalle'}
                     </button>
                   </td>
                 </tr>
