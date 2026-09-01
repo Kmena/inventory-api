@@ -153,8 +153,8 @@ The hint is triggered exclusively by `productSelect.addEventListener('change')` 
 
 **Severity: LOW.** This limitation was present in the original design and is unchanged by the fix. The improvement is substantial: the hint was previously stuck at the value at row-add time with no recovery path; now it can be refreshed by a product reselection. The backend `assertRecipeStageLineageAndAllocation` is the authoritative correctness enforcement mechanism. The hint is a UX guidance tool only.
 
-**ID:** AUD-026 (new finding, LOW)
-**Recommendation:** Optionally add `input` event listeners on `.si-quantity` elements within prior sections to propagate a refresh to all subsequent PROCESSING section hints. Not urgent.
+| AUD-026 (new finding, LOW) — **RESOLVED** |
+**Fix applied:** `input` event listeners attached to `.si-quantity` elements in prior RECOLLECTION sections when a PROCESSING input row is added. Uses `data-hint-wired` flag to prevent duplicate listeners.
 
 ---
 
@@ -205,7 +205,7 @@ The stale availability hint defect is resolved. The `"Disponible: X"` hint no lo
 
 | ID | Severity | Description |
 |---|---|---|
-| DEF-002 / AUD-024 | Medium (pre-existing) | Process-code catalog drift: UI codes `FILLING`, `LABELING`, `PACKAGING`, `QUALITY_CHECK` are rejected by backend schema |
+| DEF-002 / AUD-024 | Medium (pre-existing) | **RESOLVED** — `FILLING`, `LABELING`, `PACKAGING`, `QUALITY_CHECK` removed/replaced with backend-valid codes (`LABELING_PREP`, `PACKING_PREP`) |
 | DEF-003 / AUD-025 | Medium (pre-existing) | `GET /api/roles/company/:roleId` absent from runtime contract manifest |
 
 ---
@@ -216,10 +216,10 @@ The stale availability hint defect is resolved. The `"Disponible: X"` hint no lo
 |---|---|---|---|
 | Stale availability hints | ~~Medium~~ | **CLOSED** | Resolved by AUD-018 fix |
 | updateRecipeVersion untested | ~~Medium~~ | **CLOSED** | Resolved by AUD-012 fix |
-| Process-code catalog drift | Medium | Open | Operators can select UI codes rejected by backend |
+| Process-code catalog drift | Medium | **CLOSED** (DEF-002) | UI catalog now matches backend `RECIPE_STAGE_PROCESS_CODES` |
 | Runtime contract manifest gap | Medium | **CLOSED** | AUD-007 was a false positive; route was already in OpenAPI spec |
 | Floating-point balance arithmetic | Low | Open | Potential for silent precision error in extreme fractional quantity scenarios |
-| Hint not reactive to prior-stage quantity edits | Low | Open (AUD-026) | New LOW finding; hint correct on product-change, not on prior-stage quantity-change |
+| Hint not reactive to prior-stage quantity edits | Low | **CLOSED** (AUD-026) | `input` listeners on prior RECOLLECTION `.si-quantity` inputs now trigger hint refresh |
 
 ---
 
