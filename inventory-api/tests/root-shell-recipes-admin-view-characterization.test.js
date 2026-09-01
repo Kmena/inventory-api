@@ -1,3 +1,9 @@
+// AUD-014: These tests exercise source-level structural contracts (regex over source text)
+// and Node vm-sandboxed execution where possible. Full DOM execution would require a
+// headless browser environment (e.g. Playwright) and is tracked as a future E2E concern.
+// AUD-016: All PROCESSING stage fixtures in this file intentionally omit stageType where
+// they test the legacy backward-compat path (stageType defaults to PROCESSING). All
+// explicitly typed PROCESSING stages include processCode, verified by linting the fixtures.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

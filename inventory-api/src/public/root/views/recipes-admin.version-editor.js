@@ -59,6 +59,10 @@
     // of { productId → { recollected, used } } so PROCESSING stage inputs can be
     // filtered to only products with remaining availability.
     // Descriptive inputs without productId are ignored (BR-009).
+    // AUD-005: uses native JS floating-point arithmetic. Adequate for typical recipe
+    // quantities (integer or 1-2 decimal places). For high-precision fractional inputs,
+    // consider replacing the accumulation with integer math (multiply by 1000, divide at display)
+    // or a Decimal.js dependency.
     function computeRecollectedBalances(upToSection) {
       const balance = new Map(); // productId string → { recollected, used }
       const sections = Array.from(stagesList.querySelectorAll('.stage-section'));

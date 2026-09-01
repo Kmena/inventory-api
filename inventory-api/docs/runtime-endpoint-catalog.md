@@ -86,6 +86,7 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 | POST | `/api/users/` | Sí | `authorize('root')` | Crear usuario global | Scope root |
 | GET | `/api/roles/permissions` | Sí | `authorizeAccessPolicy('role.permissions.list')` | Listar permisos asignables | Base para roles personalizados |
 | GET | `/api/roles/company` | Sí | `authorizeAccessPolicy('role.company.list')` | Listar roles asignables por compañía | Consumido por UI; actor scope `company-admin` |
+| GET | `/api/roles/company/:roleId` | Sí | `authorizeAccessPolicy('role.company.list')` | Obtener rol de compañía por ID | Tenant isolation; devuelve 404 si el rol no pertenece a la compañía |
 | POST | `/api/roles/company` | Sí | `authorizeAccessPolicy('role.company.create')` | Crear rol de compañía | Validado por schema; actor scope `company-admin`, y el servicio aplica gobernanza adicional, niega permisos de alcance plataforma como `companies.manage` antes de persistir y registra el deny path mediante auditoría fail-open cuando hay contexto de request |
 | PUT | `/api/roles/company/:roleId` | Sí | `authorizeAccessPolicy('role.company.update')` | Actualizar permisos y nombre de un rol de empresa | Requiere `settings.manage`; validación de tenant isolation, gobernanza de permisos platform-scoped, protección anti auto-bloqueo, auditoría de cambios |
 

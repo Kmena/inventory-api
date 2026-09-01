@@ -670,6 +670,52 @@ test('approveRecipeVersion succeeds when every recollected product is fully allo
   });
 });
 
+test('approveRecipeVersion rejects when one product is fully allocated but another is partially allocated (AUD-013, multi-product under-allocation)', async () => {
+  // productId=20 (Agua): 10 recollected, 10 used → OK
+  // productId=21 (Sal):  5  recollected, 3  used  → fails: 2 sin asignar
+  const versionTwoProducts = makeMinimalDraftVersion({
+    stages: [
+      {
+        id: 1n, stageOrder: 0, stageType: 'RECOLLECTION', name: 'Recoleccion',
+        instructions: null, responsibleRoleCode: null,
+        expectedParameters: [], parameterTolerances: [], requiredEvidence: [],
+        qaMandatory: false, processCode: null, processLabel: null,
+        stageInputs: [
+          { id: 1n, productId: 20n, name: 'Agua', quantity: 10, unit: 'KG', sortOrder: 0, notes: null },
+          { id: 2n, productId: 21n, name: 'Sal',  quantity: 5,  unit: 'KG', sortOrder: 1, notes: null },
+        ],
+      },
+      {
+        id: 2n, stageOrder: 1, stageType: 'PROCESSING', name: 'Mezclado',
+        processCode: 'MIXING', processLabel: null,
+        instructions: null, responsibleRoleCode: null,
+        expectedParameters: [], parameterTolerances: [], requiredEvidence: [],
+        qaMandatory: false,
+        stageInputs: [
+          { id: 3n, productId: 20n, name: 'Agua', quantity: 10, unit: 'KG', sortOrder: 0, notes: null },
+          { id: 4n, productId: 21n, name: 'Sal',  quantity: 3,  unit: 'KG', sortOrder: 1, notes: null },
+        ],
+      },
+    ],
+  });
+
+  await withModuleStubs([[recipeRepository, {
+    findRecipeVersionById: async () => versionTwoProducts,
+  }]], async () => {
+    await assert.rejects(
+      () => recipeService.approveRecipeVersion(91n, {}, auth),
+      (error) => {
+        assert.equal(error?.statusCode, 400);
+        assert.equal(error?.code, 'validation_error');
+        // Must mention the under-allocated product (Sal), not the fully allocated one (Agua)
+        assert.match(error?.message || '', /Sal/i);
+        assert.match(error?.message || '', /sin asignar|asign|aloc/i);
+        return true;
+      },
+    );
+  });
+});
+
 test('updateRecipeVersion rejects PROCESSING stage referencing a product not in any prior RECOLLECTION stage (AC-005, updateRecipeVersion path)', async () => {
   // Ensures assertRecipeStageLineageAndAllocation is also called on the update path
   const existingDraft = makeMinimalDraftVersion();

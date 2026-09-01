@@ -626,5 +626,6 @@ module.exports = {
   serializeRecipeVersion,
   __private__: {
     assertAllStageInputsHaveProductId,
+    assertRecipeStageLineageAndAllocation,
   },
 };

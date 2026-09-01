@@ -180,6 +180,10 @@ Feature-relevant current schema elements:
 - `ProductionRecolectionStage.recoveryType`
 - `ProductionRecolectionEntry`
 - `ProductionRecolectionReconciliation`
+- `Client.creditLimit` — aggregate credit limit at client level (migration `20260924020000_add_credit_fields_to_client`)
+- `Client.creditBalance` — aggregate credit balance at client level (same migration)
+- `ClientStore.creditLimit` — per-store credit limit
+- `ClientStore.creditBalance` — per-store credit balance
 
 Feature-relevant migration observed:
 - `20260923001000_recolection_entry_and_reconciliation/`
@@ -199,6 +203,12 @@ Feature-relevant API endpoints currently implemented:
 - `POST /api/production/orders/:id/recolections/:recolectionId/reconciliation`
 - `GET /api/production/orders/:id`
 - `GET /api/production/orders`
+- `GET /api/clients/:id/ledger` — exposes `client.creditLimit` and `client.creditBalance` (TASK-015 cycle)
+
+Credit balance lifecycle (TASK-015):
+- `paymentService.approvePayment` decrements `Client.creditBalance` via `tx.client.update` inside the Prisma transaction
+- `paymentService.reversePayment` increments `Client.creditBalance` symmetrically
+- Per-store `ClientStore.creditBalance` is also updated when the invoice is linked to an order with a `clientStoreId`
 
 Current contract behavior:
 - production routes are authenticated and permission-guarded through `authorizeAccessPolicy`
