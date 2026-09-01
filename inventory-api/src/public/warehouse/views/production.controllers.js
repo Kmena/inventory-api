@@ -772,51 +772,52 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
       const entryRows = card.querySelectorAll('.wh-recovery-entry-row');
       if (!entryRows.length) { continue; }
 
-      // Collect required productIds from the entry rows
-      const requiredProductIds = new Set(
-        Array.from(entryRows).map((r) => r.dataset.productId).filter(Boolean),
-      );
 
       let productLots = {}; // productId string → sorted lot array
       try {
-        // First try the rejected stage itself
+        // Try the rejected processing stage first. Processing stages often have no
+        // productId inputs — those live in the prior RECOLLECTION stage(s).
         let lotsResponse = await api.getAvailableLotsForStage(session, order.id, recipeStageId);
-        console.debug('[recovery-lots] stage', recipeStageId, 'products', JSON.stringify(lotsResponse.products?.map((p) => ({ id: p.productId, lots: p.lots?.length }))));
 
-        // If the processing stage has no productId inputs, fall back to the
-        // RECOLLECTION stage whose inputs cover the required products.
-        if (!(lotsResponse.products || []).length && requiredProductIds.size > 0) {
-          const recolStage = snapshotStages.find(
-            (s) => s.stageType === 'RECOLLECTION'
-              && Array.isArray(s.stageInputs)
-              && s.stageInputs.some(
-                (inp) => inp.productId && requiredProductIds.has(String(inp.productId)),
-              ),
-          );
-          console.debug('[recovery-lots] requiredProductIds', [...requiredProductIds], 'recolStage found', recolStage?.id, 'stageType', recolStage?.stageType);
-          if (recolStage) {
-            lotsResponse = await api.getAvailableLotsForStage(session, order.id, String(recolStage.id));
-            console.debug('[recovery-lots] recolStage', recolStage.id, 'products', JSON.stringify(lotsResponse.products?.map((p) => ({ id: p.productId, lots: p.lots?.length }))));
+        // Fallback: if the processing stage returned no products, try every RECOLLECTION
+        // stage in the snapshot and merge results. No productId pre-filtering here —
+        // the entry rows already constrain which products are shown in the form.
+        if (!(lotsResponse.products || []).length) {
+          const merged = [];
+          const seenProductIds = new Set();
+          for (const s of snapshotStages) {
+            if (s.stageType !== 'RECOLLECTION') { continue; }
+            if (!Array.isArray(s.stageInputs) || !s.stageInputs.some((inp) => inp.productId)) { continue; }
+            const r = await api.getAvailableLotsForStage(session, order.id, String(s.id));
+            for (const p of (r.products || [])) {
+              const pid = String(p.productId);
+              if (!seenProductIds.has(pid)) {
+                seenProductIds.add(pid);
+                merged.push(p);
+              }
+            }
           }
+          lotsResponse = { products: merged };
         }
 
-        // Filter response to only the products actually needed in this recovery
         for (const p of (lotsResponse.products || [])) {
-          if (!requiredProductIds.size || requiredProductIds.has(String(p.productId))) {
-            const sorted = (p.lots || []).slice().sort(
-              (a, b) => Number(b.availableQuantity ?? 0) - Number(a.availableQuantity ?? 0),
-            );
-            productLots[String(p.productId)] = sorted;
-          }
+          const sorted = (p.lots || []).slice().sort(
+            (a, b) => Number(b.availableQuantity ?? 0) - Number(a.availableQuantity ?? 0),
+          );
+          productLots[String(p.productId)] = sorted;
         }
       } catch (err) {
-        console.error('[recovery-lots] error', err?.message || err);
+        console.log('[recovery-lots] ERROR fetching lots', err?.message || err);
         continue;
       }
 
       for (const row of entryRows) {
         const productId = row.dataset.productId;
-        const lots = productLots[productId] || [];
+        // When productId is missing from the row (requiredItems stored without catalog link),
+        // fall back to the first product in the lots map — single-product recovery is the
+        // common case and this avoids a dead-end fallback input.
+        const lots = productLots[productId]
+          || (Object.values(productLots)[Array.from(entryRows).indexOf(row)] ?? []);
         const select = row.querySelector('.wh-recovery-entry-lot-id');
         if (!select) { continue; }
         const unit = row.dataset.defaultUnit || '';
