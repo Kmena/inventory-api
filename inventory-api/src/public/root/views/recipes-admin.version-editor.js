@@ -174,6 +174,21 @@
       if (data.productId) updateAvailHint();
 
       inputsContainer.appendChild(row);
+
+      // AUD-026: wire prior RECOLLECTION stage quantity inputs so the hint refreshes
+      // when the user edits quantities — not just when they change the product selector.
+      if (isProcessingMode && parentSection) {
+        const allSections = Array.from(stagesList.querySelectorAll('.stage-section'));
+        for (const section of allSections) {
+          if (section === parentSection) break;
+          if (section.querySelector('.stage-type')?.value !== 'RECOLLECTION') continue;
+          section.querySelectorAll('.si-quantity').forEach((qtyInput) => {
+            if (qtyInput.dataset.hintWired) return;
+            qtyInput.dataset.hintWired = '1';
+            qtyInput.addEventListener('input', updateAvailHint);
+          });
+        }
+      }
     }
 
     function addQaParameterRow(qaContainer, parameter = {}) {
@@ -219,16 +234,15 @@
     }
 
     // TASK-001 (qa-rejection-material-reconciliation-amendment): processCode catalog
+    // Catalog must stay in sync with RECIPE_STAGE_PROCESS_CODES in src/schemas/recipe.schema.js.
     const PROCESS_CODE_OPTIONS = [
       { value: 'MIXING',        label: 'Mezclado' },
       { value: 'HEATING',       label: 'Calentamiento' },
       { value: 'COOLING',       label: 'Enfriamiento' },
-      { value: 'FILLING',       label: 'Llenado' },
       { value: 'CAPPING',       label: 'Tapado' },
       { value: 'SEALING',       label: 'Sellado' },
-      { value: 'LABELING',      label: 'Etiquetado' },
-      { value: 'PACKAGING',     label: 'Empaque' },
-      { value: 'QUALITY_CHECK', label: 'Control de calidad' },
+      { value: 'LABELING_PREP', label: 'Prep. etiquetado' },
+      { value: 'PACKING_PREP',  label: 'Prep. empaque' },
       { value: 'OTHER',         label: 'Otro (describe abajo)' },
     ];
 
