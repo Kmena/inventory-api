@@ -630,7 +630,7 @@ function renderReplacementRecoveryStageItem(order, vm, permissions) {
 
   const entriesForm = canConfirm && requiredItems.length
     ? `<div class="wh-recovery-entries" style="margin-top:0.75rem">
-         <p class="wh-caption" style="margin:0 0 0.5rem">Registra los lotes realmente conseguidos para habilitar el control por lote.</p>
+         <p class="wh-caption" style="margin:0 0 0.5rem">Selecciona el lote repuesto para cada material. Se recomienda el lote con mayor stock disponible.</p>
          ${requiredItems.map((it, index) => `
            <div class="wh-recovery-entry-row"
                 data-product-id="${escapeHtml(String(it.productId ?? ''))}"
@@ -638,16 +638,30 @@ function renderReplacementRecoveryStageItem(order, vm, permissions) {
                 data-default-unit="${escapeHtml(String(it.unit || ''))}"
                 style="border:1px solid var(--border,#ddd);border-radius:8px;padding:0.75rem;margin-bottom:0.5rem">
              <p style="margin:0 0 0.4rem"><strong>${escapeHtml(it.productName || (it.productId ? `Producto #${it.productId}` : `Material ${index + 1}`))}</strong></p>
-             <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-               <label style="flex:1"><span>Lote ID *</span><input type="number" min="1" step="1" class="wh-recovery-entry-lot-id" placeholder="ID del lote" /></label>
-               <label style="flex:1"><span>Cantidad *</span><input type="number" min="0.001" step="0.001" class="wh-recovery-entry-qty" value="${escapeHtml(String(it.quantity ?? ''))}" /></label>
-               <label style="flex:1"><span>Unidad</span><input type="text" class="wh-recovery-entry-unit" value="${escapeHtml(String(it.unit || ''))}" maxlength="30" /></label>
+             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
+               <label style="flex:2;min-width:200px"><span>Lote *</span>
+                 <select class="wh-recovery-entry-lot-id" required disabled
+                         aria-label="Seleccionar lote de reposicion para ${escapeHtml(it.productName || `Producto #${it.productId}`)}"
+                         style="width:100%">
+                   <option value="">Cargando lotes disponibles...</option>
+                 </select>
+               </label>
+               <label style="flex:1;min-width:100px"><span>Cantidad *</span>
+                 <input type="number" min="0.001" step="0.001" class="wh-recovery-entry-qty"
+                        value="${escapeHtml(String(it.quantity ?? ''))}" />
+               </label>
+               <label style="flex:1;min-width:80px"><span>Unidad</span>
+                 <input type="text" class="wh-recovery-entry-unit"
+                        value="${escapeHtml(String(it.unit || ''))}" maxlength="30" />
+               </label>
              </div>
            </div>`).join('')}
        </div>`
     : '';
 
-  return `<li class="wh-item-card wh-stage-card wh-stage-card--virtual wh-stage-card--replacement">
+  // data-recipe-stage-id is used by the controller to auto-populate lot dropdowns for each recovery entry.
+  return `<li class="wh-item-card wh-stage-card wh-stage-card--virtual wh-stage-card--replacement"
+              data-recipe-stage-id="${escapeHtml(String(stage?.id ?? ''))}">
     <h3 class="wh-item-card__title">🔄 ${escapeHtml(stage?.name || 'Reposición de materiales')}</h3>
     <p class="wh-item-card__meta">Estado: ${renderStageBadge(status)}</p>
     <div class="wh-alert wh-alert--warning" role="alert" style="margin-top:0.5rem">

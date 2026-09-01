@@ -753,6 +753,58 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
     app,
     order,
   });
+
+  // Auto-populate lot dropdowns for REPLACEMENT_RECOVERY cards.
+  // Each card carries data-recipe-stage-id; we fetch available lots once per card
+  // and pre-select the lot with the highest available quantity (the recommended one).
+  (async () => {
+    const recoveryCards = container.querySelectorAll('.wh-stage-card--replacement');
+    for (const card of recoveryCards) {
+      const recipeStageId = card.dataset.recipeStageId;
+      if (!recipeStageId) { continue; }
+      const entryRows = card.querySelectorAll('.wh-recovery-entry-row');
+      if (!entryRows.length) { continue; }
+
+      let productLots = {}; // productId string → sorted lot array
+      try {
+        const lotsResponse = await api.getAvailableLotsForStage(session, order.id, recipeStageId);
+        for (const p of (lotsResponse.products || [])) {
+          // Sort descending by available quantity so index-0 is the recommended lot
+          const sorted = (p.lots || []).slice().sort(
+            (a, b) => Number(b.availableQuantity ?? 0) - Number(a.availableQuantity ?? 0),
+          );
+          productLots[String(p.productId)] = sorted;
+        }
+      } catch (_) { /* leave selects in loading state on error */ continue; }
+
+      for (const row of entryRows) {
+        const productId = row.dataset.productId;
+        const lots = productLots[productId] || [];
+        const select = row.querySelector('.wh-recovery-entry-lot-id');
+        if (!select) { continue; }
+        const unit = row.dataset.defaultUnit || '';
+
+        if (!lots.length) {
+          select.innerHTML = '<option value="">Sin lotes disponibles en bodega</option>';
+          select.disabled = false;
+          continue;
+        }
+
+        // Build options: recommended (most stock) is first and pre-selected
+        const options = lots.map((lot, i) => {
+          const expLabel = lot.expirationDate ? String(lot.expirationDate).slice(0, 10) : 'Sin venc.';
+          const label = `${lot.lotNumber || `Lote #${lot.lotId}`} — Disp: ${lot.availableQuantity ?? '?'} ${unit} — Venc: ${expLabel}`;
+          const recommended = i === 0 ? ' (recomendado)' : '';
+          return `<option value="${lot.lotId}" ${i === 0 ? 'selected' : ''}>${label}${recommended}</option>`;
+        }).join('');
+
+        select.innerHTML = `<option value="">Selecciona un lote...</option>${options}`;
+        // Auto-select the recommended lot
+        select.value = String(lots[0].lotId);
+        select.disabled = false;
+      }
+    }
+  })();
 }
 
 WarehouseShell.register('views.productionControllers', {
