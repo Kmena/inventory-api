@@ -181,12 +181,21 @@ function normalizeRoutePayload(payload) {
     );
   }
 
-  return {
+  const normalized = {
     code,
     name,
     visitFrequencyDays,
     isActive: payload.isActive !== false,
   };
+
+  if (payload.nearLimitDays !== undefined && payload.nearLimitDays !== null) {
+    const nearLimitDays = Number(payload.nearLimitDays);
+    if (Number.isInteger(nearLimitDays) && nearLimitDays >= 1) {
+      normalized.nearLimitDays = nearLimitDays;
+    }
+  }
+
+  return normalized;
 }
 
 async function listCompanyRoutes(auth) {

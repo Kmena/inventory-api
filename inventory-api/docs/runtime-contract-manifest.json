@@ -488,6 +488,33 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "recolection-reconciliation-outside-current-openapi-baseline",
       "reason": "TASK-006 (qa-rejection-material-reconciliation-amendment): Registro de resultados de conciliación (USED/RETURNED/DISCARDED) para material recolectado. Ruta activa en runtime pero excluida del contrato parcial OpenAPI hasta formalización."
+    },
+    {
+      "method": "PATCH",
+      "mountPath": "/api/clients",
+      "expressPath": "/company/:clientId/stores/:storeId/credit-limit",
+      "routeFile": "src/routes/client.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "client-store-credit-limit-outside-current-openapi-baseline",
+      "reason": "Actualización del límite de crédito por tienda de cliente. Ruta activa en runtime pero excluida del contrato OpenAPI parcial hasta formalización del módulo de crédito."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/orders",
+      "expressPath": "/dispatched",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "Listado de pedidos despachados para el módulo de despacho de bodega. Ruta activa en runtime pero excluida del contrato parcial OpenAPI en esta iteración."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/agent",
+      "expressPath": "/stores/:storeId/payments",
+      "routeFile": "src/routes/agent.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "agent-payment-registration-outside-current-openapi-baseline",
+      "reason": "Registro de pagos por el agente comercial desde la vista de tienda. Ruta activa en runtime pero excluida del contrato OpenAPI parcial hasta formalización del módulo de cobranza."
     }
   ]
 }
