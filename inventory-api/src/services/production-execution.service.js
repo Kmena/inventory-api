@@ -300,15 +300,22 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
       movementGroupId,
     }, tx);
 
-    const consumptions = await reduceStageInventory(
-      tx,
-      auth,
-      order,
-      createdStageExecution,
-      createdStageExecution.stageName,
-      payload.consumptions ?? [],
-      'PRODUCTION_CONSUMPTION',
-    );
+    // PROCESSING stages consume materials already pulled from the warehouse by a
+    // preceding RECOLLECTION stage. Calling reduceStageInventory would cause a
+    // double warehouse deduction for the same lot. Only non-PROCESSING stages
+    // (i.e. RECOLLECTION or stages without an explicit type) touch inventory.
+    const isProcessingStage = snapshotStage?.stageType === 'PROCESSING';
+    const consumptions = isProcessingStage
+      ? []
+      : await reduceStageInventory(
+        tx,
+        auth,
+        order,
+        createdStageExecution,
+        createdStageExecution.stageName,
+        payload.consumptions ?? [],
+        'PRODUCTION_CONSUMPTION',
+      );
 
     for (const consumption of consumptions) {
       await productionRepository.createProductionConsumption({

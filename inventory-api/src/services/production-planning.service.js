@@ -92,6 +92,9 @@ function buildRecipeVersionSnapshot(recipeVersion, override) {
         id: stage.id,
         stageOrder: stage.stageOrder,
         name: stage.name,
+        // Freeze stageType so execution can distinguish RECOLLECTION vs PROCESSING
+        // without a live DB hit. PROCESSING stages must not deduct from warehouse.
+        stageType: stage.stageType ?? null,
         instructions: stage.instructions,
         responsibleRoleCode: stage.responsibleRoleCode,
         expectedParameters: (stage.expectedParameters ?? []).map(normalizeSnapshotQaParameterDefinition),

@@ -277,24 +277,39 @@ async function attachExecuteStageHandlers(container, session, order, snapshotSta
 
   let lotPickerHtml = '';
   let lotModels = [];
-  try {
-    const availableLotsResponse = await api.getAvailableLotsForStage(session, order.id, stageId);
-    const productionState = WarehouseShell.require('views.productionState');
-    lotModels = productionState.buildLotPickerModel(availableLotsResponse, {});
-    lotPickerHtml = lotModels.length
-      ? `<section class="wh-step-section" aria-label="Selector de lotes">
-           <h4 class="wh-step-section__title">Consumo de insumos (FEFO/FIFO)</h4>
-           ${lotModels.map((m) => {
-             const html = renderers.renderLotPicker(m);
-             return html.replace(
-               'class="lot-picker-block"',
-               `class="lot-picker-block" data-required-qty="${m.requiredQuantity}" data-tolerance-pct="${m.toleranceDefaultPercent}"`,
-             );
-           }).join('')}
-         </section>`
-      : '<p class="wh-caption muted">Esta etapa no requiere insumos de lote.</p>';
-  } catch (_err) {
-    lotPickerHtml = '<p class="wh-caption muted">No se pudo cargar lotes disponibles.</p>';
+
+  // PROCESSING stages consume materials already collected from the warehouse by
+  // the preceding RECOLLECTION stage. Showing a lot picker here would mislead
+  // the operator into thinking they need to pull MORE stock, and submitting
+  // consumptions would cause a double warehouse deduction. Skip the lot picker
+  // entirely; the stage is executed for its QA / parameter-capture value only.
+  const isProcessingStage = snapshotStage?.stageType === 'PROCESSING';
+
+  if (isProcessingStage) {
+    lotPickerHtml = `<p class="wh-caption muted">
+      ℹ️ Los insumos de esta etapa fueron recolectados en la etapa de recolección anterior.
+      No se descontarán materiales adicionales de bodega.
+    </p>`;
+  } else {
+    try {
+      const availableLotsResponse = await api.getAvailableLotsForStage(session, order.id, stageId);
+      const productionState = WarehouseShell.require('views.productionState');
+      lotModels = productionState.buildLotPickerModel(availableLotsResponse, {});
+      lotPickerHtml = lotModels.length
+        ? `<section class="wh-step-section" aria-label="Selector de lotes">
+             <h4 class="wh-step-section__title">Consumo de insumos (FEFO/FIFO)</h4>
+             ${lotModels.map((m) => {
+               const html = renderers.renderLotPicker(m);
+               return html.replace(
+                 'class="lot-picker-block"',
+                 `class="lot-picker-block" data-required-qty="${m.requiredQuantity}" data-tolerance-pct="${m.toleranceDefaultPercent}"`,
+               );
+             }).join('')}
+           </section>`
+        : '<p class="wh-caption muted">Esta etapa no requiere insumos de lote.</p>';
+    } catch (_err) {
+      lotPickerHtml = '<p class="wh-caption muted">No se pudo cargar lotes disponibles.</p>';
+    }
   }
 
   const formHtml = renderers.renderExecuteStageForm(order, snapshotStage, stageId, lotPickerHtml);
