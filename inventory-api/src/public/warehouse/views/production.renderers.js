@@ -655,6 +655,7 @@ function renderReplacementRecoveryStageItem(order, vm, permissions) {
       Se requiere conseguir nuevos materiales antes de re-ejecutar la etapa.
     </div>
     ${itemsList}
+    ${entriesForm}
     ${canConfirm
       ? `<div class="wh-stage-actions" style="margin-top:0.75rem">
            <button type="button" class="primary-button wh-confirm-recolection-submit-btn"

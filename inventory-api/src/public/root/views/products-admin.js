@@ -223,7 +223,6 @@
     const presentationTypeSelect = container.querySelector('#products-form-presentation-type');
     const netContentGroup = container.querySelector('#products-form-net-content-group');
     const netContentInput = container.querySelector('#products-form-net-content');
-    const netContentUnitGroup = container.querySelector('#products-form-net-content-unit-group');
     const netContentUnitSelect = container.querySelector('#products-form-net-content-unit');
     const densityGroup = container.querySelector('#products-form-density-group');
     const densityInput = container.querySelector('#products-form-density');

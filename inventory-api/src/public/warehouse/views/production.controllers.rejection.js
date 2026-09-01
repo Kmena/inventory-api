@@ -262,7 +262,7 @@ function attachTerminateProductionHandler(container, session, deps) {
  */
 function attachReconciliationHandlers(container, ids, session, deps) {
   const { orderId, recolectionId } = ids;
-  const { warehouseApi, renderReconciliationPanel, app } = deps;
+  const { warehouseApi, app } = deps;
 
   const panel = container.querySelector('.wh-reconciliation-panel');
   if (!panel) { return; }

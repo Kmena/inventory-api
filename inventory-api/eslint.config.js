@@ -42,6 +42,7 @@ const browserGlobals = {
   console: 'readonly',
   XLSX: 'readonly',
   L: 'readonly',
+  CSS: 'readonly',
 };
 
 module.exports = [

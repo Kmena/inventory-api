@@ -545,8 +545,8 @@
       path: '/root/views/routes-admin.renderers.js',
       category: 'view-provider',
       registers: ['views.routesAdminRenderers'],
-      requiresModules: ['ui', 'views.routesAdminHelpers'],
-      requiresScripts: ['/root/registry.js', '/root/ui.js', '/root/views/routes-admin.helpers.js'],
+      requiresModules: ['ui'],
+      requiresScripts: ['/root/registry.js', '/root/ui.js'],
     },
     {
       path: '/root/views/routes-admin.state.js',

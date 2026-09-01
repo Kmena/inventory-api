@@ -1,7 +1,6 @@
 (function attachRootShellRoutesAdminRenderers(globalScope) {
   const rootShell = /** @type {any} */ (globalScope).RootShell;
   const rootShellUi = rootShell.require('ui');
-  const routesHelpers = rootShell.require('views.routesAdminHelpers');
 
   function renderRouteList(routes, selectedRouteId) {
     if (!routes.length) {
