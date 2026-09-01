@@ -47,17 +47,30 @@
       return { label: 'Agent', path: '/agent/', note: null };
     }
 
+    // El role code sales_agent tiene prioridad sobre warehouse.access:
+    // un agente no debe ser redirigido a warehouse aunque tenga el permiso.
+    if (roleCode === 'sales_agent') {
+      return { label: 'Agent', path: '/agent/', note: null };
+    }
+
+    // Heurística legacy para agentes operativos sin agent.access explícito
+    // (espeja hasOperationalAgentPermissions en login.js).
+    const isLegacyAgent = permCodes.includes('sales.routes.view.own')
+      && permCodes.includes('sales.orders.create')
+      && permCodes.includes('customer.activities.manage')
+      && !permCodes.includes('sales.routes.assign')
+      && !permCodes.includes('sales.routes.view.all');
+    if (isLegacyAgent) {
+      return { label: 'Agent', path: '/agent/', note: null };
+    }
+
     if (permCodes.includes('warehouse.access')) {
       return { label: 'Warehouse', path: '/warehouse/', note: null };
     }
 
     // 3. Fallback legacy para roles históricos sin permiso de landing explícito
     if (roleCode === 'admin') {
-      return { label: 'Root', path: '/root/', note: 'administrador (sin root.access)' };
-    }
-
-    if (roleCode === 'sales_agent') {
-      return { label: 'Agent', path: '/agent/', note: 'legacy' };
+      return { label: 'Root', path: '/root/', note: 'administrador' };
     }
 
     if (roleCode === 'sales_supervisor') {
