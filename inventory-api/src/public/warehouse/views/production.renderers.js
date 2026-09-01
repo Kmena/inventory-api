@@ -618,9 +618,29 @@ function renderReplacementRecoveryStageItem(order, vm, permissions) {
   const recolectionId = recolection?.id ?? '';
   const requiredItems = Array.isArray(recolection?.requiredItems) ? recolection.requiredItems : [];
 
+  // Build productId → name map from the recipe snapshot (stageInputs include product relation).
+  // requiredItems stores productId but not productName, so we enrich from the snapshot here.
+  const snapshotStages = Array.isArray(order?.recipeVersionSnapshot?.recipeVersion?.stages)
+    ? order.recipeVersionSnapshot.recipeVersion.stages : [];
+  const productNameMap = new Map();
+  for (const s of snapshotStages) {
+    for (const inp of (Array.isArray(s.stageInputs) ? s.stageInputs : [])) {
+      if (inp.productId && (inp.product?.name || inp.productName)) {
+        productNameMap.set(String(inp.productId), inp.product?.name || inp.productName);
+      }
+    }
+  }
+  /** @param {any} it @param {number} idx */
+  const resolveProductLabel = (it, idx) => {
+    const pid = it.productId ? String(it.productId) : null;
+    return it.productName
+      || (pid && productNameMap.get(pid))
+      || (pid ? `Producto #${pid}` : `Material ${idx + 1}`);
+  };
+
   const itemsList = requiredItems.length
     ? `<ul class="wh-recolection-items" style="margin:0.5rem 0 0 1rem;padding:0;list-style:disc">
-        ${requiredItems.map((it) => `<li>${escapeHtml(it.productName || (it.productId ? `Producto #${it.productId}` : 'Material'))}: <strong>${escapeHtml(String(it.quantity ?? ''))}</strong> ${escapeHtml(it.unit || '')}</li>`).join('')}
+        ${requiredItems.map((it, idx) => `<li>${escapeHtml(resolveProductLabel(it, idx))}: <strong>${escapeHtml(String(it.quantity ?? ''))}</strong> ${escapeHtml(it.unit || '')}</li>`).join('')}
        </ul>`
     : '';
 
@@ -637,11 +657,11 @@ function renderReplacementRecoveryStageItem(order, vm, permissions) {
                 data-default-quantity="${escapeHtml(String(it.quantity ?? ''))}"
                 data-default-unit="${escapeHtml(String(it.unit || ''))}"
                 style="border:1px solid var(--border,#ddd);border-radius:8px;padding:0.75rem;margin-bottom:0.5rem">
-             <p style="margin:0 0 0.4rem"><strong>${escapeHtml(it.productName || (it.productId ? `Producto #${it.productId}` : `Material ${index + 1}`))}</strong></p>
+             <p style="margin:0 0 0.4rem"><strong>${escapeHtml(resolveProductLabel(it, index))}</strong></p>
              <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
                <label style="flex:2;min-width:200px"><span>Lote *</span>
                  <select class="wh-recovery-entry-lot-id" required disabled
-                         aria-label="Seleccionar lote de reposicion para ${escapeHtml(it.productName || `Producto #${it.productId}`)}"
+                         aria-label="Seleccionar lote de reposicion para ${escapeHtml(resolveProductLabel(it, index))}"
                          style="width:100%">
                    <option value="">Cargando lotes disponibles...</option>
                  </select>

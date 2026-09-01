@@ -786,7 +786,8 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
           const merged = [];
           const seenProductIds = new Set();
           for (const s of snapshotStages) {
-            if (s.stageType !== 'RECOLLECTION') { continue; }
+            // Do NOT filter by stageType — recipes may name a recolection stage as
+            // PROCESSING type. Any stage with productId inputs is a valid lot source.
             if (!Array.isArray(s.stageInputs) || !s.stageInputs.some((inp) => inp.productId)) { continue; }
             const r = await api.getAvailableLotsForStage(session, order.id, String(s.id));
             for (const p of (r.products || [])) {
