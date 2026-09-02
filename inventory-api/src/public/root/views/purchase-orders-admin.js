@@ -196,9 +196,13 @@
         actions.push({ id: 'btn-cancel-one-reopen', label: `Cancelar solo OC #${order.id} y reabrir solicitud`, primary: false, danger: false, handler: 'cancelOneReopen' });
         actions.push({ id: 'btn-cancel-one', label: `Cancelar solo OC #${order.id} (OC #${siblings.map((s) => s.id).join(', #')} sigue activa)`, primary: false, danger: true, handler: 'cancelOne' });
 
+        const siblingNames = siblings.map((s) => `OC #${s.id} (${s.supplier?.name || '—'})`).join(', ');
         hintRegion.innerHTML =
-          '<strong>Cancelar todas:</strong> limpia la selección mixta completa — la solicitud queda abierta para rehacerla desde cero.<br/>' +
-          '<strong>Cancelar solo esta:</strong> las otras OCs siguen activas; la solicitud se reabre solo si elegís esa opción.';
+          '<strong>Cancelar todas:</strong> limpia la selección mixta completa. Podés rehacer la selección desde cero sin riesgo de duplicados.<br/>' +
+          `<strong>Cancelar solo esta y reabrir:</strong> ${siblingNames} sigue activa en DRAFT. ` +
+          'Al volver a Cotizaciones <u>seleccioná únicamente los productos del proveedor que cancelaste</u> — si confirmás ' +
+          'toda la matriz crearás una OC duplicada para el proveedor que ya tiene OC activa.<br/>' +
+          '<strong>Cancelar sin reabrir:</strong> la solicitud queda cerrada.';
       } else {
         actions.push({ id: 'btn-cancel-reopen', label: 'Cancelar OC y reabrir solicitud para hacer cambios', primary: true, handler: 'cancelOneReopen' });
         actions.push({ id: 'btn-cancel-only', label: 'Solo cancelar la OC (la solicitud queda cerrada)', primary: false, danger: true, handler: 'cancelOne' });
