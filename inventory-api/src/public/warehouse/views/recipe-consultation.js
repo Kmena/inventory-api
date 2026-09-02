@@ -67,7 +67,7 @@ function renderStageAccordion(stage, index) {
         <span>Etapa ${escapeHtml(String(stage.stageOrder || (index + 1)))} · ${escapeHtml(stage.name || `Etapa ${index + 1}`)}</span>
         <span class="recipe-stage__chevron" aria-hidden="true">▶</span>
       </button>
-      <div id="${escapeHtml(stageId)}" class="recipe-stage__content" hidden>
+      <div id="${escapeHtml(stageId)}" class="recipe-stage__content">
         ${stage.instructions ? `<p class="recipe-stage__instructions">${escapeHtml(stage.instructions)}</p>` : ''}
         ${ingredientsHtml}
         ${qaHtml}
@@ -78,14 +78,17 @@ function renderStageAccordion(stage, index) {
 
 function attachAccordionBehavior(container) {
   container.querySelectorAll('.recipe-stage__toggle').forEach((btn) => {
+    // Start collapsed: hide content via display so CSS display:grid doesn't override `hidden`
+    const initialContent = btn.closest('.recipe-stage')?.querySelector('.recipe-stage__content');
+    if (initialContent) { /** @type {HTMLElement} */ (initialContent).style.display = 'none'; }
+
     btn.addEventListener('click', () => {
       const isExpanded = btn.getAttribute('aria-expanded') === 'true';
-      // Traverse up to the <li> stage, then find the content panel sibling
-      const content = btn.closest('.recipe-stage')?.querySelector('.recipe-stage__content');
+      const content = /** @type {HTMLElement|null} */ (btn.closest('.recipe-stage')?.querySelector('.recipe-stage__content'));
       const chevron = btn.querySelector('.recipe-stage__chevron');
 
       btn.setAttribute('aria-expanded', String(!isExpanded));
-      if (content) { content.hidden = isExpanded; }
+      if (content) { content.style.display = isExpanded ? 'none' : ''; }
       if (chevron) { chevron.textContent = isExpanded ? '▶' : '▼'; }
     });
   });

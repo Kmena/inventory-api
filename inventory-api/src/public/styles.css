@@ -1,4 +1,7 @@
-﻿:root {
+﻿/* Global reset: ensure [hidden] always wins over any display property in the author stylesheet */
+[hidden] { display: none !important; }
+
+:root {
   color-scheme: light;
   font-family: Arial, Helvetica, sans-serif;
   --bg: #f4f7fb;
