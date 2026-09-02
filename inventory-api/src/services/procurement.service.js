@@ -569,7 +569,7 @@ async function selectSupplierQuotation(purchaseRequestId, payload, auth) {
  * Selección mixta de proveedores: cada producto se asigna independientemente
  * a la cotización del proveedor que ofrece el mejor precio para ese producto.
  * Crea una SupplierSelection por cada proveedor involucrado.
- * @returns {{ selections: object[], requiresApproval: boolean }}
+ * @returns {Promise<{ selections: object[], requiresApproval: boolean }>}
  */
 async function selectMixedSupplierItems(purchaseRequestId, payload, auth) {
   const scope = assertCompanyScope(auth);
@@ -740,7 +740,7 @@ async function createPurchaseOrderFromSelection(purchaseRequestId, payload, auth
  * Crea todas las órdenes de compra de una selección mixta en una sola llamada.
  * Evita el 409 que ocurre cuando el loop del frontend intenta crear la segunda PO
  * sobre una solicitud que el primer call ya cerró.
- * @returns {{ orders: object[] }}
+ * @returns {Promise<{ orders: object[] }>}
  */
 async function createPurchaseOrdersFromMixedSelections(purchaseRequestId, payload, auth) {
   const scope = assertCompanyScope(auth);
