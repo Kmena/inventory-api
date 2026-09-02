@@ -153,10 +153,15 @@ test('quotations view render exposes the dedicated quotations workspace and dial
   assert.match(markup, /quotations-list-region/);
   assert.match(markup, /quotations-detail-dialog/);
   assert.match(markup, /quotations-confirm-dialog/);
-  assert.match(markup, /Solicitud activa/);
-  assert.match(markup, /Respuestas recibidas/);
-  assert.match(markup, /Solicitudes abiertas/);
+  // Sidebar layout: heading is now just "Solicitudes" inside the aside
+  assert.match(markup, /rfq-tracking-section/);
+  assert.match(markup, /rfq-section/);
   assert.match(markup, /rfq-response-details-dialog/);
+  // Create panel and empty state are new split-view panels
+  assert.match(markup, /quotations-create-panel/);
+  assert.match(markup, /quotations-empty-state/);
+  assert.match(markup, /quotations-request-detail/);
+  assert.match(markup, /quotations-comparison-inline/);
   assert.match(markup, /Generar cotizaciones/);
   assert.doesNotMatch(markup, /Modulo en progreso/);
 });
@@ -337,8 +342,11 @@ test('quotations-admin mounts comparison section extension point after RFQ track
 
   assert.match(source, /views\.quotationsComparison/, 'quotations-admin must require comparison module');
   assert.match(source, /comparison\.mountComparisonSection/, 'quotations-admin must call mountComparisonSection');
-  assert.match(source, /requestWithResponses/, 'quotations-admin must find first request with responses');
-  assert.match(source, /respondedInvitationCount/, 'quotations-admin must check respondedInvitationCount');
+  // Comparison is now mounted inline and refreshed on-demand when a request is selected
+  assert.match(source, /quotations-comparison-inline/, 'comparison must mount into the inline detail panel');
+  assert.match(source, /comparison\.refreshForRequest/, 'comparison must be refreshed when a request is selected');
+  // respondedInvitationCount tracking lives in helpers/renderers, not in the admin orchestrator
+  assert.match(source, /loadRfqTracking/, 'admin must load tracking list');
 });
 
 test('quotations-api exposes comparison and selection endpoints', () => {
