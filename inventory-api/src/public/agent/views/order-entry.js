@@ -313,7 +313,9 @@ async function render(containerEl, session, params) {
   function updatePaymentConditionVisibility() {
     const val = paymentConditionSelect?.value;
     if (transferFieldsBlock) transferFieldsBlock.hidden = (val !== 'TRANSFER');
-    const showCredit = val === 'CREDIT' && (cachedStore?.isNearLimit === true);
+    // Show credit warning only when the store actually has a pending balance > 0.
+    // isNearLimit tracks visit frequency, NOT credit usage — using it here was wrong.
+    const showCredit = val === 'CREDIT' && (Number(cachedStore?.pendingBalance) > 0);
     if (creditWarningBanner) creditWarningBanner.hidden = !showCredit;
   }
 
