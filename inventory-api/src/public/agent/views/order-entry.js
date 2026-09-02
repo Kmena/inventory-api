@@ -328,7 +328,7 @@ async function render(containerEl, session, params) {
     const isOverOrNearLimit = pendingBalance > 0
       && (creditLimit === 0 || pendingBalance >= creditLimit * NEAR_PCT);
     const showCredit = val === 'CREDIT' && isOverOrNearLimit;
-    if (creditWarningBanner) creditWarningBanner.hidden = !showCredit;
+    if (creditWarningBanner) creditWarningBanner.style.display = showCredit ? 'flex' : 'none';
   }
 
   if (paymentConditionSelect) {
