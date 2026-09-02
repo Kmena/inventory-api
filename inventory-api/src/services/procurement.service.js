@@ -116,7 +116,16 @@ function serializeSupplierQuotation(quotation) {
     reference: quotation.reference,
     currency: quotation.currency,
     notes: quotation.notes,
-    evidence: quotation.evidence,
+    // Evidence may be a tagged object { _source, data? } or a legacy raw value.
+    // Narrow JsonValue to plain object before accessing our meta-key.
+    evidence: (() => {
+      const ev = quotation.evidence;
+      if (ev && typeof ev === 'object' && !Array.isArray(ev)) {
+        const meta = /** @type {Record<string, unknown>} */ (ev);
+        return meta._source ? (meta.data ?? null) : ev;
+      }
+      return ev;
+    })(),
     status: quotation.status,
     submittedAt: quotation.submittedAt,
     createdAt: quotation.createdAt,
@@ -400,6 +409,11 @@ async function createSupplierQuotation(purchaseRequestId, payload, auth) {
     }
   }
 
+  // Tag the evidence JSON with _source so tracking logic can distinguish
+  // direct-entry quotations from catalog-assisted ones (which have evidence: null).
+  const evidencePayload = payload.evidence ? toSnapshotValue(payload.evidence) : null;
+  const evidenceWithMeta = { _source: 'DIRECT_ENTRY', ...(evidencePayload ? { data: evidencePayload } : {}) };
+
   const quotation = await procurementRepository.createSupplierQuotation({
     companyId: scope.companyId,
     purchaseRequestId: request.id,
@@ -408,7 +422,7 @@ async function createSupplierQuotation(purchaseRequestId, payload, auth) {
     reference: normalizeOptionalText(payload.reference),
     currency: payload.currency?.trim() || 'CRC',
     notes: normalizeOptionalText(payload.notes),
-    evidence: toSnapshotValue(payload.evidence),
+    evidence: evidenceWithMeta,
     items: {
       create: payload.items.map((item) => ({
         productId: item.productId,
@@ -431,19 +445,82 @@ async function compareSupplierQuotations(purchaseRequestId, auth) {
     throw createHttpError(404, 'Solicitud de compra no encontrada', 'not_found');
   }
 
-  const quotations = ((/** @type {any} */ (request).quotations) || []).map(serializeSupplierQuotation)
-    .map((quotation) => ({
-      ...quotation,
-      averageLeadTimeDays: quotation.items.length > 0
-        ? quotation.items.reduce((sum, item) => sum + Number(item.leadTimeDays ?? 0), 0) / quotation.items.length
+  const rawQuotations = (/** @type {any} */ (request).quotations) || [];
+
+  // Separate catalog-assisted (evidence._source absent → null evidence) from
+  // actual responses (evidence._source === 'DIRECT_ENTRY', or linked to an RFQ
+  // invitation via rfqInvitations relation).
+  // evidence is JsonValue; narrow to plain object before reading our _source meta-key.
+  const getEvidenceMeta = (q) => (q.evidence && typeof q.evidence === 'object' && !Array.isArray(q.evidence)
+    ? /** @type {Record<string, unknown>} */ (q.evidence)
+    : null);
+
+  /** Resolve the response source of a raw SupplierQuotation. */
+  const resolveQuotationResponseSource = (q) => {
+    if (q.rfqInvitations?.length > 0) return q.rfqInvitations[0].responseSource || 'MANUAL_OFFICE_EMAIL';
+    if (getEvidenceMeta(q)?._source === 'DIRECT_ENTRY') return 'DIRECT_ENTRY';
+    return null; // catalog-assisted — no actual supplier response yet
+  };
+
+  // Group by supplierId. For each supplier, prefer actual responses over catalog-
+  // assisted ones. If a supplier only has catalog-assisted quotations, keep those
+  // so they still appear in the comparison.
+  const bySupplier = new Map();
+  for (const q of rawQuotations) {
+    const key = String(q.supplierId);
+    const responseSource = resolveQuotationResponseSource(q);
+    const actual = resolveQuotationResponseSource(q) !== null;
+    const serialized = serializeSupplierQuotation(q);
+    if (!bySupplier.has(key)) {
+      bySupplier.set(key, { quotations: [], hasActual: false });
+    }
+    const bucket = bySupplier.get(key);
+    bucket.quotations.push({ serialized, actual, responseSource });
+    if (actual) bucket.hasActual = true;
+  }
+
+  const raw = [];
+  for (const { quotations, hasActual } of bySupplier.values()) {
+    // Keep only actual responses when available; otherwise keep all (catalog-assisted).
+    const keep = hasActual ? quotations.filter((q) => q.actual) : quotations;
+    // Merge items + totals for the kept quotations (handles multiple RFQ responses).
+    const merged = keep.reduce((acc, { serialized, responseSource }) => {
+      if (!acc) return { ...serialized, items: [...serialized.items], responseSource: responseSource || null };
+      acc.items = [...acc.items, ...serialized.items];
+      acc.totalAmount += serialized.totalAmount;
+      if (serialized.reference && serialized.reference !== acc.reference) {
+        acc.reference = [acc.reference, serialized.reference].filter(Boolean).join(' / ');
+      }
+      // Prefer the most informative source (rfq > direct > null)
+      if (!acc.responseSource && responseSource) acc.responseSource = responseSource;
+      return acc;
+    }, null);
+    if (merged) raw.push(merged);
+  }
+
+  const quotations = raw
+    .map((q) => ({
+      ...q,
+      averageLeadTimeDays: q.items.length > 0
+        ? q.items.reduce((sum, item) => sum + Number(item.leadTimeDays ?? 0), 0) / q.items.length
         : null,
     }))
     .sort((left, right) => left.totalAmount - right.totalAmount);
+
+  // Collect productIds that already have an active (non-CANCELLED) purchase order
+  // for this request. The matrix uses this to lock those rows and prevent duplicate OCs.
+  const activePurchaseOrders = (request.purchaseOrders || []).filter((po) => po.status !== 'CANCELLED');
+  const activeOrderedProductIds = [
+    ...new Set(
+      activePurchaseOrders.flatMap((po) => (po.items || []).map((item) => String(item.productId))),
+    ),
+  ];
 
   return {
     purchaseRequestId: request.id,
     requestTitle: request.title,
     quotations,
+    activeOrderedProductIds,
   };
 }
 
@@ -486,6 +563,76 @@ async function selectSupplierQuotation(purchaseRequestId, payload, auth) {
   });
 
   return serializeSupplierSelection(selection);
+}
+
+/**
+ * Selección mixta de proveedores: cada producto se asigna independientemente
+ * a la cotización del proveedor que ofrece el mejor precio para ese producto.
+ * Crea una SupplierSelection por cada proveedor involucrado.
+ * @returns {Promise<{ selections: object[], requiresApproval: boolean }>}
+ */
+async function selectMixedSupplierItems(purchaseRequestId, payload, auth) {
+  const scope = assertCompanyScope(auth);
+  const request = await procurementRepository.findPurchaseRequestByIdForCompany(purchaseRequestId, scope.companyId);
+  if (!request) throw createHttpError(404, 'Solicitud de compra no encontrada', 'not_found');
+  if (request.status !== 'OPEN') throw createHttpError(409, 'La solicitud no está abierta', 'conflict');
+
+  const companyConfig = await procurementRepository.findCompanyConfigByCompanyId(scope.companyId);
+  const threshold = getProcurementApprovalThreshold(companyConfig);
+
+  // Group lines by quotationId
+  const byQuotation = new Map();
+  for (const line of payload.items) {
+    const qid = String(line.quotationId);
+    if (!byQuotation.has(qid)) byQuotation.set(qid, []);
+    byQuotation.get(qid).push(line);
+  }
+
+  const createdSelections = [];
+
+  for (const [quotationIdStr, lines] of byQuotation.entries()) {
+    const quotation = await procurementRepository.findSupplierQuotationByIdForCompany(
+      BigInt(quotationIdStr), scope.companyId,
+    );
+    if (!quotation || quotation.purchaseRequestId !== request.id) {
+      throw createHttpError(404, `Cotización ${quotationIdStr} no encontrada para esta solicitud`, 'not_found');
+    }
+
+    const subtotal = lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
+    const approvalRequired = threshold !== null && subtotal > threshold;
+
+    const selection = await procurementRepository.createSupplierSelection({
+      companyId: scope.companyId,
+      purchaseRequestId: request.id,
+      quotationId: quotation.id,
+      selectedByUserId: scope.actorUserId,
+      approvalRequired,
+      approvalStatus: approvalRequired ? 'PENDING' : 'APPROVED',
+      approvedByUserId: approvalRequired ? null : scope.actorUserId,
+      approvedAt: approvalRequired ? null : new Date(),
+      totalAmount: subtotal,
+      currency: quotation.currency,
+      justification: normalizeOptionalText(payload.justification),
+    });
+
+    await procurementRepository.updateSupplierQuotation(quotation.id, scope.companyId, { status: 'SELECTED' });
+
+    createdSelections.push({
+      ...serializeSupplierSelection(selection),
+      // Attach the specific items assigned to this supplier so the frontend
+      // can pass them back as an override when creating the purchase order.
+      assignedItems: lines.map((l) => ({
+        productId: l.productId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+      })),
+    });
+  }
+
+  return {
+    selections: createdSelections,
+    requiresApproval: createdSelections.some((s) => s.approvalRequired),
+  };
 }
 
 async function approveSupplierSelection(selectionId, payload, auth) {
@@ -553,6 +700,17 @@ async function createPurchaseOrderFromSelection(purchaseRequestId, payload, auth
   }
 
   const quotation = selection.quotation;
+  // When `payload.items` is provided, use those specific lines (mixed-supplier flow).
+  // Otherwise fall back to all items from the quotation (single-supplier flow).
+  const sourceItems = Array.isArray(payload.items) && payload.items.length > 0
+    ? payload.items
+    : (quotation.items || []).map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        notes: item.notes,
+      }));
+
   const purchaseOrder = await procurementRepository.createPurchaseOrder({
     companyId: scope.companyId,
     purchaseRequestId: request.id,
@@ -562,11 +720,11 @@ async function createPurchaseOrderFromSelection(purchaseRequestId, payload, auth
     createdByUserId: scope.actorUserId,
     notes: normalizeOptionalText(payload.notes),
     items: {
-      create: (quotation.items || []).map((item) => ({
-        productId: item.productId,
+      create: sourceItems.map((item) => ({
+        productId: BigInt(item.productId),
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        notes: normalizeOptionalText(item.notes),
+        notes: normalizeOptionalText(item.notes ?? null),
       })),
     },
   });
@@ -576,6 +734,127 @@ async function createPurchaseOrderFromSelection(purchaseRequestId, payload, auth
   });
 
   return serializePurchaseOrder(purchaseOrder);
+}
+
+/**
+ * Crea todas las órdenes de compra de una selección mixta en una sola llamada.
+ * Evita el 409 que ocurre cuando el loop del frontend intenta crear la segunda PO
+ * sobre una solicitud que el primer call ya cerró.
+ * @returns {Promise<{ orders: object[] }>}
+ */
+async function createPurchaseOrdersFromMixedSelections(purchaseRequestId, payload, auth) {
+  const scope = assertCompanyScope(auth);
+  const request = await procurementRepository.findPurchaseRequestByIdForCompany(purchaseRequestId, scope.companyId);
+  if (!request) throw createHttpError(404, 'Solicitud de compra no encontrada', 'not_found');
+  // Allow CLOSED as well: a partial previous attempt may have closed the request
+  // after creating only some POs. This endpoint is idempotent — it creates any
+  // outstanding POs and only re-closes the request when it's still OPEN.
+  if (request.status === 'CANCELLED') throw createHttpError(409, 'La solicitud de compra está cancelada', 'conflict');
+
+  const notes = normalizeOptionalText(payload.notes);
+  const createdOrders = [];
+
+  for (const entry of payload.orders) {
+    const selection = await procurementRepository.findSupplierSelectionByIdForCompany(
+      BigInt(entry.selectionId), scope.companyId,
+    );
+    if (!selection || selection.purchaseRequestId !== request.id) {
+      throw createHttpError(404, `Selección ${entry.selectionId} no encontrada para esta solicitud`, 'not_found');
+    }
+    if (selection.approvalRequired && selection.approvalStatus !== 'APPROVED') {
+      throw createHttpError(409, `La selección ${entry.selectionId} requiere aprobación previa`, 'conflict');
+    }
+
+    const quotation = selection.quotation;
+    const sourceItems = Array.isArray(entry.items) && entry.items.length > 0
+      ? entry.items
+      : (quotation.items || []).map((i) => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, notes: i.notes }));
+
+    const po = await procurementRepository.createPurchaseOrder({
+      companyId: scope.companyId,
+      purchaseRequestId: request.id,
+      quotationId: quotation.id,
+      selectionId: selection.id,
+      supplierId: quotation.supplierId,
+      createdByUserId: scope.actorUserId,
+      notes,
+      items: {
+        create: sourceItems.map((item) => ({
+          productId: BigInt(item.productId),
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          notes: normalizeOptionalText(item.notes ?? null),
+        })),
+      },
+    });
+    createdOrders.push(serializePurchaseOrder(po));
+  }
+
+  // Close the request once — only if it is still OPEN (idempotent: a partial
+  // previous attempt may have already closed it).
+  if (request.status === 'OPEN') {
+    await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'CLOSED' });
+  }
+
+  return { orders: createdOrders };
+}
+
+/**
+ * Cancela una orden de compra en estado DRAFT o ISSUED.
+ * Si la solicitud de compra asociada estaba CLOSED, la reabre (OPEN) para
+ * permitir crear una nueva orden o corregir la selección mixta.
+ */
+/**
+ * Cancela una orden de compra en estado DRAFT o ISSUED.
+ * Si reopen=true, también reabre la solicitud de compra asociada (CLOSED → OPEN)
+ * para que el usuario pueda corregir la selección mixta.
+ */
+async function cancelPurchaseOrder(orderId, payload, auth) {
+  const scope = assertCompanyScope(auth);
+  const order = await procurementRepository.findPurchaseOrderByIdForCompany(BigInt(orderId), scope.companyId);
+  if (!order) throw createHttpError(404, 'Orden de compra no encontrada', 'not_found');
+  if (order.status === 'CANCELLED') throw createHttpError(409, 'La orden ya está cancelada', 'conflict');
+
+  const cancelled = await procurementRepository.cancelPurchaseOrder(order.id);
+
+  const request = order.purchaseRequest;
+  if (payload?.reopen && request && request.status === 'CLOSED') {
+    await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'OPEN' });
+  }
+
+  return {
+    ...serializePurchaseOrder(cancelled),
+    requestReopened: Boolean(payload?.reopen && request?.status === 'CLOSED'),
+  };
+}
+
+/**
+ * Cancela TODAS las órdenes de compra activas (DRAFT/ISSUED) de una solicitud
+ * y reabre la solicitud para que el usuario pueda rehacerla desde cero.
+ * Útil cuando una selección mixta quedó incompleta o incorrecta.
+ */
+async function cancelAllOrdersForRequest(purchaseRequestId, auth) {
+  const scope = assertCompanyScope(auth);
+  const request = await procurementRepository.findPurchaseRequestByIdForCompany(purchaseRequestId, scope.companyId);
+  if (!request) throw createHttpError(404, 'Solicitud de compra no encontrada', 'not_found');
+  if (request.status === 'CANCELLED') throw createHttpError(409, 'La solicitud está cancelada', 'conflict');
+
+  const activeOrders = await procurementRepository.listActivePurchaseOrdersByRequestId(
+    request.id, scope.companyId,
+  );
+
+  const cancelledOrders = [];
+  for (const order of activeOrders) {
+    const cancelled = await procurementRepository.cancelPurchaseOrder(order.id);
+    cancelledOrders.push(serializePurchaseOrder(cancelled));
+  }
+
+  // Reopen the request regardless of previous status (CLOSED or OPEN)
+  if (request.status !== 'OPEN') {
+    await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'OPEN' });
+  }
+
+  return { cancelledOrders, requestReopened: true };
 }
 
 async function issuePurchaseOrder(orderId, auth) {
@@ -594,6 +873,10 @@ async function issuePurchaseOrder(orderId, auth) {
 module.exports = {
   createPurchaseRequest,
   createAssistedQuotationRequest,
+  selectMixedSupplierItems,
+  createPurchaseOrdersFromMixedSelections,
+  cancelPurchaseOrder,
+  cancelAllOrdersForRequest,
   listPurchaseRequests,
   listPurchaseOrders,
   listQuotableProducts,

@@ -87,6 +87,49 @@ async function postOrder(session, storeId, payload) {
   });
 }
 
+/**
+ * POST /api/agent/stores/:storeId/payments
+ * @param {any} session
+ * @param {string|number} storeId
+ * @param {any} payload
+ */
+async function postPayment(session, storeId, payload) {
+  return inventoryAuth.fetchJson(session, `${BASE}/stores/${encodeURIComponent(storeId)}/payments`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * POST /api/agent/orders/:id/correct — update + resubmit a REJECTED order in one step.
+ * Uses agent.workspace.access — no order.update permission needed.
+ * @param {any} session
+ * @param {string|number} orderId
+ * @param {any} payload  Same shape as postOrder.
+ */
+async function correctAndResubmitOrder(session, orderId, payload) {
+  return inventoryAuth.fetchJson(session, `${BASE}/orders/${encodeURIComponent(orderId)}/correct`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * POST /api/orders/:id/resubmit — agent resubmits a REJECTED order after correction.
+ * @param {any} session
+ * @param {string|number} orderId
+ */
+async function resubmitOrder(session, orderId) {
+  return inventoryAuth.fetchJson(session, `/api/orders/${encodeURIComponent(orderId)}/resubmit`, {
+    method: 'POST',
+    credentials: 'same-origin',
+  });
+}
+
 AgentShell.register('api.agentApi', {
   fetchDashboard,
   fetchStores,
@@ -94,8 +137,11 @@ AgentShell.register('api.agentApi', {
   fetchStoreDetail,
   fetchOrderContext,
   fetchOrders,
+  correctAndResubmitOrder,
+  resubmitOrder,
   postVisit,
   postOrder,
+  postPayment,
 });
 
 })();

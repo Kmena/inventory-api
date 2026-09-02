@@ -25,9 +25,23 @@ function renderOrderCard(order) {
   const storeName = order.storeName || order.clientName || '—';
   const paymentLabels = { CREDIT: 'Crédito', CASH: 'Contado', TRANSFER: 'Transferencia' };
   const paymentLabel = paymentLabels[order.paymentCondition] || order.paymentCondition || '—';
+  const isRejected = order.status === 'REJECTED';
+
+  const rejectionBanner = isRejected ? `
+    <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 12px;margin-top:10px;">
+      <p style="margin:0 0 4px;font-weight:700;font-size:.85rem;color:#991B1B;">↩️ Devuelto por la oficina</p>
+      <p style="margin:0;font-size:.83rem;color:#7F1D1D;">${h.escapeHtml(order.rejectionReason || 'Sin motivo especificado')}</p>
+      <button type="button" class="agent-resubmit-btn btn"
+              data-order-id="${h.escapeHtml(String(order.id))}"
+              data-store-id="${h.escapeHtml(String(order.clientStoreId || ''))}"
+              data-existing-items="${h.escapeHtml(JSON.stringify(order.existingItems || []))}"
+              style="margin-top:10px;background:#2563EB;font-size:.85rem;width:100%;">
+        ✏️ Corregir y reenviar
+      </button>
+    </div>` : '';
 
   return `
-    <div class="commercial-list-item" style="border:1px solid #E2E8F0;border-radius:12px;padding:14px;">
+    <div class="commercial-list-item" style="border:1px solid ${isRejected ? '#FECACA' : '#E2E8F0'};border-radius:12px;padding:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
         <strong>#${h.escapeHtml(String(order.orderNumber || order.id))}</strong>
         ${badge}
@@ -40,6 +54,7 @@ function renderOrderCard(order) {
         <span>${h.escapeHtml(paymentLabel)}</span>
         <span>${h.escapeHtml(h.formatDate(order.createdAt))}</span>
       </div>
+      ${rejectionBanner}
     </div>`;
 }
 
@@ -71,8 +86,15 @@ async function render(containerEl, session, _params) {
           </div>
         </div>`;
     } else {
-      const pendingCount = orders.filter((o) => o.status === 'DRAFT').length;
+      const pendingCount  = orders.filter((o) => o.status === 'DRAFT').length;
       const approvedCount = orders.filter((o) => o.status === 'APPROVED').length;
+      const rejectedCount = orders.filter((o) => o.status === 'REJECTED').length;
+
+      // Sort: REJECTED first so agent sees them prominently
+      const sorted = [...orders].sort((a, b) => {
+        const pri = { REJECTED: 0, DRAFT: 1 };
+        return (pri[a.status] ?? 9) - (pri[b.status] ?? 9);
+      });
 
       containerEl.innerHTML = `
         <div class="agent-page">
@@ -80,11 +102,24 @@ async function render(containerEl, session, _params) {
             <button type="button" id="orders-back-btn" class="secondary-button">← Volver</button>
             <h1 style="margin:0;font-size:1.2rem;flex:1;">Mis pedidos</h1>
           </header>
+          ${rejectedCount > 0 ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 14px;margin-bottom:12px;"><strong style="color:#991B1B;">⚠️ ${rejectedCount} pedido${rejectedCount !== 1 ? 's' : ''} devuelto${rejectedCount !== 1 ? 's' : ''} para corrección</strong></div>` : ''}
           <p class="muted" style="margin:0 0 8px;">${pendingCount} pendiente${pendingCount !== 1 ? 's' : ''} · ${approvedCount} aprobado${approvedCount !== 1 ? 's' : ''} · ${orders.length} total</p>
-          <div style="display:grid;gap:10px;">
-            ${orders.map(renderOrderCard).join('')}
+          <div id="orders-list" style="display:grid;gap:10px;">
+            ${sorted.map(renderOrderCard).join('')}
           </div>
         </div>`;
+
+      // Resubmit buttons → open order-entry in edit mode so agent can correct before resubmitting.
+      // Pass existingItems as JSON string — navigate() encodes params via encodeURIComponent,
+      // which would mangle a raw array. The view parses it back with JSON.parse.
+      containerEl.querySelectorAll('.agent-resubmit-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const orderId   = btn.getAttribute('data-order-id');
+          const storeId   = btn.getAttribute('data-store-id');
+          const itemsJson = btn.getAttribute('data-existing-items') || '[]';
+          navigate('order', { storeId, orderId, existingItems: itemsJson });
+        });
+      });
     }
 
     const backBtn = containerEl.querySelector('#orders-back-btn');

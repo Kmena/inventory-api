@@ -153,10 +153,15 @@ test('quotations view render exposes the dedicated quotations workspace and dial
   assert.match(markup, /quotations-list-region/);
   assert.match(markup, /quotations-detail-dialog/);
   assert.match(markup, /quotations-confirm-dialog/);
-  assert.match(markup, /Solicitud activa/);
-  assert.match(markup, /Respuestas recibidas/);
-  assert.match(markup, /Solicitudes abiertas/);
+  // Sidebar layout: heading is now just "Solicitudes" inside the aside
+  assert.match(markup, /rfq-tracking-section/);
+  assert.match(markup, /rfq-section/);
   assert.match(markup, /rfq-response-details-dialog/);
+  // Create panel and empty state are new split-view panels
+  assert.match(markup, /quotations-create-panel/);
+  assert.match(markup, /quotations-empty-state/);
+  assert.match(markup, /quotations-request-detail/);
+  assert.match(markup, /quotations-comparison-inline/);
   assert.match(markup, /Generar cotizaciones/);
   assert.doesNotMatch(markup, /Modulo en progreso/);
 });
@@ -298,19 +303,23 @@ test('comparison renderers produce scannable comparison table and PO summary', (
   const rootShellWithComparison = createViewHarness();
   const renderers = rootShellWithComparison.require('views.quotationsComparisonRenderers');
 
+  // responseSource drives which section a row appears in.
+  // Rows with a responseSource → "Respuestas recibidas" (selectable).
+  // Rows without → "Precio histórico de catálogo" (read-only reference).
   const quotations = [
-    { id: 1, supplier: { name: 'Proveedor A' }, reference: 'QUOT-001', currency: 'CRC', totalAmount: 120000, averageLeadTimeDays: 7, source: 'Manual' },
-    { id: 2, supplier: { name: 'Proveedor B' }, reference: 'QUOT-002', currency: 'USD', totalAmount: 245, averageLeadTimeDays: 12, source: 'Portal' },
+    { id: 1, supplier: { name: 'Proveedor A' }, reference: 'QUOT-001', currency: 'CRC', totalAmount: 120000, averageLeadTimeDays: 7, responseSource: 'DIRECT_ENTRY', items: [] },
+    { id: 2, supplier: { name: 'Proveedor B' }, reference: 'QUOT-002', currency: 'USD', totalAmount: 245, averageLeadTimeDays: 12, responseSource: null, items: [] },
   ];
 
   const tableHtml = renderers.renderComparisonTable(quotations);
   assert.match(tableHtml, /Proveedor A/, 'table must include supplier A');
-  assert.match(tableHtml, /Proveedor B/, 'table must include supplier B');
+  assert.match(tableHtml, /Proveedor B/, 'table must include supplier B in catalog section');
   assert.match(tableHtml, /QUOT-001/, 'table must include reference');
-  assert.match(tableHtml, /Seleccionar este proveedor/, 'table must include action button');
+  assert.match(tableHtml, /Seleccionar este proveedor/, 'responded row must have action button');
   assert.match(tableHtml, /data-quotation-id/, 'button must carry quotation id data attribute');
-  assert.doesNotMatch(tableHtml, /Origen/, 'Origen column is not rendered — responseSource is not in comparison serializer');
-  assert.match(tableHtml, /7 días/, 'lead time must be rendered');
+  assert.match(tableHtml, /Registr/, 'catalog row must show prompt instead of select button');
+  assert.match(tableHtml, /Respuestas recibidas/, 'table must have responded section heading');
+  assert.match(tableHtml, /7 d/, 'lead time must be rendered');
 
   const selection = {
     currency: 'CRC',
@@ -333,8 +342,11 @@ test('quotations-admin mounts comparison section extension point after RFQ track
 
   assert.match(source, /views\.quotationsComparison/, 'quotations-admin must require comparison module');
   assert.match(source, /comparison\.mountComparisonSection/, 'quotations-admin must call mountComparisonSection');
-  assert.match(source, /requestWithResponses/, 'quotations-admin must find first request with responses');
-  assert.match(source, /respondedInvitationCount/, 'quotations-admin must check respondedInvitationCount');
+  // Comparison is now mounted inline and refreshed on-demand when a request is selected
+  assert.match(source, /quotations-comparison-inline/, 'comparison must mount into the inline detail panel');
+  assert.match(source, /comparison\.refreshForRequest/, 'comparison must be refreshed when a request is selected');
+  // respondedInvitationCount tracking lives in helpers/renderers, not in the admin orchestrator
+  assert.match(source, /loadRfqTracking/, 'admin must load tracking list');
 });
 
 test('quotations-api exposes comparison and selection endpoints', () => {

@@ -293,6 +293,33 @@
     },
     {
       "method": "POST",
+      "mountPath": "/api/orders",
+      "expressPath": "/:id/reject",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "El flujo de rechazo de pedidos de agente es parte del ciclo de vida de pedidos, cuya cobertura OpenAPI se planifica en una iteración futura."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/agent",
+      "expressPath": "/orders/:orderId/correct",
+      "routeFile": "src/routes/agent.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "agent-self-service-outside-current-openapi-baseline",
+      "reason": "Endpoint de corrección y reenvío de pedidos rechazados para agentes. Usa agent.workspace.access; fuera del contrato OpenAPI parcial actual."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/orders",
+      "expressPath": "/:id/resubmit",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "El reenvío de pedidos rechazados por el agente es parte del ciclo de vida de pedidos, cuya cobertura OpenAPI se planifica en una iteración futura."
+    },
+    {
+      "method": "POST",
       "mountPath": "/api/procurement",
       "expressPath": "/products/:id/request-quotations",
       "routeFile": "src/routes/procurement.routes.js",
@@ -335,6 +362,42 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "procurement-quotation-outside-current-openapi-baseline",
       "reason": "La carga interna de cotizaciones/proformas por solicitud permanece fuera del contrato OpenAPI parcial actual."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/procurement",
+      "expressPath": "/requests/:id/cancel-orders",
+      "routeFile": "src/routes/procurement.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "procurement-selection-outside-current-openapi-baseline",
+      "reason": "Cancela todas las OCs activas de una solicitud y la reabre para corrección de selección mixta."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/procurement",
+      "expressPath": "/orders/:id/cancel",
+      "routeFile": "src/routes/procurement.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "procurement-selection-outside-current-openapi-baseline",
+      "reason": "Cancela una OC en estado DRAFT o ISSUED y reabre la solicitud de compra asociada para permitir corrección."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/procurement",
+      "expressPath": "/requests/:id/purchase-orders-batch",
+      "routeFile": "src/routes/procurement.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "procurement-selection-outside-current-openapi-baseline",
+      "reason": "Batch PO creation for mixed-supplier selection — creates N POs in one transaction and closes the request once."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/procurement",
+      "expressPath": "/requests/:id/select-items",
+      "routeFile": "src/routes/procurement.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "procurement-selection-outside-current-openapi-baseline",
+      "reason": "Selección mixta de proveedores por línea de producto — crea N SupplierSelections + N POs."
     },
     {
       "method": "POST",
@@ -452,6 +515,69 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "subzone-bulk-mutation-outside-current-openapi-baseline",
       "reason": "La mutación masiva de subzonas de rutas comerciales sigue soportada, pero todavía no forma parte del recorte factual del OpenAPI parcial."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/production",
+      "expressPath": "/orders/:id/stages/:stageId/losses",
+      "routeFile": "src/routes/production.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "stage-loss-registration-outside-current-openapi-baseline",
+      "reason": "TASK-006: Registro de pérdidas post-rechazo QA (production-stage-rejection-and-reexecution). Ruta activa en runtime pero excluida del contrato parcial OpenAPI hasta formalización del módulo de rechazo."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/production",
+      "expressPath": "/orders/:id/stages/:stageId/losses",
+      "routeFile": "src/routes/production.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "stage-loss-list-outside-current-openapi-baseline",
+      "reason": "TASK-006: Listado de pérdidas por etapa (production-stage-rejection-and-reexecution). Ruta activa en runtime pero excluida del contrato parcial OpenAPI hasta formalización."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/production",
+      "expressPath": "/orders/:id/recolections/:recolectionId/confirm",
+      "routeFile": "src/routes/production.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "recolection-confirm-outside-current-openapi-baseline",
+      "reason": "TASK-006 (qa-rejection-disposition-and-continuation): Confirmación de etapa virtual de recolección de material. Ruta activa en runtime pero excluida del contrato parcial OpenAPI hasta formalización del spec extendido."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/production",
+      "expressPath": "/orders/:id/recolections/:recolectionId/reconciliation",
+      "routeFile": "src/routes/production.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "recolection-reconciliation-outside-current-openapi-baseline",
+      "reason": "TASK-006 (qa-rejection-material-reconciliation-amendment): Registro de resultados de conciliación (USED/RETURNED/DISCARDED) para material recolectado. Ruta activa en runtime pero excluida del contrato parcial OpenAPI hasta formalización."
+    },
+    {
+      "method": "PATCH",
+      "mountPath": "/api/clients",
+      "expressPath": "/company/:clientId/stores/:storeId/credit-limit",
+      "routeFile": "src/routes/client.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "client-store-credit-limit-outside-current-openapi-baseline",
+      "reason": "Actualización del límite de crédito por tienda de cliente. Ruta activa en runtime pero excluida del contrato OpenAPI parcial hasta formalización del módulo de crédito."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/orders",
+      "expressPath": "/dispatched",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "Listado de pedidos despachados para el módulo de despacho de bodega. Ruta activa en runtime pero excluida del contrato parcial OpenAPI en esta iteración."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/agent",
+      "expressPath": "/stores/:storeId/payments",
+      "routeFile": "src/routes/agent.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "agent-payment-registration-outside-current-openapi-baseline",
+      "reason": "Registro de pagos por el agente comercial desde la vista de tienda. Ruta activa en runtime pero excluida del contrato OpenAPI parcial hasta formalización del módulo de cobranza."
     }
   ]
 }

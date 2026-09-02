@@ -18,7 +18,10 @@
 
   /**
    * Infiere el dashboard de destino para un rol dado.
-   * Sigue el mismo orden de prioridad que `getHomeForSession()` en login.js.
+   * Espeja la lógica de `resolveLanding()` en permission-governance.service.js:
+   *   1. Excepción root global (roleCode='root').
+   *   2. Permisos de landing explícitos (root.access > agent.access > warehouse.access).
+   *   3. Fallback legacy para role codes históricos.
    *
    * @param {object | null | undefined} role
    * @returns {{ label: string, path: string, note: string | null }}
@@ -26,29 +29,48 @@
   function inferDashboard(role) {
     const roleCode = role?.code;
 
+    // 1. Excepción plataforma — root sin companyId maneja esto aparte
     if (roleCode === 'root') {
       return { label: 'Root', path: '/root/', note: null };
     }
 
-    if (roleCode === 'admin') {
-      return { label: 'Root', path: '/root/', note: 'administrador' };
+    const permCodes = extractPermissionCodes(role);
+
+    // 2. Permisos de landing explícitos — misma prioridad que el backend
+    //    root.access (0) > agent.access (1) > warehouse.access (2)
+    if (permCodes.includes('root.access')) {
+      const note = roleCode === 'admin' ? 'administrador' : null;
+      return { label: 'Root', path: '/root/', note };
     }
 
+    if (permCodes.includes('agent.access')) {
+      return { label: 'Agent', path: '/agent/', note: null };
+    }
+
+    // El role code sales_agent tiene prioridad sobre warehouse.access:
+    // un agente no debe ser redirigido a warehouse aunque tenga el permiso.
     if (roleCode === 'sales_agent') {
       return { label: 'Agent', path: '/agent/', note: null };
     }
 
-    const permCodes = extractPermissionCodes(role);
-
-    // Permisos operativos de agente (sin assign ni all routes)
-    const hasOwnRoute = permCodes.includes('sales.routes.view.own');
-    const hasOrderCreate = permCodes.includes('sales.orders.create');
-    const hasActivities = permCodes.includes('customer.activities.manage');
-    const hasAssign = permCodes.includes('sales.routes.assign');
-    const hasAllRoutes = permCodes.includes('sales.routes.view.all');
-
-    if (hasOwnRoute && hasOrderCreate && hasActivities && !hasAssign && !hasAllRoutes) {
+    // Heurística legacy para agentes operativos sin agent.access explícito
+    // (espeja hasOperationalAgentPermissions en login.js).
+    const isLegacyAgent = permCodes.includes('sales.routes.view.own')
+      && permCodes.includes('sales.orders.create')
+      && permCodes.includes('customer.activities.manage')
+      && !permCodes.includes('sales.routes.assign')
+      && !permCodes.includes('sales.routes.view.all');
+    if (isLegacyAgent) {
       return { label: 'Agent', path: '/agent/', note: null };
+    }
+
+    if (permCodes.includes('warehouse.access')) {
+      return { label: 'Warehouse', path: '/warehouse/', note: null };
+    }
+
+    // 3. Fallback legacy para roles históricos sin permiso de landing explícito
+    if (roleCode === 'admin') {
+      return { label: 'Root', path: '/root/', note: 'administrador' };
     }
 
     if (roleCode === 'sales_supervisor') {
@@ -57,10 +79,6 @@
 
     if (permCodes.includes('procurement.manage')) {
       return { label: 'Root', path: '/root/', note: 'abastecimiento' };
-    }
-
-    if (permCodes.includes('warehouse.access')) {
-      return { label: 'Warehouse', path: '/warehouse/', note: null };
     }
 
     return { label: 'Sin acceso', path: '/no-access.html', note: null };

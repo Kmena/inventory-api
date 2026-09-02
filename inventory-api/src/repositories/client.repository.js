@@ -23,6 +23,12 @@ function clientInclude() {
         subregion: { include: { region: true } },
         legalEntity: true,
         representatives: { where: { isActive: true }, orderBy: clientRepresentativeOrderBy },
+        // Only active (non-final) orders — lightweight, no items
+        orders: {
+          where: { status: { in: ['DRAFT', 'APPROVED', 'IN_PRODUCTION'] } },
+          select: { id: true, status: true },
+          orderBy: /** @type {any} */ ({ createdAt: 'desc' }),
+        },
       },
     },
     contacts: true,
@@ -316,6 +322,10 @@ function findClientLedger(clientId, companyId, options = {}, db = prisma) {
   return db.client.findFirst({
     where: { id: clientId, companyId, deletedAt: null },
     include: {
+      stores: {
+        where: { isActive: true },
+        select: { id: true, name: true, creditLimit: true, creditBalance: true },
+      },
       invoices: {
         where: invoiceWhere,
         take: Math.min(take, 500),

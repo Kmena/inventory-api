@@ -55,11 +55,36 @@ async function dispatchOrder(session, orderId) {
   });
 }
 
+/**
+ * POST /api/orders/:id/reject  — office rejects an agent draft with a reason.
+ * @param {any} session
+ * @param {string|number} orderId
+ * @param {string} rejectionReason
+ */
+async function rejectOrder(session, orderId, rejectionReason) {
+  return inventoryAuth.fetchJson(session, `${BASE}/${encodeURIComponent(orderId)}/reject`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rejectionReason }),
+  });
+}
+
+/**
+ * GET /api/orders/dispatched — orders already delivered (dispatch history).
+ * @param {any} session
+ */
+async function listDispatchedOrders(session) {
+  return inventoryAuth.fetchJson(session, `${BASE}/dispatched`, { credentials: 'same-origin' });
+}
+
 rootShell.register('ordersApi', {
   listOrders,
   approveOrder,
   cancelOrder,
+  rejectOrder,
   dispatchOrder,
+  listDispatchedOrders,
 });
 
 })(typeof globalThis !== 'undefined' ? globalThis : window);

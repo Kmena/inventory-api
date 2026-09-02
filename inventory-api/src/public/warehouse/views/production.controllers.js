@@ -9,6 +9,12 @@
 (() => {
 const WarehouseShell = /** @type {any} */ (window).WarehouseShell;
 
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // Lazy reference: helpers are registered before controllers in index.html.
 function helpers() {
   return WarehouseShell.require('views.productionExecHelpers');
@@ -180,7 +186,7 @@ async function attachQaAnalysisHandlers(container, session, order, snapshotStage
   const slot = container.querySelector(`#${slotId}`);
   if (!slot) { return; }
 
-  slot.innerHTML = renderers.renderQaAnalysisForm(snapshotStage, stageId);
+  slot.innerHTML = renderers.renderQaAnalysisForm(order, snapshotStage, stageId);
   const expectedParams = Array.isArray(snapshotStage?.expectedParameters) ? snapshotStage.expectedParameters : [];
 
   slot.querySelectorAll('.qa-param-row').forEach((row) => {
@@ -196,7 +202,17 @@ async function attachQaAnalysisHandlers(container, session, order, snapshotStage
     if (correctiveBlock) { correctiveBlock.style.display = needsAction ? '' : 'none'; }
     const textarea = correctiveBlock?.querySelector('.qa-corrective-action');
     if (textarea) { textarea.required = needsAction; }
+    h.syncQaRejectionFlowState(slot);
   });
+  slot.querySelectorAll('.qa-continuation-radio').forEach((input) => {
+    input.addEventListener('change', () => h.syncQaRejectionFlowState(slot));
+  });
+  slot.querySelector('.qa-continuation-stage-select')?.addEventListener('change', () => h.syncQaRejectionFlowState(slot));
+  slot.querySelectorAll('.qa-disposition-select, .qa-disposition-qty').forEach((input) => {
+    input.addEventListener('change', () => h.syncQaRejectionFlowState(slot));
+    input.addEventListener('input', () => h.syncQaRejectionFlowState(slot));
+  });
+  h.syncQaRejectionFlowState(slot);
 
   slot.querySelector('.add-qa-param-btn')?.addEventListener('click', () => {
     const paramsContainer = slot.querySelector('.qa-params-container');
@@ -256,32 +272,54 @@ async function attachExecuteStageHandlers(container, session, order, snapshotSta
   const stageId = snapshotStage?.id;
   const slotId = `exec-form-${stageId}-slot`;
   const slot = container.querySelector(`#${slotId}`);
-  if (!slot) { return; }
+  // Throw so the caller's .catch() can re-enable the button and show an error.
+  if (!slot) { throw new Error(`Formulario no encontrado (slot #${slotId}). Recarga la pagina e intenta de nuevo.`); }
 
   let lotPickerHtml = '';
   let lotModels = [];
-  try {
-    const availableLotsResponse = await api.getAvailableLotsForStage(session, order.id, stageId);
-    const productionState = WarehouseShell.require('views.productionState');
-    lotModels = productionState.buildLotPickerModel(availableLotsResponse, {});
-    lotPickerHtml = lotModels.length
-      ? `<section class="wh-step-section" aria-label="Selector de lotes">
-           <h4 class="wh-step-section__title">Consumo de insumos (FEFO/FIFO)</h4>
-           ${lotModels.map((m) => {
-             const html = renderers.renderLotPicker(m);
-             return html.replace(
-               'class="lot-picker-block"',
-               `class="lot-picker-block" data-required-qty="${m.requiredQuantity}" data-tolerance-pct="${m.toleranceDefaultPercent}"`,
-             );
-           }).join('')}
-         </section>`
-      : '<p class="wh-caption muted">Esta etapa no requiere insumos de lote.</p>';
-  } catch (_err) {
-    lotPickerHtml = '<p class="wh-caption muted">No se pudo cargar lotes disponibles.</p>';
+
+  // PROCESSING stages consume materials already collected from the warehouse by
+  // the preceding RECOLLECTION stage. Showing a lot picker here would mislead
+  // the operator into thinking they need to pull MORE stock, and submitting
+  // consumptions would cause a double warehouse deduction. Skip the lot picker
+  // entirely; the stage is executed for its QA / parameter-capture value only.
+  const isProcessingStage = snapshotStage?.stageType === 'PROCESSING';
+
+  if (isProcessingStage) {
+    lotPickerHtml = `<p class="wh-caption muted">
+      ℹ️ Los insumos de esta etapa fueron recolectados en la etapa de recolección anterior.
+      No se descontarán materiales adicionales de bodega.
+    </p>`;
+  } else {
+    try {
+      const availableLotsResponse = await api.getAvailableLotsForStage(session, order.id, stageId);
+      const productionState = WarehouseShell.require('views.productionState');
+      lotModels = productionState.buildLotPickerModel(availableLotsResponse, {});
+      lotPickerHtml = lotModels.length
+        ? `<section class="wh-step-section" aria-label="Selector de lotes">
+             <h4 class="wh-step-section__title">Consumo de insumos (FEFO/FIFO)</h4>
+             ${lotModels.map((m) => {
+               const html = renderers.renderLotPicker(m);
+               return html.replace(
+                 'class="lot-picker-block"',
+                 `class="lot-picker-block" data-required-qty="${m.requiredQuantity}" data-tolerance-pct="${m.toleranceDefaultPercent}"`,
+               );
+             }).join('')}
+           </section>`
+        : '<p class="wh-caption muted">Esta etapa no requiere insumos de lote.</p>';
+    } catch (_err) {
+      lotPickerHtml = '<p class="wh-caption muted">No se pudo cargar lotes disponibles.</p>';
+    }
   }
 
   const formHtml = renderers.renderExecuteStageForm(order, snapshotStage, stageId, lotPickerHtml);
   slot.innerHTML = formHtml;
+
+  // Restore original button label now that the form is visible.
+  const execBtnRef = container.querySelector(`.wh-execute-stage-btn[data-stage-id="${stageId}"]`);
+  if (execBtnRef) {
+    execBtnRef.textContent = execBtnRef.dataset.originalLabel || execBtnRef.textContent;
+  }
 
   const startedEl = slot.querySelector('.exec-started-at');
   if (startedEl) { startedEl.value = new Date().toISOString(); }
@@ -292,7 +330,11 @@ async function attachExecuteStageHandlers(container, session, order, snapshotSta
   slot.querySelector('.exec-cancel-btn')?.addEventListener('click', () => {
     slot.innerHTML = '';
     const execBtn = container.querySelector(`.wh-execute-stage-btn[data-stage-id="${stageId}"]`);
-    if (execBtn) { execBtn.disabled = false; execBtn.setAttribute('aria-expanded', 'false'); }
+    if (execBtn) {
+      execBtn.disabled = false;
+      execBtn.setAttribute('aria-expanded', 'false');
+      execBtn.textContent = execBtn.dataset.originalLabel || execBtn.textContent;
+    }
   });
 
   slot.querySelector('.exec-submit-btn')?.addEventListener('click', async () => {
@@ -340,6 +382,163 @@ function attachOrderListHandlers(container) {
     btn.addEventListener('click', () => {
       const oid = btn.dataset.orderId;
       if (oid) { app.navigate('production', { id: oid }); }
+    });
+  });
+}
+
+// -----------------------------------------------------------------------
+// Recolection lot-picker (virtual recolection stage after QA rejection)
+// -----------------------------------------------------------------------
+
+/**
+ * Wires the "Preparar recolección" button on virtual recolection stage cards.
+ * On click: fetches available lots for the original recipe stage, renders an
+ * interactive lot picker, and on confirm calls confirmRecolection({ entries }).
+ *
+ * @param {HTMLElement} container
+ * @param {any} session
+ * @param {object} order
+ * @param {() => void} reloadFn
+ */
+async function attachRecolectionFormHandlers(container, session, order, reloadFn) {
+  const api = WarehouseShell.require('warehouseApi');
+  const renderers = WarehouseShell.require('views.productionRenderers');
+  const productionState = WarehouseShell.require('views.productionState');
+  const app = WarehouseShell.require('app');
+
+  container.querySelectorAll('.wh-prepare-recolection-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const orderId = btn.dataset.orderId || String(order.id);
+      const recolectionId = btn.dataset.recolectionId;
+      const recipeStageId = btn.dataset.recipeStageId;
+      const card = btn.closest('li');
+      const slot = card?.querySelector('.wh-recolection-lot-slot');
+      const errEl = card?.querySelector('.recolection-confirm-error');
+
+      if (!slot || !recipeStageId) { return; }
+
+      // Parse required items (productId → requiredQty) for the lot picker model
+      let requiredByProduct = {};
+      try {
+        const items = JSON.parse(btn.dataset.requiredItems || '[]');
+        for (const it of items) {
+          if (it.productId) { requiredByProduct[String(it.productId)] = Number(it.quantity || 0); }
+        }
+      } catch (_) { /* ignore parse error */ }
+
+      btn.disabled = true;
+      btn.textContent = 'Cargando lotes...';
+      if (errEl) { errEl.hidden = true; }
+
+      try {
+        const lotsResponse = await api.getAvailableLotsForStage(session, orderId, recipeStageId);
+
+        // Filter to only products that need recolection (from requiredItems)
+        const requiredProductIds = new Set(Object.keys(requiredByProduct));
+        const filteredResponse = {
+          ...lotsResponse,
+          products: (lotsResponse.products || []).filter(
+            (p) => requiredProductIds.size === 0 || requiredProductIds.has(String(p.productId)),
+          ),
+        };
+
+        const lotModels = productionState.buildLotPickerModel(filteredResponse, requiredByProduct);
+
+        if (lotModels.length === 0) {
+          slot.innerHTML = '<p class="wh-caption wh-caption--warning">&#9888;&#xFE0F; No se encontraron lotes disponibles. Verifica el inventario antes de confirmar.</p>'
+            + `<div class="wh-form-actions" style="margin-top:0.5rem">
+                 <button type="button" class="primary-button wh-recolection-confirm-no-lots"
+                         data-order-id="${escapeHtml(orderId)}"
+                         data-recolection-id="${escapeHtml(String(recolectionId))}">&#10003; Confirmar sin selecci\u00F3n de lote</button>
+               </div>
+               <p class="recolection-lots-error wh-error-msg" hidden role="alert" aria-live="assertive"></p>`;
+
+          slot.querySelector('.wh-recolection-confirm-no-lots')?.addEventListener('click', async (e) => {
+            const b = /** @type {HTMLButtonElement} */ (e.currentTarget);
+            b.disabled = true; b.textContent = 'Confirmando...';
+            const lotsErrEl = slot.querySelector('.recolection-lots-error');
+            try {
+              await api.confirmRecolection(session, orderId, recolectionId, {});
+              app.showToast('Recolecci\u00F3n confirmada \u2713');
+              reloadFn();
+            } catch (err) {
+              b.disabled = false; b.textContent = '\u2713 Confirmar sin selecci\u00F3n de lote';
+              if (lotsErrEl) { lotsErrEl.textContent = err?.message || 'Error al confirmar.'; lotsErrEl.hidden = false; }
+            }
+          });
+
+          btn.hidden = true;
+          return;
+        }
+
+        const pickersHtml = lotModels.map((m) => {
+          const html = renderers.renderLotPicker(m);
+          return html.replace(
+            'class="lot-picker-block"',
+            `class="lot-picker-block" data-required-qty="${m.requiredQuantity}" data-tolerance-pct="${m.toleranceDefaultPercent}"`,
+          );
+        }).join('');
+
+        slot.innerHTML = `
+          <section style="margin-top:0.25rem" aria-label="Selector de lotes para recolecci\u00F3n">
+            <h4 style="margin:0 0 0.5rem;font-weight:600">Selecciona los lotes a recolectar</h4>
+            ${pickersHtml}
+            <div class="wh-form-actions" style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap">
+              <button type="button" class="primary-button wh-recolection-confirm-lots"
+                      data-order-id="${escapeHtml(orderId)}"
+                      data-recolection-id="${escapeHtml(String(recolectionId))}">
+                &#10003; Confirmar recolecci\u00F3n
+              </button>
+            </div>
+            <p class="recolection-lots-error wh-error-msg" hidden role="alert" aria-live="assertive"></p>
+          </section>`;
+
+        // Wire lot-picker live validation
+        attachLotPickerHandlers(slot);
+
+        // Wire confirm button
+        slot.querySelector('.wh-recolection-confirm-lots')?.addEventListener('click', async (e) => {
+          const confirmBtn = /** @type {HTMLButtonElement} */ (e.currentTarget);
+          const lotsErrEl = slot.querySelector('.recolection-lots-error');
+          if (lotsErrEl) { lotsErrEl.hidden = true; }
+
+          const entries = [];
+          slot.querySelectorAll('.lot-picker-block').forEach((block) => {
+            const productId = block.dataset.productId;
+            block.querySelectorAll('.lot-row').forEach((row) => {
+              const lotId = row.querySelector('.lot-select')?.value;
+              const qty = Number(row.querySelector('.lot-qty')?.value || '0');
+              if (lotId && qty > 0) {
+                entries.push({ productId: Number(productId), lotId: Number(lotId), quantity: qty });
+              }
+            });
+          });
+
+          if (entries.length === 0) {
+            if (lotsErrEl) { lotsErrEl.textContent = 'Selecciona al menos un lote antes de confirmar.'; lotsErrEl.hidden = false; }
+            return;
+          }
+
+          confirmBtn.disabled = true;
+          confirmBtn.textContent = 'Confirmando...';
+
+          try {
+            await api.confirmRecolection(session, orderId, recolectionId, { entries });
+            app.showToast('Recolecci\u00F3n confirmada \u2713');
+            reloadFn();
+          } catch (err) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = '\u2713 Confirmar recolecci\u00F3n';
+            if (lotsErrEl) { lotsErrEl.textContent = err?.message || 'Error al confirmar.'; lotsErrEl.hidden = false; }
+          }
+        });
+
+        btn.hidden = true; // Hide the "Preparar" button once the form is shown
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '\uD83D\uDCCB Preparar recolecci\u00F3n con lotes disponibles';
+        if (errEl) { errEl.textContent = err?.message || 'Error al cargar lotes disponibles.'; errEl.hidden = false; }
+      }
     });
   });
 }
@@ -402,10 +601,33 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
     btn.addEventListener('click', () => {
       const stageId = btn.dataset.stageId;
       const vm = stagesVm.find((v) => String(v.stage?.id) === String(stageId));
-      if (!vm) { return; }
+      if (!vm) {
+        // vm not found — this is a bug; make it visible instead of silent.
+        console.error('[rummy] execute-stage: vm not found for stageId', stageId, 'stagesVm:', stagesVm);
+        return;
+      }
+      const originalLabel = btn.textContent;
+      btn.dataset.originalLabel = originalLabel;
       btn.disabled = true;
+      btn.textContent = 'Cargando...';
       btn.setAttribute('aria-expanded', 'true');
-      attachExecuteStageHandlers(container, session, order, vm.stage, reloadFn);
+      attachExecuteStageHandlers(container, session, order, vm.stage, reloadFn)
+        .catch((err) => {
+          console.error('[rummy] attachExecuteStageHandlers failed:', err);
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+          btn.setAttribute('aria-expanded', 'false');
+          // Show the error near the stage card so the user knows what happened.
+          const card = btn.closest('li');
+          let errEl = card?.querySelector('.exec-load-error');
+          if (!errEl) {
+            errEl = document.createElement('p');
+            errEl.className = 'exec-load-error wh-error-msg';
+            btn.closest('.wh-stage-actions')?.insertAdjacentElement('afterend', errEl);
+          }
+          errEl.textContent = err?.message || 'Error al abrir el formulario. Intenta de nuevo.';
+          errEl.hidden = false;
+        });
     });
   });
 
@@ -417,6 +639,66 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
       btn.disabled = true;
       btn.setAttribute('aria-expanded', 'true');
       attachQaAnalysisHandlers(container, session, order, vm.stage, reloadFn);
+    });
+  });
+
+  // TASK-007 (qa-rejection-material-reconciliation-amendment): reconciliation panel handler (AUD-002 fix)
+  // The reconciliation panel is injected when the stage transitions to REPLACEMENT_RECOVERY_DONE.
+  // If a .wh-reconciliation-panel is already in the DOM (e.g. re-rendered), re-attach its handlers.
+  (() => {
+    const reconcPanel = container.querySelector('.wh-reconciliation-panel');
+    if (reconcPanel) {
+      const rOid = reconcPanel.getAttribute('data-order-id') || order.id;
+      const rRid = reconcPanel.getAttribute('data-recolection-id');
+      if (rRid) {
+        const rejCtrl = WarehouseShell.require('views.productionControllersRejection');
+        const rejRenders = WarehouseShell.require('views.productionRenderersRejection');
+        rejCtrl.attachReconciliationHandlers(
+          container,
+          { orderId: rOid, recolectionId: rRid },
+          session,
+          { warehouseApi: api, renderReconciliationPanel: rejRenders.renderReconciliationPanel, app },
+        );
+      }
+    }
+  })();
+
+  // Recolection lot-picker flow — loads available lots and renders interactive picker
+  attachRecolectionFormHandlers(container, session, order, reloadFn);
+
+  // TASK-007 (qa-rejection-disposition): confirm recolection handler (replacement recovery path)
+  container.querySelectorAll('.wh-confirm-recolection-submit-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const recolectionId = btn.dataset.recolectionId;
+      const orderId = btn.dataset.orderId || order.id;
+      const card = btn.closest('li');
+      const errEl = card?.querySelector('.recolection-confirm-error');
+      if (!recolectionId) { return; }
+
+      const entryRows = Array.from(card?.querySelectorAll('.wh-recovery-entry-row') || []);
+      const entries = entryRows.map((row) => {
+        const productId = row.getAttribute('data-product-id');
+        const lotId = row.querySelector('.wh-recovery-entry-lot-id')?.value?.trim();
+        const quantity = Number(row.querySelector('.wh-recovery-entry-qty')?.value || '0');
+        const unit = row.querySelector('.wh-recovery-entry-unit')?.value?.trim() || undefined;
+        return { productId: productId ? Number(productId) : undefined, lotId: lotId ? Number(lotId) : undefined, quantity, unit };
+      }).filter((entry) => entry.productId && entry.lotId && entry.quantity > 0);
+
+      if (entryRows.length > 0 && entries.length !== entryRows.length) {
+        if (errEl) { errEl.textContent = 'Completa lote y cantidad para todos los materiales repuestos.'; errEl.hidden = false; }
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Confirmando...';
+      if (errEl) { errEl.hidden = true; }
+      api.confirmRecolection(session, orderId, recolectionId, { entries })
+        .then(() => { app.showToast('Recolección confirmada ✓'); reloadFn(); })
+        .catch((err) => {
+          btn.disabled = false;
+          btn.textContent = '✓ Confirmar disponibilidad de material';
+          if (errEl) { errEl.textContent = err?.message || 'No se pudo confirmar la recolección.'; errEl.hidden = false; }
+        });
     });
   });
 
@@ -476,6 +758,123 @@ function attachOrderDetailHandlers(container, session, order, stagesVm, reloadFn
         if (completeErr) { completeErr.textContent = err?.message || 'No se pudo completar la orden.'; completeErr.hidden = false; }
       });
   });
+
+  // Adjuntar handler del boton «Cancelar orden» (wh-terminate-production-btn).
+  // Este modulo esta separado en production.controllers.rejection.js pero el boton
+  // se renderiza dentro del detalle de la orden, por lo que debe adjuntarse aqui.
+  const rejectionControllers = WarehouseShell.require('views.productionControllersRejection');
+  rejectionControllers.attachTerminateProductionHandler(container, session, {
+    warehouseApi: api,
+    app,
+    order,
+  });
+
+  // Auto-populate lot dropdowns for REPLACEMENT_RECOVERY cards.
+  // Each card carries data-recipe-stage-id (the rejected PROCESSING stage).
+  // PROCESSING stages often have no productId inputs — the productIds live in the
+  // prior RECOLLECTION stage. We try the processing stage first; if it returns no
+  // products, we fall back to any RECOLLECTION stage in the snapshot that covers
+  // the required products (identified via data-product-id on entry rows).
+  (async () => {
+    const snapshotStages = Array.isArray(
+      order?.recipeVersionSnapshot?.recipeVersion?.stages,
+    ) ? order.recipeVersionSnapshot.recipeVersion.stages : [];
+
+    const recoveryCards = container.querySelectorAll('.wh-stage-card--replacement');
+    for (const card of recoveryCards) {
+      const recipeStageId = card.dataset.recipeStageId;
+      if (!recipeStageId) { continue; }
+      const entryRows = card.querySelectorAll('.wh-recovery-entry-row');
+      if (!entryRows.length) { continue; }
+
+
+      let productLots = {}; // productId string → sorted lot array
+      try {
+        // Try the rejected processing stage first. Processing stages often have no
+        // productId inputs — those live in the prior RECOLLECTION stage(s).
+        let lotsResponse = await api.getAvailableLotsForStage(session, order.id, recipeStageId);
+
+        // Fallback: if the processing stage returned no products, try every RECOLLECTION
+        // stage in the snapshot and merge results. No productId pre-filtering here —
+        // the entry rows already constrain which products are shown in the form.
+        if (!(lotsResponse.products || []).length) {
+          const merged = [];
+          const seenProductIds = new Set();
+          for (const s of snapshotStages) {
+            // Do NOT filter by stageType — recipes may name a recolection stage as
+            // PROCESSING type. Any stage with productId inputs is a valid lot source.
+            if (!Array.isArray(s.stageInputs) || !s.stageInputs.some((inp) => inp.productId)) { continue; }
+            const r = await api.getAvailableLotsForStage(session, order.id, String(s.id));
+            for (const p of (r.products || [])) {
+              const pid = String(p.productId);
+              if (!seenProductIds.has(pid)) {
+                seenProductIds.add(pid);
+                merged.push(p);
+              }
+            }
+          }
+          lotsResponse = { products: merged };
+        }
+
+        for (const p of (lotsResponse.products || [])) {
+          const sorted = (p.lots || []).slice().sort(
+            (a, b) => Number(b.availableQuantity ?? 0) - Number(a.availableQuantity ?? 0),
+          );
+          productLots[String(p.productId)] = sorted;
+        }
+      } catch (err) {
+        console.log('[recovery-lots] ERROR fetching lots', err?.message || err);
+        continue;
+      }
+
+      for (const row of entryRows) {
+        const productId = row.dataset.productId;
+        // When productId is missing from the row (requiredItems stored without catalog link),
+        // fall back to the first product in the lots map — single-product recovery is the
+        // common case and this avoids a dead-end fallback input.
+        const lots = productLots[productId]
+          || (Object.values(productLots)[Array.from(entryRows).indexOf(row)] ?? []);
+        const select = row.querySelector('.wh-recovery-entry-lot-id');
+        if (!select) { continue; }
+        const unit = row.dataset.defaultUnit || '';
+
+        if (!lots.length) {
+          // No stock in origin warehouse for this product. Replace the select with a
+          // plain text input so the operator can enter the incoming lot ID manually.
+          // This covers the common replacement scenario where new material arrives and
+          // hasn't been received into the warehouse system yet.
+          const fallbackInput = document.createElement('input');
+          fallbackInput.type = 'number';
+          fallbackInput.min = '1';
+          fallbackInput.step = '1';
+          fallbackInput.className = 'wh-recovery-entry-lot-id';
+          fallbackInput.required = true;
+          fallbackInput.placeholder = 'ID del lote a reponer';
+          fallbackInput.setAttribute('aria-label', 'ID del lote de reposición');
+          const hint = document.createElement('p');
+          hint.className = 'wh-caption wh-caption--warning';
+          hint.style.margin = '0.25rem 0 0';
+          hint.textContent = '⚠️ No hay lotes con stock en bodega. Ingresa el ID del lote de reposición manualmente, o recibí el material primero desde Recepciones.';
+          select.replaceWith(fallbackInput);
+          fallbackInput.insertAdjacentElement('afterend', hint);
+          continue;
+        }
+
+        // Build options: recommended (most stock) is first and pre-selected
+        const options = lots.map((lot, i) => {
+          const expLabel = lot.expirationDate ? String(lot.expirationDate).slice(0, 10) : 'Sin venc.';
+          const label = `${lot.lotNumber || `Lote #${lot.lotId}`} — Disp: ${lot.availableQuantity ?? '?'} ${unit} — Venc: ${expLabel}`;
+          const recommended = i === 0 ? ' (recomendado)' : '';
+          return `<option value="${lot.lotId}" ${i === 0 ? 'selected' : ''}>${label}${recommended}</option>`;
+        }).join('');
+
+        select.innerHTML = `<option value="">Selecciona un lote...</option>${options}`;
+        // Auto-select the recommended lot
+        select.value = String(lots[0].lotId);
+        select.disabled = false;
+      }
+    }
+  })();
 }
 
 WarehouseShell.register('views.productionControllers', {

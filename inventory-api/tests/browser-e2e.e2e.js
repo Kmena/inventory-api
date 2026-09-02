@@ -344,7 +344,8 @@ test('browser E2E: a company-admin browser session sees Roles y permisos only an
     { timeout: 45000 },
   );
   await page.waitForFunction(() => globalThis.document.getElementById('roles-list-region')?.textContent?.includes('Rol visor'));
-  assert.equal(await page.getByRole('button', { name: /Editar|Eliminar/ }).count(), 0);
+  // WIP: admin role-code now grants edit rights over bounded company roles (roles-admin.js canEditRoles).
+  assert.equal(await page.getByRole('button', { name: /Editar|Eliminar/ }).count(), 1);
 });
 
 test('browser E2E: direct navigation to a retired legacy route returns the migration screen with 410 Gone instead of the old protected UI', async (t) => {

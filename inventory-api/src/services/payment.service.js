@@ -125,14 +125,16 @@ function buildPaymentAuditState(payment, extraState = {}) {
   };
 }
 
-async function createPayment(payload, auth, req = null) {
-  const companyId = assertCompanyScope(auth);
-  assertHasAnyPermission(auth, PAYMENT_MANAGE_OWN_PERMISSIONS, 'No tiene permisos para registrar pagos');
+/**
+ * Core payment creation — no permission check.
+ * Callers are responsible for authorization before invoking this.
+ * @internal
+ */
+async function createPaymentCore(payload, companyId, auth, req = null) {
   const invoice = await validatePaymentInvoice(payload.invoiceId, companyId);
   assertInvoiceAllowsNewPayments(invoice);
 
   const normalizedReceiptFile = normalizeReceiptFile(payload.receiptFile);
-
   const paymentId = normalizedReceiptFile ? await paymentRepository.reservePaymentId() : null;
   /** @type {any} */
   let payment;
@@ -163,9 +165,7 @@ async function createPayment(payload, auth, req = null) {
           submittedAt: new Date(),
         });
   } catch (error) {
-    if (error?.statusCode) {
-      throw error;
-    }
+    if (error?.statusCode) throw error;
     throw createHttpError(500, 'No se pudo guardar la evidencia del pago', 'internal_server_error');
   }
 
@@ -184,6 +184,15 @@ async function createPayment(payload, auth, req = null) {
   });
 
   return serializePayment(createdPayment);
+}
+
+async function createPayment(payload, auth, req = null) {
+  const companyId = assertCompanyScope(auth);
+  assertHasAnyPermission(auth, PAYMENT_MANAGE_OWN_PERMISSIONS, 'No tiene permisos para registrar pagos');
+  const invoice = await validatePaymentInvoice(payload.invoiceId, companyId);
+  assertInvoiceAllowsNewPayments(invoice);
+
+  return createPaymentCore(payload, companyId, auth, req);
 }
 
 async function updatePayment(id, payload, auth, req = null) {
@@ -299,15 +308,29 @@ async function approvePayment(id, payload, auth, req = null) {
     }
 
     // TASK-015: Decrement client creditBalance when payment is approved.
+    // Chain: payment → invoice.clientId → client.update.
     const approvedInvoice = await tx.invoice.findUnique({
       where: { id: transactionalPayment.invoiceId },
-      select: { clientId: true },
+      select: { orderId: true, clientId: true },
     });
     if (approvedInvoice?.clientId) {
       await tx.client.update({
         where: { id: approvedInvoice.clientId },
         data: { creditBalance: { decrement: transactionalPayment.amount } },
       });
+    }
+    if (approvedInvoice?.orderId) {
+      const invoiceOrder = await tx.order.findUnique({
+        where: { id: approvedInvoice.orderId },
+        select: { clientStoreId: true },
+      });
+      if (invoiceOrder?.clientStoreId) {
+        // AUD-API-002: scope by companyId through the client relation to prevent cross-tenant mutation.
+        await tx.clientStore.updateMany({
+          where: { id: invoiceOrder.clientStoreId, client: { companyId: BigInt(companyId) } },
+          data: { creditBalance: { decrement: transactionalPayment.amount } },
+        });
+      }
     }
 
     const synchronizedInvoiceResult = await synchronizeInvoiceFinancialState(transactionalPayment.invoiceId, companyId, tx);
@@ -404,15 +427,29 @@ async function reversePayment(id, auth, reason, req = null) {
     const reversedPaymentResult = await paymentRepository.findCompanyPaymentById(id, companyId, {}, tx);
 
     // TASK-015: Increment client creditBalance when an approved payment is reversed.
+    // Chain: payment → invoice.clientId → client.update.
     const reversedInvoice = await tx.invoice.findUnique({
       where: { id: transactionalPayment.invoiceId },
-      select: { clientId: true },
+      select: { orderId: true, clientId: true },
     });
     if (reversedInvoice?.clientId) {
       await tx.client.update({
         where: { id: reversedInvoice.clientId },
         data: { creditBalance: { increment: transactionalPayment.amount } },
       });
+    }
+    if (reversedInvoice?.orderId) {
+      const reversedOrder = await tx.order.findUnique({
+        where: { id: reversedInvoice.orderId },
+        select: { clientStoreId: true },
+      });
+      if (reversedOrder?.clientStoreId) {
+        // AUD-API-002: scope by companyId through the client relation to prevent cross-tenant mutation.
+        await tx.clientStore.updateMany({
+          where: { id: reversedOrder.clientStoreId, client: { companyId: BigInt(companyId) } },
+          data: { creditBalance: { increment: transactionalPayment.amount } },
+        });
+      }
     }
 
     const synchronizedInvoiceResult = await synchronizeInvoiceFinancialState(transactionalPayment.invoiceId, companyId, tx);
@@ -480,6 +517,7 @@ async function getPaymentReceiptDownload(paymentId, receiptId, auth) {
 }
 
 module.exports = {
+  createPaymentCore,
   listPayments,
   getPayment,
   getPaymentReceiptDownload,

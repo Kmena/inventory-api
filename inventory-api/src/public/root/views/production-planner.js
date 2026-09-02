@@ -94,6 +94,104 @@
     return n.toLocaleString('es-CR', { maximumFractionDigits: 3 });
   }
 
+  /**
+   * TASK-006: Implementación cliente de la misma lógica que product-size-conversion.helper.js.
+   * Derivar kg por unidad comercial a partir de los campos de presentación del producto.
+   * Returns null cuando faltan datos requeridos (se oculta el preview en ese caso).
+   *
+   * @param {object} product - Objeto con campos de conversión del productStockMap.
+   * @returns {number|null}
+   */
+  function deriveKgPerUnitClient(product) {
+    const { presentationType, netContent, netContentUnit, density, kgConversionFactor } = product;
+
+    if (!presentationType) {
+      // Legado: usar kgConversionFactor si existe, sino 1.
+      return Number(kgConversionFactor != null ? kgConversionFactor : 1);
+    }
+
+    if (presentationType === 'VOLUME') {
+      if (!netContent || netContent <= 0) return null;
+      if (!netContentUnit || (netContentUnit !== 'ML' && netContentUnit !== 'L')) return null;
+      if (!density || density <= 0) return null;
+      const contentInLiters = netContentUnit === 'ML' ? netContent * 0.001 : netContent;
+      return contentInLiters * density;
+    }
+
+    if (presentationType === 'MASS') {
+      if (!netContent || netContent <= 0) return null;
+      if (!netContentUnit || (netContentUnit !== 'G' && netContentUnit !== 'KG')) return null;
+      return netContentUnit === 'G' ? netContent * 0.001 : netContent;
+    }
+
+    if (presentationType === 'LENGTH') {
+      if (!netContent || netContent <= 0) return null;
+      if (!kgConversionFactor || kgConversionFactor <= 0) return null;
+      return netContent * kgConversionFactor;
+    }
+
+    if (presentationType === 'COUNT') {
+      return Number(kgConversionFactor != null ? kgConversionFactor : 1);
+    }
+
+    return null;
+  }
+
+  /**
+   * Renders a compact material-availability panel for the planner dialog.
+   * Compares required quantity (ingredient.quantity × qty) against available
+   * stock from productStockMap. Returns empty string if no data to show.
+   *
+   * @param {Array<object>} ingredients - from approved recipe version
+   * @param {number}        qty         - production quantity entered by user
+   * @param {Map<string,object>} productStockMap - productId → { quantity, name, unit, code }
+   */
+  function renderIngredientAvailability(ingredients, qty, productStockMap) {
+    if (!ingredients || !ingredients.length || !qty || qty <= 0) { return ''; }
+
+    let allOk = true;
+    const rows = ingredients.map((ing) => {
+      const stock   = productStockMap.get(String(ing.productId)) || {};
+      const avail   = stock.quantity ?? 0;
+      const needed  = Number(ing.quantity) * qty;
+      const unit    = ing.product?.unit   || stock.unit || '';
+      const name    = ing.product?.name   || stock.name || `Insumo #${ing.productId}`;
+      const code    = ing.product?.code   || stock.code || '';
+      const ok      = avail >= needed - 0.0001;
+      if (!ok) { allOk = false; }
+      const diff    = formatQty(needed - avail);
+      const status  = ok
+        ? '<span style="color:green">✓</span>'
+        : `<span style="color:#c00">✗ falta ${escapeHtml(diff)} ${escapeHtml(unit)}</span>`;
+      return `<tr>
+        <td style="padding:3px 4px">${escapeHtml(name)}${code ? ` <small class="muted">(${escapeHtml(code)})</small>` : ''}</td>
+        <td style="text-align:right;padding:3px 4px;white-space:nowrap">${escapeHtml(formatQty(needed))} ${escapeHtml(unit)}</td>
+        <td style="text-align:right;padding:3px 4px;white-space:nowrap">${escapeHtml(formatQty(avail))} ${escapeHtml(unit)}</td>
+        <td style="padding:3px 4px">${status}</td>
+      </tr>`;
+    }).join('');
+
+    const bg     = allOk ? '#e6f4ea' : '#fff3cd';
+    const border = allOk ? '#4caf50' : '#ffc107';
+    const title  = allOk ? '✅ Suficiente materia prima' : '⚠️ Stock insuficiente para algunos insumos';
+
+    return `
+      <div style="background:${bg};border:1px solid ${border};border-radius:6px;padding:10px 12px;font-size:.87em">
+        <strong style="display:block;margin-bottom:6px">${title}</strong>
+        <table style="width:100%;min-width:480px;border-collapse:collapse">
+          <thead>
+            <tr style="border-bottom:1px solid rgba(0,0,0,.12)">
+              <th style="text-align:left;padding:2px 6px;font-weight:600;color:#555">Insumo</th>
+              <th style="text-align:right;padding:2px 6px;font-weight:600;color:#555">Requerido</th>
+              <th style="text-align:right;padding:2px 6px;font-weight:600;color:#555">Disponible</th>
+              <th style="padding:2px 6px;font-weight:600;color:#555">Estado</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
   // -------------------------------------------------------------------
   // Data loading
   // -------------------------------------------------------------------
@@ -101,8 +199,28 @@
   async function loadPlannerData(session, deps) {
     const products = await deps.productsApi.listProducts(session);
     const list = Array.isArray(products) ? products : (products?.items || []);
+
+    // Build stock map for ALL products so the dialog can check ingredient availability.
+    const productStockMap = new Map();
+    for (const p of list) {
+      if (p && p.id != null) {
+        productStockMap.set(String(p.id), {
+          quantity: toNum(p.quantity) ?? 0,
+          name: p.name || `Producto #${p.id}`,
+          unit: p.unit || '',
+          code: p.code || '',
+          // TASK-006: campos de conversión para el preview de kg planeados.
+          presentationType: p.presentationType || null,
+          netContent: toNum(p.netContent),
+          netContentUnit: p.netContentUnit || null,
+          density: toNum(p.density),
+          kgConversionFactor: toNum(p.kgConversionFactor),
+        });
+      }
+    }
+
     const withRecipe = list.filter((p) => p && p.recipeId != null && p.isActive !== false);
-    return withRecipe.map((p) => {
+    const rows = withRecipe.map((p) => {
       const qty = toNum(p.quantity);
       const min = toNum(p.minStock);
       const max = toNum(p.maxStock);
@@ -124,6 +242,7 @@
       if (sa !== sb) { return sa - sb; }
       return a.name.localeCompare(b.name);
     });
+    return { rows, productStockMap };
   }
 
   // -------------------------------------------------------------------
@@ -155,7 +274,7 @@
           <div id="planner-table-region" aria-live="polite"></div>
         </article>
 
-        <dialog id="planner-order-dialog" class="planner-dialog" aria-labelledby="planner-dialog-title" style="max-width:520px;width:calc(100% - 32px);border:none;border-radius:12px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+        <dialog id="planner-order-dialog" class="planner-dialog" aria-labelledby="planner-dialog-title" style="max-width:720px;width:calc(100% - 32px);max-height:90vh;overflow-y:auto;border:none;border-radius:12px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
           <form id="planner-order-form" method="dialog">
             <header style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px">
               <div>
@@ -172,6 +291,14 @@
               <span>Cantidad a producir *</span>
               <input type="number" id="planner-field-quantity" min="0.001" step="0.001" required />
             </label>
+            <!-- TASK-006: preview estimado de kg planeados (solo visible cuando el producto
+                 tiene presentationType configurado y la cantidad es válida). -->
+            <p id="planner-kg-preview"
+               aria-live="polite"
+               class="muted"
+               style="display:none;margin:-6px 0 12px 0;font-size:0.875rem">
+              Kg planeados: <strong id="planner-kg-preview-value">—</strong>
+            </p>
             <label style="display:block;margin-bottom:12px">
               <span>Codigo de lote de produccion *</span>
               <input type="text" id="planner-field-lot-code" maxlength="100" required placeholder="Ej. LOT-2025-001" />
@@ -192,6 +319,12 @@
               <span>Fecha planificada (opcional)</span>
               <input type="date" id="planner-field-planned-date" />
             </label>
+            <label style="display:block;margin-bottom:12px" id="planner-version-field">
+              <span>Version de receta *</span>
+              <select id="planner-field-recipe-version" required></select>
+            </label>
+
+            <div id="planner-ingredients-preview" aria-live="polite" style="margin-bottom:12px;overflow-x:auto;max-height:260px;overflow-y:auto"></div>
 
             <footer style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
               <button type="button" class="secondary-button" id="planner-dialog-cancel">Cancelar</button>
@@ -286,7 +419,7 @@
     const value = (id) => /** @type {HTMLInputElement|HTMLSelectElement} */ (dialog.querySelector(id))?.value?.trim() || '';
     const payload = {
       productId: ctx.productId,
-      recipeVersionId: ctx.recipeVersionId,
+      recipeVersionId: value('#planner-field-recipe-version') || ctx.recipeVersionId,
       quantity: Number(value('#planner-field-quantity')),
       productionLotCode: value('#planner-field-lot-code'),
       originWarehouseId: value('#planner-field-origin-wh'),
@@ -313,7 +446,7 @@
     return null;
   }
 
-  async function openDialog(container, session, dialogCtx, refs, dialogState, deps) {
+  async function openDialog(container, session, dialogCtx, refs, dialogState, deps, productStockMap) {
     const dialog = /** @type {HTMLDialogElement} */ (container.querySelector('#planner-order-dialog'));
     if (!dialog) { return; }
 
@@ -338,34 +471,102 @@
       }
     }
 
-    // Resolve recipeVersionId lazily and cache per recipeId to avoid re-fetching.
-    let recipeVersionId = dialogState.recipeVersionCache.get(String(dialogCtx.recipeId));
-    if (!recipeVersionId) {
+    // Resolve approved versions lazily; cache per recipeId.
+    let cached = dialogState.recipeVersionCache.get(String(dialogCtx.recipeId));
+    if (!cached) {
       try {
         const recipe = await deps.recipesApi.getRecipe(session, dialogCtx.recipeId);
-        recipeVersionId = recipe?.latestApprovedVersionId;
-        if (!recipeVersionId) {
+        const vId = recipe?.latestApprovedVersionId;
+        if (!vId) {
           setDialogError(dialog, 'La receta de este producto no tiene una version aprobada. Aprueba una version antes de crear la orden.');
           dialog.showModal();
           return;
         }
-        dialogState.recipeVersionCache.set(String(dialogCtx.recipeId), recipeVersionId);
+        const approvedVersions = (recipe?.versions || []).filter((v) => v.status === 'APPROVED');
+        cached = { defaultVersionId: vId, approvedVersions };
+        dialogState.recipeVersionCache.set(String(dialogCtx.recipeId), cached);
       } catch (err) {
         setDialogError(dialog, err?.message || 'No se pudo cargar la receta.');
         return;
       }
     }
-    dialogCtx.recipeVersionId = recipeVersionId;
+    dialogCtx.recipeVersionId = cached.defaultVersionId;
     refs.currentCtx = dialogCtx;
+
+    // Populate version select with all approved versions.
+    const versionSelect = /** @type {HTMLSelectElement} */ (dialog.querySelector('#planner-field-recipe-version'));
+    if (versionSelect) {
+      versionSelect.innerHTML = cached.approvedVersions.map((v) => {
+        const isDefault = String(v.id) === String(cached.defaultVersionId);
+        const label = `v${v.versionNumber} — ${(v.stages || []).length} etapa(s)${isDefault ? ' · activa ✓' : ''}`;
+        return `<option value="${escapeHtml(String(v.id))}"${isDefault ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+      }).join('');
+    }
 
     // Prefill product name + suggested quantity.
     const productLabel = dialog.querySelector('#planner-dialog-product');
     if (productLabel) { productLabel.textContent = dialogCtx.productName; }
     const qtyInput = /** @type {HTMLInputElement} */ (dialog.querySelector('#planner-field-quantity'));
-    if (qtyInput) {
-      qtyInput.value = dialogCtx.suggested ? String(dialogCtx.suggested) : '';
+    if (qtyInput) { qtyInput.value = dialogCtx.suggested ? String(dialogCtx.suggested) : ''; }
+
+    // Wire live ingredient-availability preview (reacts to qty AND version changes).
+    const ingPreview = dialog.querySelector('#planner-ingredients-preview');
+
+    // TASK-006: refs al preview de kg planeados.
+    const kgPreviewEl = dialog.querySelector('#planner-kg-preview');
+    const kgPreviewValueEl = dialog.querySelector('#planner-kg-preview-value');
+    const plannerProduct = productStockMap.get(String(dialogCtx.productId));
+
+    /**
+     * Actualiza el indicador de kg planeados debajo del input de cantidad.
+     * Solo se muestra cuando el producto tiene presentationType configurado
+     * y la cantidad ingresada es un número positivo válido.
+     */
+    function updateKgPreview() {
+      if (!kgPreviewEl || !kgPreviewValueEl || !plannerProduct) {
+        if (kgPreviewEl) kgPreviewEl.style.display = 'none';
+        return;
+      }
+      // Productos legacy (sin presentationType) solo muestran el preview si tienen kgConversionFactor
+      // distinto de 1 o si explicitamente tienen el tipo definido.
+      if (!plannerProduct.presentationType) {
+        kgPreviewEl.style.display = 'none';
+        return;
+      }
+      const qty = Number(qtyInput?.value || 0);
+      const kgPerUnit = deriveKgPerUnitClient(plannerProduct);
+      if (kgPerUnit === null || !Number.isFinite(qty) || qty <= 0) {
+        kgPreviewEl.style.display = 'none';
+        return;
+      }
+      kgPreviewValueEl.textContent = (qty * kgPerUnit).toFixed(3) + ' kg';
+      kgPreviewEl.style.display = '';
     }
+
+    function updatePreview() {
+      const qty    = Number(qtyInput?.value || 0);
+      const selVer = cached.approvedVersions.find((v) => String(v.id) === (versionSelect?.value || cached.defaultVersionId));
+      const ings   = selVer?.ingredients || [];
+
+      // PER_OUTPUT_KG recipes express ingredient quantities per kg of finished
+      // product, so we must scale by (kgPerUnit × qty), not by unit count alone.
+      // Passing raw qty would multiply by units and over-report requirements.
+      const quantityBasis = selVer?.quantityBasis ?? 'PER_OUTPUT_KG';
+      const kgPerUnit     = deriveKgPerUnitClient(plannerProduct) ?? 1;
+      const scalingQty    = quantityBasis === 'PER_OUTPUT_KG' ? kgPerUnit * qty : qty;
+
+      if (ingPreview) { ingPreview.innerHTML = renderIngredientAvailability(ings, scalingQty, productStockMap); }
+      updateKgPreview();
+    }
+    if (dialogState.currentQtyListener && qtyInput) {
+      qtyInput.removeEventListener('input', dialogState.currentQtyListener);
+    }
+    dialogState.currentQtyListener = updatePreview;
+    qtyInput?.addEventListener('input', updatePreview);
+    versionSelect?.addEventListener('change', updatePreview);
+
     setDialogError(dialog, '');
+    updatePreview();
     dialog.showModal();
   }
 
@@ -422,14 +623,18 @@
     const dialogState = {
       dropdownsLoaded: false,
       recipeVersionCache: new Map(),
+      currentQtyListener: null,
     };
     const refs = { currentCtx: null };
+    let productStockMap = new Map();
 
     async function refresh() {
       setShellStatus('Cargando planificador...');
       if (pageMessage) { pageMessage.innerHTML = ''; }
       try {
-        const rows = await loadPlannerData(session, deps);
+        const result = await loadPlannerData(session, deps);
+        const { rows } = result;
+        productStockMap = result.productStockMap; // refresh for next dialog open
         if (summary) {
           const critical = rows.filter((r) => r.status === 'critical').length;
           const low = rows.filter((r) => r.status === 'low').length;
@@ -459,7 +664,7 @@
         productName: el.dataset.productName || '',
         suggested: el.dataset.suggested ? Number(el.dataset.suggested) : null,
       };
-      openDialog(container, session, dialogCtx, refs, dialogState, deps);
+      openDialog(container, session, dialogCtx, refs, dialogState, deps, productStockMap);
     });
 
     wireDialog(container, session, refs, dialogState, deps, () => {

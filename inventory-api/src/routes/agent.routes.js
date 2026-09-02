@@ -7,7 +7,9 @@ const { parseBigIntId } = require('../lib/parse');
 const {
   createAgentVisitSchema,
   createAgentOrderSchema,
+  createAgentPaymentSchema,
 } = require('../schemas/agent-workspace.schema');
+const { highPayloadParsers } = require('../middlewares/request-payload');
 const agentWorkspaceService = require('../services/agent-workspace.service');
 
 const router = express.Router();
@@ -93,6 +95,15 @@ router.get('/orders', authorizeAccessPolicy('agent.workspace.access'), async (re
   }
 });
 
+// Agent corrects a REJECTED order and resubmits it atomically (no order.update perm needed).
+router.post('/orders/:orderId/correct', authorizeAccessPolicy('agent.workspace.access'), validate(createAgentOrderSchema), async (req, res, next) => {
+  try {
+    return res.json(await agentWorkspaceService.correctAndResubmitAgentOrder(parseBigIntId(req.params.orderId, 'orderId'), req.body, req.auth));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/stores/:storeId/orders', authorizeAccessPolicy('agent.workspace.access'), validate(createAgentOrderSchema), async (req, res, next) => {
   try {
     return res.status(201).json(await agentWorkspaceService.createAgentStoreOrder(parseBigIntId(req.params.storeId, 'storeId'), req.body, req.auth));
@@ -100,5 +111,27 @@ router.post('/stores/:storeId/orders', authorizeAccessPolicy('agent.workspace.ac
     return next(error);
   }
 });
+
+// Register a payment collected from a client store
+router.post(
+  '/stores/:storeId/payments',
+  ...highPayloadParsers,
+  authorizeAccessPolicy('agent.workspace.access'),
+  validate(createAgentPaymentSchema),
+  async (req, res, next) => {
+    try {
+      return res.status(201).json(
+        await agentWorkspaceService.createAgentPayment(
+          parseBigIntId(req.params.storeId, 'storeId'),
+          req.body,
+          req.auth,
+          req,
+        ),
+      );
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 module.exports = router;

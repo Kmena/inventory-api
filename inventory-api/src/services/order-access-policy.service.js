@@ -78,9 +78,9 @@ function assertDraftEditAccess(order, authScope, auth) {
   if (hasGlobalSalesAccess(auth)) {
     return;
   }
-
+  // Agents can edit their own DRAFT or REJECTED orders (REJECTED = office sent it back for correction).
   if (order.userId !== authScope.userId) {
-    throw createHttpError(403, 'El agente solo puede editar sus propios pedidos en borrador', 'forbidden');
+    throw createHttpError(403, 'El agente solo puede editar sus propios pedidos en borrador o rechazados', 'forbidden');
   }
 }
 
@@ -143,12 +143,21 @@ function toOrderCreateData(payload, authScope) {
     ...rest
   } = payload;
   const isCashOverride = rest.paymentCondition === 'CASH' ? { isCash: true } : {};
+  // Compute order total from line items so Order.total is always accurate
+  const computedTotal = Math.max(
+    0,
+    (items || []).reduce(
+      (sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0) - Number(item.totalDiscount || 0)),
+      0,
+    ),
+  );
   return {
     ...rest,
     ...(warehouseId === null || warehouseId === undefined ? {} : { warehouseId }),
     ...isCashOverride,
     companyId: authScope.companyId,
     userId: authScope.userId,
+    total: computedTotal,
     status: 'DRAFT',
     approved: false,
     approvedAt: null,

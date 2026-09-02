@@ -620,14 +620,22 @@ async function getRfqTrackingSummary(auth) {
 
     const serializedQuotations = (req.quotations || []).map((quotation) => {
       const relatedInvitation = invitations.find((invitation) => String(invitation.quotationId) === String(quotation.id));
+      // Distinguish direct-entry quotations (tagged with evidence._source) from
+      // catalog-assisted ones (evidence: null). Only the former count as responses.
+      // Cast to any-typed object to safely read the _source meta-key we embed;
+      // evidence is JsonValue (Prisma) so TS won't infer object properties directly.
+      const evidenceMeta = /** @type {Record<string, unknown>|null} */ (quotation.evidence && typeof quotation.evidence === 'object' && !Array.isArray(quotation.evidence) ? quotation.evidence : null);
+      const isDirectEntry = evidenceMeta?._source === 'DIRECT_ENTRY';
+      const responseSource = relatedInvitation?.responseSource || (isDirectEntry ? 'DIRECT_ENTRY' : null);
       return {
-        ...serializeQuotationResponseSummary(quotation, relatedInvitation?.responseSource || null),
+        ...serializeQuotationResponseSummary(quotation, responseSource),
         invitationId: relatedInvitation?.id || null,
         invitationStatus: relatedInvitation?.status || null,
       };
     });
 
     const respondedInvitations = serializedInvitations.filter((invitation) => invitation.status === 'RESPONDED');
+    const directEntryCount = serializedQuotations.filter((q) => q.responseSource === 'DIRECT_ENTRY').length;
 
     return {
       purchaseRequestId: req.id,
@@ -641,6 +649,7 @@ async function getRfqTrackingSummary(auth) {
       respondedInvitationCount: respondedInvitations.length,
       manualResponseCount: respondedInvitations.filter((invitation) => invitation.responseSource === 'MANUAL_OFFICE_EMAIL').length,
       publicResponseCount: respondedInvitations.filter((invitation) => invitation.responseSource === 'PUBLIC_TOKEN').length,
+      directEntryCount,
       items: (req.items || []).map((item) => ({
         id: item.id,
         productId: item.productId,

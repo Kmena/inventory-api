@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-01 — audit-findings-resolution
+- **AUD-025 (Medium — CLOSED):** `GET /api/roles/company/:roleId` added to `docs/runtime-endpoint-catalog.md`.
+- **AUD-002 (Low — CLOSED):** `docs/current-state.md` §7 updated with `Client.creditLimit`, `Client.creditBalance`, `ClientStore` credit fields; §8 updated with `GET /api/clients/:id/ledger` and TASK-015 credit lifecycle description.
+- **AUD-005 (Low — ACKNOWLEDGED):** Comment added to `computeRecollectedBalances` in `recipes-admin.version-editor.js` documenting floating-point limitation and Decimal.js upgrade path.
+- **AUD-013 (Low — CLOSED):** New test `approveRecipeVersion rejects when one product is fully allocated but another is partially allocated` in `recipe-service-foundation.test.js`.
+- **AUD-014 (Low — ACKNOWLEDGED):** Comment added to `root-shell-recipes-admin-view-characterization.test.js` documenting DOM execution gap and future E2E path.
+- **AUD-016 (Low — ACKNOWLEDGED):** Comment added clarifying legacy fixtures without `stageType` are intentional backward-compat cases.
+- **AUD-019 (Low — CLOSED):** `assertRecipeStageLineageAndAllocation` exported via `__private__` in `recipe.service.js`.
+- Test suite: 1542 pass, 0 fail, 3 skipped. ESLint: clean. TypeScript: clean.
+
+## 2026-09-01 — credit-and-catalog-alignment
+- **DEF-002 / AUD-026**: `PROCESS_CODE_OPTIONS` in `recipes-admin.version-editor.js` aligned with backend `RECIPE_STAGE_PROCESS_CODES` — removed `FILLING`, `QUALITY_CHECK`; replaced `LABELING` → `LABELING_PREP`, `PACKAGING` → `PACKING_PREP`. Added `input` event listeners on prior RECOLLECTION `.si-quantity` elements for live availability hint updates.
+- **TASK-015**: `paymentService.approvePayment` and `reversePayment` now call `tx.client.update` to decrement/increment `Client.creditBalance` via `invoice.clientId`, in addition to the existing per-store `ClientStore.creditBalance` path.
+- **Client credit fields**: `creditLimit` added to `buildClientPayload` `allowedFields`; `getClientLedger` now exposes `creditLimit` and `creditBalance` in the client response object. `Client` Prisma model updated with `creditLimit` and `creditBalance` fields (migration `20260924020000_add_credit_fields_to_client`).
+- **Docs**: `DEF-PRD-001` removed from known defects in `current-state.md`; process-code drift references removed from open problems in `action-plan.md`.
+- **Tests**: characterization tests added for `ClientStore.creditBalance` path in approval/reversal (AUD-028).
+- Test suite: 1541 pass, 0 fail, 3 skipped. ESLint: clean. TypeScript: clean.
+
 ## 2026-09-01 — recepciones-fiscales-workspace (spec)
 - Creado paquete de especificación completo para la implementación de los placeholders `#recepciones` y `#referencias_fiscales` del root shell.
 - Documentados 7 tasks en orden de ejecución óptimo: TASK-001 (backend endpoint GET /api/fiscal-references) → TASK-002 (adaptador browser) → TASK-003/004 (renderers y view de recepciones) → TASK-005/006 (renderers y view de referencias fiscales) → TASK-007 (wiring).

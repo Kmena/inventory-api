@@ -370,3 +370,108 @@ test('BUG-001: calculateInvoiceAmount clamps negative totals to 0', () => {
   const shouldDecrement = !!(cancel && clientId && orderAmount > 0);
   assert.equal(shouldDecrement, false);
 });
+
+// ---------------------------------------------------------------------------
+// AUD-028 — ClientStore.creditBalance path in approvePayment / reversePayment
+//
+// When the invoice has an orderId the service walks invoice → order → clientStoreId
+// and updates ClientStore.creditBalance in addition to Client.creditBalance.
+// These tests exercise that branch by providing an orderId in the invoice stub.
+// ---------------------------------------------------------------------------
+
+function buildApprovalHarnessWithStore({ clientStoreId }) {
+  const storeUpdateCalls = [];
+
+  const paymentId     = 55n;
+  const invoiceId     = 14n;
+  const orderId       = 77n;
+  const paymentAmount = 200;
+
+  const pendingPayment = {
+    id: paymentId, invoiceId, amount: paymentAmount,
+    paymentMethod: 'TRANSFER', reference: 'SINPE-999',
+    status: 'PENDING_APPROVAL', reviewReason: null,
+    invoice: { id: invoiceId, client: { companyId: 9n } },
+    receipts: [],
+  };
+
+  const transactionStub = async (work) => {
+    const tx = {
+      invoice: {
+        findUnique: async ({ where }) => {
+          if (where?.id === invoiceId) return { clientId: null, orderId };
+          return null;
+        },
+      },
+      order: {
+        findUnique: async ({ where }) => {
+          if (where?.id === orderId) return { clientStoreId };
+          return null;
+        },
+      },
+      client: { update: async () => null },
+      clientStore: {
+        // AUD-API-002: service now uses updateMany with company scope
+        updateMany: async (args) => { storeUpdateCalls.push(args); return { count: 1 }; },
+      },
+    };
+    return work(tx);
+  };
+
+  const paymentRepositoryStubs = {
+    transaction: transactionStub,
+    findCompanyPaymentById: async () => ({ ...pendingPayment }),
+    approveCompanyPayment: async () => ({ ...pendingPayment, status: 'APPROVED' }),
+  };
+
+  const invoiceRepositoryStubs = {
+    findCompanyInvoiceForFinancialSync: async () => ({
+      id: invoiceId, clientId: null, amount: 500, status: 'PENDING',
+      paidAt: null, client: { companyId: 9n }, payments: [],
+    }),
+    updateCompanyInvoiceFinancialState: async () => ({
+      id: invoiceId, clientId: null, amount: 500, status: 'PARTIAL',
+      paidAt: null, client: { companyId: 9n }, payments: [],
+    }),
+  };
+
+  return { storeUpdateCalls, paymentRepositoryStubs, invoiceRepositoryStubs };
+}
+
+test('AUD-028: approvePayment decrements ClientStore.creditBalance when invoice has orderId → clientStoreId', async () => {
+  const clientStoreId = 88n;
+  const { storeUpdateCalls, paymentRepositoryStubs, invoiceRepositoryStubs } =
+    buildApprovalHarnessWithStore({ clientStoreId });
+
+  const auth = { companyId: '9', sub: '55', permissions: ['collections.payments.approve'] };
+
+  await withStubs(
+    [
+      [paymentRepository, paymentRepositoryStubs],
+      [invoiceRepository, invoiceRepositoryStubs],
+    ],
+    () => paymentService.approvePayment(55n, {}, auth),
+  );
+
+  assert.equal(storeUpdateCalls.length, 1, 'tx.clientStore.update must be called once');
+  assert.equal(storeUpdateCalls[0].where.id, clientStoreId);
+  assert.deepEqual(storeUpdateCalls[0].data, { creditBalance: { decrement: 200 } });
+});
+
+test('AUD-028: approvePayment skips ClientStore.creditBalance when order has no clientStoreId', async () => {
+  const { storeUpdateCalls, paymentRepositoryStubs, invoiceRepositoryStubs } =
+    buildApprovalHarnessWithStore({ clientStoreId: null });
+
+  const auth = { companyId: '9', sub: '55', permissions: ['collections.payments.approve'] };
+
+  await withStubs(
+    [
+      [paymentRepository, paymentRepositoryStubs],
+      [invoiceRepository, invoiceRepositoryStubs],
+    ],
+    () => paymentService.approvePayment(55n, {}, auth),
+  );
+
+  assert.equal(storeUpdateCalls.length, 0,
+    'tx.clientStore.update must NOT be called when order has no clientStoreId');
+});

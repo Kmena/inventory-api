@@ -247,6 +247,7 @@ app.use('/api/invoices', ...mediumPayloadParsers, invoiceRouter);
 app.use('/api/payments', ...mediumPayloadParsers, paymentRouter);
 app.use('/api/inventory', ...mediumPayloadParsers, inventoryRouter);
 app.use('/api/warehouses', ...mediumPayloadParsers, warehouseRouter);
+app.use('/api/warehouse-orders', ...mediumPayloadParsers, require('./routes/warehouse-orders.routes'));
 app.use('/api/regions', ...mediumPayloadParsers, regionRouter);
 app.use('/api/sales-routes', ...mediumPayloadParsers, salesRouteRouter);
 app.use('/api/agent', ...mediumPayloadParsers, agentRouter);

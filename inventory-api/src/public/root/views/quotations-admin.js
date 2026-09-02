@@ -12,37 +12,92 @@
       <section class="root-hero" aria-labelledby="root-view-title">
         <p class="eyebrow">Compras</p>
         <h2 id="root-view-title">Cotizaciones</h2>
-        <p class="muted">Genera solicitudes de cotización agrupadas para productos con faltante y proveedores asociados.</p>
+        <p class="muted">Gestiona solicitudes de cotización, invitaciones RFQ y comparación de proveedores.</p>
       </section>
 
-      <section class="routes-page quotations-page" id="quotations-page">
-        <div id="quotations-metrics" class="commercial-metrics" aria-live="polite"></div>
-        <div id="quotations-page-message"></div>
+      <div id="quotations-page-message"></div>
 
-        <article class="card root-card">
-          <div class="page-header">
-            <div>
-              <h3>Productos cotizables</h3>
-              <p id="quotations-list-summary" class="muted">Cargando productos cotizables...</p>
+      <div style="display:grid;grid-template-columns:300px 1fr;gap:1.5rem;align-items:start;">
+
+        <!-- ═══ SIDEBAR: lista de solicitudes abiertas ═══ -->
+        <aside id="rfq-tracking-section">
+          <article class="card root-card">
+            <div class="page-header">
+              <div>
+                <h3>Solicitudes</h3>
+                <p id="rfq-tracking-summary" class="muted" style="font-size:0.8rem;">Cargando...</p>
+              </div>
+              <button id="quotations-new-request-button" type="button" style="font-size:0.8rem;padding:0.3rem 0.6rem;">+ Nueva</button>
             </div>
-            <div class="action-row compact-action-row">
-              <button id="quotations-refresh-button" class="secondary-button" type="button">Actualizar</button>
-              <button id="quotations-generate-button" type="button" disabled>Generar cotizaciones</button>
+            <div id="rfq-tracking-message"></div>
+            <div id="rfq-tracking-region" aria-live="polite"></div>
+            <div style="margin-top:0.75rem;">
+              <button id="rfq-tracking-refresh-button" class="secondary-button" type="button" style="width:100%;font-size:0.8rem;">Actualizar estado</button>
             </div>
+          </article>
+        </aside>
+
+        <!-- ═══ PANEL PRINCIPAL ═══ -->
+        <main>
+          <div id="quotations-metrics" class="commercial-metrics" aria-live="polite"></div>
+
+          <!-- Estado vacío: ninguna solicitud seleccionada y no creando -->
+          <div id="quotations-empty-state" class="card root-card" style="text-align:center;padding:2.5rem 1.5rem;">
+            <p style="font-size:1.1rem;font-weight:600;margin:0 0 0.5rem;">Seleccioná una solicitud</p>
+            <p class="muted" style="margin:0 0 1.5rem;">Elegí una solicitud abierta del panel izquierdo o creá una cotización agrupada nueva.</p>
+            <button id="quotations-new-request-button-main" type="button">Crear cotización agrupada</button>
           </div>
 
-          <div class="client-command-bar">
-            <label class="client-search-field"><span>Buscar</span><input id="quotations-search-input" type="search" placeholder="Nombre o SKU del producto" /></label>
-          </div>
+          <!-- Panel de creación: Productos cotizables (oculto hasta que se pulse Nueva) -->
+          <article class="card root-card" id="quotations-create-panel" hidden>
+            <div class="page-header">
+              <div>
+                <h3>Productos cotizables</h3>
+                <p id="quotations-list-summary" class="muted">Cargando productos cotizables...</p>
+              </div>
+              <div class="action-row compact-action-row">
+                <button id="quotations-back-button" class="secondary-button" type="button">← Solicitudes</button>
+                <button id="quotations-refresh-button" class="secondary-button" type="button">Actualizar</button>
+                <button id="quotations-generate-button" type="button" disabled>Generar cotizaciones</button>
+              </div>
+            </div>
+            <div class="client-command-bar">
+              <label class="client-search-field"><span>Buscar</span><input id="quotations-search-input" type="search" placeholder="Nombre o SKU del producto" /></label>
+            </div>
+            <div class="stack-section">
+              <h4>Resumen de selección</h4>
+              <div id="quotations-selection-summary"></div>
+            </div>
+            <div id="quotations-list-region" aria-live="polite"></div>
+          </article>
 
-          <div class="stack-section">
-            <h4>Resumen de selección</h4>
-            <div id="quotations-selection-summary"></div>
-          </div>
+          <!-- Panel de detalle de solicitud (oculto hasta que se seleccione una) -->
+          <div id="quotations-request-detail" hidden>
+            <!-- Solicitud activa + RFQ -->
+            <article class="card root-card" id="rfq-section">
+              <div class="page-header">
+                <div>
+                  <h3 id="rfq-detail-title">Solicitud</h3>
+                  <p id="rfq-section-summary" class="muted">Invitaciones, respuestas y comparación de cotizaciones.</p>
+                </div>
+                <div class="compact-action-row">
+                  <button id="rfq-generate-button" type="button" disabled>Generar invitaciones RFQ</button>
+                  <button id="rfq-direct-quotation-button" class="secondary-button" type="button" hidden>📝 Ingresar cotización</button>
+                  <button id="rfq-view-responses-button" class="secondary-button" type="button" hidden>Ver respuestas</button>
+                </div>
+              </div>
+              <div id="rfq-active-request-summary" aria-live="polite"></div>
+              <div id="rfq-response-summary" aria-live="polite"></div>
+              <div id="rfq-status-summary" class="tag-list" aria-live="polite"></div>
+              <div id="rfq-invitations-message"></div>
+              <div id="rfq-invitations-region" aria-live="polite"></div>
+            </article>
 
-          <div id="quotations-list-region" aria-live="polite"></div>
-        </article>
-      </section>
+            <!-- Comparación inline (antes era una card separada debajo) -->
+            <div id="quotations-comparison-inline"></div>
+          </div>
+        </main>
+      </div>
 
       <dialog id="quotations-detail-dialog" class="modal-card">
         <div class="page-header">
@@ -59,38 +114,6 @@
           <button id="quotations-cancel-selection-button" class="secondary-button" type="button">Cancelar</button>
         </div>
       </dialog>
-
-      <article class="card root-card" id="rfq-section" hidden>
-        <div class="page-header">
-          <div>
-            <h3>Solicitud activa</h3>
-            <p id="rfq-section-summary" class="muted">Continúa con invitaciones y consulta respuestas sin salir del workspace.</p>
-          </div>
-          <div class="compact-action-row">
-            <button id="rfq-generate-button" type="button" disabled>Generar invitaciones RFQ</button>
-            <button id="rfq-view-responses-button" class="secondary-button" type="button" hidden>Ver respuestas</button>
-          </div>
-        </div>
-        <div id="rfq-active-request-summary" aria-live="polite"></div>
-        <div id="rfq-response-summary" aria-live="polite"></div>
-        <div id="rfq-status-summary" class="tag-list" aria-live="polite"></div>
-        <div id="rfq-invitations-message"></div>
-        <div id="rfq-invitations-region" aria-live="polite"></div>
-      </article>
-
-      <article class="card root-card" id="rfq-tracking-section" hidden>
-        <div class="page-header">
-          <div>
-            <h3>Solicitudes abiertas</h3>
-            <p id="rfq-tracking-summary" class="muted">Carga una solicitud abierta en esta misma vista para continuar o consultar respuestas.</p>
-          </div>
-          <div class="compact-action-row">
-            <button id="rfq-tracking-refresh-button" class="secondary-button" type="button">Actualizar estado</button>
-          </div>
-        </div>
-        <div id="rfq-tracking-message"></div>
-        <div id="rfq-tracking-region" aria-live="polite"></div>
-      </article>
 
       <dialog id="rfq-machote-dialog" class="modal-card">
         <div class="page-header">
@@ -121,6 +144,22 @@
         <div class="action-row">
           <button id="rfq-manual-submit-button" type="button">Registrar respuesta</button>
           <button id="rfq-manual-cancel-button" class="secondary-button" type="button">Cancelar</button>
+        </div>
+      </dialog>
+
+      <dialog id="direct-quotation-dialog" class="modal-card">
+        <div class="page-header">
+          <div>
+            <h3 id="direct-quotation-title">Ingresar cotización de proveedor</h3>
+            <p id="direct-quotation-subtitle" class="muted">Registra la cotización recibida directamente, sin invitación RFQ.</p>
+          </div>
+          <button id="direct-quotation-close-button" class="secondary-button" type="button">Cerrar</button>
+        </div>
+        <div id="direct-quotation-message"></div>
+        <div id="direct-quotation-content"></div>
+        <div class="action-row">
+          <button id="direct-quotation-submit-button" type="button">Registrar cotización</button>
+          <button id="direct-quotation-cancel-button" class="secondary-button" type="button">Cancelar</button>
         </div>
       </dialog>
 
@@ -426,7 +465,6 @@
     confirmSubmitButton.addEventListener('click', submitGroupedQuotation);
 
     // --- RFQ Section ---
-    const rfqSection = container.querySelector('#rfq-section');
     const rfqSectionSummary = container.querySelector('#rfq-section-summary');
     const rfqActiveRequestSummary = container.querySelector('#rfq-active-request-summary');
     const rfqResponseSummary = container.querySelector('#rfq-response-summary');
@@ -441,6 +479,14 @@
     const rfqTrackingMessage = container.querySelector('#rfq-tracking-message');
     const rfqTrackingRegion = container.querySelector('#rfq-tracking-region');
     const rfqTrackingRefreshButton = container.querySelector('#rfq-tracking-refresh-button');
+
+    // Split-view panels
+    const emptyState = container.querySelector('#quotations-empty-state');
+    const createPanel = container.querySelector('#quotations-create-panel');
+    const requestDetail = container.querySelector('#quotations-request-detail');
+    const newRequestButton = container.querySelector('#quotations-new-request-button');
+    const newRequestButtonMain = container.querySelector('#quotations-new-request-button-main');
+    const backButton = container.querySelector('#quotations-back-button');
 
     const machoteDialog = container.querySelector('#rfq-machote-dialog');
     const machoteContent = container.querySelector('#rfq-machote-content');
@@ -465,6 +511,15 @@
     const responseDetailsCloseButton = container.querySelector('#rfq-response-details-close-button');
     const responseDetailsDismissButton = container.querySelector('#rfq-response-details-dismiss-button');
 
+    // Cotizacion directa (sin invitacion RFQ)
+    const directQuotationDialog = container.querySelector('#direct-quotation-dialog');
+    const directQuotationContent = container.querySelector('#direct-quotation-content');
+    const directQuotationMessage = container.querySelector('#direct-quotation-message');
+    const directQuotationSubmitButton = container.querySelector('#direct-quotation-submit-button');
+    const directQuotationCancelButton = container.querySelector('#direct-quotation-cancel-button');
+    const directQuotationCloseButton = container.querySelector('#direct-quotation-close-button');
+    const directQuotationButton = container.querySelector('#rfq-direct-quotation-button');
+
     const cancelDialog = container.querySelector('#rfq-cancel-dialog');
     const cancelMessage = container.querySelector('#rfq-cancel-message');
     const cancelSupplierName = container.querySelector('#rfq-cancel-supplier-name');
@@ -480,6 +535,7 @@
     let currentCancelInvitationId = null;
     let currentPurchaseRequestItems = [];
     let currentRfqSupplierIds = [];
+    let cachedSuppliers = null;
 
     function syncActiveRequestFromTracking() {
       const activeRequest = helpers.findTrackingRequestById(currentTrackingRequests, currentPurchaseRequestId);
@@ -512,17 +568,35 @@
       responseDetailsDialog.showModal();
     }
 
+    function showPanel(panel) {
+      // Show one of: 'empty' | 'create' | 'detail'
+      if (emptyState) emptyState.hidden = panel !== 'empty';
+      if (createPanel) createPanel.hidden = panel !== 'create';
+      if (requestDetail) requestDetail.hidden = panel !== 'detail';
+    }
+
     function setActiveRequestContext(purchaseRequestId, items, supplierIds = []) {
       currentPurchaseRequestId = purchaseRequestId;
       currentPurchaseRequestItems = items || [];
       currentRfqSupplierIds = Array.isArray(supplierIds)
         ? [...new Set(supplierIds.filter(Boolean))]
         : [];
-      if (rfqSection) rfqSection.hidden = false;
-      if (rfqTrackingSection) rfqTrackingSection.hidden = false;
+      showPanel('detail');
+      // Update the detail panel title from tracking data
+      const activeReq = helpers.findTrackingRequestById(currentTrackingRequests, purchaseRequestId);
+      const rfqDetailTitle = container.querySelector('#rfq-detail-title');
+      if (rfqDetailTitle && activeReq?.title) rfqDetailTitle.textContent = activeReq.title;
       if (rfqGenerateButton) rfqGenerateButton.disabled = !canManage || !currentRfqSupplierIds.length;
+      if (directQuotationButton) directQuotationButton.hidden = !canManage;
       syncActiveRequestFromTracking();
       loadRfqInvitations();
+      // Re-render sidebar to highlight active item without a full API reload
+      if (rfqTrackingRegion && currentTrackingRequests.length) {
+        rfqTrackingRegion.innerHTML = renderers.renderOpenRequestsTable(currentTrackingRequests, purchaseRequestId);
+        bindTrackingContextButtons();
+      }
+      // Refresh the inline comparison for this request
+      comparison.refreshForRequest(purchaseRequestId);
     }
 
     function showRfqSection(purchaseRequestId, items, supplierIds = []) {
@@ -577,7 +651,7 @@
     }
 
     function bindTrackingContextButtons() {
-      rfqTrackingRegion.querySelectorAll('.quotations-open-request-context-button').forEach((button) => {
+      rfqTrackingRegion.querySelectorAll('.quotations-sidebar-item').forEach((button) => {
         button.addEventListener('click', () => {
           const purchaseRequestId = button.getAttribute('data-purchase-request-id');
           const selectedRequest = helpers.findTrackingRequestById(currentTrackingRequests, purchaseRequestId);
@@ -727,6 +801,103 @@
       }
     }
 
+    // ── Cotizacion directa (sin invitacion RFQ) ───────────────────────────
+
+    async function openDirectQuotationDialog() {
+      if (!directQuotationDialog) return;
+      if (directQuotationMessage) directQuotationMessage.innerHTML = '';
+      if (directQuotationContent) directQuotationContent.innerHTML = '<p class="muted">Cargando proveedores...</p>';
+      directQuotationDialog.showModal();
+
+      try {
+        if (!cachedSuppliers) {
+          const result = await quotationsApi.listSuppliers(session);
+          cachedSuppliers = Array.isArray(result?.items) ? result.items
+            : Array.isArray(result) ? result : [];
+        }
+        if (directQuotationContent) {
+          directQuotationContent.innerHTML = renderers.renderDirectQuotationForm(
+            cachedSuppliers,
+            currentPurchaseRequestItems,
+          );
+        }
+      } catch (err) {
+        if (directQuotationMessage) {
+          directQuotationMessage.innerHTML = rootShellUi.renderInlineMessage(
+            err?.message || 'No se pudieron cargar los proveedores.', 'error',
+          );
+        }
+        if (directQuotationContent) directQuotationContent.innerHTML = '';
+      }
+    }
+
+    function closeDirectQuotationDialog() {
+      if (directQuotationDialog) directQuotationDialog.close();
+    }
+
+    async function submitDirectQuotation() {
+      if (!currentPurchaseRequestId) return;
+      if (directQuotationMessage) directQuotationMessage.innerHTML = '';
+
+      const supplierId = directQuotationContent?.querySelector('#direct-q-supplier')?.value?.trim();
+      const currency   = directQuotationContent?.querySelector('#direct-q-currency')?.value || 'CRC';
+      const reference  = directQuotationContent?.querySelector('#direct-q-reference')?.value?.trim() || null;
+      const notes      = directQuotationContent?.querySelector('#direct-q-notes')?.value?.trim() || null;
+
+      if (!supplierId) {
+        if (directQuotationMessage) {
+          directQuotationMessage.innerHTML = rootShellUi.renderInlineMessage('Selecciona un proveedor.', 'warning');
+        }
+        return;
+      }
+
+      const itemRows = directQuotationContent?.querySelectorAll('#direct-q-items-body tr') || [];
+      const items = Array.from(itemRows).map((row) => ({
+        productId: Number(row.getAttribute('data-product-id')),
+        unitPrice: Number(row.querySelector('[name="unitPrice"]')?.value || 0),
+        quantity:  Number(row.querySelector('[name="quantity"]')?.value || 0),
+        leadTimeDays: row.querySelector('[name="leadTimeDays"]')?.value
+          ? Number(row.querySelector('[name="leadTimeDays"]').value) : null,
+      })).filter((item) => item.unitPrice > 0 && item.quantity > 0);
+
+      if (!items.length) {
+        if (directQuotationMessage) {
+          directQuotationMessage.innerHTML = rootShellUi.renderInlineMessage(
+            'Ingresa precio unitario y cantidad para al menos un producto.', 'warning',
+          );
+        }
+        return;
+      }
+
+      const payload = { supplierId: Number(supplierId), currency, reference, notes, items };
+
+      if (directQuotationSubmitButton) { directQuotationSubmitButton.disabled = true; directQuotationSubmitButton.textContent = 'Registrando...'; }
+
+      try {
+        await quotationsApi.createDirectQuotation(session, currentPurchaseRequestId, payload);
+        closeDirectQuotationDialog();
+        if (pageMessage) {
+          pageMessage.innerHTML = rootShellUi.renderInlineMessage(
+            'Cotización registrada. La comparación de proveedores se actualizó.',
+            'success',
+          );
+        }
+        // Refresca la seccion de comparacion para mostrar la nueva cotizacion directa
+        await comparison.refreshForRequest(currentPurchaseRequestId);
+        await loadRfqTracking();
+      } catch (err) {
+        if (directQuotationMessage) {
+          directQuotationMessage.innerHTML = rootShellUi.renderInlineMessage(
+            err?.message || 'No se pudo registrar la cotización.', 'error',
+          );
+        }
+      } finally {
+        if (directQuotationSubmitButton) { directQuotationSubmitButton.disabled = false; directQuotationSubmitButton.textContent = 'Registrar cotización'; }
+      }
+    }
+
+    // ── Respuesta manual via invitacion RFQ ────────────────────────────────
+
     function openManualResponseDialog(invitationId, supplierName) {
       currentManualInvitation = rfqInvitations.find((i) => String(i.id) === String(invitationId)) || { id: invitationId, supplierName };
       manualTitle.textContent = `Registrar respuesta — ${supplierName || 'Proveedor'}`;
@@ -796,12 +967,24 @@
     if (manualCloseButton) manualCloseButton.addEventListener('click', closeManualDialog);
     if (manualCancelButton) manualCancelButton.addEventListener('click', closeManualDialog);
     if (manualSubmitButton) manualSubmitButton.addEventListener('click', submitManualResponseAction);
+
+    // Cotizacion directa
+    if (directQuotationButton) directQuotationButton.addEventListener('click', openDirectQuotationDialog);
+    if (directQuotationCloseButton) directQuotationCloseButton.addEventListener('click', closeDirectQuotationDialog);
+    if (directQuotationCancelButton) directQuotationCancelButton.addEventListener('click', closeDirectQuotationDialog);
+    if (directQuotationSubmitButton) directQuotationSubmitButton.addEventListener('click', submitDirectQuotation);
     if (responseDetailsCloseButton) responseDetailsCloseButton.addEventListener('click', () => responseDetailsDialog?.close());
     if (responseDetailsDismissButton) responseDetailsDismissButton.addEventListener('click', () => responseDetailsDialog?.close());
     if (cancelCloseButton) cancelCloseButton.addEventListener('click', () => cancelDialog.close());
     if (cancelDismissButton) cancelDismissButton.addEventListener('click', () => cancelDialog.close());
     if (cancelConfirmButton) cancelConfirmButton.addEventListener('click', confirmCancelInvitation);
     if (rfqTrackingRefreshButton) rfqTrackingRefreshButton.addEventListener('click', loadRfqTracking);
+
+    // Split-view panel navigation
+    const showCreate = () => { showPanel('create'); renderCurrentState(); };
+    if (newRequestButton) newRequestButton.addEventListener('click', showCreate);
+    if (newRequestButtonMain) newRequestButtonMain.addEventListener('click', showCreate);
+    if (backButton) backButton.addEventListener('click', () => showPanel('empty'));
 
     // Hook into the existing grouped quotation success to show the RFQ section
     const originalSubmitGroupedQuotation = submitGroupedQuotation;
@@ -815,15 +998,16 @@
     await loadProducts();
     await loadRfqTracking();
 
-    const requestWithResponses = currentTrackingRequests.find(
-      (r) => Number(r.respondedInvitationCount || 0) > 0,
-    );
-    await comparison.mountComparisonSection(
-      container,
-      session,
-      requestWithResponses?.purchaseRequestId || null,
-      helpersBag,
-    );
+    // Montar comparación en el panel inline del detalle (no en el container exterior)
+    const comparisonInline = container.querySelector('#quotations-comparison-inline');
+    if (comparisonInline) {
+      await comparison.mountComparisonSection(
+        comparisonInline,
+        session,
+        null, // loaded on-demand via refreshForRequest when a request is selected
+        helpersBag,
+      );
+    }
   }
 
   rootShell.register('views.quotationsAdmin', {

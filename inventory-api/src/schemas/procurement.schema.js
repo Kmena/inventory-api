@@ -67,6 +67,42 @@ const createAssistedQuotationRequestSchema = z.object({
 const createPurchaseOrderSchema = z.object({
   selectionId: z.coerce.bigint(),
   notes: z.string().trim().max(2000).optional().nullable(),
+  // Optional item override for mixed-supplier selections (subset of quotation items).
+  items: z.array(z.object({
+    productId: z.coerce.bigint(),
+    quantity: z.coerce.number().positive(),
+    unitPrice: z.coerce.number().nonnegative(),
+    notes: z.string().trim().max(500).optional().nullable(),
+  })).optional(),
+}).strict();
+
+// Mixed-supplier selection: user assigns each product line to a specific quotation.
+const mixedSelectionLineSchema = z.object({
+  productId: z.coerce.bigint(),
+  quotationId: z.coerce.bigint(),
+  quantity: z.coerce.number().positive(),
+  unitPrice: z.coerce.number().nonnegative(),
+});
+
+const selectMixedItemsSchema = z.object({
+  justification: z.string().trim().max(2000).optional().nullable(),
+  items: z.array(mixedSelectionLineSchema).min(1),
+}).strict();
+
+// Batch PO creation from a mixed selection — avoids the 409 loop bug.
+const mixedPoOrderSchema = z.object({
+  selectionId: z.coerce.bigint(),
+  items: z.array(z.object({
+    productId: z.coerce.bigint(),
+    quantity: z.coerce.number().positive(),
+    unitPrice: z.coerce.number().nonnegative(),
+    notes: z.string().trim().max(500).optional().nullable(),
+  })).optional(),
+});
+
+const createMixedPurchaseOrdersSchema = z.object({
+  notes: z.string().trim().max(2000).optional().nullable(),
+  orders: z.array(mixedPoOrderSchema).min(1),
 }).strict();
 
 module.exports = {
@@ -76,4 +112,6 @@ module.exports = {
   selectSupplierQuotationSchema,
   approveSupplierSelectionSchema,
   createPurchaseOrderSchema,
+  selectMixedItemsSchema,
+  createMixedPurchaseOrdersSchema,
 };

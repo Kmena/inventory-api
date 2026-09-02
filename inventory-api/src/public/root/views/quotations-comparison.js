@@ -86,6 +86,19 @@
     `;
   }
 
+  // Referencia al loader interno; se asigna una vez montado el modulo
+  let _refreshRef = null;
+
+  /**
+   * Recarga la seccion de comparacion para el purchaseRequestId dado.
+   * Sirve para actualizarla despues de registrar una cotizacion directa.
+   */
+  async function refreshForRequest(requestId) {
+    if (typeof _refreshRef === 'function') {
+      await _refreshRef(requestId);
+    }
+  }
+
   async function mountComparisonSection(container, session, purchaseRequestId, helpersBag) {
     const setShellStatus = typeof helpersBag?.setShellStatus === 'function' ? helpersBag.setShellStatus : () => {};
     const canManage = sessionAdapter.hasPermission(session, 'procurement.manage');
@@ -149,6 +162,9 @@
       await loadComparisonData(currentPurchaseRequestId);
     }
 
+    // Quotations in flight — kept for matrix recompute on radio change
+    let currentRespondedQuotations = [];
+
     async function loadComparisonData(requestId) {
       currentPurchaseRequestId = requestId;
       tableRegion.innerHTML = '<p class="empty-state">Cargando cotizaciones...</p>';
@@ -157,25 +173,127 @@
       try {
         const data = await quotationsApi.getComparisonData(session, requestId);
         const quotations = Array.isArray(data.quotations) ? data.quotations : [];
+        const activeOrderedProductIds = new Set(data.activeOrderedProductIds || []);
 
         if (!quotations.length) {
           section.hidden = true;
           return;
         }
 
+        const responded = quotations.filter((q) => q.responseSource);
+        const catalogOnly = quotations.filter((q) => !q.responseSource);
+        currentRespondedQuotations = responded;
+
         section.removeAttribute('hidden');
-        summaryEl.textContent = `${quotations.length} proveedor(es) con respuesta · ordenados por precio total ascendente`;
-        tableRegion.innerHTML = renderers.renderComparisonTable(quotations);
-        bindSelectButtons();
+        const parts = [];
+        if (responded.length) parts.push(`${responded.length} con respuesta`);
+        if (catalogOnly.length) parts.push(`${catalogOnly.length} solo precio histórico`);
+        summaryEl.textContent = parts.join(' · ');
+
+        if (responded.length >= 2) {
+          // Multiple suppliers → show product matrix for line-level selection
+          const hasLocked = activeOrderedProductIds.size > 0;
+          const lockedBanner = hasLocked
+            ? `<div style="background:#fef9c3;border:1px solid #fde047;border-radius:6px;padding:0.6rem 0.75rem;margin-bottom:0.75rem;font-size:0.82rem;">
+                ⚠️ Las filas en gris ya tienen una OC activa — no se pueden volver a seleccionar para evitar duplicados.
+               </div>`
+            : '';
+          tableRegion.innerHTML = `
+            <p class="muted" style="font-size:0.85rem;margin:0 0 0.75rem;">Seleccioná el proveedor más conveniente por cada línea de producto. El precio más bajo está pre-seleccionado en verde.</p>
+            ${lockedBanner}
+            ${renderers.renderProductMatrix(responded, activeOrderedProductIds)}
+            ${catalogOnly.length ? '<div style="margin-top:1.5rem;">' + buildCatalogSection(catalogOnly) + '</div>' : ''}
+          `;
+          updateMatrixFooter();
+          bindMatrixRadios();
+        } else {
+          // Single supplier or all catalog → keep the simple table
+          tableRegion.innerHTML = renderers.renderComparisonTable(quotations);
+          bindSelectButtons();
+        }
       } catch (_error) {
         section.hidden = true;
       }
     }
 
+    function buildCatalogSection(catalogQuotations) {
+      return `
+        <h4 style="margin:0 0 0.5rem;">Precio histórico de catálogo</h4>
+        <p class="muted" style="font-size:0.82rem;margin:0 0 0.75rem;">Sin respuesta confirmada del proveedor para esta solicitud.</p>
+        ${renderers.renderComparisonTable(catalogQuotations)}
+      `;
+    }
+
+    /** Recompute subtotals from current radio state and refresh the matrix footer. */
+    function updateMatrixFooter() {
+      const matrixFooter = tableRegion.querySelector('#quotations-matrix-footer');
+      if (!matrixFooter) return;
+
+      // Aggregate selected lines by quotation (skip locked/disabled rows)
+      const byQuotation = new Map(); // quotationId → { supplierName, currency, totalAmount, itemCount }
+      const radios = tableRegion.querySelectorAll('.quotations-matrix-radio:checked:not([disabled])');
+      radios.forEach((radio) => {
+        const qid = radio.getAttribute('data-quotation-id');
+        const qty = Number(radio.getAttribute('data-quantity') || 0);
+        const up = Number(radio.getAttribute('data-unit-price') || 0);
+        const currency = radio.getAttribute('data-currency') || 'CRC';
+        const q = currentRespondedQuotations.find((r) => String(r.id) === qid);
+        if (!q) return;
+        if (!byQuotation.has(qid)) {
+          byQuotation.set(qid, { supplierName: q.supplier?.name || q.supplierName || '—', currency, totalAmount: 0, itemCount: 0 });
+        }
+        const entry = byQuotation.get(qid);
+        entry.totalAmount += qty * up;
+        entry.itemCount += 1;
+      });
+
+      matrixFooter.innerHTML = renderers.renderMatrixFooter([...byQuotation.values()]);
+      const confirmBtn = matrixFooter.querySelector('#quotations-confirm-mixed-button');
+      if (confirmBtn) confirmBtn.addEventListener('click', openMixedConfirmDialog);
+    }
+
+    function bindMatrixRadios() {
+      tableRegion.querySelectorAll('.quotations-matrix-radio').forEach((radio) => {
+        radio.addEventListener('change', updateMatrixFooter);
+      });
+    }
+
+    // Exponer el loader para que modulos externos puedan refrescar
+    _refreshRef = loadComparisonData;
+
     function bindSelectButtons() {
       tableRegion.querySelectorAll('.quotations-select-supplier-button').forEach((btn) => {
         btn.addEventListener('click', () => openSelectConfirmDialog(btn));
       });
+    }
+
+    function openMixedConfirmDialog() {
+      if (!canManage) return;
+      // Build a summary of the current matrix selection (skip locked/disabled rows)
+      const lines = [];
+      tableRegion.querySelectorAll('.quotations-matrix-radio:checked:not([disabled])').forEach((radio) => {
+        lines.push({
+          productId: radio.getAttribute('data-product-id'),
+          quotationId: radio.getAttribute('data-quotation-id'),
+          quantity: Number(radio.getAttribute('data-quantity') || 0),
+          unitPrice: Number(radio.getAttribute('data-unit-price') || 0),
+        });
+      });
+      if (!lines.length) return;
+
+      // Reuse the select-confirm dialog with mixed context
+      currentSelectionContext = { mixed: true, lines };
+      const totalAll = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+      const firstQ = currentRespondedQuotations.find((q) => String(q.id) === lines[0].quotationId);
+      const currency = firstQ?.currency || 'CRC';
+      const supplierCount = new Set(lines.map((l) => l.quotationId)).size;
+      selectConfirmSupplier.textContent = `${supplierCount} proveedor(es) — selección mixta`;
+      selectConfirmAmount.textContent = renderers.formatCurrency(totalAll, currency);
+      selectJustification.value = '';
+      selectConfirmMessage.innerHTML = '';
+      selectConfirmSubmit.disabled = false;
+      selectConfirmSubmit.textContent = 'Confirmar selección mixta';
+      selectConfirmDialog.showModal();
     }
 
     function openSelectConfirmDialog(btn) {
@@ -209,6 +327,24 @@
       selectConfirmMessage.innerHTML = '';
 
       try {
+        if (currentSelectionContext.mixed) {
+          // Mixed-supplier flow: send all lines grouped by quotation
+          const result = await quotationsApi.selectMixedItems(session, currentPurchaseRequestId, {
+            justification,
+            items: currentSelectionContext.lines,
+          });
+          currentSelectionResult = result;
+          selectConfirmDialog.close();
+          if (result.requiresApproval) {
+            const firstSel = result.selections[0];
+            renderApprovalBanner(canApprove, firstSel?.id);
+          } else {
+            openCreatePoDialogMixed(result.selections);
+          }
+          return;
+        }
+
+        // Single-supplier flow (unchanged)
         const result = await quotationsApi.selectQuotation(session, currentPurchaseRequestId, {
           quotationId: currentSelectionContext.quotationId,
           justification,
@@ -292,7 +428,24 @@
       createPoMessage.innerHTML = '';
       createPoSubmit.disabled = false;
       createPoSubmit.textContent = 'Crear orden de compra';
-      currentSelectionResult = selection;
+      currentSelectionResult = { single: selection };
+      createPoDialog.showModal();
+    }
+
+    /** Opens the PO creation dialog for a mixed-supplier result (N selections → N POs). */
+    function openCreatePoDialogMixed(selections) {
+      // Build a combined summary showing each supplier + their assigned items
+      const combinedHtml = selections.map((sel) => {
+        const items = sel.assignedItems || [];
+        return renderers.renderCreatePoSummary(sel, items);
+      }).join('<hr style="margin:1rem 0;"/>');
+
+      createPoSummaryRegion.innerHTML = combinedHtml;
+      createPoNotes.value = '';
+      createPoMessage.innerHTML = '';
+      createPoSubmit.disabled = false;
+      createPoSubmit.textContent = `Crear ${selections.length} orden(es) de compra`;
+      currentSelectionResult = { mixed: selections };
       createPoDialog.showModal();
     }
 
@@ -301,32 +454,45 @@
 
       const notes = createPoNotes.value.trim() || null;
       createPoSubmit.disabled = true;
-      createPoSubmit.textContent = 'Creando orden...';
       createPoMessage.innerHTML = '';
 
       try {
-        await quotationsApi.createPurchaseOrder(session, currentPurchaseRequestId, {
-          selectionId: currentSelectionResult.id,
-          notes,
-        });
+        if (currentSelectionResult.mixed) {
+          // Batch: one request, one transaction, request closed once at the end.
+          createPoSubmit.textContent = 'Creando órdenes...';
+          await quotationsApi.createPurchaseOrdersBatch(session, currentPurchaseRequestId, {
+            notes,
+            orders: currentSelectionResult.mixed.map((sel) => ({
+              selectionId: sel.id,
+              items: sel.assignedItems,
+            })),
+          });
+        } else {
+          createPoSubmit.textContent = 'Creando orden...';
+          await quotationsApi.createPurchaseOrder(session, currentPurchaseRequestId, {
+            selectionId: currentSelectionResult.single.id,
+            notes,
+          });
+        }
 
         createPoDialog.close();
         messageEl.innerHTML = '';
         section.hidden = true;
-        setShellStatus('Orden de compra creada correctamente.');
+        setShellStatus('Orden(es) de compra creada(s) correctamente.');
       } catch (error) {
-        createPoMessage.innerHTML = rootShellUi.renderInlineMessage(
-          error.message || 'Error al crear la orden de compra.',
-          'error',
-        );
+        const msg = error.message || 'Error al crear la(s) orden(es) de compra.';
+        // Scroll the dialog to top so the error is visible
+        createPoMessage.innerHTML = rootShellUi.renderInlineMessage(msg, 'error');
+        createPoMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } finally {
         createPoSubmit.disabled = false;
-        createPoSubmit.textContent = 'Crear orden de compra';
+        createPoSubmit.textContent = 'Crear orden(es) de compra';
       }
     }
   }
 
   rootShell.register('views.quotationsComparison', {
     mountComparisonSection,
+    refreshForRequest,
   });
 }(window));

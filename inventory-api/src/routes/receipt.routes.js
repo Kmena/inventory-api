@@ -14,7 +14,8 @@ router.use(authenticate);
 
 router.get('/', authorizeAccessPolicy('receipt.view'), async (req, res, next) => {
   try {
-    return res.json(await receiptService.listPurchaseReceipts(req.auth));
+    const statusFilter = req.query.status ? String(req.query.status).split(',') : null;
+    return res.json(await receiptService.listPurchaseReceipts(req.auth, statusFilter));
   } catch (error) {
     return next(error);
   }

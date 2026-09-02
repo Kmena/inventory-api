@@ -11,6 +11,8 @@ const {
   selectSupplierQuotationSchema,
   approveSupplierSelectionSchema,
   createPurchaseOrderSchema,
+  selectMixedItemsSchema,
+  createMixedPurchaseOrdersSchema,
 } = require('../schemas/procurement.schema');
 const procurementService = require('../services/procurement.service');
 
@@ -81,6 +83,14 @@ router.get('/requests/:id/comparison', authorizeAccessPolicy('procurement.view')
   }
 });
 
+router.post('/requests/:id/select-items', authorizeAccessPolicy('procurement.manage'), validate(selectMixedItemsSchema), async (req, res, next) => {
+  try {
+    return res.status(201).json(await procurementService.selectMixedSupplierItems(parseBigIntId(req.params.id), req.body, req.auth));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/requests/:id/select-quotation', authorizeAccessPolicy('procurement.manage'), validate(selectSupplierQuotationSchema), async (req, res, next) => {
   try {
     return res.json(await procurementService.selectSupplierQuotation(parseBigIntId(req.params.id), req.body, req.auth));
@@ -105,9 +115,33 @@ router.post('/requests/:id/cancel', authorizeAccessPolicy('procurement.manage'),
   }
 });
 
+router.post('/requests/:id/purchase-orders-batch', authorizeAccessPolicy('procurement.manage'), validate(createMixedPurchaseOrdersSchema), async (req, res, next) => {
+  try {
+    return res.status(201).json(await procurementService.createPurchaseOrdersFromMixedSelections(parseBigIntId(req.params.id), req.body, req.auth));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/requests/:id/purchase-orders', authorizeAccessPolicy('procurement.manage'), validate(createPurchaseOrderSchema), async (req, res, next) => {
   try {
     return res.status(201).json(await procurementService.createPurchaseOrderFromSelection(parseBigIntId(req.params.id), req.body, req.auth));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/requests/:id/cancel-orders', authorizeAccessPolicy('procurement.manage'), async (req, res, next) => {
+  try {
+    return res.json(await procurementService.cancelAllOrdersForRequest(parseBigIntId(req.params.id), req.auth));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/orders/:id/cancel', authorizeAccessPolicy('procurement.manage'), async (req, res, next) => {
+  try {
+    return res.json(await procurementService.cancelPurchaseOrder(parseBigIntId(req.params.id), req.body, req.auth));
   } catch (error) {
     return next(error);
   }

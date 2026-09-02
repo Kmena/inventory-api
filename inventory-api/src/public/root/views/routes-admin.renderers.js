@@ -1,7 +1,6 @@
 (function attachRootShellRoutesAdminRenderers(globalScope) {
   const rootShell = /** @type {any} */ (globalScope).RootShell;
   const rootShellUi = rootShell.require('ui');
-  const routesHelpers = rootShell.require('views.routesAdminHelpers');
 
   function renderRouteList(routes, selectedRouteId) {
     if (!routes.length) {
@@ -39,24 +38,24 @@
     `;
   }
 
-  function renderSvgMap(route) {
-    const mapModel = routesHelpers.buildMapModel(route?.stores || []);
-    if (!mapModel.hasMapData) {
+  /**
+   * Renders the Leaflet map container. The actual map tiles + markers are
+   * initialized imperatively in routes-admin.js after innerHTML is set.
+   */
+  function renderLeafletMap(route) {
+    const mappableCount = (route?.stores || []).filter(
+      (s) => s.latitude !== null && s.longitude !== null
+        && Number.isFinite(Number(s.latitude)) && Number.isFinite(Number(s.longitude)),
+    ).length;
+
+    if (!mappableCount) {
       return '<p class="empty-state">No hay tiendas con coordenadas para mostrar en el mapa.</p>';
     }
 
     return `
-      <div class="route-map-card" data-route-map>
-        <p class="muted">${mapModel.points.length} tienda(s) con coordenadas visibles en la ruta.</p>
-        <svg viewBox="0 0 400 240" class="route-map-svg" role="img" aria-label="Mapa simplificado de cobertura de la ruta">
-          <rect x="8" y="8" width="384" height="224" rx="18" class="route-map-svg__frame"></rect>
-          ${mapModel.points.map((point) => `
-            <g transform="translate(${point.x}, ${point.y})" data-map-point="${rootShellUi.escapeHtml(point.id)}">
-              <circle r="7" class="route-map-svg__point"></circle>
-              <text x="10" y="4" class="route-map-svg__label">${rootShellUi.escapeHtml(point.code || point.name || 'Tienda')}</text>
-            </g>
-          `).join('')}
-        </svg>
+      <div class="route-map-card">
+        <p class="muted">${mappableCount} tienda(s) con coordenadas en la ruta.</p>
+        <div id="routes-leaflet-map" class="route-leaflet-map" data-route-map></div>
       </div>
     `;
   }
@@ -118,8 +117,8 @@
           <div class="root-form-grid">
             <label><span>Codigo *</span><input name="code" type="text" required minlength="2" maxlength="40" value="${rootShellUi.escapeHtml(route.code || '')}" /></label>
             <label><span>Nombre *</span><input name="name" type="text" required minlength="2" maxlength="120" value="${rootShellUi.escapeHtml(route.name || '')}" /></label>
-            <label><span>Frecuencia *</span><input name="visitFrequencyDays" type="number" min="1" required value="${rootShellUi.escapeHtml(route.visitFrequencyDays || 1)}" /></label>
-            <label><span>Alerta *</span><input name="nearLimitDays" type="number" min="0" required value="${rootShellUi.escapeHtml(route.nearLimitDays || 0)}" /></label>
+            <label><span>Frecuencia (días) *</span><input name="visitFrequencyDays" type="number" min="5" required value="${rootShellUi.escapeHtml(route.visitFrequencyDays || 15)}" /></label>
+            
             <label><span>Activa</span><input name="isActive" type="checkbox" ${route.isActive !== false ? 'checked' : ''} /></label>
           </div>
           <div class="action-row compact-action-row"><button type="submit">Guardar ruta</button></div>
@@ -176,7 +175,7 @@
 
       <section class="stack-section">
         <h4>Mapa de cobertura</h4>
-        ${renderSvgMap(route)}
+        ${renderLeafletMap(route)}
       </section>
     `;
   }
@@ -184,8 +183,8 @@
   rootShell.register('views.routesAdminRenderers', {
     renderCoverage,
     renderGoalsEditor,
+    renderLeafletMap,
     renderRouteDetail,
     renderRouteList,
-    renderSvgMap,
   });
 }(window));

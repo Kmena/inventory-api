@@ -15,6 +15,7 @@ const { toSnapshotValue } = productionPlanningPrivate;
 const {
   normalizeOptionalText,
   assertStagePrerequisites,
+  assertRecolectionCoverageForConsumption,
   validateConsumptionAgainstRequirement,
   validateQaMeasurements,
   recordStageOverrideAuditEvent,
@@ -64,6 +65,9 @@ function serializeStageExecution(execution) {
     responsibleUserId: execution.responsibleUserId,
     startedAt: execution.startedAt,
     endedAt: execution.endedAt,
+    status: execution.status ?? 'COMPLETED',
+    lossesAcknowledged: execution.lossesAcknowledged ?? false,
+    lossesAcknowledgedAt: execution.lossesAcknowledgedAt ?? null,
     actualParameters: execution.actualParameters,
     qaOutOfTolerance: execution.qaOutOfTolerance,
     overrideJustification: execution.overrideJustification,
@@ -77,6 +81,7 @@ function serializeStageExecution(execution) {
     returns: Array.isArray(execution.returns)
       ? execution.returns.map(serializeProductionReturn)
       : [],
+    losses: execution.losses ?? [],
     qualityInspections,
     qaApproved,
   };
@@ -234,7 +239,13 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
       throw createHttpError(404, 'Orden de producción no encontrada', 'not_found');
     }
 
-    assertTransition(order, ['IN_PROGRESS'], 'ejecutar etapas');
+    // QA_HOLD is also allowed: re-executing a QA-rejected stage brings the order
+    // back to IN_PROGRESS so the normal stage-gate flow resumes.
+    assertTransition(order, ['IN_PROGRESS', 'QA_HOLD'], 'ejecutar etapas');
+
+    if (order.status === 'QA_HOLD') {
+      await productionRepository.updateProductionOrder(order.id, scope.companyId, { status: 'IN_PROGRESS' }, tx);
+    }
 
     if (!order.originWarehouseId) {
       throw createHttpError(409, 'La orden de producción debe tener bodega origen para registrar consumo y merma', 'conflict');
@@ -247,9 +258,23 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
 
     assertStagePrerequisites(order, stageId);
 
-    // El operador registra consumos y notas. Los parametros QA los registra
-    // por separado un inspector de calidad mediante POST .../inspections.
-    // La validacion de sobre-consumo usa la tolerancia configurada en la empresa (DEC-002).
+    // FR-010/BR-004: if this stage was preceded by a completed recovery/recolection stage with lot-level entries,
+    // proposed consumptions must stay within the recovered balance for the same product+lot pairs.
+    const _orderAny = /** @type {any} */ (order);
+    const relatedRecolectionStage = Array.isArray(_orderAny.recolectionStages)
+      ? _orderAny.recolectionStages.find((stage) => String(stage.recipeStageId) === String(stageId) && stage.status === 'COMPLETED')
+      : null;
+    if (relatedRecolectionStage) {
+      assertRecolectionCoverageForConsumption(
+        Array.isArray(relatedRecolectionStage.recolectionEntries) ? relatedRecolectionStage.recolectionEntries : [],
+        Array.isArray(order.stageExecutions)
+          ? order.stageExecutions.flatMap((execution) => Array.isArray(execution.consumptions) ? execution.consumptions : [])
+          : [],
+        payload.consumptions ?? [],
+      );
+    }
+
+    // DEC-002: El inspector de calidad registra QA por separado. El operador solo registra consumos.
     const consumptionValidation = validateConsumptionAgainstRequirement(
       order,
       payload.consumptions ?? [],
@@ -275,15 +300,37 @@ async function executeProductionStage(id, stageId, payload, auth, req = null) {
       movementGroupId,
     }, tx);
 
-    const consumptions = await reduceStageInventory(
-      tx,
-      auth,
-      order,
-      createdStageExecution,
-      createdStageExecution.stageName,
-      payload.consumptions ?? [],
-      'PRODUCTION_CONSUMPTION',
-    );
+    // PROCESSING stages consume materials already pulled from the warehouse by a
+    // preceding RECOLLECTION stage. Calling reduceStageInventory would cause a
+    // double warehouse deduction for the same lot. Only non-PROCESSING stages
+    // (i.e. RECOLLECTION or stages without an explicit type) deduct inventory.
+    //
+    // stageType is frozen in the snapshot for orders created after the fix was
+    // deployed. For older orders the snapshot lacks stageType — fall back to a
+    // live DB lookup so the guard still fires on legacy order snapshots.
+    let isProcessingStage = snapshotStage?.stageType === 'PROCESSING';
+    // stageType was added to the snapshot after initial deployment; older orders
+    // won't have it. Fall back to a live DB lookup so the guard still fires on
+    // legacy order snapshots. tx.recipeStage may be absent in test environments
+    // that mock the Prisma client partially — guard before calling.
+    if (!isProcessingStage && snapshotStage?.stageType == null && snapshotStage?.id && tx.recipeStage) {
+      const liveStage = await tx.recipeStage.findUnique({
+        where: { id: BigInt(snapshotStage.id) },
+        select: { stageType: true },
+      });
+      isProcessingStage = liveStage?.stageType === 'PROCESSING';
+    }
+    const consumptions = isProcessingStage
+      ? []
+      : await reduceStageInventory(
+        tx,
+        auth,
+        order,
+        createdStageExecution,
+        createdStageExecution.stageName,
+        payload.consumptions ?? [],
+        'PRODUCTION_CONSUMPTION',
+      );
 
     for (const consumption of consumptions) {
       await productionRepository.createProductionConsumption({
@@ -425,9 +472,7 @@ async function recordProductionReturn(id, stageId, payload, auth) {
 }
 
 async function reconcileProductionOrderAggregates(id, auth) {
-  const scope = {
-    companyId: BigInt(auth.companyId),
-  };
+  const scope = { companyId: BigInt(auth.companyId) };
 
   const order = await productionRepository.findProductionOrderById(id, scope.companyId);
   if (!order) {

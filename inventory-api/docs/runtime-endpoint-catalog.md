@@ -86,6 +86,7 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 | POST | `/api/users/` | Sí | `authorize('root')` | Crear usuario global | Scope root |
 | GET | `/api/roles/permissions` | Sí | `authorizeAccessPolicy('role.permissions.list')` | Listar permisos asignables | Base para roles personalizados |
 | GET | `/api/roles/company` | Sí | `authorizeAccessPolicy('role.company.list')` | Listar roles asignables por compañía | Consumido por UI; actor scope `company-admin` |
+| GET | `/api/roles/company/:roleId` | Sí | `authorizeAccessPolicy('role.company.list')` | Obtener rol de compañía por ID | Tenant isolation; devuelve 404 si el rol no pertenece a la compañía |
 | POST | `/api/roles/company` | Sí | `authorizeAccessPolicy('role.company.create')` | Crear rol de compañía | Validado por schema; actor scope `company-admin`, y el servicio aplica gobernanza adicional, niega permisos de alcance plataforma como `companies.manage` antes de persistir y registra el deny path mediante auditoría fail-open cuando hay contexto de request |
 | PUT | `/api/roles/company/:roleId` | Sí | `authorizeAccessPolicy('role.company.update')` | Actualizar permisos y nombre de un rol de empresa | Requiere `settings.manage`; validación de tenant isolation, gobernanza de permisos platform-scoped, protección anti auto-bloqueo, auditoría de cambios |
 
@@ -185,6 +186,10 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 | GET | `/api/production/orders/:id/inspections` | Sí | `authorizeAccessPolicy('quality.view')` | Listar inspecciones QA de una orden | Retorna todas las inspecciones ordenadas por fecha descendente |
 | POST | `/api/production/orders/:id/complete` | Sí | `authorizeAccessPolicy('production.complete')` | Completar orden de producción | Valida QA gates, crea lote del producto terminado, registra movimiento `PRODUCTION_RECEIPT` en bodega destino, transiciona a `COMPLETED` |
 | POST | `/api/production/orders/:id/cancel` | Sí | `authorizeAccessPolicy('production.cancel')` | Cancelar orden de producción | Transición compatible desde estados operativos tempranos |
+| POST | `/api/production/orders/:id/stages/:stageId/losses` | Sí | `authorizeAccessPolicy('production.manage')` | Registrar pérdidas de materia prima por etapa | Requiere ejecución QA_REJECTED + lossesAcknowledged gate; feature: production-stage-rejection-and-reexecution |
+| GET | `/api/production/orders/:id/stages/:stageId/losses` | Sí | `authorizeAccessPolicy('production.view')` | Listar pérdidas por etapa | Retorna todos los registros de pérdidas para la etapa |
+| POST | `/api/production/orders/:id/recolections/:recolectionId/confirm` | Sí | `authorizeAccessPolicy('production.execute')` | Confirmar disponibilidad de material en etapa de recolección | feature: qa-rejection-disposition-and-continuation; sets status=COMPLETED, unblocks re-execution |
+| POST | `/api/production/orders/:id/recolections/:recolectionId/reconciliation` | Sí | `authorizeAccessPolicy('production.execute')` | Registrar resultados de conciliación de material recolectado (USED/RETURNED/DISCARDED) | feature: qa-rejection-material-reconciliation-amendment (TASK-006); payload: `{ outcomes: [{productId, lotId, quantity, outcome, notes?}] }` |
 
 ## Gestión de proveedores
 | Method | Path | Authentication | Authorization observed | Purpose | Notes |

@@ -132,8 +132,17 @@
       ? `<p class="muted">${rootShellUi.escapeHtml(order.notes)}</p>`
       : '<p class="muted">Sin notas.</p>';
 
-    const issueButton = order.status === 'DRAFT'
-      ? `<button type="button" id="po-issue-button" class="" data-order-id="${rootShellUi.escapeHtml(String(order.id))}">Emitir orden de compra</button>`
+    const isDraft = order.status === 'DRAFT';
+    const canCancel = isDraft || order.status === 'ISSUED';
+
+    const issueButton = isDraft
+      ? `<button type="button" id="po-issue-button" data-order-id="${rootShellUi.escapeHtml(String(order.id))}">Emitir orden de compra</button>`
+      : '';
+    const cancelButton = canCancel
+      ? `<button type="button" id="po-cancel-button" class="secondary-button" data-order-id="${rootShellUi.escapeHtml(String(order.id))}" style="color:#b91c1c;">Cancelar OC</button>`
+      : '';
+    const actionRow = (issueButton || cancelButton)
+      ? `<div class="compact-action-row">${issueButton}${cancelButton}</div>`
       : '';
 
     return `
@@ -146,7 +155,7 @@
             <span> · ${date}</span>
           </p>
         </div>
-        ${issueButton ? `<div class="action-row">${issueButton}</div>` : ''}
+        ${actionRow}
       </div>
 
       <div class="stack-section">

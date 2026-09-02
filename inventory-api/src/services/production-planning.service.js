@@ -65,6 +65,9 @@ function buildRecipeVersionSnapshot(recipeVersion, override) {
       recipeId: recipeVersion.recipeId,
       versionNumber: recipeVersion.versionNumber,
       status: recipeVersion.status,
+      // TASK-004 (production-size-conversion): freeze basis into snapshot so the order
+      // always knows how it was calculated, even if the recipe is later updated.
+      quantityBasis: recipeVersion.quantityBasis ?? 'PER_OUTPUT_KG',
       effectiveFrom: recipeVersion.effectiveFrom,
       effectiveTo: recipeVersion.effectiveTo,
       expectedYield: recipeVersion.expectedYield,
@@ -89,6 +92,9 @@ function buildRecipeVersionSnapshot(recipeVersion, override) {
         id: stage.id,
         stageOrder: stage.stageOrder,
         name: stage.name,
+        // Freeze stageType so execution can distinguish RECOLLECTION vs PROCESSING
+        // without a live DB hit. PROCESSING stages must not deduct from warehouse.
+        stageType: stage.stageType ?? null,
         instructions: stage.instructions,
         responsibleRoleCode: stage.responsibleRoleCode,
         expectedParameters: (stage.expectedParameters ?? []).map(normalizeSnapshotQaParameterDefinition),
@@ -125,8 +131,22 @@ function buildRecipeVersionSnapshot(recipeVersion, override) {
 
 function buildMaterialRequirements(recipeVersion, quantity) {
   const requirementsByProductId = new Map();
+  const allStages = recipeVersion?.stages || [];
 
-  for (const stage of recipeVersion?.stages || []) {
+  // Mirror the same deduplication logic as aggregateIngredientsFromStages:
+  // PROCESSING stages consume already-collected material — counting them again
+  // would inflate warehouse requirements for products that also appear in a
+  // RECOLLECTION stage. Only fall back to all stages for legacy recipes that
+  // have no RECOLLECTION stage with productId inputs.
+  const hasRecollectionInputs = allStages.some(
+    (s) => s.stageType === 'RECOLLECTION'
+      && s.stageInputs?.some((i) => i.productId),
+  );
+  const sourcingStages = hasRecollectionInputs
+    ? allStages.filter((s) => s.stageType === 'RECOLLECTION')
+    : allStages;
+
+  for (const stage of sourcingStages) {
     for (const stageInput of stage?.stageInputs || []) {
       if (!stageInput?.productId) {
         continue;

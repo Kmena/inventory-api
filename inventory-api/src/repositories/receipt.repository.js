@@ -52,9 +52,12 @@ function createPurchaseReceipt(data, db = prisma) {
   });
 }
 
-function listPurchaseReceipts(companyId, db = prisma) {
+function listPurchaseReceipts(companyId, statusFilter = null, db = prisma) {
   return db.purchaseReceipt.findMany({
-    where: { companyId },
+    where: {
+      companyId,
+      ...(statusFilter?.length ? { status: { in: statusFilter } } : {}),
+    },
     include: purchaseReceiptInclude,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   });
@@ -110,15 +113,21 @@ function updatePurchaseReceiptItemConfirmedLot(itemId, confirmedLotId, tx) {
 
 /**
  * Lists purchase orders available to create a warehouse receipt.
- * Only ISSUED orders are shown — DRAFT orders are still being prepared
- * and CANCELLED orders are closed for business.
+ * Only ISSUED orders without a CONFIRMED receipt are shown:
+ * - DRAFT  → still being prepared
+ * - CANCELLED → closed
+ * - ISSUED + already has a CONFIRMED receipt → fully received, no longer pending
  *
  * @param {bigint} companyId
  * @param {import('@prisma/client').PrismaClient} db
  */
 function listPurchaseOrdersForReceipt(companyId, db = prisma) {
   return db.purchaseOrder.findMany({
-    where: { companyId, status: 'ISSUED' },
+    where: {
+      companyId,
+      status: 'ISSUED',
+      receipts: { none: { status: 'CONFIRMED' } },
+    },
     include: {
       supplier: true,
       items: { include: { product: true } },

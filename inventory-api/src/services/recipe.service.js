@@ -27,12 +27,111 @@ function normalizeCode(value) {
 
 // stageOrder and sortOrder are derived from array position — no manual numbering.
 
+// ── recipe-stage-lineage-validation: balance engine ──────────────────────────
+// Validates that PROCESSING stages only consume products from prior RECOLLECTION
+// stages, that cumulative usage never exceeds cumulative recollection per product,
+// and (in 'approval' mode) that every recollected product is fully allocated.
+//
+// Supports two sources:
+//   - Payload stages (array order, no stageOrder yet)
+//   - DB stages (have stageOrder; sorted before passing in)
+//
+// mode: 'draft'    — lineage + overuse checked; under-allocation allowed
+// mode: 'approval' — lineage + overuse + full-allocation per product required
+//
+// Descriptive stageInputs without productId are ignored (BR-009, FR-009).
+function assertRecipeStageLineageAndAllocation(stages, mode) {
+  // Sort by stageOrder when present (DB records); trust array order otherwise (payload).
+  const orderedStages = (stages || []).slice().sort((a, b) => {
+    if (a.stageOrder != null && b.stageOrder != null) {
+      return Number(a.stageOrder) - Number(b.stageOrder);
+    }
+    return 0;
+  });
+
+  // Cumulative balance per productId: { recollected, used, name }
+  const balance = new Map();
+
+  for (const stage of orderedStages) {
+    const inputs = stage.stageInputs || [];
+
+    if (stage.stageType === 'RECOLLECTION') {
+      for (const input of inputs) {
+        if (!input.productId) continue;
+        const key = String(input.productId);
+        const qty = Number(input.quantity) || 0;
+        const entry = balance.get(key);
+        if (entry) {
+          entry.recollected += qty;
+        } else {
+          balance.set(key, { recollected: qty, used: 0, name: input.name });
+        }
+      }
+    } else if (stage.stageType === 'PROCESSING') {
+      for (const input of inputs) {
+        if (!input.productId) continue;
+        const key = String(input.productId);
+        const qty = Number(input.quantity) || 0;
+        const entry = balance.get(key);
+
+        if (!entry || entry.recollected === 0) {
+          throw createHttpError(
+            400,
+            `La etapa "${stage.name}" usa el insumo "${input.name}" que no fue recolectado en ninguna etapa de recoleccion previa`,
+            'validation_error',
+          );
+        }
+
+        if (entry.used + qty > entry.recollected) {
+          const disponible = entry.recollected - entry.used;
+          throw createHttpError(
+            400,
+            `La etapa "${stage.name}" excede la cantidad disponible del insumo "${input.name}": disponible ${disponible}, requerido ${qty}`,
+            'validation_error',
+          );
+        }
+
+        entry.used += qty;
+      }
+    }
+  }
+
+  if (mode === 'approval') {
+    for (const entry of balance.values()) {
+      if (entry.used < entry.recollected) {
+        const sinAsignar = entry.recollected - entry.used;
+        throw createHttpError(
+          400,
+          `Para aprobar la receta, todos los materiales recolectados deben ser usados completamente. El insumo "${entry.name}" tiene ${sinAsignar} sin asignar`,
+          'validation_error',
+        );
+      }
+    }
+  }
+}
+
 // ── Derived BOM: aggregate product-bearing stageInputs across all stages ──
 
 function aggregateIngredientsFromStages(stages) {
   const aggregated = new Map();
+  const allStages = stages || [];
 
-  for (const stage of stages || []) {
+  // RECOLLECTION stages define what gets pulled FROM the warehouse.
+  // PROCESSING stages consume already-collected material and must NOT be
+  // counted again as additional warehouse requirements — that would double
+  // the demand for any product that appears in both stage types.
+  // Fall back to all stages only when the recipe has no RECOLLECTION stage
+  // with productId inputs (backward-compatible with legacy single-stage recipes).
+  const hasRecollectionInputs = allStages.some(
+    (s) => s.stageType === 'RECOLLECTION'
+      && Array.isArray(s.stageInputs)
+      && s.stageInputs.some((i) => i.productId),
+  );
+  const sourcingStages = hasRecollectionInputs
+    ? allStages.filter((s) => s.stageType === 'RECOLLECTION')
+    : allStages;
+
+  for (const stage of sourcingStages) {
     for (const input of stage.stageInputs || []) {
       if (!input.productId || !input.quantity) {
         continue;
@@ -133,27 +232,39 @@ function toRecipeVersionCreateData(payload, scope, recipeId, versionNumber) {
     wasteTolerancePercent: payload.wasteTolerancePercent ?? null,
     instructions: payload.instructions ?? null,
     notes: payload.notes ?? null,
+    // TASK-004 (production-size-conversion): persist the recipe scaling basis.
+    // Default is PER_OUTPUT_KG as the primary model for new records.
+    quantityBasis: payload.quantityBasis ?? 'PER_OUTPUT_KG',
     createdByUserId: scope.actorUserId,
     stages: {
-      create: payload.stages.map((stage, stageIndex) => ({
-        stageOrder: stageIndex,
-        name: stage.name,
-        instructions: stage.instructions ?? null,
-        responsibleRoleCode: stage.responsibleRoleCode ?? null,
-        expectedParameters: (stage.expectedParameters ?? []).map(normalizeQaParameterDefinition),
-        parameterTolerances: stage.parameterTolerances ?? [],
-        requiredEvidence: stage.requiredEvidence ?? [],
-        qaMandatory: stage.qaMandatory ?? false,
-        stageInputs: {
-          create: (stage.stageInputs ?? []).map((stageInput, inputIndex) => ({
-            productId: stageInput.productId ?? null,
-            name: stageInput.name,
-            quantity: stageInput.quantity ?? null,
-            unit: normalizeStageInputUnit(stageInput.unit),
-            sortOrder: inputIndex,
-            notes: stageInput.notes ?? null,
-          })),
-        },
+      create: payload.stages.map((stage, stageIndex) => buildRecipeStageCreateData(stage, stageIndex)),
+    },
+  };
+}
+
+// Build a single stage create payload including stage-type and process-code fields (TASK-001).
+function buildRecipeStageCreateData(stage, stageIndex) {
+  const stageType = stage.stageType ?? 'PROCESSING';
+  return {
+    stageOrder: stageIndex,
+    name: stage.name,
+    instructions: stage.instructions ?? null,
+    responsibleRoleCode: stage.responsibleRoleCode ?? null,
+    expectedParameters: (stage.expectedParameters ?? []).map(normalizeQaParameterDefinition),
+    parameterTolerances: stage.parameterTolerances ?? [],
+    requiredEvidence: stage.requiredEvidence ?? [],
+    qaMandatory: stage.qaMandatory ?? false,
+    stageType,
+    processCode: stageType === 'PROCESSING' ? (stage.processCode ?? null) : null,
+    processLabel: stage.processCode === 'OTHER' ? (stage.processLabel ?? null) : null,
+    stageInputs: {
+      create: (stage.stageInputs ?? []).map((stageInput, inputIndex) => ({
+        productId: stageInput.productId ?? null,
+        name: stageInput.name,
+        quantity: stageInput.quantity ?? null,
+        unit: normalizeStageInputUnit(stageInput.unit),
+        sortOrder: inputIndex,
+        notes: stageInput.notes ?? null,
       })),
     },
   };
@@ -212,6 +323,8 @@ function buildRecipeVersionUpdateData(payload) {
     'wasteTolerancePercent',
     'instructions',
     'notes',
+    // TASK-004 (production-size-conversion): allow updating the recipe scaling basis.
+    'quantityBasis',
   ]) {
     if (Object.prototype.hasOwnProperty.call(payload, fieldName)) {
       data[fieldName] = payload[fieldName] ?? null;
@@ -221,26 +334,7 @@ function buildRecipeVersionUpdateData(payload) {
   if (payload.stages) {
     data.stages = {
       deleteMany: {},
-      create: payload.stages.map((stage, stageIndex) => ({
-        stageOrder: stageIndex,
-        name: stage.name,
-        instructions: stage.instructions ?? null,
-        responsibleRoleCode: stage.responsibleRoleCode ?? null,
-        expectedParameters: (stage.expectedParameters ?? []).map(normalizeQaParameterDefinition),
-        parameterTolerances: stage.parameterTolerances ?? [],
-        requiredEvidence: stage.requiredEvidence ?? [],
-        qaMandatory: stage.qaMandatory ?? false,
-        stageInputs: {
-          create: (stage.stageInputs ?? []).map((stageInput, inputIndex) => ({
-            productId: stageInput.productId ?? null,
-            name: stageInput.name,
-            quantity: stageInput.quantity ?? null,
-            unit: normalizeStageInputUnit(stageInput.unit),
-            sortOrder: inputIndex,
-            notes: stageInput.notes ?? null,
-          })),
-        },
-      })),
+      create: payload.stages.map((stage, stageIndex) => buildRecipeStageCreateData(stage, stageIndex)),
     };
   }
 
@@ -267,6 +361,8 @@ function serializeRecipeStageInput(stageInput) {
 }
 
 function serializeRecipeStage(stage) {
+  // Legacy stages without stageType are treated as PROCESSING for backward compatibility (FR-018, DEC-legacy-compat).
+  const stageType = stage.stageType ?? 'PROCESSING';
   return {
     id: stage.id,
     stageOrder: stage.stageOrder,
@@ -277,6 +373,10 @@ function serializeRecipeStage(stage) {
     parameterTolerances: stage.parameterTolerances ?? [],
     requiredEvidence: stage.requiredEvidence ?? [],
     qaMandatory: stage.qaMandatory,
+    // Stage typing and process definition (TASK-001, FR-003, FR-006)
+    stageType,
+    processCode: stage.processCode ?? null,
+    processLabel: stage.processLabel ?? null,
     stageInputs: (stage.stageInputs || []).map(serializeRecipeStageInput),
   };
 }
@@ -304,6 +404,8 @@ function serializeRecipeVersion(version) {
     companyId: version.companyId,
     versionNumber: version.versionNumber,
     status: version.status,
+    // TASK-004 (production-size-conversion): expose recipe scaling basis to consumers.
+    quantityBasis: version.quantityBasis ?? 'PER_OUTPUT_KG',
     effectiveFrom: version.effectiveFrom,
     effectiveTo: version.effectiveTo,
     expectedYield: version.expectedYield,
@@ -417,6 +519,8 @@ async function createRecipeVersion(recipeId, payload, auth) {
 
   await validateCompanyProductReferences(payload, scope.companyId);
   await assertStageInputsUnitConsistency(payload, scope.companyId);
+  // recipe-stage-lineage-validation: draft mode — lineage + overuse only, under-allocation allowed
+  assertRecipeStageLineageAndAllocation(payload.stages, 'draft');
 
   const latestVersion = await recipeRepository.findLatestRecipeVersion(recipeId, scope.companyId);
   const versionNumber = (latestVersion?.versionNumber || 0) + 1;
@@ -440,6 +544,10 @@ async function updateRecipeVersion(recipeVersionId, payload, auth) {
 
   await validateCompanyProductReferences(payload, scope.companyId);
   await assertStageInputsUnitConsistency(payload, scope.companyId);
+  // recipe-stage-lineage-validation: draft mode — validate only when stages are in the update payload
+  if (payload.stages) {
+    assertRecipeStageLineageAndAllocation(payload.stages, 'draft');
+  }
 
   const updatedVersion = await recipeRepository.updateRecipeVersion(
     recipeVersionId,
@@ -494,6 +602,8 @@ async function approveRecipeVersion(recipeVersionId, payload, auth) {
 
   // BR-011 / AC-015: reject if any stageInput lacks a productId.
   assertAllStageInputsHaveProductId(currentVersion);
+  // recipe-stage-lineage-validation: approval mode — lineage + overuse + full allocation per product
+  assertRecipeStageLineageAndAllocation(currentVersion.stages, 'approval');
 
   const approvalData = {
     status: 'APPROVED',
@@ -527,7 +637,11 @@ module.exports = {
   approveRecipeVersion,
   aggregateIngredientsFromStages,
   assertStageInputsUnitConsistency,
+  // TASK-004 (production-size-conversion): expose serializer so tests can verify
+  // quantityBasis is included in the API representation.
+  serializeRecipeVersion,
   __private__: {
     assertAllStageInputsHaveProductId,
+    assertRecipeStageLineageAndAllocation,
   },
 };

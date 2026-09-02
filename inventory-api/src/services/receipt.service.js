@@ -137,9 +137,9 @@ async function createPurchaseReceipt(payload, auth) {
   return serializeReceipt(receipt);
 }
 
-async function listPurchaseReceipts(auth) {
+async function listPurchaseReceipts(auth, statusFilter = null) {
   const scope = assertCompanyScope(auth);
-  const receipts = await receiptRepository.listPurchaseReceipts(scope.companyId);
+  const receipts = await receiptRepository.listPurchaseReceipts(scope.companyId, statusFilter);
   return receipts.map(serializeReceipt);
 }
 

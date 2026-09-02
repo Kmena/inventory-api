@@ -1,6 +1,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 
+const prisma = require('../lib/prisma');
 const clientRepository = require('../repositories/client.repository');
 const regionRepository = require('../repositories/region.repository');
 const { createHttpError } = require('../lib/errors');
@@ -317,16 +318,44 @@ async function getClientLedger(clientId, auth, options = {}) {
       id: clientData.id,
       code: clientData.code,
       name: clientData.name,
-      creditLimit: clientData.creditLimit,
-      creditBalance: clientData.creditBalance,
       paymentType: clientData.paymentType,
       paymentDays: clientData.paymentDays,
+      creditLimit: clientData.creditLimit != null ? Number(clientData.creditLimit) : null,
+      creditBalance: clientData.creditBalance != null ? Number(clientData.creditBalance) : null,
     },
     invoices: (clientData.invoices || []).map((invoice) => ({
       ...invoice,
       pendingAmount: getPendingAmount(invoice),
       appliedAmount: getAppliedAmount(invoice),
     })),
+  };
+}
+
+async function updateCompanyClientStoreCreditLimit(clientId, storeId, payload, auth) {
+  assertCompanyUser(auth);
+  const companyId = BigInt(auth.companyId);
+
+  const store = await prisma.clientStore.findFirst({
+    where: {
+      id: BigInt(storeId),
+      clientId: BigInt(clientId),
+      client: { companyId },
+      isActive: true,
+    },
+  });
+  if (!store) {
+    throw createHttpError(404, 'Tienda no encontrada', 'not_found');
+  }
+
+  const updated = await prisma.clientStore.update({
+    where: { id: store.id },
+    data: { creditLimit: payload.creditLimit },
+  });
+
+  return {
+    id: updated.id.toString(),
+    creditLimit: Number(updated.creditLimit),
+    creditBalance: Number(updated.creditBalance),
   };
 }
 
@@ -344,5 +373,6 @@ module.exports = {
   getCompanyClientDocumentDownload,
   updateClient,
   removeClient,
+  updateCompanyClientStoreCreditLimit,
   getClientLedger,
 };

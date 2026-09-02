@@ -420,17 +420,20 @@ test('createSupplierQuotation rejects products not present in request', async ()
 });
 
 test('compareSupplierQuotations sorts quotations by total amount', async () => {
+  // Two quotations from DIFFERENT suppliers so they are not merged.
+  // supplierId must differ; buildQuotation defaults to supplierId 3001n.
   await withPatched({
     findPurchaseRequestByIdForCompany: async () => buildRequest({
       quotations: [
-        buildQuotation({ id: 1n, items: [{ id: 1n, productId: 11n, quantity: 10, unitPrice: 20, leadTimeDays: 5, product: { id: 11n } }] }),
-        buildQuotation({ id: 2n, items: [{ id: 2n, productId: 11n, quantity: 10, unitPrice: 10, leadTimeDays: 3, product: { id: 11n } }] }),
+        buildQuotation({ id: 1n, supplierId: 3001n, supplier: { id: 3001n, companyId: 7n, name: 'Proveedor Uno' }, items: [{ id: 1n, productId: 11n, quantity: 10, unitPrice: 20, leadTimeDays: 5, product: { id: 11n } }] }),
+        buildQuotation({ id: 2n, supplierId: 3002n, supplier: { id: 3002n, companyId: 7n, name: 'Proveedor Dos' }, items: [{ id: 2n, productId: 11n, quantity: 10, unitPrice: 10, leadTimeDays: 3, product: { id: 11n } }] }),
       ],
     }),
   }, async () => {
     const result = await procurementService.compareSupplierQuotations(1001n, auth);
-    assert.equal(result.quotations.length, 2);
-    assert.equal(result.quotations[0].id, 2n);
+    assert.equal(result.quotations.length, 2, 'should have one row per unique supplier');
+    // Supplier 3002 (unitPrice 10 → total 100) must come first.
+    assert.equal(result.quotations[0].supplierId, 3002n);
     assert.equal(result.quotations[0].totalAmount, 100);
   });
 });

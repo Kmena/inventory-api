@@ -204,6 +204,99 @@ function collectExecutionPayload(formContainer) {
   };
 }
 
+function syncQaRejectionFlowState(formContainer) {
+  const result = formContainer.querySelector('.qa-result-select')?.value;
+  const rejectionFlow = formContainer.querySelector('.qa-rejection-flow');
+  const priorStageSelector = formContainer.querySelector('.qa-prior-stage-selector');
+  const invalidatedSection = formContainer.querySelector('.qa-invalidated-stages-section');
+  const continuationPoint = formContainer.querySelector('.qa-continuation-radio:checked')?.value || 'CURRENT';
+
+  if (rejectionFlow) {
+    rejectionFlow.hidden = result !== 'REJECTED';
+  }
+
+  const showPriorStage = result === 'REJECTED' && continuationPoint === 'PRIOR_STAGE';
+  if (priorStageSelector) { priorStageSelector.hidden = !showPriorStage; }
+  if (invalidatedSection) { invalidatedSection.hidden = !showPriorStage; }
+
+  formContainer.querySelectorAll('.qa-invalidated-stage-card').forEach((card) => {
+    if (!showPriorStage) {
+      card.hidden = true;
+      return;
+    }
+    const selectedStageId = formContainer.querySelector('.qa-continuation-stage-select')?.value || '';
+    const cardStageOrder = Number(card.dataset.stageOrder || 0);
+    const selectedStageOrder = Number(
+      formContainer.querySelector('.qa-continuation-stage-select')?.selectedOptions?.[0]?.dataset?.stageOrder || 0,
+    );
+    card.hidden = !selectedStageId || cardStageOrder < selectedStageOrder;
+  });
+
+  formContainer.querySelectorAll('.qa-disposition-row').forEach((row) => {
+    const disposition = row.querySelector('.qa-disposition-select')?.value || '';
+    const qtyBlock = row.querySelector('.qa-disposition-qty-block');
+    const qtyLabel = row.querySelector('.qa-disposition-qty-label');
+    const qtyInput = row.querySelector('.qa-disposition-qty');
+    const needsVisibleQuantity = disposition === 'RETURN';
+
+    if (qtyBlock) { qtyBlock.style.display = needsVisibleQuantity ? '' : 'none'; }
+    if (qtyInput) {
+      qtyInput.required = needsVisibleQuantity;
+      if (!needsVisibleQuantity) { qtyInput.value = ''; }
+    }
+    if (qtyLabel) {
+      qtyLabel.textContent = disposition === 'RETURN' ? 'Cantidad a devolver *' : 'Cantidad *';
+    }
+  });
+
+  // Auto-manage replacement checkbox: active when any visible material is DISCARD or RECOLLECT.
+  const replacementCheckbox = /** @type {HTMLInputElement|null} */ (formContainer.querySelector('.qa-requires-replacement-stage'));
+  if (replacementCheckbox) {
+    const visibleDispositions = Array.from(
+      formContainer.querySelectorAll('.qa-rejection-flow .qa-disposition-select'),
+    ).filter((sel) => !sel.closest('[hidden]'));
+    const needsReplacement = visibleDispositions.some(
+      (sel) => sel.value === 'DISCARD' || sel.value === 'RECOLLECT',
+    );
+    replacementCheckbox.checked = needsReplacement;
+  }
+}
+
+function collectDispositionEntries(section) {
+  if (!section) {
+    throw new Error('Debes completar la gestión del rechazo antes de registrar la inspección.');
+  }
+
+  return Array.from(section.querySelectorAll('.qa-disposition-row')).map((row) => {
+    const disposition = row.querySelector('.qa-disposition-select')?.value || '';
+    const productId = row.dataset.productId;
+    const lotId = row.dataset.lotId;
+    const consumedQuantity = Number(row.dataset.consumedQuantity || 0);
+    const qtyInputValue = row.querySelector('.qa-disposition-qty')?.value || '';
+
+    if (!disposition) {
+      throw new Error('Debes completar la disposición de material antes de registrar el rechazo.');
+    }
+
+    if (disposition === 'RETURN') {
+      const quantity = Number(qtyInputValue);
+      if (!(quantity > 0)) {
+        throw new Error('Indica la cantidad a devolver.');
+      }
+      return { productId: Number(productId), lotId: Number(lotId), disposition, quantity };
+    }
+
+    // REUSE: material stays in production, no backend action needed.
+    // Included here for completeness; filtered out before sending to API.
+    return {
+      productId: Number(productId),
+      lotId: Number(lotId),
+      disposition,
+      quantity: consumedQuantity,
+    };
+  });
+}
+
 function collectQaPayload(formContainer, snapshotStage) {
   const result = formContainer.querySelector('.qa-result-select')?.value;
   if (!result) { throw new Error('Selecciona un resultado (Aprobado / Aceptado / Rechazado).'); }
@@ -231,7 +324,87 @@ function collectQaPayload(formContainer, snapshotStage) {
     throw new Error('La accion correctiva es obligatoria para resultados no aprobados.');
   }
 
-  return { result, expectedParameters, actualResults, observations, correctiveAction };
+  if (result !== 'REJECTED') {
+    return { result, expectedParameters, actualResults, observations, correctiveAction };
+  }
+
+  const rejectionFlow = formContainer.querySelector('.qa-rejection-flow');
+  const rejectedSection = rejectionFlow?.querySelector('.qa-material-disposition-section');
+  // REUSE dispositions are UI-only (no backend action). Filter them out before sending.
+  const materialDispositions = collectDispositionEntries(rejectedSection)
+    .filter((d) => d.disposition !== 'REUSE');
+  const continuationPoint = formContainer.querySelector('.qa-continuation-radio:checked')?.value || 'CURRENT';
+  // Replacement checkbox is now auto-managed by syncQaRejectionFlowState.
+  const requiresReplacementStage = formContainer.querySelector('.qa-requires-replacement-stage')?.checked === true;
+
+  // Replacement items: only include rows where material needs to be replaced
+  // (DISCARD = damaged/contaminated, RECOLLECT = needs fresh material).
+  const buildReplacementItems = () => {
+    if (!rejectionFlow) { return []; }
+    const rows = Array.from(rejectionFlow.querySelectorAll('.qa-disposition-row'))
+      .filter((row) => !row.closest('[hidden]'));
+    const byProduct = new Map();
+    rows.forEach((row) => {
+      const disposition = row.querySelector('.qa-disposition-select')?.value || '';
+      if (disposition !== 'DISCARD' && disposition !== 'RECOLLECT') { return; }
+      const productId = row.getAttribute('data-product-id');
+      const quantity = Number(row.getAttribute('data-consumed-quantity') || '0');
+      const unit = row.getAttribute('data-unit') || undefined;
+      if (!productId || quantity <= 0) { return; }
+      const current = byProduct.get(productId) || { productId: Number(productId), quantity: 0, unit };
+      current.quantity += quantity;
+      if (!current.unit && unit) { current.unit = unit; }
+      byProduct.set(productId, current);
+    });
+    return Array.from(byProduct.values()).filter((item) => item.quantity > 0);
+  };
+
+  if (continuationPoint !== 'PRIOR_STAGE') {
+    return {
+      result,
+      expectedParameters,
+      actualResults,
+      observations,
+      correctiveAction,
+      continuationPoint: 'CURRENT',
+      materialDispositions,
+      requiresReplacementStage,
+      replacementItems: requiresReplacementStage ? buildReplacementItems() : undefined,
+    };
+  }
+
+  const continuationStageSelect = formContainer.querySelector('.qa-continuation-stage-select');
+  const continuationStageId = continuationStageSelect?.value || '';
+  if (!continuationStageId) {
+    throw new Error('Selecciona la etapa a la que regresará la producción.');
+  }
+
+  const selectedStageOrder = Number(continuationStageSelect?.selectedOptions?.[0]?.dataset?.stageOrder || 0);
+  const invalidatedStagesDispositions = Array.from(
+    formContainer.querySelectorAll('.qa-invalidated-stage-card'),
+  ).filter((card) => !card.hidden && Number(card.dataset.stageOrder || 0) >= selectedStageOrder)
+    .map((card) => ({
+      stageExecutionId: Number(card.dataset.executionId),
+      dispositions: collectDispositionEntries(card),
+    }));
+
+  if (!invalidatedStagesDispositions.length) {
+    throw new Error('Completa la disposición de materiales de todas las etapas afectadas.');
+  }
+
+  return {
+    result,
+    expectedParameters,
+    actualResults,
+    observations,
+    correctiveAction,
+    continuationPoint,
+    continuationStageId: Number(continuationStageId),
+    materialDispositions,
+    invalidatedStagesDispositions,
+    requiresReplacementStage,
+    replacementItems: requiresReplacementStage ? buildReplacementItems() : undefined,
+  };
 }
 
 WarehouseShell.register('views.productionExecHelpers', {
@@ -239,6 +412,7 @@ WarehouseShell.register('views.productionExecHelpers', {
   evaluateQaResultBadge,
   evaluateInlineExecutionQa,
   syncExecutionOverrideState,
+  syncQaRejectionFlowState,
   collectExecutionPayload,
   collectQaPayload,
 });

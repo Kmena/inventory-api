@@ -329,9 +329,10 @@
         </div>
         <div class="tag-list">
           <span class="badge ${hasInvitations ? 'badge-info' : ''}">${rootShellUi.escapeHtml(hasInvitations ? `Invitaciones: ${activeRequest.invitations?.length || 0}` : 'Sin invitaciones')}</span>
-          <span class="badge badge-success">${rootShellUi.escapeHtml(`Respuestas: ${activeRequest.respondedInvitationCount || 0}`)}</span>
+          <span class="badge badge-success">${rootShellUi.escapeHtml(`Respondidas: ${activeRequest.respondedInvitationCount || 0}`)}</span>
           <span class="badge">${rootShellUi.escapeHtml(`Manual: ${activeRequest.manualResponseCount || 0}`)}</span>
           <span class="badge">${rootShellUi.escapeHtml(`Pública: ${activeRequest.publicResponseCount || 0}`)}</span>
+          <span class="badge badge-info">${rootShellUi.escapeHtml(`Ingresadas: ${activeRequest.directEntryCount || 0}`)}</span>
         </div>
         <p class="muted">${rootShellUi.escapeHtml(hasInvitations ? 'Solicitud activa: continúa con invitaciones y consulta respuestas sin salir del workspace.' : 'Esta solicitud todavía no tiene invitaciones RFQ. Genera invitaciones para solicitar respuesta a los proveedores seleccionados.')}</p>
       </div>
@@ -350,6 +351,7 @@
           <span class="badge">${rootShellUi.escapeHtml(`Productos cotizados: ${summary.quotedProductCount}`)}</span>
           <span class="badge">${rootShellUi.escapeHtml(`Manual: ${summary.manualResponseCount}`)}</span>
           <span class="badge">${rootShellUi.escapeHtml(`Pública: ${summary.publicResponseCount}`)}</span>
+          <span class="badge badge-info">${rootShellUi.escapeHtml(`Ingresadas: ${summary.directEntryCount || 0}`)}</span>
         </div>
       </div>
     `;
@@ -399,37 +401,131 @@
     `).join('');
   }
 
+  /**
+   * Renderiza la lista de solicitudes abiertas como ítems clickeables para el sidebar.
+   * Cada ítem completo actúa como botón — sin columna de acción separada.
+   */
   function renderOpenRequestsTable(trackingData, activeRequestId) {
     if (!trackingData || !trackingData.length) {
-      return '<div class="empty-state"><p class="muted">No hay solicitudes abiertas para mostrar.</p></div>';
+      return '<p class="muted" style="font-size:0.85rem;padding:0.5rem 0;">Sin solicitudes abiertas.</p>';
     }
 
+    const items = trackingData.map((req) => {
+      const isActive = String(req.purchaseRequestId) === String(activeRequestId);
+      const invCount = req.invitations?.length || 0;
+      const respCount = Number(req.respondedInvitationCount || 0);
+      const title = rootShellUi.escapeHtml(req.title || `Solicitud #${req.purchaseRequestId}`);
+      const date = rootShellUi.escapeHtml(helpers.formatDate(req.createdAt));
+      const statusLabel = rootShellUi.escapeHtml(req.status || '—');
+      const respBadge = respCount > 0
+        ? `<span class="badge badge-success" style="font-size:0.7rem;">${respCount} resp.</span>`
+        : '';
+
+      const activeStyle = isActive
+        ? 'background:var(--primary-color,#2563eb);color:#fff;border-color:transparent;'
+        : 'background:transparent;color:inherit;border-color:var(--border-color,#e5e7eb);';
+
+      return `
+        <li style="list-style:none;margin:0;padding:0;">
+          <button
+            class="quotations-sidebar-item"
+            type="button"
+            data-purchase-request-id="${rootShellUi.escapeHtml(String(req.purchaseRequestId))}"
+            aria-current="${isActive ? 'true' : 'false'}"
+            style="width:100%;text-align:left;padding:0.6rem 0.75rem;border:1px solid;border-radius:6px;cursor:pointer;${activeStyle}"
+          >
+            <div style="font-weight:600;font-size:0.85rem;line-height:1.3;">${title}</div>
+            <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;margin-top:0.3rem;">
+              <span class="badge" style="font-size:0.7rem;opacity:${isActive ? '0.85' : '1'};">${statusLabel}</span>
+              ${respBadge}
+              <span style="font-size:0.72rem;opacity:0.75;">${invCount} inv · ${date}</span>
+            </div>
+          </button>
+        </li>
+      `;
+    }).join('');
+
+    return `<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.35rem;">${items}</ul>`;
+  }
+
+  /**
+   * Renderiza el formulario del modal de cotizacion directa.
+   * @param {any[]} suppliers   - Lista de proveedores activos de la empresa
+   * @param {any[]} requestItems - Items de la solicitud de compra activa
+   */
+  function renderDirectQuotationForm(suppliers, requestItems) {
+    const ui = rootShell.require('ui');
+    const esc = ui.escapeHtml.bind(ui);
+
+    const supplierOptions = (Array.isArray(suppliers) ? suppliers : [])
+      .map((s) => `<option value="${esc(String(s.id))}">${esc(s.name)}</option>`)
+      .join('');
+
+    const itemRows = (Array.isArray(requestItems) ? requestItems : []).map((item) => `
+      <tr data-product-id="${esc(String(item.productId))}">
+        <td>${esc(item.product?.name || item.productName || String(item.productId))}</td>
+        <td>${esc(String(Number(item.quantity || 0).toFixed(3)))} ${esc(item.product?.unit || item.unit || '')}</td>
+        <td><input type="number" name="unitPrice" min="0.01" step="0.01" required
+                   style="width:100px" placeholder="0.00"
+                   aria-label="Precio unitario de ${esc(item.productName || String(item.productId))}" /></td>
+        <td><input type="number" name="quantity" min="0.001" step="0.001"
+                   value="${esc(String(Number(item.quantity || 0)))}" required
+                   style="width:90px"
+                   aria-label="Cantidad ofertada" /></td>
+        <td><input type="number" name="leadTimeDays" min="0" step="1"
+                   style="width:70px" placeholder="0"
+                   aria-label="Dias de entrega" /></td>
+      </tr>
+    `).join('');
+
     return `
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Solicitud</th>
-              <th>Estado</th>
-              <th>Invitaciones</th>
-              <th>Respuestas</th>
-              <th>Creada</th>
-              <th>Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${trackingData.map((req) => `
+      <div style="display:flex;flex-direction:column;gap:0.75rem">
+        <label style="display:block">
+          <span>Proveedor <strong style="color:var(--color-danger,#c00)">*</strong></span>
+          <select id="direct-q-supplier" required style="width:100%;margin-top:0.25rem">
+            <option value="">Selecciona un proveedor...</option>
+            ${supplierOptions}
+          </select>
+        </label>
+
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+          <label style="flex:1;min-width:120px">
+            <span>Moneda</span>
+            <select id="direct-q-currency" style="width:100%;margin-top:0.25rem">
+              <option value="CRC" selected>CRC</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </label>
+          <label style="flex:2;min-width:200px">
+            <span>Referencia (opcional)</span>
+            <input type="text" id="direct-q-reference" maxlength="120"
+                   placeholder="Ej: Cotización #123" style="width:100%;margin-top:0.25rem" />
+          </label>
+        </div>
+
+        <label style="display:block">
+          <span>Notas del proveedor (opcional)</span>
+          <textarea id="direct-q-notes" rows="2" maxlength="2000"
+                    style="width:100%;margin-top:0.25rem"
+                    placeholder="Condiciones, vigencia, etc."></textarea>
+        </label>
+
+        <div style="overflow-x:auto">
+          <table class="wh-table" style="width:100%;min-width:520px">
+            <thead>
               <tr>
-                <td data-label="Solicitud"><strong>${rootShellUi.escapeHtml(req.title || `Solicitud #${req.purchaseRequestId}`)}</strong>${String(req.purchaseRequestId) === String(activeRequestId) ? ' <span class="badge badge-info">Activa</span>' : ''}</td>
-                <td data-label="Estado"><span class="badge">${rootShellUi.escapeHtml(req.status || '—')}</span></td>
-                <td data-label="Invitaciones">${rootShellUi.escapeHtml(String(req.invitations?.length || 0))}</td>
-                <td data-label="Respuestas">${rootShellUi.escapeHtml(String(req.respondedInvitationCount || 0))}</td>
-                <td data-label="Creada">${rootShellUi.escapeHtml(helpers.formatDate(req.createdAt))}</td>
-                <td data-label="Acción"><button class="secondary-button quotations-open-request-context-button" type="button" data-purchase-request-id="${rootShellUi.escapeHtml(String(req.purchaseRequestId))}">Ver en esta vista</button></td>
+                <th>Producto</th>
+                <th>Requerido</th>
+                <th>Precio unitario *</th>
+                <th>Cantidad ofertada *</th>
+                <th>Días entrega</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody id="direct-q-items-body">${itemRows}</tbody>
+          </table>
+        </div>
+        ${!itemRows ? '<p class="muted">No hay productos en la solicitud activa.</p>' : ''}
       </div>
     `;
   }
@@ -449,5 +545,6 @@
     renderRfqStatusSummary,
     renderOpenRequestsTable,
     renderSelectionSummary,
+    renderDirectQuotationForm,
   });
 }(window));

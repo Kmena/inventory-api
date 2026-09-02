@@ -369,7 +369,7 @@ test('products view creates categories, creates products, edits and deactivates 
   await page.locator('#products-form-name').fill('Producto nuevo');
   await page.locator('input[name="code"]').fill('PT-12');
   await page.locator('#products-form-category').selectOption('8');
-  await page.locator('input[name="currency"]').fill('CRC');
+  await page.locator('select[name="currency"]').selectOption('CRC');
   await page.locator('input[name="price"]').fill('1550');
   await page.getByRole('button', { name: 'Guardar producto' }).click();
 

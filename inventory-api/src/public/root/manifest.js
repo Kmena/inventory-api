@@ -335,7 +335,7 @@
   // TASK-012: Billing view — client-payment-ledger feature
   const billingItem = createRouteItem({
     id: 'billing',
-    label: 'Facturación',
+    label: 'Facturación y Cobros',
     routeKey: 'billing',
     href: '/root/#billing',
     implemented: true,
@@ -356,7 +356,7 @@
     visibilityRule: guards.isCompanyAdmin,
     actorScope: 'company-admin',
     icon: 'badge-check',
-    includeInRootNav: false,
+    includeInRootNav: true,
     dependencyTag: 'order-approvals',
   });
   const reportsItem = createAdminPendingEntry('reports', 'Reportes', 'bar-chart-3');

@@ -74,9 +74,12 @@ function renderDashboard(dashboardData, stores, goalsData, goalsError, ordersDat
   const goalsValue = goalsError ? '—' : (Array.isArray(goalsData?.goals) ? goalsData.goals.length : '—');
   const goalsNote = goalsError ? '<span style="font-size:0.75rem;color:#ef4444;">No disponible</span>' : '';
   const allOrders = ordersData?.orders || [];
-  const pendingOrders = allOrders.filter((o) => o.status === 'DRAFT');
+  const pendingOrders  = allOrders.filter((o) => o.status === 'DRAFT');
+  const rejectedOrders = allOrders.filter((o) => o.status === 'REJECTED');
   const ordersValue = ordersError ? '—' : pendingOrders.length;
-  const ordersNote = ordersError ? '<span style="font-size:0.75rem;color:#ef4444;">No disponible</span>' : '';
+  const ordersNote  = ordersError
+    ? '<span style="font-size:0.75rem;color:#ef4444;">No disponible</span>'
+    : (rejectedOrders.length > 0 ? `<span style="font-size:0.75rem;color:#DC2626;font-weight:700;">↩️ ${rejectedOrders.length} devuelto${rejectedOrders.length !== 1 ? 's' : ''}</span>` : '');
 
   const vencidas = stores.filter((s) => s.status === 'VENCIDA').length;
 

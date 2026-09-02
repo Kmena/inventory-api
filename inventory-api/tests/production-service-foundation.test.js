@@ -1232,3 +1232,240 @@ test('executeProductionStage rejects stage execution when the production order i
     );
   });
 });
+
+// ─── TASK-005: PER_OUTPUT_KG scaling in production order creation ─────────────
+
+test('createProductionOrder scales material requirements by plannedOutputKg for VOLUME PER_OUTPUT_KG recipe (TASK-005)', async () => {
+  let createdData = null;
+  const persistedRequirementRows = [];
+
+  // Product: 325 mL per unit, density 1.02 kg/L → kgPerUnit = 0.325 * 1.02 = 0.3315
+  // Order quantity: 10 units → plannedOutputKg = 10 * 0.3315 = 3.315
+  // Stage input: 1.25 kg/kg_output → totalRequired = 1.25 * 3.315 = 4.14375 kg
+  const volumeProduct = buildProduct({
+    sourcingMethod: 'PRODUCTION_ONLY',
+    presentationType: 'VOLUME',
+    netContent: 325,
+    netContentUnit: 'ML',
+    density: 1.02,
+  });
+  const kgRecipe = buildPlanningRecipeVersion({ quantityBasis: 'PER_OUTPUT_KG' });
+
+  const tx = {
+    warehouseStock: {
+      findMany: async () => [
+        { productId: 31n, quantity: 500, reservedQuantity: 0 },
+        { productId: 32n, quantity: 100, reservedQuantity: 0 },
+      ],
+    },
+  };
+
+  await withPatchedRepositories({
+    findProductById: async () => volumeProduct,
+    findRecipeVersionById: async () => kgRecipe,
+    findCompanyWarehousesByIds: async () => [{ id: 5n }, { id: 8n }],
+    findActiveCompanyUserById: async () => ({ id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' }),
+    transaction: async (work) => work(tx),
+    acquireCompanyInventoryAdvisoryLock: async () => {},
+    createProductionOrder: async (data) => {
+      createdData = data;
+      return {
+        id: 701n, companyId: 7n, orderId: null,
+        productId: data.productId, recipeId: data.recipeId, recipeVersionId: data.recipeVersionId,
+        originWarehouseId: data.originWarehouseId, destinationWarehouseId: data.destinationWarehouseId,
+        responsibleUserId: data.responsibleUserId,
+        quantity: data.quantity, plannedOutputKg: data.plannedOutputKg,
+        status: data.status, priority: data.priority, responsible: data.responsible,
+        productionLotCode: data.productionLotCode,
+        plannedDate: data.plannedDate, productionDate: data.productionDate, expirationDate: data.expirationDate,
+        submittedAt: null, approvedAt: null, startedAt: null, cancelledAt: null,
+        overrideJustification: data.overrideJustification,
+        recipeVersionSnapshot: data.recipeVersionSnapshot,
+        createdAt: new Date(), updatedAt: new Date(),
+        product: volumeProduct, recipe: kgRecipe.recipe,
+        recipeVersion: { id: 21n, recipeId: 50n, versionNumber: 3, status: 'APPROVED' },
+        originWarehouse: { id: 5n, code: 'RAW', name: 'Raw', warehouseType: 'RAW_MATERIAL', isActive: true },
+        destinationWarehouse: { id: 8n, code: 'FG', name: 'Finished', warehouseType: 'FINISHED_GOODS', isActive: true },
+        responsibleUser: { id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' },
+        items: [], materialRequirements: [],
+      };
+    },
+    createMaterialRequirements: async (_orderId, rows) => {
+      persistedRequirementRows.push(...rows);
+      return { count: rows.length };
+    },
+  }, async () => {
+    const result = await productionService.createProductionOrder({
+      ...validPayload,
+      productId: 11n,
+      quantity: 10,
+    }, auth);
+
+    // plannedOutputKg = 10 units × (325mL × 1.02 kg/L) = 10 × 0.3315 = 3.315
+    assert.ok(Math.abs(Number(createdData.plannedOutputKg) - 3.315) < 0.001,
+      `Expected plannedOutputKg ≈ 3.315, got ${createdData.plannedOutputKg}`);
+
+    // Material requirements must be scaled by plannedOutputKg, not by order quantity.
+    // Stage input 0: 1.25 kg × 3.315 = 4.14375
+    // Stage input 1: 0.25 L × 3.315 = 0.82875
+    const req31 = persistedRequirementRows.find((r) => String(r.productId) === '31');
+    const req32 = persistedRequirementRows.find((r) => String(r.productId) === '32');
+    assert.ok(req31, 'Requirement for product 31 must be persisted');
+    assert.ok(Math.abs(req31.requiredQuantity - 4.14375) < 0.0001,
+      `Expected req31.requiredQuantity ≈ 4.14375, got ${req31.requiredQuantity}`);
+    assert.ok(req32, 'Requirement for product 32 must be persisted');
+    assert.ok(Math.abs(req32.requiredQuantity - 0.82875) < 0.0001,
+      `Expected req32.requiredQuantity ≈ 0.82875, got ${req32.requiredQuantity}`);
+
+    // plannedOutputKg must be exposed in the serialized response.
+    assert.ok(Math.abs(Number(result.plannedOutputKg) - 3.315) < 0.001,
+      `Expected result.plannedOutputKg ≈ 3.315, got ${result.plannedOutputKg}`);
+  });
+});
+
+test('createProductionOrder uses quantity as scalingQuantity for PER_FINISHED_UNIT recipe (TASK-005)', async () => {
+  let createdData = null;
+  const persistedRequirementRows = [];
+
+  // Same VOLUME product, but the recipe basis is PER_FINISHED_UNIT.
+  // Expected: scalingQuantity = 10, no kg conversion applied.
+  const volumeProduct = buildProduct({
+    sourcingMethod: 'PRODUCTION_ONLY',
+    presentationType: 'VOLUME',
+    netContent: 325,
+    netContentUnit: 'ML',
+    density: 1.02,
+  });
+  const unitRecipe = buildPlanningRecipeVersion({ quantityBasis: 'PER_FINISHED_UNIT' });
+
+  const tx = {
+    warehouseStock: {
+      findMany: async () => [
+        { productId: 31n, quantity: 500, reservedQuantity: 0 },
+        { productId: 32n, quantity: 100, reservedQuantity: 0 },
+      ],
+    },
+  };
+
+  await withPatchedRepositories({
+    findProductById: async () => volumeProduct,
+    findRecipeVersionById: async () => unitRecipe,
+    findCompanyWarehousesByIds: async () => [{ id: 5n }, { id: 8n }],
+    findActiveCompanyUserById: async () => ({ id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' }),
+    transaction: async (work) => work(tx),
+    acquireCompanyInventoryAdvisoryLock: async () => {},
+    createProductionOrder: async (data) => {
+      createdData = data;
+      return {
+        id: 702n, companyId: 7n, orderId: null,
+        productId: data.productId, recipeId: data.recipeId, recipeVersionId: data.recipeVersionId,
+        originWarehouseId: data.originWarehouseId, destinationWarehouseId: data.destinationWarehouseId,
+        responsibleUserId: data.responsibleUserId,
+        quantity: data.quantity, plannedOutputKg: data.plannedOutputKg,
+        status: data.status, priority: data.priority, responsible: data.responsible,
+        productionLotCode: data.productionLotCode,
+        plannedDate: data.plannedDate, productionDate: data.productionDate, expirationDate: data.expirationDate,
+        submittedAt: null, approvedAt: null, startedAt: null, cancelledAt: null,
+        overrideJustification: data.overrideJustification,
+        recipeVersionSnapshot: data.recipeVersionSnapshot,
+        createdAt: new Date(), updatedAt: new Date(),
+        product: volumeProduct, recipe: unitRecipe.recipe,
+        recipeVersion: { id: 21n, recipeId: 50n, versionNumber: 3, status: 'APPROVED' },
+        originWarehouse: { id: 5n, code: 'RAW', name: 'Raw', warehouseType: 'RAW_MATERIAL', isActive: true },
+        destinationWarehouse: { id: 8n, code: 'FG', name: 'Finished', warehouseType: 'FINISHED_GOODS', isActive: true },
+        responsibleUser: { id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' },
+        items: [], materialRequirements: [],
+      };
+    },
+    createMaterialRequirements: async (_orderId, rows) => {
+      persistedRequirementRows.push(...rows);
+      return { count: rows.length };
+    },
+  }, async () => {
+    await productionService.createProductionOrder({
+      ...validPayload,
+      productId: 11n,
+      quantity: 10,
+    }, auth);
+
+    // PER_FINISHED_UNIT: plannedOutputKg must be null.
+    assert.equal(createdData.plannedOutputKg, null,
+      `Expected plannedOutputKg null for PER_FINISHED_UNIT, got ${createdData.plannedOutputKg}`);
+
+    // Material requirements scaled by quantity = 10, not by kg.
+    // Stage input 0: 1.25 × 10 = 12.5
+    // Stage input 1: 0.25 × 10 = 2.5
+    const req31 = persistedRequirementRows.find((r) => String(r.productId) === '31');
+    assert.ok(Math.abs(req31.requiredQuantity - 12.5) < 0.001,
+      `Expected req31.requiredQuantity = 12.5, got ${req31.requiredQuantity}`);
+  });
+});
+
+test('createProductionOrder defaults to kg scaling for backward-compatible product without presentationType (TASK-005)', async () => {
+  let createdData = null;
+  const persistedRequirementRows = [];
+
+  // Product without presentationType → kgConversionFactor fallback = 1 → plannedOutputKg = quantity.
+  const legacyProduct = buildProduct({ sourcingMethod: 'PRODUCTION_ONLY' });
+  const kgRecipe = buildPlanningRecipeVersion({ quantityBasis: 'PER_OUTPUT_KG' });
+
+  const tx = {
+    warehouseStock: {
+      findMany: async () => [
+        { productId: 31n, quantity: 500, reservedQuantity: 0 },
+        { productId: 32n, quantity: 100, reservedQuantity: 0 },
+      ],
+    },
+  };
+
+  await withPatchedRepositories({
+    findProductById: async () => legacyProduct,
+    findRecipeVersionById: async () => kgRecipe,
+    findCompanyWarehousesByIds: async () => [{ id: 5n }, { id: 8n }],
+    findActiveCompanyUserById: async () => ({ id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' }),
+    transaction: async (work) => work(tx),
+    acquireCompanyInventoryAdvisoryLock: async () => {},
+    createProductionOrder: async (data) => {
+      createdData = data;
+      return {
+        id: 703n, companyId: 7n, orderId: null,
+        productId: data.productId, recipeId: data.recipeId, recipeVersionId: data.recipeVersionId,
+        originWarehouseId: data.originWarehouseId, destinationWarehouseId: data.destinationWarehouseId,
+        responsibleUserId: data.responsibleUserId,
+        quantity: data.quantity, plannedOutputKg: data.plannedOutputKg,
+        status: data.status, priority: data.priority, responsible: data.responsible,
+        productionLotCode: data.productionLotCode,
+        plannedDate: data.plannedDate, productionDate: data.productionDate, expirationDate: data.expirationDate,
+        submittedAt: null, approvedAt: null, startedAt: null, cancelledAt: null,
+        overrideJustification: data.overrideJustification,
+        recipeVersionSnapshot: data.recipeVersionSnapshot,
+        createdAt: new Date(), updatedAt: new Date(),
+        product: legacyProduct, recipe: kgRecipe.recipe,
+        recipeVersion: { id: 21n, recipeId: 50n, versionNumber: 3, status: 'APPROVED' },
+        originWarehouse: { id: 5n, code: 'RAW', name: 'Raw', warehouseType: 'RAW_MATERIAL', isActive: true },
+        destinationWarehouse: { id: 8n, code: 'FG', name: 'Finished', warehouseType: 'FINISHED_GOODS', isActive: true },
+        responsibleUser: { id: 34n, fullName: 'Operador', username: 'operador', status: 'ACTIVE' },
+        items: [], materialRequirements: [],
+      };
+    },
+    createMaterialRequirements: async (_orderId, rows) => {
+      persistedRequirementRows.push(...rows);
+      return { count: rows.length };
+    },
+  }, async () => {
+    await productionService.createProductionOrder({
+      ...validPayload,
+      productId: 11n,
+      quantity: 10,
+    }, auth);
+
+    // Fallback: kgPerUnit = 1, so plannedOutputKg = 10 * 1 = 10 (same as quantity).
+    assert.ok(Math.abs(Number(createdData.plannedOutputKg) - 10) < 0.001,
+      `Expected plannedOutputKg ≈ 10, got ${createdData.plannedOutputKg}`);
+
+    // Material requirements unchanged: 1.25 × 10 = 12.5, 0.25 × 10 = 2.5
+    const req31 = persistedRequirementRows.find((r) => String(r.productId) === '31');
+    assert.ok(Math.abs(req31.requiredQuantity - 12.5) < 0.001,
+      `Expected req31.requiredQuantity = 12.5, got ${req31.requiredQuantity}`);
+  });
+});

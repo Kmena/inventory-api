@@ -11,6 +11,7 @@ const {
   createClientStoreSchema,
   uploadClientDocumentSchema,
   createClientReferenceSchema,
+  updateClientStoreCreditLimitSchema,
 } = require('../schemas/client.schema');
 const clientService = require('../services/client.service');
 const { highPayloadParsers } = require('../middlewares/request-payload');
@@ -42,6 +43,19 @@ router.post('/company/:clientId/stores', authorizeAccessPolicy('client.store.cre
   try {
     return res.status(201).json(
       await clientService.createCompanyClientStore(parseBigIntId(req.params.clientId, 'clientId'), req.body, req.auth),
+    );
+  } catch (error) { return next(error); }
+});
+
+router.patch('/company/:clientId/stores/:storeId/credit-limit', authorizeAccessPolicy('client.store.credit.manage'), validate(updateClientStoreCreditLimitSchema), async (req, res, next) => {
+  try {
+    return res.json(
+      await clientService.updateCompanyClientStoreCreditLimit(
+        parseBigIntId(req.params.clientId, 'clientId'),
+        parseBigIntId(req.params.storeId, 'storeId'),
+        req.body,
+        req.auth,
+      ),
     );
   } catch (error) { return next(error); }
 });

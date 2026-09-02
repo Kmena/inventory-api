@@ -10,6 +10,10 @@ const purchaseRequestInclude = {
       items: {
         include: { product: true },
       },
+      // Needed by compareSupplierQuotations to determine response origin.
+      rfqInvitations: {
+        select: { id: true, responseSource: true, status: true },
+      },
     },
   },
   selections: {
@@ -268,6 +272,13 @@ function findPurchaseOrderByIdForCompany(id, companyId, db = prisma) {
   });
 }
 
+function listActivePurchaseOrdersByRequestId(purchaseRequestId, companyId, db = prisma) {
+  return db.purchaseOrder.findMany({
+    where: { purchaseRequestId, companyId, status: { not: 'CANCELLED' } },
+    include: { supplier: true, items: { include: { product: true } } },
+  });
+}
+
 function listPurchaseOrders(companyId, db = prisma) {
   return db.purchaseOrder.findMany({
     where: { companyId },
@@ -276,6 +287,18 @@ function listPurchaseOrders(companyId, db = prisma) {
       items: { include: { product: true } },
     },
     orderBy: { createdAt: 'desc' },
+  });
+}
+
+function cancelPurchaseOrder(id, db = prisma) {
+  return db.purchaseOrder.update({
+    where: { id },
+    data: { status: 'CANCELLED' },
+    include: {
+      supplier: true,
+      items: { include: { product: true } },
+      purchaseRequest: true,
+    },
   });
 }
 
@@ -311,5 +334,7 @@ module.exports = {
   createPurchaseOrder,
   findPurchaseOrderByIdForCompany,
   listPurchaseOrders,
+  listActivePurchaseOrdersByRequestId,
   issuePurchaseOrder,
+  cancelPurchaseOrder,
 };

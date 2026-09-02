@@ -524,6 +524,50 @@
       }
     },
     "/api/roles/company/{roleId}": {
+      "get": {
+        "operationId": "getCompanyRole",
+        "summary": "Obtener un rol de empresa por ID con todos sus permisos",
+        "tags": [
+          "roles"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "roleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "x-governance": {
+          "routePolicy": "role.company.list",
+          "actorScope": "company-admin",
+          "boundary": "tenant-admin-legacy",
+          "coveragePosture": "bounded-p33-admin-convergence"
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/roles",
+          "routeFile": "src/routes/role.routes.js",
+          "expressPath": "/company/:roleId"
+        },
+        "responses": {
+          "200": {
+            "description": "Rol con permisos completos"
+          },
+          "403": {
+            "description": "Sin permisos"
+          },
+          "404": {
+            "description": "Rol no encontrado"
+          }
+        }
+      },
       "put": {
         "operationId": "updateCompanyRole",
         "summary": "Actualizar permisos y nombre de un rol de empresa",

@@ -60,8 +60,9 @@ async function updateOrder(id, payload, auth, req = null) {
   const authScope = scope(auth);
   const currentOrder = await getOrder(id, auth);
   assertDraftEditAccess(currentOrder, authScope, auth);
-  if (currentOrder.status !== 'DRAFT') {
-    throw createHttpError(409, 'Solo se pueden editar pedidos en borrador', 'conflict');
+  // Agents can also edit REJECTED orders (they were sent back for correction).
+  if (currentOrder.status !== 'DRAFT' && currentOrder.status !== 'REJECTED') {
+    throw createHttpError(409, 'Solo se pueden editar pedidos en borrador o rechazados', 'conflict');
   }
 
   assertEditableStatus(payload);
@@ -126,6 +127,56 @@ async function approveOrder(id, auth, req = null) {
   return inventoryService.reserveStockForOrder(id, auth, req);
 }
 
+async function rejectOrder(id, payload, auth, req = null) {
+  const order = await getOrder(id, auth);
+  assertLifecycleStatusAllowed(order.status, ['DRAFT'], 'Solo se pueden rechazar pedidos en borrador');
+  const { companyId, userId } = scope(auth);
+  const rejectedOrder = await orderRepository.updateOrder(id, companyId, {
+    status: 'REJECTED',
+    rejectionReason: payload.rejectionReason,
+    rejectedById: userId,
+    rejectedAt: new Date(),
+  });
+  if (!rejectedOrder) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'orders.reject',
+    resourceType: 'order',
+    resourceId: id,
+    outcome: 'SUCCESS',
+    beforeState: { id: order.id, status: order.status },
+    afterState:  { id: rejectedOrder.id, status: rejectedOrder.status, rejectionReason: rejectedOrder.rejectionReason },
+  });
+  return rejectedOrder;
+}
+
+async function resubmitOrder(id, auth, req = null) {
+  const order = await getOrder(id, auth);
+  assertLifecycleStatusAllowed(order.status, ['REJECTED'], 'Solo se pueden reenviar pedidos rechazados');
+  const authScope = scope(auth);
+  // Only the agent who created the order can resubmit it.
+  if (order.userId == null || String(order.userId) !== String(authScope.userId)) {
+    throw createHttpError(403, 'Solo el agente que creó el pedido puede reenviarlo', 'forbidden');
+  }
+  const resubmitted = await orderRepository.updateOrder(id, authScope.companyId, {
+    status: 'DRAFT',
+    rejectionReason: null,
+    rejectedById: null,
+    rejectedAt: null,
+  });
+  if (!resubmitted) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'orders.resubmit',
+    resourceType: 'order',
+    resourceId: id,
+    outcome: 'SUCCESS',
+    beforeState: { id: order.id, status: order.status },
+    afterState:  { id: resubmitted.id, status: resubmitted.status },
+  });
+  return resubmitted;
+}
+
 async function cancelOrder(id, auth, req = null) {
   const order = await getOrder(id, auth);
   if (order.status === 'DELIVERED') {
@@ -134,6 +185,7 @@ async function cancelOrder(id, auth, req = null) {
   if (order.status === 'CANCELLED') {
     throw createHttpError(409, 'El pedido ya esta cancelado', 'conflict');
   }
+  // REJECTED orders have no stock reservation — cancel directly.
   if (order.status === 'APPROVED') {
     return inventoryService.releaseStockReservation(id, true, auth, req);
   }
@@ -162,9 +214,9 @@ async function cancelOrder(id, auth, req = null) {
   return cancelledOrder;
 }
 
-async function dispatchOrder(id, auth, req = null) {
+async function dispatchOrder(id, auth, body = null, req = null) {
   await getOrder(id, auth);
-  return inventoryService.dispatchOrder(id, auth, req);
+  return inventoryService.dispatchOrder(id, auth, body, req);
 }
 
 async function removeOrder(id, auth, req = null) {
@@ -201,14 +253,82 @@ async function removeOrder(id, auth, req = null) {
   return deletedOrder;
 }
 
+/**
+ * For warehouse SPA: returns only APPROVED orders with full item + lot allocation detail.
+ * @param {any} auth
+ */
+async function listOrdersForDispatch(auth) {
+  const { companyId } = scope(auth);
+  return orderRepository.findApprovedOrdersForDispatch(companyId);
+}
+
+async function listDeliveredOrders(auth) {
+  const { companyId } = scope(auth);
+  return orderRepository.findDeliveredOrders(companyId);
+}
+
+/**
+ * Single order for warehouse dispatch view — includes allocations (lot movements).
+ * @param {bigint} id
+ * @param {any} auth
+ */
+async function getOrderForDispatch(id, auth) {
+  const { companyId } = scope(auth);
+  const order = await orderRepository.findOrderWithAllocations(id, companyId);
+  if (!order) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  return order;
+}
+
+/**
+ * Fetch a specific order scoped by companyId + userId (for agent self-service).
+ * Throws 404 if not found or doesn't belong to this agent.
+ */
+async function getOrderForAgent(id, companyId, userId) {
+  const order = await orderRepository.findOrderById(id, companyId);
+  if (!order) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  if (String(order.userId) !== String(userId)) {
+    throw createHttpError(403, 'No tenés acceso a este pedido', 'forbidden');
+  }
+  return order;
+}
+
+/**
+ * Update order items without full auth policy check — used by agent correction flow.
+ * Only updates items and basic fields; does not change status.
+ */
+async function updateOrderAsAgent(id, payload, companyId) {
+  const data = {};
+  if (payload.paymentCondition) data.paymentCondition = payload.paymentCondition;
+  if (payload.notes !== undefined) data.notes = payload.notes;
+  if (payload.responsible !== undefined) data.responsible = payload.responsible;
+  if (payload.items) {
+    // updateMany doesn't support nested relation writes — use update (singular) instead.
+    data.items = { deleteMany: {}, create: toOrderItemsCreate(payload.items) };
+  }
+  const updated = await orderRepository.updateOrderWithRelations(id, data);
+  if (!updated) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  // Verify the order belongs to this company (ownership check after update).
+  if (String(updated.companyId) !== String(companyId)) {
+    throw createHttpError(403, 'No tenés acceso a este pedido', 'forbidden');
+  }
+  return updated;
+}
+
 module.exports = {
   listOrders,
   getOrder,
+  getOrderForAgent,
   createOrder,
   updateOrder,
+  updateOrderAsAgent,
   approveOrder,
+  rejectOrder,
+  resubmitOrder,
   cancelOrder,
   dispatchOrder,
   removeOrder,
+  listOrdersForDispatch,
+  getOrderForDispatch,
+  listDeliveredOrders,
 };
 

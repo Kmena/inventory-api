@@ -151,9 +151,9 @@
         <div class="detail-grid">
           <article class="detail-item"><span>Codigo</span><strong>${rootShellUi.escapeHtml(product?.code || 'Sin codigo visible')}</strong></article>
           <article class="detail-item"><span>Subcategoria</span><strong>${rootShellUi.escapeHtml(product?.subcategory?.name || 'Sin subcategoria')}</strong></article>
-          <article class="detail-item"><span>Categoria</span><strong>${rootShellUi.escapeHtml(product?.category?.name || (product?.subcategory ? '' : 'Sin categoria'))}</strong></article>
+          <article class="detail-item"><span>Contenido neto</span><strong>${rootShellUi.escapeHtml(product?.netContent != null ? `${productsHelpers.formatNumber(product.netContent)} ${product?.netContentUnit || ''}`.trim() : 'Sin definir')}</strong></article>
+          <article class="detail-item"><span>Unidad</span><strong>${rootShellUi.escapeHtml(product?.netContentUnit || product?.unit || 'Sin unidad visible')}</strong></article>
           <article class="detail-item"><span>Precio principal</span><strong>${rootShellUi.escapeHtml(productsHelpers.formatCurrency(product?.price, product?.currency || 'CRC'))}</strong></article>
-          <article class="detail-item"><span>Unidad</span><strong>${rootShellUi.escapeHtml(product?.unit || 'Sin unidad visible')}</strong></article>
           <article class="detail-item"><span>Stock disponible</span><strong>${rootShellUi.escapeHtml(inventoryVisible ? productsHelpers.formatNumber(product?.quantity || 0) : 'No visible')}</strong></article>
           <article class="detail-item"><span>Stock reservado</span><strong>${rootShellUi.escapeHtml(inventoryVisible ? productsHelpers.formatNumber(product?.reservedQuantity || 0) : 'No visible')}</strong></article>
           <article class="detail-item"><span>Stock minimo</span><strong>${rootShellUi.escapeHtml(inventoryVisible ? productsHelpers.formatNumber(product?.minStock || 0) : 'No visible')}</strong></article>

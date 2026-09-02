@@ -123,3 +123,102 @@ test('production routes restrict QA inspection endpoints to quality.inspect and 
   assert.equal(allowedInspectionGet, undefined,
     'quality.view must grant read access to GET inspections endpoint');
 });
+
+// ─── TASK-006: Loss endpoints route contract ───────────────────────────────
+
+test("production routes expose the POST and GET /losses endpoints (TASK-006)", () => {
+  assert.ok(
+    getRouteLayer("/orders/:id/stages/:stageId/losses", "post").length >= 3,
+    "POST /orders/:id/stages/:stageId/losses must exist and be governed",
+  );
+  assert.ok(
+    getRouteLayer("/orders/:id/stages/:stageId/losses", "get").length >= 2,
+    "GET /orders/:id/stages/:stageId/losses must exist and be governed",
+  );
+});
+
+test("POST /losses requires production.manage permission (TASK-006)", async () => {
+  const lossesPostRoute = productionRoutes.stack.find(
+    (entry) => entry.route
+      && entry.route.path === "/orders/:id/stages/:stageId/losses"
+      && entry.route.methods.post,
+  );
+  const guard = lossesPostRoute.route.stack[0].handle;
+
+  // Deny: production.execute does not grant production.manage
+  const denied = await runGuard(guard, { companyId: "7", permissions: ["production.execute"] });
+  assert.equal(denied?.statusCode, 403, "production.execute must not grant access to losses endpoint");
+
+  // Allow: production.manage grants write access
+  const allowed = await runGuard(guard, { companyId: "7", permissions: ["production.manage"] });
+  assert.equal(allowed, undefined, "production.manage must grant access to POST losses endpoint");
+});
+
+test("GET /losses requires production.view permission (TASK-006)", async () => {
+  const lossesGetRoute = productionRoutes.stack.find(
+    (entry) => entry.route
+      && entry.route.path === "/orders/:id/stages/:stageId/losses"
+      && entry.route.methods.get,
+  );
+  const guard = lossesGetRoute.route.stack[0].handle;
+
+  // Allow: production.view grants read access
+  const allowed = await runGuard(guard, { companyId: "7", permissions: ["production.view"] });
+  assert.equal(allowed, undefined, "production.view must grant access to GET losses endpoint");
+
+  // Allow: production.execute also grants view access (production.view policy includes execute)
+  const allowedExecute = await runGuard(guard, { companyId: "7", permissions: ["production.execute"] });
+  assert.equal(allowedExecute, undefined, "production.execute is included in production.view policy");
+
+  // Deny: no relevant permissions
+  const denied = await runGuard(guard, { companyId: "7", permissions: ["supplier.view"] });
+  assert.equal(denied?.statusCode, 403, "supplier.view must not grant access to GET losses");
+});
+
+test("production routes expose the recolection confirm endpoint (TASK-006)", () => {
+  assert.ok(
+    getRouteLayer("/orders/:id/recolections/:recolectionId/confirm", "post").length >= 3,
+    "POST /orders/:id/recolections/:recolectionId/confirm must exist and be governed",
+  );
+});
+
+test("POST /recolections/:recolectionId/confirm requires production.execute permission (TASK-006)", async () => {
+  const recolectionPostRoute = productionRoutes.stack.find(
+    (entry) => entry.route
+      && entry.route.path === "/orders/:id/recolections/:recolectionId/confirm"
+      && entry.route.methods.post,
+  );
+  const guard = recolectionPostRoute.route.stack[0].handle;
+
+  const denied = await runGuard(guard, { companyId: "7", permissions: ["production.view"] });
+  assert.equal(denied?.statusCode, 403, "production.view must not grant access to recolection confirm endpoint");
+
+  const allowed = await runGuard(guard, { companyId: "7", permissions: ["production.execute"] });
+  assert.equal(allowed, undefined, "production.execute must grant access to POST recolection confirm endpoint");
+});
+
+test("stageLossSchema from production.schema accepts losses:[] (TASK-006)", () => {
+  const { stageLossSchema } = require("../src/schemas/production.schema");
+  const result = stageLossSchema.safeParse({ losses: [] });
+  assert.ok(result.success, "stageLossSchema must accept empty losses array");
+  assert.equal(result.data.losses.length, 0);
+});
+
+test("stageLossSchema from production.schema validates loss items (TASK-006)", () => {
+  const { stageLossSchema } = require("../src/schemas/production.schema");
+
+  const valid = stageLossSchema.safeParse({
+    losses: [
+      { productId: "1", lotId: "5", quantity: 3.5, reasonCode: "CONTAMINATED" },
+    ],
+  });
+  assert.ok(valid.success, "stageLossSchema must accept valid loss item");
+  assert.equal(valid.data.losses[0].productId, 1n);
+  assert.equal(valid.data.losses[0].lotId, 5n);
+
+  // Reject negative quantity
+  const invalid = stageLossSchema.safeParse({
+    losses: [{ productId: "1", lotId: "5", quantity: -1, reasonCode: "BROKEN" }],
+  });
+  assert.ok(!invalid.success, "stageLossSchema must reject negative quantity");
+});

@@ -27,6 +27,7 @@ enum OrderStatus {
   IN_PRODUCTION
   DELIVERED
   CANCELLED
+  REJECTED
 }
 
 enum InvoiceStatus {
@@ -91,6 +92,27 @@ enum ProductInventoryType {
   PACKAGING
   WORK_IN_PROCESS
   FINISHED_GOOD
+}
+
+enum ProductPresentationType {
+  VOLUME
+  MASS
+  LENGTH
+  COUNT
+}
+
+enum ProductNetContentUnit {
+  ML
+  L
+  G
+  KG
+  M
+  UN
+}
+
+enum RecipeQuantityBasis {
+  PER_OUTPUT_KG
+  PER_FINISHED_UNIT
 }
 
 enum RecipeVersionStatus {
@@ -252,6 +274,7 @@ model Company {
   orderStoreBackfillAudits OrderStoreBackfillAudit[]
   fiscalDocumentReferences FiscalDocumentReference[]
   rfqInvitations           SupplierQuotationInvitation[]
+  productionRecolectionStages ProductionRecolectionStage[]
 
   @@map("companies")
 }
@@ -361,6 +384,8 @@ model User {
   role                  Role?                   @relation(fields: [roleId], references: [id])
   orders                Order[]                 @relation("order_user")
   approvals             Order[]                 @relation("order_approver")
+  rejections            Order[]                 @relation("order_rejector")
+  dispatches            Order[]                 @relation("order_dispatcher")
   createdProducts       Product[]               @relation("product_creator")
   createdRecipeVersions RecipeVersion[]         @relation("recipe_version_creator")
   approvedRecipeVersions RecipeVersion[]        @relation("recipe_version_approver")
@@ -537,6 +562,8 @@ model Client {
   @@index([companyId, deletedAt])
   @@index([clientClassificationId])
   @@index([legalEntityId])
+  @@index([creditBalance])
+  @@index([creditLimit])
   @@map("clients")
 }
 
@@ -602,6 +629,8 @@ model ClientStore {
   province  String?
   canton    String?
   district  String?
+  creditLimit   Decimal @default(0) @db.Decimal(14, 2) @map("credit_limit")
+  creditBalance Decimal @default(0) @db.Decimal(14, 2) @map("credit_balance")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -614,6 +643,7 @@ model ClientStore {
   @@unique([clientId, code])
   @@index([legalEntityId])
   @@index([subregionId])
+  @@index([creditBalance])
   @@map("client_stores")
 }
 
@@ -850,6 +880,7 @@ model Product {
   taxRate          Decimal           @default(13.0) @db.Decimal(5, 2) @map("tax_rate")
   density          Decimal?          @db.Decimal(14, 6)
   densityUnit      String?           @map("density_unit")
+  presentationType ProductPresentationType? @map("presentation_type")
   requiresLot      Boolean?          @map("requires_lot")
   requiresExpiration Boolean?        @map("requires_expiration")
   standardCost     Decimal?          @db.Decimal(14, 2) @map("standard_cost")
@@ -858,6 +889,7 @@ model Product {
   lotStrategy      String            @default("TRACKED") @map("lot_strategy")
   inCatalog        Boolean           @default(false) @map("in_catalog")
   netContent       Decimal           @default(0) @db.Decimal(14, 3) @map("net_content")
+  netContentUnit   ProductNetContentUnit? @map("net_content_unit")
   conversionFactor Decimal           @default(1) @db.Decimal(14, 6) @map("conversion_factor")
   kgConversionFactor Decimal         @default(1) @db.Decimal(14, 6) @map("kg_conversion_factor")
   minStock         Decimal?          @db.Decimal(14, 3) @map("min_stock")
@@ -891,6 +923,8 @@ model Product {
   purchaseReceiptItems PurchaseReceiptItem[] @relation("purchase_receipt_item_product")
   substituteReceiptItems PurchaseReceiptItem[] @relation("purchase_receipt_item_substitute_product")
   receiptInspections ReceiptInspection[] @relation("receipt_inspection_product")
+  recolectionEntries    ProductionRecolectionEntry[]
+  recolectionReconciliations ProductionRecolectionReconciliation[]
 
   @@unique([companyId, code])
   @@map("products")
@@ -1249,6 +1283,9 @@ model Lot {
   productionReturns     ProductionReturn[]
   qualityInspections    QualityInspection[]
   purchaseReceiptItemsConfirmed PurchaseReceiptItem[] @relation("purchase_receipt_item_confirmed_lot")
+  stageLosses           ProductionStageLoss[]
+  recolectionEntries    ProductionRecolectionEntry[]
+  recolectionReconciliations ProductionRecolectionReconciliation[]
 
   @@unique([companyId, internalLotNumber])
   @@index([productId])
@@ -1350,8 +1387,18 @@ model Order {
   transferMetadata  Json?                 @map("transfer_metadata")
   total             Decimal              @default(0) @db.Decimal(14, 2)
   otherCosts    Decimal      @default(0) @db.Decimal(14, 2) @map("other_costs")
-  transport     String?
-  status        OrderStatus  @default(DRAFT)
+  transport             String?
+  // Dispatch / shipping info — filled by warehouse at dispatch time
+  transportMethod       String?   @map("transport_method")
+  trackingNumber        String?   @map("tracking_number")
+  transportResponsible  String?   @map("transport_responsible")
+  dispatchedAt          DateTime? @map("dispatched_at")
+  dispatchedById        BigInt?   @map("dispatched_by_id")
+  status          OrderStatus  @default(DRAFT)
+  // Rejection flow: office rejects → REJECTED; agent corrects → DRAFT again
+  rejectionReason String?      @map("rejection_reason")
+  rejectedById    BigInt?      @map("rejected_by_id")
+  rejectedAt      DateTime?    @map("rejected_at")
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
   company       Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1359,6 +1406,8 @@ model Order {
   clientStore   ClientStore? @relation(fields: [clientStoreId], references: [id])
   user          User?        @relation("order_user", fields: [userId], references: [id])
   approvedBy    User?        @relation("order_approver", fields: [approvedById], references: [id])
+  rejectedBy    User?        @relation("order_rejector", fields: [rejectedById], references: [id])
+  dispatchedBy  User?        @relation("order_dispatcher", fields: [dispatchedById], references: [id])
   warehouse     Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   items         OrderItem[]
   invoices      Invoice[]
@@ -1502,6 +1551,7 @@ model RecipeVersion {
   recipeId               BigInt                   @map("recipe_id")
   versionNumber          Int                      @map("version_number")
   status                 RecipeVersionStatus      @default(DRAFT)
+  quantityBasis          RecipeQuantityBasis      @default(PER_OUTPUT_KG) @map("quantity_basis")
   effectiveFrom          DateTime?                @map("effective_from")
   effectiveTo            DateTime?                @map("effective_to")
   expectedYield          Decimal?                 @db.Decimal(14, 3) @map("expected_yield")
@@ -1541,6 +1591,13 @@ model RecipeStage {
   parameterTolerances   Json?                     @map("parameter_tolerances")
   requiredEvidence      Json?                     @map("required_evidence")
   qaMandatory           Boolean                   @default(false) @map("qa_mandatory")
+  /// Stage type: RECOLLECTION (recolectar insumos de lote) | PROCESSING (ejecutar proceso sobre insumos).
+  /// Legacy stages without explicit type are treated as PROCESSING for backward compatibility.
+  stageType             String                    @default("PROCESSING") @map("stage_type")
+  /// Required for PROCESSING stages. Must be a value from the approved processCode catalog.
+  processCode           String?                   @map("process_code")
+  /// Required only when processCode = OTHER. Not required for catalog-backed codes.
+  processLabel          String?                   @map("process_label")
   createdAt             DateTime                  @default(now()) @map("created_at")
   updatedAt             DateTime                  @updatedAt @map("updated_at")
   recipeVersion         RecipeVersion             @relation(fields: [recipeVersionId], references: [id], onDelete: Cascade)
@@ -1582,6 +1639,7 @@ model ProductionOrder {
   destinationWarehouseId BigInt?                   @map("destination_warehouse_id")
   responsibleUserId      BigInt?                   @map("responsible_user_id")
   quantity               Decimal                   @db.Decimal(14, 3)
+  plannedOutputKg        Decimal?                  @db.Decimal(14, 3) @map("planned_output_kg")
   status                 ProductionOrderStatus     @default(DRAFT)
   priority               Int                       @default(0)
   responsible            String?
@@ -1612,6 +1670,8 @@ model ProductionOrder {
   wastes                 ProductionWaste[]
   returns                ProductionReturn[]
   qualityInspections     QualityInspection[]
+  stageLosses            ProductionStageLoss[]
+  recolectionStages      ProductionRecolectionStage[]
 
   @@index([companyId, status, plannedDate])
   @@index([companyId, productId, createdAt])
@@ -1655,31 +1715,39 @@ model ProductionItem {
 }
 
 model ProductionStageExecution {
-  id                BigInt             @id @default(autoincrement())
-  productionOrderId BigInt             @map("production_order_id")
-  recipeStageId     BigInt             @map("recipe_stage_id")
-  stageOrder        Int                @map("stage_order")
-  stageName         String             @map("stage_name")
-  responsibleUserId BigInt?            @map("responsible_user_id")
-  startedAt         DateTime           @map("started_at")
-  endedAt           DateTime           @map("ended_at")
+  id                    BigInt             @id @default(autoincrement())
+  productionOrderId     BigInt             @map("production_order_id")
+  recipeStageId         BigInt             @map("recipe_stage_id")
+  stageOrder            Int                @map("stage_order")
+  stageName             String             @map("stage_name")
+  responsibleUserId     BigInt?            @map("responsible_user_id")
+  startedAt             DateTime           @map("started_at")
+  endedAt               DateTime           @map("ended_at")
+  /// COMPLETED = ejecución finalizada. QA_REJECTED = rechazada por inspector QA.
+  status                String             @default("COMPLETED")
+  /// true cuando el supervisor declaró las pérdidas (incluso cero). Gate para re-ejecución.
+  lossesAcknowledged    Boolean            @default(false) @map("losses_acknowledged")
+  lossesAcknowledgedAt  DateTime?          @map("losses_acknowledged_at")
   actualParameters      Json?              @map("actual_parameters")
-  qaOutOfTolerance     Boolean            @default(false) @map("qa_out_of_tolerance")
-  overrideJustification String?           @map("override_justification")
+  qaOutOfTolerance      Boolean            @default(false) @map("qa_out_of_tolerance")
+  overrideJustification String?            @map("override_justification")
   evidence              Json?
   notes                 String?
   movementGroupId       String?            @map("movement_group_id")
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
-  productionOrder   ProductionOrder    @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
-  recipeStage       RecipeStage        @relation(fields: [recipeStageId], references: [id])
-  consumptions      ProductionConsumption[]
-  wastes            ProductionWaste[]
-  returns           ProductionReturn[]
-  qualityInspections QualityInspection[]
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  productionOrder       ProductionOrder    @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  recipeStage           RecipeStage        @relation(fields: [recipeStageId], references: [id])
+  consumptions          ProductionConsumption[]
+  wastes                ProductionWaste[]
+  returns               ProductionReturn[]
+  qualityInspections    QualityInspection[]
+  losses                ProductionStageLoss[]
+  recolectionStage      ProductionRecolectionStage?
 
   @@index([productionOrderId, stageOrder, createdAt])
   @@index([recipeStageId])
+  @@index([productionOrderId, recipeStageId, createdAt(sort: Desc)], name: "production_stage_executions_stage_status_idx")
   @@map("production_stage_executions")
 }
 
@@ -1747,24 +1815,135 @@ model ProductionReturn {
   @@map("production_returns")
 }
 
+/// Registro declarativo de materiales perdidos post-rechazo QA de etapa.
+/// NO genera movimiento de stock — el stock ya bajó durante el execute.
+/// productionStageLoss: material no recuperable tras una ejecución rechazada.
+model ProductionStageLoss {
+  id                  BigInt                   @id @default(autoincrement())
+  companyId           BigInt                   @map("company_id")
+  productionOrderId   BigInt                   @map("production_order_id")
+  stageExecutionId    BigInt                   @map("stage_execution_id")
+  productId           BigInt                   @map("product_id")
+  lotId               BigInt                   @map("lot_id")
+  quantity            Decimal                  @db.Decimal(14, 3)
+  reasonCode          String                   @map("reason_code") @db.VarChar(100)
+  note                String?
+  registeredByUserId  BigInt?                  @map("registered_by_user_id")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+
+  stageExecution      ProductionStageExecution @relation(fields: [stageExecutionId], references: [id], onDelete: Cascade)
+  productionOrder     ProductionOrder          @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  lot                 Lot                      @relation(fields: [lotId], references: [id], onDelete: Restrict)
+
+  @@index([productionOrderId, stageExecutionId], name: "production_stage_losses_order_idx")
+  @@index([lotId], name: "production_stage_losses_lot_idx")
+  @@map("production_stage_losses")
+}
+
+/// Etapa de recolección/recuperación vinculada a un rechazo QA.
+/// recoveryType distingue entre flujo legacy (VIRTUAL_RECOLECTION) y el nuevo
+/// flujo de reposición de insumos dañados/faltantes (REPLACEMENT_RECOVERY).
+/// status=PENDING bloquea la re-ejecución hasta que el operador confirma.
+model ProductionRecolectionStage {
+  id                  BigInt                          @id @default(autoincrement())
+  companyId           BigInt                          @map("company_id")
+  productionOrderId   BigInt                          @map("production_order_id")
+  /// UNIQUE: solo una recolección por ejecución rechazada.
+  rejectedExecutionId BigInt                          @unique @map("rejected_execution_id")
+  recipeStageId       BigInt                          @map("recipe_stage_id")
+  /// PENDING = esperando confirmación. COMPLETED = material disponible.
+  status              String                          @default("PENDING")
+  /// VIRTUAL_RECOLECTION (legacy) | REPLACEMENT_RECOVERY (nuevo flujo post-rechazo)
+  recoveryType        String                          @default("VIRTUAL_RECOLECTION") @map("recovery_type")
+  /// Legacy JSON para compatibilidad con filas existentes.
+  requiredItems       Json                            @default("[]") @map("required_items")
+  completedByUserId   BigInt?                         @map("completed_by_user_id")
+  completedAt         DateTime?                       @map("completed_at")
+  notes               String?
+  createdAt           DateTime                        @default(now()) @map("created_at")
+
+  company             Company                         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  productionOrder     ProductionOrder                 @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  rejectedExecution   ProductionStageExecution        @relation(fields: [rejectedExecutionId], references: [id], onDelete: Cascade)
+  /// Entradas de recolección por lote (TASK-003: nuevo flujo estructurado)
+  recolectionEntries  ProductionRecolectionEntry[]
+  /// Registros de conciliación terminal (TASK-003)
+  reconciliations     ProductionRecolectionReconciliation[]
+
+  @@index([productionOrderId, status], name: "production_recolection_stages_order_idx")
+  @@index([rejectedExecutionId], name: "production_recolection_stages_exec_idx")
+  @@map("production_recolection_stages")
+}
+
+/// Registro de material recolectado por lote para una etapa de recuperación.
+/// Uno por (recolectionStageId, productId, lotId) — permite granularidad por lote.
+model ProductionRecolectionEntry {
+  id                    BigInt                       @id @default(autoincrement())
+  recolectionStageId    BigInt                       @map("recolection_stage_id")
+  productId             BigInt                       @map("product_id")
+  lotId                 BigInt                       @map("lot_id")
+  quantity              Decimal                      @db.Decimal(14, 3)
+  unit                  String?
+  createdAt             DateTime                     @default(now()) @map("created_at")
+
+  recolectionStage      ProductionRecolectionStage   @relation(fields: [recolectionStageId], references: [id], onDelete: Cascade)
+  product               Product                      @relation(fields: [productId], references: [id])
+  lot                   Lot                          @relation(fields: [lotId], references: [id])
+
+  @@index([recolectionStageId])
+  @@index([productId])
+  @@index([lotId])
+  @@map("production_recolection_entries")
+}
+
+/// Registro de conciliación terminal para material recolectado no usado.
+/// outcome: USED | RETURNED | DISCARDED (BR-007, FR-012)
+model ProductionRecolectionReconciliation {
+  id                    BigInt                       @id @default(autoincrement())
+  recolectionStageId    BigInt                       @map("recolection_stage_id")
+  productId             BigInt                       @map("product_id")
+  lotId                 BigInt                       @map("lot_id")
+  quantity              Decimal                      @db.Decimal(14, 3)
+  /// USED | RETURNED | DISCARDED
+  outcome               String
+  notes                 String?
+  reconciledAt          DateTime                     @default(now()) @map("reconciled_at")
+  createdAt             DateTime                     @default(now()) @map("created_at")
+
+  recolectionStage      ProductionRecolectionStage   @relation(fields: [recolectionStageId], references: [id], onDelete: Cascade)
+  product               Product                      @relation(fields: [productId], references: [id])
+  lot                   Lot                          @relation(fields: [lotId], references: [id])
+
+  @@index([recolectionStageId])
+  @@index([productId])
+  @@index([lotId])
+  @@map("production_recolection_reconciliations")
+}
+
 model QualityInspection {
-  id                 BigInt                   @id @default(autoincrement())
-  productionOrderId  BigInt                   @map("production_order_id")
-  stageExecutionId   BigInt                   @map("stage_execution_id")
-  inspectorUserId    BigInt                   @map("inspector_user_id")
-  lotId              BigInt?                  @map("lot_id")
-  result             QualityInspectionResult
-  expectedParameters Json?                    @map("expected_parameters")
-  actualResults      Json?                    @map("actual_results")
-  observations       String?
-  evidence           Json?
-  correctiveAction   String?                  @map("corrective_action")
-  inspectedAt        DateTime                 @map("inspected_at")
-  createdAt          DateTime                 @default(now()) @map("created_at")
-  updatedAt          DateTime                 @updatedAt @map("updated_at")
-  productionOrder    ProductionOrder          @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
-  stageExecution     ProductionStageExecution @relation(fields: [stageExecutionId], references: [id], onDelete: Cascade)
-  lot                Lot?                     @relation(fields: [lotId], references: [id], onDelete: Restrict)
+  id                   BigInt                   @id @default(autoincrement())
+  productionOrderId    BigInt                   @map("production_order_id")
+  stageExecutionId     BigInt                   @map("stage_execution_id")
+  inspectorUserId      BigInt                   @map("inspector_user_id")
+  lotId                BigInt?                  @map("lot_id")
+  result               QualityInspectionResult
+  expectedParameters   Json?                    @map("expected_parameters")
+  actualResults        Json?                    @map("actual_results")
+  observations         String?
+  evidence             Json?
+  correctiveAction     String?                  @map("corrective_action")
+  inspectedAt          DateTime                 @map("inspected_at")
+  /// CURRENT (default) | PRIOR_STAGE — punto de continuación tras rechazo.
+  continuationPoint    String?                  @map("continuation_point")
+  /// recipeStageId hacia donde retrocede la producción cuando PRIOR_STAGE.
+  continuationStageId  BigInt?                  @map("continuation_stage_id")
+  /// Snapshot de disposiciones declaradas inline por el inspector.
+  materialDispositions Json?                    @map("material_dispositions")
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+  productionOrder      ProductionOrder          @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  stageExecution       ProductionStageExecution @relation(fields: [stageExecutionId], references: [id], onDelete: Cascade)
+  lot                  Lot?                     @relation(fields: [lotId], references: [id], onDelete: Restrict)
 
   @@index([productionOrderId, stageExecutionId, createdAt])
   @@index([lotId])
@@ -1863,4 +2042,3 @@ model SupplierQuotationInvitation {
   @@index([status, expiresAt])
   @@map("supplier_quotation_invitations")
 }
-

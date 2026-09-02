@@ -12,7 +12,10 @@ const governedDirectories = [
   'tests',
   'prisma',
 ];
-const expectedRawUnsafeFiles = [];
+const expectedRawUnsafeFiles = [
+  // TASK-003: migration test queries Prisma constraints via $queryRawUnsafe (read-only introspection)
+  'tests/production-stage-rejection-migration.test.js',
+];
 
 function collectFiles(directory) {
   const entries = fs.readdirSync(directory, { withFileTypes: true });

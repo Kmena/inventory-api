@@ -81,6 +81,19 @@
     });
   }
 
+  /**
+   * Selección mixta: cada línea de producto se asigna a un proveedor distinto.
+   * POST /api/procurement/requests/:id/select-items
+   * payload: { justification?, items: [{ productId, quotationId, quantity, unitPrice }] }
+   */
+  async function selectMixedItems(session, purchaseRequestId, payload) {
+    return inventoryAuth.fetchJson(session, `/api/procurement/requests/${purchaseRequestId}/select-items`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudo confirmar la selección mixta de proveedores.',
+    });
+  }
+
   async function selectQuotation(session, purchaseRequestId, payload) {
     return inventoryAuth.fetchJson(session, `/api/procurement/requests/${purchaseRequestId}/select-quotation`, {
       method: 'POST',
@@ -97,11 +110,48 @@
     });
   }
 
+  /**
+   * Crea todas las órdenes de compra de una selección mixta en un solo request.
+   * payload: { notes?, orders: [{ selectionId, items? }] }
+   */
+  async function createPurchaseOrdersBatch(session, purchaseRequestId, payload) {
+    return inventoryAuth.fetchJson(session, `/api/procurement/requests/${purchaseRequestId}/purchase-orders-batch`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudieron crear las órdenes de compra.',
+    });
+  }
+
   async function createPurchaseOrder(session, purchaseRequestId, payload) {
     return inventoryAuth.fetchJson(session, `/api/procurement/requests/${purchaseRequestId}/purchase-orders`, {
       method: 'POST',
       body: JSON.stringify(payload),
       fallbackMessage: 'No se pudo crear la orden de compra.',
+    });
+  }
+
+  /**
+   * Crea una cotizacion de proveedor directamente en una solicitud de compra,
+   * sin pasar por el flujo de invitacion RFQ.
+   * POST /api/procurement/requests/:id/quotations
+   * Requiere: procurement.manage
+   */
+  async function createDirectQuotation(session, purchaseRequestId, payload) {
+    return inventoryAuth.fetchJson(session, `/api/procurement/requests/${purchaseRequestId}/quotations`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudo registrar la cotizacion del proveedor.',
+    });
+  }
+
+  /**
+   * Lista los proveedores activos de la empresa.
+   * GET /api/suppliers/company
+   * Requiere: suppliers.view o suppliers.manage
+   */
+  async function listSuppliers(session) {
+    return inventoryAuth.fetchJson(session, '/api/suppliers/company', {
+      fallbackMessage: 'No se pudieron cargar los proveedores.',
     });
   }
 
@@ -117,8 +167,12 @@
     getRfqTrackingSummary,
     listPurchaseRequests,
     getComparisonData,
+    selectMixedItems,
     selectQuotation,
+    createPurchaseOrdersBatch,
     approveSelection,
     createPurchaseOrder,
+    createDirectQuotation,
+    listSuppliers,
   });
 }(window));

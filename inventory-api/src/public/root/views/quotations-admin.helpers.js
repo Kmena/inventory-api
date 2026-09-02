@@ -232,6 +232,11 @@
   }
 
   function buildResponseDetailGroups(activeRequest) {
+    // Only quotations with a non-null responseSource are actual supplier responses:
+    //   'DIRECT_ENTRY'         – entered manually via the office form
+    //   'MANUAL_OFFICE_EMAIL'  – entered from an RFQ email response
+    //   'PUBLIC_TOKEN'         – submitted by the supplier via public link
+    // null = catalog-assisted (pre-populated at request creation) → excluded here.
     const quotations = (Array.isArray(activeRequest?.quotations) ? activeRequest.quotations : [])
       .filter((q) => q?.responseSource != null);
     return quotations.map((quotation) => ({
@@ -263,6 +268,7 @@
       respondedInvitationCount: Number(request.respondedInvitationCount || 0),
       manualResponseCount: Number(request.manualResponseCount || 0),
       publicResponseCount: Number(request.publicResponseCount || 0),
+      directEntryCount: Number(request.directEntryCount || 0),
       supplierResponseCount: responseGroups.length,
       quotedProductCount: quotedProducts.size,
       responseGroups,

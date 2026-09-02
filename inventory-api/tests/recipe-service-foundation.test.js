@@ -295,3 +295,503 @@ test('aggregateIngredientsFromStages merges quantities by product across stages'
   assert.equal(base.quantity, 25);
   assert.equal(fragrance.quantity, 5);
 });
+
+// ─── TASK-004: quantityBasis persistence and serialization ───────────────────
+
+test('createRecipeVersion persists PER_OUTPUT_KG quantityBasis from payload (TASK-004)', async () => {
+  const observed = { createPayload: null };
+
+  const createdVersion = {
+    id: 92n, companyId: 7n, recipeId: 33n, versionNumber: 1,
+    status: 'DRAFT', quantityBasis: 'PER_OUTPUT_KG',
+    effectiveFrom: null, effectiveTo: null,
+    expectedYield: null, expectedWaste: null,
+    yieldTolerancePercent: null, wasteTolerancePercent: null,
+    instructions: null, notes: null,
+    approvedAt: null, createdAt: new Date(), updatedAt: new Date(),
+    createdByUser: null, approvedByUser: null, stages: [],
+    recipe: { id: 33n, name: 'Test' },
+  };
+
+  await withModuleStubs(
+    [
+      [recipeRepository, {
+        findRecipeById: async (id, companyId) => ({ id, companyId, versions: [] }),
+        findLatestRecipeVersion: async () => null,
+        createRecipeVersion: async (payload) => { observed.createPayload = payload; return createdVersion; },
+      }],
+      [productRepository, { findProductsByIds: async () => [] }],
+    ],
+    () => recipeService.createRecipeVersion(33n, {
+      quantityBasis: 'PER_OUTPUT_KG',
+      stages: [{ name: 'Mezcla', stageInputs: [] }],
+    }, auth),
+  );
+
+  assert.equal(observed.createPayload.quantityBasis, 'PER_OUTPUT_KG');
+});
+
+test('createRecipeVersion defaults quantityBasis to PER_OUTPUT_KG when omitted (TASK-004)', async () => {
+  const observed = { createPayload: null };
+
+  const createdVersion = {
+    id: 93n, companyId: 7n, recipeId: 33n, versionNumber: 1,
+    status: 'DRAFT', quantityBasis: 'PER_OUTPUT_KG',
+    effectiveFrom: null, effectiveTo: null,
+    expectedYield: null, expectedWaste: null,
+    yieldTolerancePercent: null, wasteTolerancePercent: null,
+    instructions: null, notes: null,
+    approvedAt: null, createdAt: new Date(), updatedAt: new Date(),
+    createdByUser: null, approvedByUser: null, stages: [],
+    recipe: { id: 33n, name: 'Test' },
+  };
+
+  await withModuleStubs(
+    [
+      [recipeRepository, {
+        findRecipeById: async (id, companyId) => ({ id, companyId, versions: [] }),
+        findLatestRecipeVersion: async () => null,
+        createRecipeVersion: async (payload) => { observed.createPayload = payload; return createdVersion; },
+      }],
+      [productRepository, { findProductsByIds: async () => [] }],
+    ],
+    () => recipeService.createRecipeVersion(33n, {
+      stages: [{ name: 'Mezcla', stageInputs: [] }],
+    }, auth),
+  );
+
+  // Basis must default to PER_OUTPUT_KG even when not supplied in payload.
+  assert.equal(observed.createPayload.quantityBasis, 'PER_OUTPUT_KG');
+});
+
+test('serializeRecipeVersion exposes quantityBasis from the DB record (TASK-004)', () => {
+  const version = {
+    id: 91n, recipeId: 33n, companyId: 7n, versionNumber: 1,
+    status: 'DRAFT', quantityBasis: 'PER_OUTPUT_KG',
+    effectiveFrom: null, effectiveTo: null,
+    expectedYield: null, expectedWaste: null,
+    yieldTolerancePercent: null, wasteTolerancePercent: null,
+    instructions: null, notes: null,
+    approvedAt: null, createdAt: new Date(), updatedAt: new Date(),
+    createdByUser: null, approvedByUser: null, stages: [],
+  };
+
+  const serialized = recipeService.serializeRecipeVersion(version);
+
+  assert.equal(serialized.quantityBasis, 'PER_OUTPUT_KG');
+});
+
+// ─── recipe-stage-lineage-validation ─────────────────────────────────────────
+// Shared helpers for lineage tests
+
+function makeMinimalDraftVersion(overrides = {}) {
+  return {
+    id: 91n, companyId: 7n, recipeId: 33n, versionNumber: 1,
+    status: 'DRAFT', quantityBasis: 'PER_OUTPUT_KG',
+    effectiveFrom: null, effectiveTo: null,
+    expectedYield: null, expectedWaste: null,
+    yieldTolerancePercent: null, wasteTolerancePercent: null,
+    instructions: null, notes: null,
+    approvedAt: null, createdAt: new Date(), updatedAt: new Date(),
+    createdByUser: null, approvedByUser: null,
+    stages: [],
+    recipe: { id: 33n, name: 'Test' },
+    ...overrides,
+  };
+}
+
+const lineageStubs = (extraRepoStubs = {}) => [
+  [recipeRepository, {
+    findRecipeById: async (id, companyId) => ({ id, companyId, versions: [] }),
+    findLatestRecipeVersion: async () => null,
+    createRecipeVersion: async () => makeMinimalDraftVersion(),
+    ...extraRepoStubs,
+  }],
+  [productRepository, {
+    findProductsByIds: async (ids) => ids.map((id) => ({ id, name: `Producto-${id}`, unit: 'KG' })),
+  }],
+];
+
+test('createRecipeVersion rejects PROCESSING stage referencing a product not in any prior RECOLLECTION stage (AC-005, BR-001)', async () => {
+  await withModuleStubs(lineageStubs(), async () => {
+    await assert.rejects(
+      () => recipeService.createRecipeVersion(33n, {
+        stages: [
+          {
+            name: 'Mezclado inicial',
+            stageType: 'PROCESSING',
+            processCode: 'MIXING',
+            stageInputs: [{ productId: 20n, name: 'Agua', quantity: 5, unit: 'KG' }],
+          },
+        ],
+      }, auth),
+      (error) => {
+        assert.equal(error?.statusCode, 400);
+        assert.equal(error?.code, 'validation_error');
+        assert.match(error?.message || '', /recolect/i);
+        return true;
+      },
+    );
+  });
+});
+
+test('createRecipeVersion rejects PROCESSING stage that over-consumes recollected quantity (AC-006, BR-005)', async () => {
+  await withModuleStubs(lineageStubs(), async () => {
+    await assert.rejects(
+      () => recipeService.createRecipeVersion(33n, {
+        stages: [
+          {
+            name: 'Recoleccion',
+            stageType: 'RECOLLECTION',
+            stageInputs: [{ productId: 20n, name: 'Agua', quantity: 10, unit: 'KG' }],
+          },
+          {
+            name: 'Mezclado',
+            stageType: 'PROCESSING',
+            processCode: 'MIXING',
+            stageInputs: [{ productId: 20n, name: 'Agua', quantity: 11, unit: 'KG' }],
+          },
+        ],
+      }, auth),
+      (error) => {
+        assert.equal(error?.statusCode, 400);
+        assert.equal(error?.code, 'validation_error');
+        assert.match(error?.message || '', /excede|disponible|recolect/i);
+        return true;
+      },
+    );
+  });
+});
+
+test('createRecipeVersion rejects PROCESSING stage using product from a LATER recollection (AC-011, BR-002)', async () => {
+  // PROCESSING first (index 0), RECOLLECTION after (index 1) → product not available
+  await withModuleStubs(lineageStubs(), async () => {
+    await assert.rejects(
+      () => recipeService.createRecipeVersion(33n, {
+        stages: [
+          {
+            name: 'Procesamiento inicial',
+            stageType: 'PROCESSING',
+            processCode: 'MIXING',
+            stageInputs: [{ productId: 20n, name: 'Agua', quantity: 5, unit: 'KG' }],
+          },
+          {
+            name: 'Recoleccion posterior',
+            stageType: 'RECOLLECTION',
+            stageInputs: [{ productId: 20n, name: 'Agua', quantity: 10, unit: 'KG' }],
+          },
+        ],
+      }, auth),
+      (error) => {
+        assert.equal(error?.statusCode, 400);
+        assert.equal(error?.code, 'validation_error');
+        return true;
+      },
+    );
+  });
+});
+
+test('createRecipeVersion allows PROCESSING stage with zero catalog-product inputs (AC-004, BR-010)', async () => {
+  const result = await withModuleStubs(lineageStubs(), () =>
+    recipeService.createRecipeVersion(33n, {
+      stages: [
+        {
+          name: 'Esterilizacion inicial',
+          stageType: 'PROCESSING',
+          processCode: 'STERILIZATION',
+          stageInputs: [],
+        },
+      ],
+    }, auth),
+  );
+  assert.ok(result);
+});
+
+test('createRecipeVersion allows descriptive stageInputs without productId in PROCESSING without prior recollection (BR-009)', async () => {
+  const result = await withModuleStubs(lineageStubs(), () =>
+    recipeService.createRecipeVersion(33n, {
+      stages: [
+        {
+          name: 'Limpieza',
+          stageType: 'PROCESSING',
+          processCode: 'STERILIZATION',
+          stageInputs: [{ name: 'Nota operativa de limpieza', quantity: null }],
+        },
+      ],
+    }, auth),
+  );
+  assert.ok(result);
+});
+
+test('createRecipeVersion allows under-allocation in DRAFT (AC-007, BR-007)', async () => {
+  // 10 recollected, only 8 used — draft save must succeed
+  const result = await withModuleStubs(lineageStubs(), () =>
+    recipeService.createRecipeVersion(33n, {
+      stages: [
+        {
+          name: 'Recoleccion',
+          stageType: 'RECOLLECTION',
+          stageInputs: [{ productId: 20n, name: 'Agua', quantity: 10, unit: 'KG' }],
+        },
+        {
+          name: 'Mezclado',
+          stageType: 'PROCESSING',
+          processCode: 'MIXING',
+          stageInputs: [{ productId: 20n, name: 'Agua', quantity: 8, unit: 'KG' }],
+        },
+      ],
+    }, auth),
+  );
+  assert.ok(result);
+});
+
+test('createRecipeVersion aggregates multiple RECOLLECTION stages for the same product (AC-010)', async () => {
+  // Two RECOLLECTION stages: 5 + 5 = 10 available; PROCESSING uses 9 → OK
+  const result = await withModuleStubs(lineageStubs(), () =>
+    recipeService.createRecipeVersion(33n, {
+      stages: [
+        {
+          name: 'Recoleccion A',
+          stageType: 'RECOLLECTION',
+          stageInputs: [{ productId: 20n, name: 'Agua', quantity: 5, unit: 'KG' }],
+        },
+        {
+          name: 'Recoleccion B',
+          stageType: 'RECOLLECTION',
+          stageInputs: [{ productId: 20n, name: 'Agua', quantity: 5, unit: 'KG' }],
+        },
+        {
+          name: 'Mezclado',
+          stageType: 'PROCESSING',
+          processCode: 'MIXING',
+          stageInputs: [{ productId: 20n, name: 'Agua', quantity: 9, unit: 'KG' }],
+        },
+      ],
+    }, auth),
+  );
+  assert.ok(result);
+});
+
+test('createRecipeVersion allows the same recollected product split across multiple PROCESSING stages (BR-012)', async () => {
+  // 10 recollected; processing1 uses 4, processing2 uses 6 → total 10 → OK
+  const result = await withModuleStubs(lineageStubs(), () =>
+    recipeService.createRecipeVersion(33n, {
+      stages: [
+        {
+          name: 'Recoleccion',
+          stageType: 'RECOLLECTION',
+          stageInputs: [{ productId: 20n, name: 'Agua', quantity: 10, unit: 'KG' }],
+        },
+        {
+          name: 'Mezclado parcial',
+          stageType: 'PROCESSING',
+          processCode: 'MIXING',
+          stageInputs: [{ productId: 20n, name: 'Agua', quantity: 4, unit: 'KG' }],
+        },
+        {
+          name: 'Dilución',
+          stageType: 'PROCESSING',
+          processCode: 'DILUTION',
+          stageInputs: [{ productId: 20n, name: 'Agua', quantity: 6, unit: 'KG' }],
+        },
+      ],
+    }, auth),
+  );
+  assert.ok(result);
+});
+
+test('approveRecipeVersion rejects under-allocated draft — recollected product not fully used (AC-008, BR-008)', async () => {
+  // Version in DB: 10 recollected, 8 used → approval must be rejected
+  const versionWithStages = makeMinimalDraftVersion({
+    stages: [
+      {
+        id: 1n, stageOrder: 0, stageType: 'RECOLLECTION', name: 'Recoleccion',
+        instructions: null, responsibleRoleCode: null,
+        expectedParameters: [], parameterTolerances: [], requiredEvidence: [],
+        qaMandatory: false, processCode: null, processLabel: null,
+        stageInputs: [{ id: 1n, productId: 20n, name: 'Agua', quantity: 10, unit: 'KG', sortOrder: 0, notes: null }],
+      },
+      {
+        id: 2n, stageOrder: 1, stageType: 'PROCESSING', name: 'Mezclado',
+        processCode: 'MIXING', processLabel: null,
+        instructions: null, responsibleRoleCode: null,
+        expectedParameters: [], parameterTolerances: [], requiredEvidence: [],
+        qaMandatory: false,
+        stageInputs: [{ id: 2n, productId: 20n, name: 'Agua', quantity: 8, unit: 'KG', sortOrder: 0, notes: null }],
+      },
+    ],
+  });
+
+  await withModuleStubs([[recipeRepository, {
+    findRecipeVersionById: async () => versionWithStages,
+  }]], async () => {
+    await assert.rejects(
+      () => recipeService.approveRecipeVersion(91n, {}, auth),
+      (error) => {
+        assert.equal(error?.statusCode, 400);
+        assert.equal(error?.code, 'validation_error');
+        assert.match(error?.message || '', /asign|aloc|complet|sin asignar/i);
+        return true;
+      },
+    );
+  });
+});
+
+test('approveRecipeVersion succeeds when every recollected product is fully allocated (AC-009, BR-008)', async () => {
+  // Version in DB: 10 recollected, exactly 10 used → approval must succeed
+  const versionWithStages = makeMinimalDraftVersion({
+    stages: [
+      {
+        id: 1n, stageOrder: 0, stageType: 'RECOLLECTION', name: 'Recoleccion',
+        instructions: null, responsibleRoleCode: null,
+        expectedParameters: [], parameterTolerances: [], requiredEvidence: [],
+        qaMandatory: false, processCode: null, processLabel: null,
+        stageInputs: [{ id: 1n, productId: 20n, name: 'Agua', quantity: 10, unit: 'KG', sortOrder: 0, notes: null }],
+      },
+      {
+        id: 2n, stageOrder: 1, stageType: 'PROCESSING', name: 'Mezclado',
+        processCode: 'MIXING', processLabel: null,
+        instructions: null, responsibleRoleCode: null,
+        expectedParameters: [], parameterTolerances: [], requiredEvidence: [],
+        qaMandatory: false,
+        stageInputs: [{ id: 2n, productId: 20n, name: 'Agua', quantity: 10, unit: 'KG', sortOrder: 0, notes: null }],
+      },
+    ],
+  });
+
+  const approvedVersion = { ...versionWithStages, status: 'APPROVED', approvedAt: new Date() };
+
+  await withModuleStubs([[recipeRepository, {
+    findRecipeVersionById: async () => versionWithStages,
+    updateRecipeVersion: async () => approvedVersion,
+  }]], async () => {
+    const result = await recipeService.approveRecipeVersion(91n, {}, auth);
+    assert.equal(result.status, 'APPROVED');
+  });
+});
+
+test('approveRecipeVersion rejects when one product is fully allocated but another is partially allocated (AUD-013, multi-product under-allocation)', async () => {
+  // productId=20 (Agua): 10 recollected, 10 used → OK
+  // productId=21 (Sal):  5  recollected, 3  used  → fails: 2 sin asignar
+  const versionTwoProducts = makeMinimalDraftVersion({
+    stages: [
+      {
+        id: 1n, stageOrder: 0, stageType: 'RECOLLECTION', name: 'Recoleccion',
+        instructions: null, responsibleRoleCode: null,
+        expectedParameters: [], parameterTolerances: [], requiredEvidence: [],
+        qaMandatory: false, processCode: null, processLabel: null,
+        stageInputs: [
+          { id: 1n, productId: 20n, name: 'Agua', quantity: 10, unit: 'KG', sortOrder: 0, notes: null },
+          { id: 2n, productId: 21n, name: 'Sal',  quantity: 5,  unit: 'KG', sortOrder: 1, notes: null },
+        ],
+      },
+      {
+        id: 2n, stageOrder: 1, stageType: 'PROCESSING', name: 'Mezclado',
+        processCode: 'MIXING', processLabel: null,
+        instructions: null, responsibleRoleCode: null,
+        expectedParameters: [], parameterTolerances: [], requiredEvidence: [],
+        qaMandatory: false,
+        stageInputs: [
+          { id: 3n, productId: 20n, name: 'Agua', quantity: 10, unit: 'KG', sortOrder: 0, notes: null },
+          { id: 4n, productId: 21n, name: 'Sal',  quantity: 3,  unit: 'KG', sortOrder: 1, notes: null },
+        ],
+      },
+    ],
+  });
+
+  await withModuleStubs([[recipeRepository, {
+    findRecipeVersionById: async () => versionTwoProducts,
+  }]], async () => {
+    await assert.rejects(
+      () => recipeService.approveRecipeVersion(91n, {}, auth),
+      (error) => {
+        assert.equal(error?.statusCode, 400);
+        assert.equal(error?.code, 'validation_error');
+        // Must mention the under-allocated product (Sal), not the fully allocated one (Agua)
+        assert.match(error?.message || '', /Sal/i);
+        assert.match(error?.message || '', /sin asignar|asign|aloc/i);
+        return true;
+      },
+    );
+  });
+});
+
+test('updateRecipeVersion rejects PROCESSING stage referencing a product not in any prior RECOLLECTION stage (AC-005, updateRecipeVersion path)', async () => {
+  // Ensures assertRecipeStageLineageAndAllocation is also called on the update path
+  const existingDraft = makeMinimalDraftVersion();
+
+  await withModuleStubs([
+    [recipeRepository, {
+      findRecipeVersionById: async () => existingDraft,
+    }],
+    [productRepository, {
+      findProductsByIds: async (ids) => ids.map((id) => ({ id, name: `Producto-${id}`, unit: 'KG' })),
+    }],
+  ], async () => {
+    await assert.rejects(
+      () => recipeService.updateRecipeVersion(91n, {
+        stages: [
+          {
+            name: 'Procesamiento sin recoleccion previa',
+            stageType: 'PROCESSING',
+            processCode: 'MIXING',
+            stageInputs: [{ productId: 20n, name: 'Agua', quantity: 5, unit: 'KG' }],
+          },
+        ],
+      }, auth),
+      (error) => {
+        assert.equal(error?.statusCode, 400);
+        assert.equal(error?.code, 'validation_error');
+        assert.match(error?.message || '', /recolect/i);
+        return true;
+      },
+    );
+  });
+});
+
+test('approveRecipeVersion rejects when PROCESSING stage references product not recollected (AC-005 on approval path)', async () => {
+  // Version in DB: PROCESSING uses productId=20 but no RECOLLECTION stage
+  const versionInvalid = makeMinimalDraftVersion({
+    stages: [
+      {
+        id: 1n, stageOrder: 0, stageType: 'PROCESSING', name: 'Mezclado',
+        processCode: 'MIXING', processLabel: null,
+        instructions: null, responsibleRoleCode: null,
+        expectedParameters: [], parameterTolerances: [], requiredEvidence: [],
+        qaMandatory: false,
+        stageInputs: [{ id: 1n, productId: 20n, name: 'Agua', quantity: 5, unit: 'KG', sortOrder: 0, notes: null }],
+      },
+    ],
+  });
+
+  await withModuleStubs([[recipeRepository, {
+    findRecipeVersionById: async () => versionInvalid,
+  }]], async () => {
+    await assert.rejects(
+      () => recipeService.approveRecipeVersion(91n, {}, auth),
+      (error) => {
+        assert.equal(error?.statusCode, 400);
+        assert.equal(error?.code, 'validation_error');
+        return true;
+      },
+    );
+  });
+});
+
+test('serializeRecipeVersion defaults quantityBasis to PER_OUTPUT_KG for legacy records without the field (TASK-004)', () => {
+  const version = {
+    id: 91n, recipeId: 33n, companyId: 7n, versionNumber: 1,
+    status: 'DRAFT',
+    // No quantityBasis — simulates a record created before TASK-004
+    effectiveFrom: null, effectiveTo: null,
+    expectedYield: null, expectedWaste: null,
+    yieldTolerancePercent: null, wasteTolerancePercent: null,
+    instructions: null, notes: null,
+    approvedAt: null, createdAt: new Date(), updatedAt: new Date(),
+    createdByUser: null, approvedByUser: null, stages: [],
+  };
+
+  const serialized = recipeService.serializeRecipeVersion(version);
+
+  assert.equal(serialized.quantityBasis, 'PER_OUTPUT_KG');
+});
