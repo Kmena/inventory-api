@@ -52,9 +52,12 @@ function createPurchaseReceipt(data, db = prisma) {
   });
 }
 
-function listPurchaseReceipts(companyId, db = prisma) {
+function listPurchaseReceipts(companyId, statusFilter = null, db = prisma) {
   return db.purchaseReceipt.findMany({
-    where: { companyId },
+    where: {
+      companyId,
+      ...(statusFilter?.length ? { status: { in: statusFilter } } : {}),
+    },
     include: purchaseReceiptInclude,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   });
