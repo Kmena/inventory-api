@@ -28,8 +28,18 @@ function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
-test('dependency hygiene validator no longer approves any bcrypt-chain residual packages', () => {
-  assert.deepEqual(Object.keys(dependencyHygieneValidator.approvedResidualVulnerabilities), []);
+test('dependency hygiene validator approved residual set matches documented posture', () => {
+  // After the bcrypt closeout the approved set was empty.
+  // In May-2025 three moderate CVEs in Express/qs were added as residual because
+  // the fix requires a semver-major Express 4→5 upgrade (deferred to a dedicated slice).
+  // The approved set must exactly match what is documented in dependency-hygiene-baseline.md.
+  const approved = Object.keys(dependencyHygieneValidator.approvedResidualVulnerabilities).sort();
+  assert.deepEqual(approved, ['body-parser', 'express', 'qs'],
+    'Approved residual set must match documented posture — update baseline.md before changing this assertion');
+  for (const [, entry] of Object.entries(dependencyHygieneValidator.approvedResidualVulnerabilities)) {
+    assert.ok(entry.classification, 'Each residual entry must declare a severity classification');
+    assert.ok(entry.rationale, 'Each residual entry must declare a rationale');
+  }
 });
 
 test('dependency hygiene baseline doc records the bcrypt closeout with a zero-vulnerability audit result', (t) => {

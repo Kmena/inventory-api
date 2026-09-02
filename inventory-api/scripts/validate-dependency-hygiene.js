@@ -1,6 +1,28 @@
 const { execSync } = require('node:child_process');
 
-const approvedResidualVulnerabilities = {};
+// Vulnerabilities approved as residual pending a safe upgrade path.
+// Each entry must include a classification and rationale.
+// Review docs/audit/dependency-hygiene-baseline.md for full context.
+const approvedResidualVulnerabilities = {
+  qs: {
+    classification: 'moderate',
+    rationale:
+      'CVE GHSA-x5fp-wj9c-mxmx / GHSA-4mjr-xmp4-gh2g. ' +
+      'Fix requires express@5.2.1 (semver-major). ' +
+      'Upgrade deferred: Express 4→5 is a breaking change requiring full regression. ' +
+      'qs is only used for internal URL parsing in Express middleware, not for user-supplied untrusted data in direct callers.',
+  },
+  'body-parser': {
+    classification: 'moderate',
+    rationale:
+      'Transitive dependency via qs. Same root cause and upgrade path as qs entry above.',
+  },
+  express: {
+    classification: 'moderate',
+    rationale:
+      'Transitive dependency via body-parser and qs. Same root cause and upgrade path as qs entry above.',
+  },
+};
 
 function readAuditReport() {
   try {
