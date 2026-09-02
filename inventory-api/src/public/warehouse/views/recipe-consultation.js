@@ -16,23 +16,21 @@ function escapeHtml(str) {
 }
 
 function renderStageAccordion(stage, index) {
-  const ingredients = stage.ingredients || stage.items || [];
-  const qaRequired = stage.requiresQualityCheck === true;
-  const stageId = `recipe-stage-${index}`;
+  // Snapshot field names: stageInputs, qaMandatory, expectedParameters, stageOrder
+  const inputs    = stage.stageInputs || [];
+  const qaRequired = stage.qaMandatory === true;
+  const stageId   = `recipe-stage-${index}`;
 
   let ingredientsHtml = '';
-  if (ingredients.length > 0) {
+  if (inputs.length > 0) {
     ingredientsHtml = `
       <div class="recipe-ingredients">
-        <h4 class="recipe-ingredients__title">Ingredientes</h4>
+        <h4 class="recipe-ingredients__title">Insumos</h4>
         <ul class="recipe-ingredients__list">
-          ${ingredients.map((/** @type {any} */ ing) => `
+          ${inputs.map((/** @type {any} */ inp) => `
             <li class="recipe-ingredients__item">
-              <span class="recipe-ingredients__name">${escapeHtml(ing.product?.name || (ing.productId ? `Producto #${ing.productId}` : '—'))}</span>
-              <span class="recipe-ingredients__qty">
-                ${escapeHtml(String(ing.quantity || '—'))} ${escapeHtml(ing.unit || '')}
-                ${ing.tolerance ? ` <em>(±${escapeHtml(String(ing.tolerance))}%)</em>` : ''}
-              </span>
+              <span class="recipe-ingredients__name">${escapeHtml(inp.product?.name || inp.name || (inp.productId ? `Producto #${inp.productId}` : '—'))}</span>
+              <span class="recipe-ingredients__qty">${escapeHtml(String(inp.quantity || '—'))} ${escapeHtml(inp.unit || '')}</span>
             </li>
           `).join('')}
         </ul>
@@ -42,7 +40,7 @@ function renderStageAccordion(stage, index) {
 
   let qaHtml = '';
   if (qaRequired) {
-    const qaParams = stage.qualityParameters || [];
+    const qaParams = stage.expectedParameters || [];
     qaHtml = `
       <div class="recipe-qa-params" role="note" aria-label="Parametros de QA obligatorios">
         <p class="wh-qa-required-badge">🔍 QA Obligatorio</p>
@@ -51,7 +49,7 @@ function renderStageAccordion(stage, index) {
             ${qaParams.map((/** @type {any} */ p) => `
               <li class="recipe-ingredients__item">
                 <span class="recipe-ingredients__name">${escapeHtml(p.name || '—')}</span>
-                <span class="recipe-ingredients__qty">${escapeHtml(p.expectedValue || '—')}</span>
+                <span class="recipe-ingredients__qty">${escapeHtml(p.expectedValue || '—')} ${escapeHtml(p.unit || '')}</span>
               </li>
             `).join('')}
           </ul>
@@ -66,7 +64,7 @@ function renderStageAccordion(stage, index) {
               class="recipe-stage__toggle"
               aria-expanded="false"
               aria-controls="${escapeHtml(stageId)}">
-        <span>Etapa ${escapeHtml(String(stage.sequence || (index + 1)))} · ${escapeHtml(stage.name || `Etapa ${index + 1}`)}</span>
+        <span>Etapa ${escapeHtml(String(stage.stageOrder || (index + 1)))} · ${escapeHtml(stage.name || `Etapa ${index + 1}`)}</span>
         <span class="recipe-stage__chevron" aria-hidden="true">▶</span>
       </button>
       <div id="${escapeHtml(stageId)}" class="recipe-stage__content" hidden>
@@ -142,11 +140,13 @@ function render(container, session, params) {
     .then((/** @type {any} */ order) => {
       if (statusEl) { statusEl.hidden = true; }
 
-      const snapshot = order.frozenRecipeSnapshot || order.recipe || null;
-      const stages = order.stages || snapshot?.stages || [];
-      const recipeName = snapshot?.name || order.recipe?.name || order.product?.name || '—';
-      const recipeVersion = snapshot?.versionLabel || snapshot?.version || '—';
-      const frozenAt = order.createdAt ? new Date(order.createdAt).toLocaleDateString('es') : '—';
+      // recipeVersionSnapshot shape: { recipe, recipeVersion: { versionNumber, stages, ... } }
+      const snapshot    = order.recipeVersionSnapshot || null;
+      const rv          = snapshot?.recipeVersion || null;
+      const stages      = rv?.stages || [];
+      const recipeName  = snapshot?.recipe?.name || order.recipe?.name || order.product?.name || '—';
+      const recipeVersion = rv?.versionNumber != null ? `v${rv.versionNumber}` : '—';
+      const frozenAt    = order.createdAt ? new Date(order.createdAt).toLocaleDateString('es') : '—';
 
       if (!contentEl) { return; }
       contentEl.innerHTML = `
