@@ -147,8 +147,9 @@
       `;
 
       const productSelect = row.querySelector('.si-product');
-      const unitInput = row.querySelector('.si-unit');
-      const availHint = row.querySelector('.si-avail-hint');
+      const nameInput     = row.querySelector('.si-name');
+      const unitInput     = row.querySelector('.si-unit');
+      const availHint     = row.querySelector('.si-avail-hint');
 
       // Recomputes the availability hint live from current form state so it stays
       // accurate even when the user modifies prior stage quantities after row creation.
@@ -172,8 +173,22 @@
           unitInput.removeAttribute('aria-readonly');
           unitInput.title = '';
         }
+        // Auto-fill name from product if the field is empty or was auto-filled before
+        if (nameInput && selectedProduct && (!nameInput.value.trim() || nameInput.dataset.autoFilled === '1')) {
+          nameInput.value = selectedProduct.name || '';
+          nameInput.dataset.autoFilled = '1';
+        }
+        if (nameInput && !selectedProduct) {
+          // Product deselected — clear the auto-filled name but not a manually typed one
+          if (nameInput.dataset.autoFilled === '1') { nameInput.value = ''; }
+        }
         updateAvailHint();
       });
+
+      // Let user typing clear the auto-fill flag so we stop overriding their input
+      if (nameInput) {
+        nameInput.addEventListener('input', () => { nameInput.dataset.autoFilled = ''; });
+      }
 
       // Initialize hint if product is already selected (e.g., editing an existing version)
       if (data.productId) updateAvailHint();
