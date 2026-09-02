@@ -10,6 +10,10 @@ const purchaseRequestInclude = {
       items: {
         include: { product: true },
       },
+      // Needed by compareSupplierQuotations to determine response origin.
+      rfqInvitations: {
+        select: { id: true, responseSource: true, status: true },
+      },
     },
   },
   selections: {

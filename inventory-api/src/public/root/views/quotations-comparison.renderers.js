@@ -34,6 +34,19 @@
     }).join('');
   }
 
+  function responseSourceBadge(source) {
+    const map = {
+      DIRECT_ENTRY:        { label: 'Ingresado directamente', cls: 'badge-info' },
+      MANUAL_OFFICE_EMAIL: { label: 'RFQ · respuesta manual',  cls: 'badge-info' },
+      PUBLIC_TOKEN:        { label: 'RFQ · respuesta pública',  cls: 'badge-success' },
+    };
+    const entry = map[source];
+    if (entry) {
+      return `<span class="badge ${rootShellUi.escapeHtml(entry.cls)}" style="font-size:0.75rem;">${rootShellUi.escapeHtml(entry.label)}</span>`;
+    }
+    return '<span class="badge badge-warning" style="font-size:0.75rem;">⏳ Sin respuesta del proveedor</span>';
+  }
+
   function renderComparisonTable(quotations) {
     if (!quotations || !quotations.length) {
       return '<p class="empty-state">No hay cotizaciones con respuesta para comparar.</p>';
@@ -49,7 +62,10 @@
       return `
         <tr>
           <td data-label="Proveedor">
-            <strong>${rootShellUi.escapeHtml(supplierName)}</strong>
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+              <strong>${rootShellUi.escapeHtml(supplierName)}</strong>
+              ${responseSourceBadge(q.responseSource)}
+            </div>
             <div style="margin-top:0.4rem;">${itemsHtml}</div>
           </td>
           <td data-label="Referencia"><span class="badge badge-info">${rootShellUi.escapeHtml(q.reference || '—')}</span></td>

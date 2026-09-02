@@ -454,7 +454,13 @@ async function compareSupplierQuotations(purchaseRequestId, auth) {
   const getEvidenceMeta = (q) => (q.evidence && typeof q.evidence === 'object' && !Array.isArray(q.evidence)
     ? /** @type {Record<string, unknown>} */ (q.evidence)
     : null);
-  const isActualResponse = (q) => getEvidenceMeta(q)?._source === 'DIRECT_ENTRY' || (q.rfqInvitations?.length > 0);
+
+  /** Resolve the response source of a raw SupplierQuotation. */
+  const resolveQuotationResponseSource = (q) => {
+    if (q.rfqInvitations?.length > 0) return q.rfqInvitations[0].responseSource || 'MANUAL_OFFICE_EMAIL';
+    if (getEvidenceMeta(q)?._source === 'DIRECT_ENTRY') return 'DIRECT_ENTRY';
+    return null; // catalog-assisted — no actual supplier response yet
+  };
 
   // Group by supplierId. For each supplier, prefer actual responses over catalog-
   // assisted ones. If a supplier only has catalog-assisted quotations, keep those
@@ -462,13 +468,14 @@ async function compareSupplierQuotations(purchaseRequestId, auth) {
   const bySupplier = new Map();
   for (const q of rawQuotations) {
     const key = String(q.supplierId);
-    const actual = isActualResponse(q);
+    const responseSource = resolveQuotationResponseSource(q);
+    const actual = resolveQuotationResponseSource(q) !== null;
     const serialized = serializeSupplierQuotation(q);
     if (!bySupplier.has(key)) {
       bySupplier.set(key, { quotations: [], hasActual: false });
     }
     const bucket = bySupplier.get(key);
-    bucket.quotations.push({ serialized, actual });
+    bucket.quotations.push({ serialized, actual, responseSource });
     if (actual) bucket.hasActual = true;
   }
 
@@ -477,13 +484,15 @@ async function compareSupplierQuotations(purchaseRequestId, auth) {
     // Keep only actual responses when available; otherwise keep all (catalog-assisted).
     const keep = hasActual ? quotations.filter((q) => q.actual) : quotations;
     // Merge items + totals for the kept quotations (handles multiple RFQ responses).
-    const merged = keep.reduce((acc, { serialized }) => {
-      if (!acc) return { ...serialized, items: [...serialized.items] };
+    const merged = keep.reduce((acc, { serialized, responseSource }) => {
+      if (!acc) return { ...serialized, items: [...serialized.items], responseSource: responseSource || null };
       acc.items = [...acc.items, ...serialized.items];
       acc.totalAmount += serialized.totalAmount;
       if (serialized.reference && serialized.reference !== acc.reference) {
         acc.reference = [acc.reference, serialized.reference].filter(Boolean).join(' / ');
       }
+      // Prefer the most informative source (rfq > direct > null)
+      if (!acc.responseSource && responseSource) acc.responseSource = responseSource;
       return acc;
     }, null);
     if (merged) raw.push(merged);
