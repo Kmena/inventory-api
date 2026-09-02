@@ -27,6 +27,7 @@ enum OrderStatus {
   IN_PRODUCTION
   DELIVERED
   CANCELLED
+  REJECTED
 }
 
 enum InvoiceStatus {
@@ -383,6 +384,7 @@ model User {
   role                  Role?                   @relation(fields: [roleId], references: [id])
   orders                Order[]                 @relation("order_user")
   approvals             Order[]                 @relation("order_approver")
+  rejections            Order[]                 @relation("order_rejector")
   dispatches            Order[]                 @relation("order_dispatcher")
   createdProducts       Product[]               @relation("product_creator")
   createdRecipeVersions RecipeVersion[]         @relation("recipe_version_creator")
@@ -1392,7 +1394,11 @@ model Order {
   transportResponsible  String?   @map("transport_responsible")
   dispatchedAt          DateTime? @map("dispatched_at")
   dispatchedById        BigInt?   @map("dispatched_by_id")
-  status        OrderStatus  @default(DRAFT)
+  status          OrderStatus  @default(DRAFT)
+  // Rejection flow: office rejects → REJECTED; agent corrects → DRAFT again
+  rejectionReason String?      @map("rejection_reason")
+  rejectedById    BigInt?      @map("rejected_by_id")
+  rejectedAt      DateTime?    @map("rejected_at")
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
   company       Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1400,6 +1406,7 @@ model Order {
   clientStore   ClientStore? @relation(fields: [clientStoreId], references: [id])
   user          User?        @relation("order_user", fields: [userId], references: [id])
   approvedBy    User?        @relation("order_approver", fields: [approvedById], references: [id])
+  rejectedBy    User?        @relation("order_rejector", fields: [rejectedById], references: [id])
   dispatchedBy  User?        @relation("order_dispatcher", fields: [dispatchedById], references: [id])
   warehouse     Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   items         OrderItem[]

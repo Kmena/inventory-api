@@ -60,8 +60,9 @@ async function updateOrder(id, payload, auth, req = null) {
   const authScope = scope(auth);
   const currentOrder = await getOrder(id, auth);
   assertDraftEditAccess(currentOrder, authScope, auth);
-  if (currentOrder.status !== 'DRAFT') {
-    throw createHttpError(409, 'Solo se pueden editar pedidos en borrador', 'conflict');
+  // Agents can also edit REJECTED orders (they were sent back for correction).
+  if (currentOrder.status !== 'DRAFT' && currentOrder.status !== 'REJECTED') {
+    throw createHttpError(409, 'Solo se pueden editar pedidos en borrador o rechazados', 'conflict');
   }
 
   assertEditableStatus(payload);
@@ -126,6 +127,56 @@ async function approveOrder(id, auth, req = null) {
   return inventoryService.reserveStockForOrder(id, auth, req);
 }
 
+async function rejectOrder(id, payload, auth, req = null) {
+  const order = await getOrder(id, auth);
+  assertLifecycleStatusAllowed(order.status, ['DRAFT'], 'Solo se pueden rechazar pedidos en borrador');
+  const { companyId, userId } = scope(auth);
+  const rejectedOrder = await orderRepository.updateOrder(id, companyId, {
+    status: 'REJECTED',
+    rejectionReason: payload.rejectionReason,
+    rejectedById: userId,
+    rejectedAt: new Date(),
+  });
+  if (!rejectedOrder) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'orders.reject',
+    resourceType: 'order',
+    resourceId: id,
+    outcome: 'SUCCESS',
+    beforeState: { id: order.id, status: order.status },
+    afterState:  { id: rejectedOrder.id, status: rejectedOrder.status, rejectionReason: rejectedOrder.rejectionReason },
+  });
+  return rejectedOrder;
+}
+
+async function resubmitOrder(id, auth, req = null) {
+  const order = await getOrder(id, auth);
+  assertLifecycleStatusAllowed(order.status, ['REJECTED'], 'Solo se pueden reenviar pedidos rechazados');
+  const authScope = scope(auth);
+  // Only the agent who created the order can resubmit it.
+  if (order.userId == null || String(order.userId) !== String(authScope.userId)) {
+    throw createHttpError(403, 'Solo el agente que creó el pedido puede reenviarlo', 'forbidden');
+  }
+  const resubmitted = await orderRepository.updateOrder(id, authScope.companyId, {
+    status: 'DRAFT',
+    rejectionReason: null,
+    rejectedById: null,
+    rejectedAt: null,
+  });
+  if (!resubmitted) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'orders.resubmit',
+    resourceType: 'order',
+    resourceId: id,
+    outcome: 'SUCCESS',
+    beforeState: { id: order.id, status: order.status },
+    afterState:  { id: resubmitted.id, status: resubmitted.status },
+  });
+  return resubmitted;
+}
+
 async function cancelOrder(id, auth, req = null) {
   const order = await getOrder(id, auth);
   if (order.status === 'DELIVERED') {
@@ -134,6 +185,7 @@ async function cancelOrder(id, auth, req = null) {
   if (order.status === 'CANCELLED') {
     throw createHttpError(409, 'El pedido ya esta cancelado', 'conflict');
   }
+  // REJECTED orders have no stock reservation — cancel directly.
   if (order.status === 'APPROVED') {
     return inventoryService.releaseStockReservation(id, true, auth, req);
   }
@@ -233,6 +285,8 @@ module.exports = {
   createOrder,
   updateOrder,
   approveOrder,
+  rejectOrder,
+  resubmitOrder,
   cancelOrder,
   dispatchOrder,
   removeOrder,

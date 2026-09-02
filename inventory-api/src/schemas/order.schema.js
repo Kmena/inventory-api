@@ -34,7 +34,7 @@ const baseOrderShape = z.object({
   total: z.number().min(0).optional(),
   otherCosts: z.number().min(0).optional(),
   transport: z.string().max(255).optional(),
-  status: z.enum(['DRAFT', 'APPROVED', 'IN_PRODUCTION', 'DELIVERED', 'CANCELLED']).optional(),
+  status: z.enum(['DRAFT', 'APPROVED', 'IN_PRODUCTION', 'DELIVERED', 'CANCELLED', 'REJECTED']).optional(),
   paymentCondition: z.enum(['CASH', 'TRANSFER', 'CREDIT']).optional(),
   transferMetadata: transferMetadataSchema.optional().nullable(),
   items: z.array(orderItemSchema).min(1),
@@ -52,4 +52,9 @@ const createOrderSchema = baseOrderShape.superRefine((data, ctx) => {
 
 const updateOrderSchema = baseOrderShape.partial();
 
-module.exports = { createOrderSchema, updateOrderSchema, transferMetadataSchema };
+// Office rejects an agent order — must supply a human-readable reason.
+const rejectOrderSchema = z.object({
+  rejectionReason: z.string().trim().min(5, 'El motivo debe tener al menos 5 caracteres').max(500),
+});
+
+module.exports = { createOrderSchema, updateOrderSchema, rejectOrderSchema, transferMetadataSchema };

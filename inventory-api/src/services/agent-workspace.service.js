@@ -348,6 +348,9 @@ async function listAgentOrders(auth) {
       storeName: order.clientStore?.name || null,
       clientName: order.client?.name || null,
       itemCount: (order.items || []).length,
+      // Rejection info — present only when status === 'REJECTED'
+      rejectionReason: order.rejectionReason ?? null,
+      rejectedAt: order.rejectedAt ?? null,
     })),
   };
 }

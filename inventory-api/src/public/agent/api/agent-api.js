@@ -102,6 +102,18 @@ async function postPayment(session, storeId, payload) {
   });
 }
 
+/**
+ * POST /api/orders/:id/resubmit — agent resubmits a REJECTED order after correction.
+ * @param {any} session
+ * @param {string|number} orderId
+ */
+async function resubmitOrder(session, orderId) {
+  return inventoryAuth.fetchJson(session, `/api/orders/${encodeURIComponent(orderId)}/resubmit`, {
+    method: 'POST',
+    credentials: 'same-origin',
+  });
+}
+
 AgentShell.register('api.agentApi', {
   fetchDashboard,
   fetchStores,
@@ -109,6 +121,7 @@ AgentShell.register('api.agentApi', {
   fetchStoreDetail,
   fetchOrderContext,
   fetchOrders,
+  resubmitOrder,
   postVisit,
   postOrder,
   postPayment,

@@ -24,7 +24,8 @@ const ORDER_STATUS_BADGE_STYLES = {
   APPROVED:      { bg: '#D1FAE5', color: '#065F46', label: 'Aprobado'                },
   IN_PRODUCTION: { bg: '#DBEAFE', color: '#1E40AF', label: 'En producción'           },
   DELIVERED:     { bg: '#E2E8F0', color: '#374151', label: 'Entregado'               },
-  CANCELLED:     { bg: '#FEE2E2', color: '#991B1B', label: 'Rechazado'               },
+  CANCELLED:     { bg: '#F1F5F9', color: '#64748B', label: 'Cancelado'               },
+  REJECTED:      { bg: '#FEE2E2', color: '#991B1B', label: '↩️ Devuelto para corrección' },
 };
 
 // ─── Funciones puras ─────────────────────────────────────────────────────────

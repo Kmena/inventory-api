@@ -78,9 +78,9 @@ function assertDraftEditAccess(order, authScope, auth) {
   if (hasGlobalSalesAccess(auth)) {
     return;
   }
-
+  // Agents can edit their own DRAFT or REJECTED orders (REJECTED = office sent it back for correction).
   if (order.userId !== authScope.userId) {
-    throw createHttpError(403, 'El agente solo puede editar sus propios pedidos en borrador', 'forbidden');
+    throw createHttpError(403, 'El agente solo puede editar sus propios pedidos en borrador o rechazados', 'forbidden');
   }
 }
 

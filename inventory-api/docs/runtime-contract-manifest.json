@@ -293,6 +293,24 @@
     },
     {
       "method": "POST",
+      "mountPath": "/api/orders",
+      "expressPath": "/:id/reject",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "El flujo de rechazo de pedidos de agente es parte del ciclo de vida de pedidos, cuya cobertura OpenAPI se planifica en una iteración futura."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/orders",
+      "expressPath": "/:id/resubmit",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "order-lifecycle-outside-current-openapi-baseline",
+      "reason": "El reenvío de pedidos rechazados por el agente es parte del ciclo de vida de pedidos, cuya cobertura OpenAPI se planifica en una iteración futura."
+    },
+    {
+      "method": "POST",
       "mountPath": "/api/procurement",
       "expressPath": "/products/:id/request-quotations",
       "routeFile": "src/routes/procurement.routes.js",
