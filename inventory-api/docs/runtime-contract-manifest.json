@@ -366,6 +366,15 @@
     {
       "method": "POST",
       "mountPath": "/api/procurement",
+      "expressPath": "/requests/:id/cancel-orders",
+      "routeFile": "src/routes/procurement.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "procurement-selection-outside-current-openapi-baseline",
+      "reason": "Cancela todas las OCs activas de una solicitud y la reabre para corrección de selección mixta."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/procurement",
       "expressPath": "/orders/:id/cancel",
       "routeFile": "src/routes/procurement.routes.js",
       "contractStatus": "intentionally-excluded",

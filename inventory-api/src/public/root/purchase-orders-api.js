@@ -27,9 +27,17 @@
     });
   }
 
+  async function cancelAllOrdersForRequest(session, purchaseRequestId) {
+    return inventoryAuth.fetchJson(session, `/api/procurement/requests/${encodeURIComponent(purchaseRequestId)}/cancel-orders`, {
+      method: 'POST',
+      fallbackMessage: 'No se pudieron cancelar las órdenes de la solicitud.',
+    });
+  }
+
   rootShell.register('purchaseOrdersApi', {
     listOrders,
     issueOrder,
     cancelOrder,
+    cancelAllOrdersForRequest,
   });
 }(window));

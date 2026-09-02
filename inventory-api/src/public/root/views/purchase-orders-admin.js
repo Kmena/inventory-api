@@ -16,25 +16,16 @@
         <div class="page-header">
           <div>
             <h3 id="po-cancel-dialog-title">Cancelar orden de compra</h3>
-            <p class="muted" id="po-cancel-dialog-subtitle">¿Qué deseas hacer con esta orden?</p>
+            <p class="muted">Revisá el impacto antes de confirmar.</p>
           </div>
           <button id="po-cancel-dialog-close" class="secondary-button" type="button" aria-label="Cerrar">Cerrar</button>
         </div>
         <div id="po-cancel-dialog-message" role="status" aria-live="polite"></div>
         <div class="stack-section">
           <div class="detail-grid" id="po-cancel-dialog-info"></div>
-          <div style="display:flex;flex-direction:column;gap:0.75rem;margin-top:1rem;">
-            <button id="po-cancel-reopen-button" type="button">
-              Cancelar OC y reabrir solicitud para hacer cambios
-            </button>
-            <button id="po-cancel-only-button" class="secondary-button" type="button" style="color:#b91c1c;">
-              Solo cancelar la OC (sin reabrir la solicitud)
-            </button>
-          </div>
-          <p class="muted" style="font-size:0.8rem;margin-top:0.75rem;">
-            <strong>Cancelar y reabrir:</strong> te permite volver a Cotizaciones y crear la selección correcta desde cero.<br/>
-            <strong>Solo cancelar:</strong> la solicitud queda cerrada; tendrías que crear una nueva solicitud si necesitás pedir ese producto.
-          </p>
+          <div id="po-cancel-dialog-siblings"></div>
+          <div id="po-cancel-dialog-actions" style="display:flex;flex-direction:column;gap:0.75rem;margin-top:1rem;"></div>
+          <p id="po-cancel-dialog-hint" class="muted" style="font-size:0.8rem;margin-top:0.75rem;"></p>
         </div>
       </dialog>
 
@@ -166,50 +157,103 @@
     function openCancelDialog(order) {
       const dialog = container.querySelector('#po-cancel-dialog');
       const infoRegion = container.querySelector('#po-cancel-dialog-info');
+      const siblingsRegion = container.querySelector('#po-cancel-dialog-siblings');
+      const actionsRegion = container.querySelector('#po-cancel-dialog-actions');
+      const hintRegion = container.querySelector('#po-cancel-dialog-hint');
       const msgRegion = container.querySelector('#po-cancel-dialog-message');
-      const reopenBtn = container.querySelector('#po-cancel-reopen-button');
-      const onlyBtn = container.querySelector('#po-cancel-only-button');
       const closeBtn = container.querySelector('#po-cancel-dialog-close');
       if (!dialog) return;
 
+      // Siblings: other active (non-cancelled) OCs for the same purchase request
+      const siblings = orders.filter((o) =>
+        String(o.purchaseRequestId) === String(order.purchaseRequestId) &&
+        String(o.id) !== String(order.id) &&
+        o.status !== 'CANCELLED',
+      );
+      const hasSiblings = siblings.length > 0;
+
       msgRegion.innerHTML = '';
+
       infoRegion.innerHTML = `
-        <div class="detail-item"><span>OC</span><strong>#${rootShellUi.escapeHtml(String(order.id))}</strong></div>
-        <div class="detail-item"><span>Proveedor</span><strong>${rootShellUi.escapeHtml(order.supplier?.name || '—')}</strong></div>
-        <div class="detail-item"><span>Estado actual</span><strong>${rootShellUi.escapeHtml(order.status || '—')}</strong></div>
+        <div class="detail-item"><span>OC a cancelar</span>
+          <strong>OC #${rootShellUi.escapeHtml(String(order.id))} · ${rootShellUi.escapeHtml(order.supplier?.name || '—')}</strong>
+        </div>
+        <div class="detail-item"><span>Estado</span><strong>${rootShellUi.escapeHtml(order.status || '—')}</strong></div>
       `;
 
-      async function executeCancelOrder(reopen) {
-        reopenBtn.disabled = true;
-        onlyBtn.disabled = true;
+      siblingsRegion.innerHTML = hasSiblings ? `
+        <div style="background:#fef9c3;border:1px solid #fde047;border-radius:6px;padding:0.75rem;margin-top:0.75rem;">
+          <p style="margin:0 0 0.4rem;font-weight:600;font-size:0.85rem;">⚠️ Esta solicitud tiene ${siblings.length} OC(s) relacionada(s):</p>
+          ${siblings.map((s) => `<p style="margin:0.2rem 0;font-size:0.82rem;">OC #${rootShellUi.escapeHtml(String(s.id))} · ${rootShellUi.escapeHtml(s.supplier?.name || '—')} · ${rootShellUi.escapeHtml(s.status)}</p>`).join('')}
+        </div>
+      ` : '';
+
+      // Build actions dynamically based on context
+      const actions = [];
+
+      if (hasSiblings) {
+        actions.push({ id: 'btn-cancel-all', label: `Cancelar TODAS las OCs de esta solicitud y reabrir para hacer cambios`, primary: true, handler: 'cancelAll' });
+        actions.push({ id: 'btn-cancel-one-reopen', label: `Cancelar solo OC #${order.id} y reabrir solicitud`, primary: false, danger: false, handler: 'cancelOneReopen' });
+        actions.push({ id: 'btn-cancel-one', label: `Cancelar solo OC #${order.id} (OC #${siblings.map((s) => s.id).join(', #')} sigue activa)`, primary: false, danger: true, handler: 'cancelOne' });
+
+        hintRegion.innerHTML =
+          '<strong>Cancelar todas:</strong> limpia la selección mixta completa — la solicitud queda abierta para rehacerla desde cero.<br/>' +
+          '<strong>Cancelar solo esta:</strong> las otras OCs siguen activas; la solicitud se reabre solo si elegís esa opción.';
+      } else {
+        actions.push({ id: 'btn-cancel-reopen', label: 'Cancelar OC y reabrir solicitud para hacer cambios', primary: true, handler: 'cancelOneReopen' });
+        actions.push({ id: 'btn-cancel-only', label: 'Solo cancelar la OC (la solicitud queda cerrada)', primary: false, danger: true, handler: 'cancelOne' });
+
+        hintRegion.innerHTML =
+          '<strong>Cancelar y reabrir:</strong> podés volver a Cotizaciones y rehacer la selección.<br/>' +
+          '<strong>Solo cancelar:</strong> la solicitud queda cerrada; necesitarías crear una nueva si querés pedir ese producto.';
+      }
+
+      actionsRegion.innerHTML = actions.map((a) => `
+        <button
+          id="${rootShellUi.escapeHtml(a.id)}"
+          type="button"
+          class="${a.primary ? '' : 'secondary-button'}"
+          style="${a.danger ? 'color:#b91c1c;' : ''}"
+        >${rootShellUi.escapeHtml(a.label)}</button>
+      `).join('');
+
+      async function runAction(handler) {
+        actionsRegion.querySelectorAll('button').forEach((b) => { b.disabled = true; });
         msgRegion.innerHTML = '';
         try {
-          await purchaseOrdersApi.cancelOrder(session, order.id, { reopen });
-          dialog.close();
-          const msg = reopen
-            ? `OC #${order.id} cancelada y solicitud reabierta — volvé a Cotizaciones para corregir la selección.`
-            : `OC #${order.id} cancelada.`;
-          pageMessage.innerHTML = rootShellUi.renderInlineMessage(msg, 'success');
+          if (handler === 'cancelAll') {
+            await purchaseOrdersApi.cancelAllOrdersForRequest(session, order.purchaseRequestId);
+            dialog.close();
+            pageMessage.innerHTML = rootShellUi.renderInlineMessage(
+              `Todas las OCs de la solicitud canceladas. La solicitud fue reabierta — volvé a Cotizaciones para rehacer la selección.`,
+              'success',
+            );
+          } else if (handler === 'cancelOneReopen') {
+            await purchaseOrdersApi.cancelOrder(session, order.id, { reopen: true });
+            dialog.close();
+            pageMessage.innerHTML = rootShellUi.renderInlineMessage(
+              `OC #${order.id} cancelada y solicitud reabierta.`,
+              'success',
+            );
+          } else {
+            await purchaseOrdersApi.cancelOrder(session, order.id, { reopen: false });
+            dialog.close();
+            pageMessage.innerHTML = rootShellUi.renderInlineMessage(`OC #${order.id} cancelada.`, 'success');
+          }
           await loadOrders();
         } catch (error) {
           msgRegion.innerHTML = rootShellUi.renderInlineMessage(
-            error.message || 'No se pudo cancelar la orden.', 'error',
+            error.message || 'No se pudo cancelar.', 'error',
           );
-        } finally {
-          reopenBtn.disabled = false;
-          onlyBtn.disabled = false;
+          actionsRegion.querySelectorAll('button').forEach((b) => { b.disabled = false; });
         }
       }
 
-      // Bind once per dialog open using one-time cloned nodes to avoid listener stacking
-      const newReopenBtn = reopenBtn.cloneNode(true);
-      const newOnlyBtn = onlyBtn.cloneNode(true);
-      reopenBtn.replaceWith(newReopenBtn);
-      onlyBtn.replaceWith(newOnlyBtn);
-      newReopenBtn.addEventListener('click', () => executeCancelOrder(true));
-      newOnlyBtn.addEventListener('click', () => executeCancelOrder(false));
-      closeBtn.onclick = () => dialog.close();
+      actions.forEach((a) => {
+        actionsRegion.querySelector(`#${a.id}`)?.addEventListener('click', () => runAction(a.handler));
+      });
 
+      closeBtn.onclick = () => dialog.close();
       dialog.showModal();
     }
 

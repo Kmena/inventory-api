@@ -272,6 +272,13 @@ function findPurchaseOrderByIdForCompany(id, companyId, db = prisma) {
   });
 }
 
+function listActivePurchaseOrdersByRequestId(purchaseRequestId, companyId, db = prisma) {
+  return db.purchaseOrder.findMany({
+    where: { purchaseRequestId, companyId, status: { not: 'CANCELLED' } },
+    include: { supplier: true, items: { include: { product: true } } },
+  });
+}
+
 function listPurchaseOrders(companyId, db = prisma) {
   return db.purchaseOrder.findMany({
     where: { companyId },
@@ -327,6 +334,7 @@ module.exports = {
   createPurchaseOrder,
   findPurchaseOrderByIdForCompany,
   listPurchaseOrders,
+  listActivePurchaseOrdersByRequestId,
   issuePurchaseOrder,
   cancelPurchaseOrder,
 };

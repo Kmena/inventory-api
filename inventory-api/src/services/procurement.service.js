@@ -818,6 +818,35 @@ async function cancelPurchaseOrder(orderId, payload, auth) {
   };
 }
 
+/**
+ * Cancela TODAS las órdenes de compra activas (DRAFT/ISSUED) de una solicitud
+ * y reabre la solicitud para que el usuario pueda rehacerla desde cero.
+ * Útil cuando una selección mixta quedó incompleta o incorrecta.
+ */
+async function cancelAllOrdersForRequest(purchaseRequestId, auth) {
+  const scope = assertCompanyScope(auth);
+  const request = await procurementRepository.findPurchaseRequestByIdForCompany(purchaseRequestId, scope.companyId);
+  if (!request) throw createHttpError(404, 'Solicitud de compra no encontrada', 'not_found');
+  if (request.status === 'CANCELLED') throw createHttpError(409, 'La solicitud está cancelada', 'conflict');
+
+  const activeOrders = await procurementRepository.listActivePurchaseOrdersByRequestId(
+    request.id, scope.companyId,
+  );
+
+  const cancelledOrders = [];
+  for (const order of activeOrders) {
+    const cancelled = await procurementRepository.cancelPurchaseOrder(order.id);
+    cancelledOrders.push(serializePurchaseOrder(cancelled));
+  }
+
+  // Reopen the request regardless of previous status (CLOSED or OPEN)
+  if (request.status !== 'OPEN') {
+    await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'OPEN' });
+  }
+
+  return { cancelledOrders, requestReopened: true };
+}
+
 async function issuePurchaseOrder(orderId, auth) {
   const scope = assertCompanyScope(auth);
   const order = await procurementRepository.findPurchaseOrderByIdForCompany(BigInt(orderId), scope.companyId);
@@ -837,6 +866,7 @@ module.exports = {
   selectMixedSupplierItems,
   createPurchaseOrdersFromMixedSelections,
   cancelPurchaseOrder,
+  cancelAllOrdersForRequest,
   listPurchaseRequests,
   listPurchaseOrders,
   listQuotableProducts,
