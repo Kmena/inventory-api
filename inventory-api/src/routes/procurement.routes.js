@@ -133,7 +133,7 @@ router.post('/requests/:id/purchase-orders', authorizeAccessPolicy('procurement.
 
 router.post('/orders/:id/cancel', authorizeAccessPolicy('procurement.manage'), async (req, res, next) => {
   try {
-    return res.json(await procurementService.cancelPurchaseOrder(parseBigIntId(req.params.id), req.auth));
+    return res.json(await procurementService.cancelPurchaseOrder(parseBigIntId(req.params.id), req.body, req.auth));
   } catch (error) {
     return next(error);
   }

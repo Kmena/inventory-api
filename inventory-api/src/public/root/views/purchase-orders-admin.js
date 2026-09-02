@@ -12,6 +12,32 @@
         <p class="muted">Consulta las órdenes de compra emitidas y gestiona la recepción de mercancía.</p>
       </section>
 
+      <dialog id="po-cancel-dialog" class="modal-card" aria-labelledby="po-cancel-dialog-title">
+        <div class="page-header">
+          <div>
+            <h3 id="po-cancel-dialog-title">Cancelar orden de compra</h3>
+            <p class="muted" id="po-cancel-dialog-subtitle">¿Qué deseas hacer con esta orden?</p>
+          </div>
+          <button id="po-cancel-dialog-close" class="secondary-button" type="button" aria-label="Cerrar">Cerrar</button>
+        </div>
+        <div id="po-cancel-dialog-message" role="status" aria-live="polite"></div>
+        <div class="stack-section">
+          <div class="detail-grid" id="po-cancel-dialog-info"></div>
+          <div style="display:flex;flex-direction:column;gap:0.75rem;margin-top:1rem;">
+            <button id="po-cancel-reopen-button" type="button">
+              Cancelar OC y reabrir solicitud para hacer cambios
+            </button>
+            <button id="po-cancel-only-button" class="secondary-button" type="button" style="color:#b91c1c;">
+              Solo cancelar la OC (sin reabrir la solicitud)
+            </button>
+          </div>
+          <p class="muted" style="font-size:0.8rem;margin-top:0.75rem;">
+            <strong>Cancelar y reabrir:</strong> te permite volver a Cotizaciones y crear la selección correcta desde cero.<br/>
+            <strong>Solo cancelar:</strong> la solicitud queda cerrada; tendrías que crear una nueva solicitud si necesitás pedir ese producto.
+          </p>
+        </div>
+      </dialog>
+
       <section class="routes-page" id="purchase-orders-page">
         <div id="purchase-orders-page-message"></div>
 
@@ -133,27 +159,58 @@
 
       const cancelBtn = detailRegion.querySelector('#po-cancel-button');
       if (cancelBtn) {
-        cancelBtn.addEventListener('click', async () => {
-          if (!globalScope.confirm(`¿Cancelar la Orden de Compra #${order.id}? Esta acción reabre la solicitud de compra para que puedas corregirla.`)) return;
-          cancelBtn.disabled = true;
-          cancelBtn.textContent = 'Cancelando...';
-          pageMessage.innerHTML = '';
-          try {
-            await purchaseOrdersApi.cancelOrder(session, order.id);
-            pageMessage.innerHTML = rootShellUi.renderInlineMessage(
-              `OC #${order.id} cancelada. La solicitud de compra fue reabierta — podés volver a Cotizaciones para corregir la selección.`,
-              'success',
-            );
-            await loadOrders();
-          } catch (error) {
-            pageMessage.innerHTML = rootShellUi.renderInlineMessage(
-              error.message || 'No se pudo cancelar la orden.', 'error',
-            );
-            cancelBtn.disabled = false;
-            cancelBtn.textContent = 'Cancelar OC';
-          }
-        });
+        cancelBtn.addEventListener('click', () => openCancelDialog(order));
       }
+    }
+
+    function openCancelDialog(order) {
+      const dialog = container.querySelector('#po-cancel-dialog');
+      const infoRegion = container.querySelector('#po-cancel-dialog-info');
+      const msgRegion = container.querySelector('#po-cancel-dialog-message');
+      const reopenBtn = container.querySelector('#po-cancel-reopen-button');
+      const onlyBtn = container.querySelector('#po-cancel-only-button');
+      const closeBtn = container.querySelector('#po-cancel-dialog-close');
+      if (!dialog) return;
+
+      msgRegion.innerHTML = '';
+      infoRegion.innerHTML = `
+        <div class="detail-item"><span>OC</span><strong>#${rootShellUi.escapeHtml(String(order.id))}</strong></div>
+        <div class="detail-item"><span>Proveedor</span><strong>${rootShellUi.escapeHtml(order.supplier?.name || '—')}</strong></div>
+        <div class="detail-item"><span>Estado actual</span><strong>${rootShellUi.escapeHtml(order.status || '—')}</strong></div>
+      `;
+
+      async function executeCancelOrder(reopen) {
+        reopenBtn.disabled = true;
+        onlyBtn.disabled = true;
+        msgRegion.innerHTML = '';
+        try {
+          await purchaseOrdersApi.cancelOrder(session, order.id, { reopen });
+          dialog.close();
+          const msg = reopen
+            ? `OC #${order.id} cancelada y solicitud reabierta — volvé a Cotizaciones para corregir la selección.`
+            : `OC #${order.id} cancelada.`;
+          pageMessage.innerHTML = rootShellUi.renderInlineMessage(msg, 'success');
+          await loadOrders();
+        } catch (error) {
+          msgRegion.innerHTML = rootShellUi.renderInlineMessage(
+            error.message || 'No se pudo cancelar la orden.', 'error',
+          );
+        } finally {
+          reopenBtn.disabled = false;
+          onlyBtn.disabled = false;
+        }
+      }
+
+      // Bind once per dialog open using one-time cloned nodes to avoid listener stacking
+      const newReopenBtn = reopenBtn.cloneNode(true);
+      const newOnlyBtn = onlyBtn.cloneNode(true);
+      reopenBtn.replaceWith(newReopenBtn);
+      onlyBtn.replaceWith(newOnlyBtn);
+      newReopenBtn.addEventListener('click', () => executeCancelOrder(true));
+      newOnlyBtn.addEventListener('click', () => executeCancelOrder(false));
+      closeBtn.onclick = () => dialog.close();
+
+      dialog.showModal();
     }
 
     refreshButton.addEventListener('click', loadOrders);

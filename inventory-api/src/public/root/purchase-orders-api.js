@@ -15,9 +15,14 @@
     });
   }
 
-  async function cancelOrder(session, orderId) {
+  /**
+   * Cancela una OC. reopen=true también reabre la solicitud de compra.
+   * @param {{ reopen?: boolean }} [options]
+   */
+  async function cancelOrder(session, orderId, options = {}) {
     return inventoryAuth.fetchJson(session, `/api/procurement/orders/${encodeURIComponent(orderId)}/cancel`, {
       method: 'POST',
+      body: JSON.stringify({ reopen: Boolean(options.reopen) }),
       fallbackMessage: 'No se pudo cancelar la orden de compra.',
     });
   }

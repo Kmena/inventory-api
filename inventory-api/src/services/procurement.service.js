@@ -794,7 +794,12 @@ async function createPurchaseOrdersFromMixedSelections(purchaseRequestId, payloa
  * Si la solicitud de compra asociada estaba CLOSED, la reabre (OPEN) para
  * permitir crear una nueva orden o corregir la selección mixta.
  */
-async function cancelPurchaseOrder(orderId, auth) {
+/**
+ * Cancela una orden de compra en estado DRAFT o ISSUED.
+ * Si reopen=true, también reabre la solicitud de compra asociada (CLOSED → OPEN)
+ * para que el usuario pueda corregir la selección mixta.
+ */
+async function cancelPurchaseOrder(orderId, payload, auth) {
   const scope = assertCompanyScope(auth);
   const order = await procurementRepository.findPurchaseOrderByIdForCompany(BigInt(orderId), scope.companyId);
   if (!order) throw createHttpError(404, 'Orden de compra no encontrada', 'not_found');
@@ -802,13 +807,15 @@ async function cancelPurchaseOrder(orderId, auth) {
 
   const cancelled = await procurementRepository.cancelPurchaseOrder(order.id);
 
-  // Reopen the purchase request so the user can retry / create the missing POs.
   const request = order.purchaseRequest;
-  if (request && request.status === 'CLOSED') {
+  if (payload?.reopen && request && request.status === 'CLOSED') {
     await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'OPEN' });
   }
 
-  return serializePurchaseOrder(cancelled);
+  return {
+    ...serializePurchaseOrder(cancelled),
+    requestReopened: Boolean(payload?.reopen && request?.status === 'CLOSED'),
+  };
 }
 
 async function issuePurchaseOrder(orderId, auth) {
