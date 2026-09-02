@@ -437,28 +437,47 @@ async function compareSupplierQuotations(purchaseRequestId, auth) {
     throw createHttpError(404, 'Solicitud de compra no encontrada', 'not_found');
   }
 
-  const raw = ((/** @type {any} */ (request).quotations) || []).map(serializeSupplierQuotation);
+  const rawQuotations = (/** @type {any} */ (request).quotations) || [];
 
-  // Group by supplierId — a supplier can have multiple quotation records
-  // (e.g. one from RFQ invitation + one from direct entry). Merge them into a
-  // single comparison row: combined items, summed total, averaged lead time.
+  // Separate catalog-assisted (evidence._source absent → null evidence) from
+  // actual responses (evidence._source === 'DIRECT_ENTRY', or linked to an RFQ
+  // invitation via rfqInvitations relation).
+  const isActualResponse = (q) => q.evidence?._source === 'DIRECT_ENTRY' || (q.rfqInvitations?.length > 0);
+
+  // Group by supplierId. For each supplier, prefer actual responses over catalog-
+  // assisted ones. If a supplier only has catalog-assisted quotations, keep those
+  // so they still appear in the comparison.
   const bySupplier = new Map();
-  for (const q of raw) {
+  for (const q of rawQuotations) {
     const key = String(q.supplierId);
-    if (bySupplier.has(key)) {
-      const merged = bySupplier.get(key);
-      merged.items = [...merged.items, ...q.items];
-      merged.totalAmount += q.totalAmount;
-      // Keep the most recent reference if different
-      if (q.reference && q.reference !== merged.reference) {
-        merged.reference = [merged.reference, q.reference].filter(Boolean).join(' / ');
-      }
-    } else {
-      bySupplier.set(key, { ...q, items: [...q.items] });
+    const actual = isActualResponse(q);
+    const serialized = serializeSupplierQuotation(q);
+    if (!bySupplier.has(key)) {
+      bySupplier.set(key, { quotations: [], hasActual: false });
     }
+    const bucket = bySupplier.get(key);
+    bucket.quotations.push({ serialized, actual });
+    if (actual) bucket.hasActual = true;
   }
 
-  const quotations = [...bySupplier.values()]
+  const raw = [];
+  for (const { quotations, hasActual } of bySupplier.values()) {
+    // Keep only actual responses when available; otherwise keep all (catalog-assisted).
+    const keep = hasActual ? quotations.filter((q) => q.actual) : quotations;
+    // Merge items + totals for the kept quotations (handles multiple RFQ responses).
+    const merged = keep.reduce((acc, { serialized }) => {
+      if (!acc) return { ...serialized, items: [...serialized.items] };
+      acc.items = [...acc.items, ...serialized.items];
+      acc.totalAmount += serialized.totalAmount;
+      if (serialized.reference && serialized.reference !== acc.reference) {
+        acc.reference = [acc.reference, serialized.reference].filter(Boolean).join(' / ');
+      }
+      return acc;
+    }, null);
+    if (merged) raw.push(merged);
+  }
+
+  const quotations = raw
     .map((q) => ({
       ...q,
       averageLeadTimeDays: q.items.length > 0
