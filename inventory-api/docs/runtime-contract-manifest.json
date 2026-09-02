@@ -366,6 +366,15 @@
     {
       "method": "POST",
       "mountPath": "/api/procurement",
+      "expressPath": "/orders/:id/cancel",
+      "routeFile": "src/routes/procurement.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "procurement-selection-outside-current-openapi-baseline",
+      "reason": "Cancela una OC en estado DRAFT o ISSUED y reabre la solicitud de compra asociada para permitir corrección."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/procurement",
       "expressPath": "/requests/:id/purchase-orders-batch",
       "routeFile": "src/routes/procurement.routes.js",
       "contractStatus": "intentionally-excluded",

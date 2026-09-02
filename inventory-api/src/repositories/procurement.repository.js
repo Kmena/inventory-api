@@ -283,6 +283,18 @@ function listPurchaseOrders(companyId, db = prisma) {
   });
 }
 
+function cancelPurchaseOrder(id, db = prisma) {
+  return db.purchaseOrder.update({
+    where: { id },
+    data: { status: 'CANCELLED' },
+    include: {
+      supplier: true,
+      items: { include: { product: true } },
+      purchaseRequest: true,
+    },
+  });
+}
+
 function issuePurchaseOrder(id, db = prisma) {
   return db.purchaseOrder.update({
     where: { id },
@@ -316,4 +328,5 @@ module.exports = {
   findPurchaseOrderByIdForCompany,
   listPurchaseOrders,
   issuePurchaseOrder,
+  cancelPurchaseOrder,
 };

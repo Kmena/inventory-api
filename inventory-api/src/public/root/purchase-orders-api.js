@@ -15,8 +15,16 @@
     });
   }
 
+  async function cancelOrder(session, orderId) {
+    return inventoryAuth.fetchJson(session, `/api/procurement/orders/${encodeURIComponent(orderId)}/cancel`, {
+      method: 'POST',
+      fallbackMessage: 'No se pudo cancelar la orden de compra.',
+    });
+  }
+
   rootShell.register('purchaseOrdersApi', {
     listOrders,
     issueOrder,
+    cancelOrder,
   });
 }(window));

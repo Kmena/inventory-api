@@ -113,22 +113,47 @@
 
     function bindDetailActions(order) {
       const issueBtn = detailRegion.querySelector('#po-issue-button');
-      if (!issueBtn) { return; }
-      issueBtn.addEventListener('click', async () => {
-        issueBtn.disabled = true;
-        issueBtn.textContent = 'Emitiendo...';
-        try {
-          await purchaseOrdersApi.issueOrder(session, order.id);
-          await loadOrders();
-        } catch (error) {
-          pageMessage.innerHTML = rootShellUi.renderInlineMessage(
-            error.message || 'No se pudo emitir la orden.',
-            'error',
-          );
-          issueBtn.disabled = false;
-          issueBtn.textContent = 'Emitir orden de compra';
-        }
-      });
+      if (issueBtn) {
+        issueBtn.addEventListener('click', async () => {
+          issueBtn.disabled = true;
+          issueBtn.textContent = 'Emitiendo...';
+          pageMessage.innerHTML = '';
+          try {
+            await purchaseOrdersApi.issueOrder(session, order.id);
+            await loadOrders();
+          } catch (error) {
+            pageMessage.innerHTML = rootShellUi.renderInlineMessage(
+              error.message || 'No se pudo emitir la orden.', 'error',
+            );
+            issueBtn.disabled = false;
+            issueBtn.textContent = 'Emitir orden de compra';
+          }
+        });
+      }
+
+      const cancelBtn = detailRegion.querySelector('#po-cancel-button');
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', async () => {
+          if (!globalScope.confirm(`¿Cancelar la Orden de Compra #${order.id}? Esta acción reabre la solicitud de compra para que puedas corregirla.`)) return;
+          cancelBtn.disabled = true;
+          cancelBtn.textContent = 'Cancelando...';
+          pageMessage.innerHTML = '';
+          try {
+            await purchaseOrdersApi.cancelOrder(session, order.id);
+            pageMessage.innerHTML = rootShellUi.renderInlineMessage(
+              `OC #${order.id} cancelada. La solicitud de compra fue reabierta — podés volver a Cotizaciones para corregir la selección.`,
+              'success',
+            );
+            await loadOrders();
+          } catch (error) {
+            pageMessage.innerHTML = rootShellUi.renderInlineMessage(
+              error.message || 'No se pudo cancelar la orden.', 'error',
+            );
+            cancelBtn.disabled = false;
+            cancelBtn.textContent = 'Cancelar OC';
+          }
+        });
+      }
     }
 
     refreshButton.addEventListener('click', loadOrders);

@@ -789,6 +789,28 @@ async function createPurchaseOrdersFromMixedSelections(purchaseRequestId, payloa
   return { orders: createdOrders };
 }
 
+/**
+ * Cancela una orden de compra en estado DRAFT o ISSUED.
+ * Si la solicitud de compra asociada estaba CLOSED, la reabre (OPEN) para
+ * permitir crear una nueva orden o corregir la selección mixta.
+ */
+async function cancelPurchaseOrder(orderId, auth) {
+  const scope = assertCompanyScope(auth);
+  const order = await procurementRepository.findPurchaseOrderByIdForCompany(BigInt(orderId), scope.companyId);
+  if (!order) throw createHttpError(404, 'Orden de compra no encontrada', 'not_found');
+  if (order.status === 'CANCELLED') throw createHttpError(409, 'La orden ya está cancelada', 'conflict');
+
+  const cancelled = await procurementRepository.cancelPurchaseOrder(order.id);
+
+  // Reopen the purchase request so the user can retry / create the missing POs.
+  const request = order.purchaseRequest;
+  if (request && request.status === 'CLOSED') {
+    await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'OPEN' });
+  }
+
+  return serializePurchaseOrder(cancelled);
+}
+
 async function issuePurchaseOrder(orderId, auth) {
   const scope = assertCompanyScope(auth);
   const order = await procurementRepository.findPurchaseOrderByIdForCompany(BigInt(orderId), scope.companyId);
@@ -807,6 +829,7 @@ module.exports = {
   createAssistedQuotationRequest,
   selectMixedSupplierItems,
   createPurchaseOrdersFromMixedSelections,
+  cancelPurchaseOrder,
   listPurchaseRequests,
   listPurchaseOrders,
   listQuotableProducts,
