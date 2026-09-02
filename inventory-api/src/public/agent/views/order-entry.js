@@ -317,9 +317,17 @@ async function render(containerEl, session, params) {
   function updatePaymentConditionVisibility() {
     const val = paymentConditionSelect?.value;
     if (transferFieldsBlock) transferFieldsBlock.hidden = (val !== 'TRANSFER');
-    // Show credit warning only when the store actually has a pending balance > 0.
-    // isNearLimit tracks visit frequency, NOT credit usage — using it here was wrong.
-    const showCredit = val === 'CREDIT' && (Number(freshStore?.pendingBalance) > 0);
+    // Credit warning rules:
+    //  - No balance owed → never warn (client is clean regardless of limit).
+    //  - Balance > 0 + no credit limit set → warn (selling on credit without authorization).
+    //  - Balance > 0 + within 80 % of approved limit → no warn (normal, authorized usage).
+    //  - Balance >= 80 % of approved limit → warn (at or over limit).
+    const pendingBalance = Number(freshStore?.pendingBalance || 0);
+    const creditLimit   = Number(freshStore?.creditLimit   || 0);
+    const NEAR_PCT      = 0.8;
+    const isOverOrNearLimit = pendingBalance > 0
+      && (creditLimit === 0 || pendingBalance >= creditLimit * NEAR_PCT);
+    const showCredit = val === 'CREDIT' && isOverOrNearLimit;
     if (creditWarningBanner) creditWarningBanner.hidden = !showCredit;
   }
 

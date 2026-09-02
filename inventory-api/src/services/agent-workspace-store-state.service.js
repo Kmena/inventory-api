@@ -230,6 +230,7 @@ function serializeStoreCard(store, route) {
     dueInDays: state.dueInDays,
     isNearLimit: state.isNearLimit,
     pendingBalance: invoiceSummary.visiblePendingBalance,
+    creditLimit: store.creditLimit !== null && store.creditLimit !== undefined ? Number(store.creditLimit) : 0,
     isNew: state.status === 'NUEVA',
   };
 }
