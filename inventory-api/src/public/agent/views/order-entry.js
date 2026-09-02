@@ -66,8 +66,10 @@ function renderSuccessOverlay(orderNumber, storeId, title = '¡Pedido creado!') 
 
 async function render(containerEl, session, params) {
   const storeId       = params?.storeId;
-  const orderId       = params?.orderId    || null;   // present when correcting a REJECTED order
-  const existingItems = params?.existingItems || [];  // [{ productId, quantity }] pre-fill
+  const orderId       = params?.orderId || null;  // present when correcting a REJECTED order
+  // existingItems arrives as a JSON string from navigate() URL params — parse it back.
+  let existingItems = [];
+  try { existingItems = params?.existingItems ? JSON.parse(params.existingItems) : []; } catch (_) { existingItems = []; }
   const api      = AgentShell.require('api.agentApi');
   const state    = AgentShell.require('state');
   const helpers  = AgentShell.require('helpers');

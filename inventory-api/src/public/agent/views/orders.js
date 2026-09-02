@@ -109,14 +109,15 @@ async function render(containerEl, session, _params) {
           </div>
         </div>`;
 
-      // Resubmit buttons → open order-entry in edit mode so agent can correct before resubmitting
+      // Resubmit buttons → open order-entry in edit mode so agent can correct before resubmitting.
+      // Pass existingItems as JSON string — navigate() encodes params via encodeURIComponent,
+      // which would mangle a raw array. The view parses it back with JSON.parse.
       containerEl.querySelectorAll('.agent-resubmit-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
-          const orderId     = btn.getAttribute('data-order-id');
-          const storeId     = btn.getAttribute('data-store-id');
-          const itemsJson   = btn.getAttribute('data-existing-items');
-          const existingItems = itemsJson ? JSON.parse(itemsJson) : [];
-          navigate('order-entry', { storeId, orderId, existingItems });
+          const orderId   = btn.getAttribute('data-order-id');
+          const storeId   = btn.getAttribute('data-store-id');
+          const itemsJson = btn.getAttribute('data-existing-items') || '[]';
+          navigate('order', { storeId, orderId, existingItems: itemsJson });
         });
       });
     }
