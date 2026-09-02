@@ -81,6 +81,19 @@
     });
   }
 
+  /**
+   * Selección mixta: cada línea de producto se asigna a un proveedor distinto.
+   * POST /api/procurement/requests/:id/select-items
+   * payload: { justification?, items: [{ productId, quotationId, quantity, unitPrice }] }
+   */
+  async function selectMixedItems(session, purchaseRequestId, payload) {
+    return inventoryAuth.fetchJson(session, `/api/procurement/requests/${purchaseRequestId}/select-items`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudo confirmar la selección mixta de proveedores.',
+    });
+  }
+
   async function selectQuotation(session, purchaseRequestId, payload) {
     return inventoryAuth.fetchJson(session, `/api/procurement/requests/${purchaseRequestId}/select-quotation`, {
       method: 'POST',
@@ -142,6 +155,7 @@
     getRfqTrackingSummary,
     listPurchaseRequests,
     getComparisonData,
+    selectMixedItems,
     selectQuotation,
     approveSelection,
     createPurchaseOrder,

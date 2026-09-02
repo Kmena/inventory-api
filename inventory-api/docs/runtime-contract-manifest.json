@@ -366,6 +366,15 @@
     {
       "method": "POST",
       "mountPath": "/api/procurement",
+      "expressPath": "/requests/:id/select-items",
+      "routeFile": "src/routes/procurement.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "procurement-selection-outside-current-openapi-baseline",
+      "reason": "Selección mixta de proveedores por línea de producto — crea N SupplierSelections + N POs."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/procurement",
       "expressPath": "/requests/:id/select-quotation",
       "routeFile": "src/routes/procurement.routes.js",
       "contractStatus": "intentionally-excluded",

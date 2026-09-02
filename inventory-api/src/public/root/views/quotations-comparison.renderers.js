@@ -190,9 +190,139 @@
     `;
   }
 
+  /**
+   * Matriz producto × proveedor con radio buttons.
+   * Cada fila es un producto de la solicitud; cada columna es un proveedor que respondió.
+   * El proveedor más barato por línea se pre-selecciona.
+   *
+   * @param {object[]} respondedQuotations - Cotizaciones con responseSource != null
+   * @returns {string} HTML
+   */
+  function renderProductMatrix(respondedQuotations) {
+    if (!respondedQuotations || !respondedQuotations.length) return '';
+
+    // Build set of all products across all quotations
+    const productMap = new Map(); // productId → { id, name }
+    for (const q of respondedQuotations) {
+      for (const item of (q.items || [])) {
+        const pid = String(item.productId);
+        if (!productMap.has(pid)) {
+          productMap.set(pid, {
+            id: pid,
+            name: item.product?.name || item.productName || `Producto #${pid}`,
+          });
+        }
+      }
+    }
+
+    if (!productMap.size) return '';
+
+    // For each product, find the quotation with lowest unit price → default selection
+    const cheapestByProduct = new Map(); // productId → quotationId
+    for (const [pid] of productMap) {
+      let bestPrice = Infinity;
+      let bestQid = null;
+      for (const q of respondedQuotations) {
+        const item = (q.items || []).find((i) => String(i.productId) === pid);
+        if (item && Number(item.unitPrice) < bestPrice) {
+          bestPrice = Number(item.unitPrice);
+          bestQid = String(q.id);
+        }
+      }
+      if (bestQid) cheapestByProduct.set(pid, bestQid);
+    }
+
+    // Column headers
+    const supplierHeaders = respondedQuotations.map((q) => {
+      const name = rootShellUi.escapeHtml(q.supplier?.name || q.supplierName || '—');
+      const badge = responseSourceBadge(q.responseSource);
+      return `<th scope="col" style="text-align:center;min-width:130px;">${name}<br/>${badge}</th>`;
+    }).join('');
+
+    // Product rows
+    const productRows = [...productMap.entries()].map(([pid, product]) => {
+      const cells = respondedQuotations.map((q) => {
+        const item = (q.items || []).find((i) => String(i.productId) === pid);
+        if (!item) {
+          return `<td style="text-align:center;color:var(--muted-color,#9ca3af);">—</td>`;
+        }
+        const qid = String(q.id);
+        const defaultChecked = cheapestByProduct.get(pid) === qid ? 'checked' : '';
+        const isCheapest = cheapestByProduct.get(pid) === qid;
+        const priceLabel = rootShellUi.escapeHtml(formatCurrency(item.unitPrice, q.currency));
+        const leadLabel = item.leadTimeDays != null ? `${item.leadTimeDays}d` : '—';
+        return `
+          <td style="text-align:center;">
+            <label style="display:flex;flex-direction:column;align-items:center;gap:0.2rem;cursor:pointer;">
+              <input
+                type="radio"
+                name="product-${rootShellUi.escapeHtml(pid)}"
+                value="${rootShellUi.escapeHtml(qid)}"
+                data-product-id="${rootShellUi.escapeHtml(pid)}"
+                data-quotation-id="${rootShellUi.escapeHtml(qid)}"
+                data-unit-price="${rootShellUi.escapeHtml(String(item.unitPrice))}"
+                data-quantity="${rootShellUi.escapeHtml(String(item.quantity))}"
+                data-currency="${rootShellUi.escapeHtml(q.currency || 'CRC')}"
+                class="quotations-matrix-radio"
+                ${defaultChecked}
+              />
+              <strong style="font-size:0.8rem;${isCheapest ? 'color:var(--success-color,#16a34a);' : ''}">${priceLabel}</strong>
+              <span class="badge" style="font-size:0.65rem;">${rootShellUi.escapeHtml(leadLabel)}</span>
+            </label>
+          </td>
+        `;
+      }).join('');
+      return `
+        <tr>
+          <td style="font-weight:600;white-space:nowrap;">${rootShellUi.escapeHtml(product.name)}</td>
+          ${cells}
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="table-wrapper" style="overflow-x:auto;">
+        <table id="quotations-product-matrix" aria-label="Selección de proveedor por producto">
+          <thead>
+            <tr>
+              <th scope="col">Producto</th>
+              ${supplierHeaders}
+            </tr>
+          </thead>
+          <tbody>${productRows}</tbody>
+        </table>
+      </div>
+      <p class="muted" style="font-size:0.8rem;margin:0.5rem 0 0;">El precio más bajo por producto está marcado en verde y pre-seleccionado. Cambiá la selección si preferís otro proveedor por línea.</p>
+      <div id="quotations-matrix-footer" style="margin-top:1rem;"></div>
+    `;
+  }
+
+  /**
+   * Renderiza el pie de la matriz con subtotales por proveedor y el botón de confirmación.
+   * @param {{ supplierName: string, supplierId: string, totalAmount: number, currency: string, itemCount: number }[]} groups
+   */
+  function renderMatrixFooter(groups) {
+    if (!groups || !groups.length) return '';
+    const cols = groups.map((g) => `
+      <div style="flex:1;text-align:center;padding:0.5rem;border:1px solid var(--border-color,#e5e7eb);border-radius:6px;">
+        <div style="font-weight:600;font-size:0.85rem;">${rootShellUi.escapeHtml(g.supplierName)}</div>
+        <div style="font-size:0.9rem;margin-top:0.2rem;">${rootShellUi.escapeHtml(formatCurrency(g.totalAmount, g.currency))}</div>
+        <div class="muted" style="font-size:0.75rem;">${g.itemCount} producto(s)</div>
+      </div>
+    `).join('');
+    const orderCount = groups.length;
+    return `
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem;">${cols}</div>
+      <p class="muted" style="font-size:0.82rem;margin:0 0 0.75rem;">Se generarán <strong>${orderCount}</strong> orden(es) de compra — una por proveedor.</p>
+      <button type="button" id="quotations-confirm-mixed-button">Confirmar selección mixta</button>
+    `;
+  }
+
   rootShell.register('views.quotationsComparisonRenderers', {
     formatCurrency,
     renderComparisonTable,
     renderCreatePoSummary,
+    renderProductMatrix,
+    renderMatrixFooter,
   });
 }(window));

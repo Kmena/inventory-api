@@ -555,6 +555,76 @@ async function selectSupplierQuotation(purchaseRequestId, payload, auth) {
   return serializeSupplierSelection(selection);
 }
 
+/**
+ * Selección mixta de proveedores: cada producto se asigna independientemente
+ * a la cotización del proveedor que ofrece el mejor precio para ese producto.
+ * Crea una SupplierSelection por cada proveedor involucrado.
+ * @returns {{ selections: object[], requiresApproval: boolean }}
+ */
+async function selectMixedSupplierItems(purchaseRequestId, payload, auth) {
+  const scope = assertCompanyScope(auth);
+  const request = await procurementRepository.findPurchaseRequestByIdForCompany(purchaseRequestId, scope.companyId);
+  if (!request) throw createHttpError(404, 'Solicitud de compra no encontrada', 'not_found');
+  if (request.status !== 'OPEN') throw createHttpError(409, 'La solicitud no está abierta', 'conflict');
+
+  const companyConfig = await procurementRepository.findCompanyConfigByCompanyId(scope.companyId);
+  const threshold = getProcurementApprovalThreshold(companyConfig);
+
+  // Group lines by quotationId
+  const byQuotation = new Map();
+  for (const line of payload.items) {
+    const qid = String(line.quotationId);
+    if (!byQuotation.has(qid)) byQuotation.set(qid, []);
+    byQuotation.get(qid).push(line);
+  }
+
+  const createdSelections = [];
+
+  for (const [quotationIdStr, lines] of byQuotation.entries()) {
+    const quotation = await procurementRepository.findSupplierQuotationByIdForCompany(
+      BigInt(quotationIdStr), scope.companyId,
+    );
+    if (!quotation || quotation.purchaseRequestId !== request.id) {
+      throw createHttpError(404, `Cotización ${quotationIdStr} no encontrada para esta solicitud`, 'not_found');
+    }
+
+    const subtotal = lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
+    const approvalRequired = threshold !== null && subtotal > threshold;
+
+    const selection = await procurementRepository.createSupplierSelection({
+      companyId: scope.companyId,
+      purchaseRequestId: request.id,
+      quotationId: quotation.id,
+      selectedByUserId: scope.actorUserId,
+      approvalRequired,
+      approvalStatus: approvalRequired ? 'PENDING' : 'APPROVED',
+      approvedByUserId: approvalRequired ? null : scope.actorUserId,
+      approvedAt: approvalRequired ? null : new Date(),
+      totalAmount: subtotal,
+      currency: quotation.currency,
+      justification: normalizeOptionalText(payload.justification),
+    });
+
+    await procurementRepository.updateSupplierQuotation(quotation.id, scope.companyId, { status: 'SELECTED' });
+
+    createdSelections.push({
+      ...serializeSupplierSelection(selection),
+      // Attach the specific items assigned to this supplier so the frontend
+      // can pass them back as an override when creating the purchase order.
+      assignedItems: lines.map((l) => ({
+        productId: l.productId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+      })),
+    });
+  }
+
+  return {
+    selections: createdSelections,
+    requiresApproval: createdSelections.some((s) => s.approvalRequired),
+  };
+}
+
 async function approveSupplierSelection(selectionId, payload, auth) {
   const scope = assertCompanyScope(auth);
   const selection = await procurementRepository.findSupplierSelectionByIdForCompany(selectionId, scope.companyId);
@@ -620,6 +690,17 @@ async function createPurchaseOrderFromSelection(purchaseRequestId, payload, auth
   }
 
   const quotation = selection.quotation;
+  // When `payload.items` is provided, use those specific lines (mixed-supplier flow).
+  // Otherwise fall back to all items from the quotation (single-supplier flow).
+  const sourceItems = Array.isArray(payload.items) && payload.items.length > 0
+    ? payload.items
+    : (quotation.items || []).map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        notes: item.notes,
+      }));
+
   const purchaseOrder = await procurementRepository.createPurchaseOrder({
     companyId: scope.companyId,
     purchaseRequestId: request.id,
@@ -629,11 +710,11 @@ async function createPurchaseOrderFromSelection(purchaseRequestId, payload, auth
     createdByUserId: scope.actorUserId,
     notes: normalizeOptionalText(payload.notes),
     items: {
-      create: (quotation.items || []).map((item) => ({
-        productId: item.productId,
+      create: sourceItems.map((item) => ({
+        productId: BigInt(item.productId),
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        notes: normalizeOptionalText(item.notes),
+        notes: normalizeOptionalText(item.notes ?? null),
       })),
     },
   });
@@ -661,6 +742,7 @@ async function issuePurchaseOrder(orderId, auth) {
 module.exports = {
   createPurchaseRequest,
   createAssistedQuotationRequest,
+  selectMixedSupplierItems,
   listPurchaseRequests,
   listPurchaseOrders,
   listQuotableProducts,
