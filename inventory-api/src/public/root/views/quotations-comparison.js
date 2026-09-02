@@ -450,15 +450,15 @@
 
       try {
         if (currentSelectionResult.mixed) {
-          // Create one PO per selection, passing only the assigned items
+          // Batch: one request, one transaction, request closed once at the end.
           createPoSubmit.textContent = 'Creando órdenes...';
-          for (const sel of currentSelectionResult.mixed) {
-            await quotationsApi.createPurchaseOrder(session, currentPurchaseRequestId, {
+          await quotationsApi.createPurchaseOrdersBatch(session, currentPurchaseRequestId, {
+            notes,
+            orders: currentSelectionResult.mixed.map((sel) => ({
               selectionId: sel.id,
-              notes,
               items: sel.assignedItems,
-            });
-          }
+            })),
+          });
         } else {
           createPoSubmit.textContent = 'Creando orden...';
           await quotationsApi.createPurchaseOrder(session, currentPurchaseRequestId, {

@@ -12,6 +12,7 @@ const {
   approveSupplierSelectionSchema,
   createPurchaseOrderSchema,
   selectMixedItemsSchema,
+  createMixedPurchaseOrdersSchema,
 } = require('../schemas/procurement.schema');
 const procurementService = require('../services/procurement.service');
 
@@ -109,6 +110,14 @@ router.post('/selections/:id/approve', authorizeAccessPolicy('procurement.approv
 router.post('/requests/:id/cancel', authorizeAccessPolicy('procurement.manage'), async (req, res, next) => {
   try {
     return res.json(await procurementService.cancelPurchaseRequest(parseBigIntId(req.params.id), req.auth));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/requests/:id/purchase-orders-batch', authorizeAccessPolicy('procurement.manage'), validate(createMixedPurchaseOrdersSchema), async (req, res, next) => {
+  try {
+    return res.status(201).json(await procurementService.createPurchaseOrdersFromMixedSelections(parseBigIntId(req.params.id), req.body, req.auth));
   } catch (error) {
     return next(error);
   }

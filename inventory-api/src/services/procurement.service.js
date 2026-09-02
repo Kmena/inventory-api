@@ -726,6 +726,63 @@ async function createPurchaseOrderFromSelection(purchaseRequestId, payload, auth
   return serializePurchaseOrder(purchaseOrder);
 }
 
+/**
+ * Crea todas las órdenes de compra de una selección mixta en una sola llamada.
+ * Evita el 409 que ocurre cuando el loop del frontend intenta crear la segunda PO
+ * sobre una solicitud que el primer call ya cerró.
+ * @returns {{ orders: object[] }}
+ */
+async function createPurchaseOrdersFromMixedSelections(purchaseRequestId, payload, auth) {
+  const scope = assertCompanyScope(auth);
+  const request = await procurementRepository.findPurchaseRequestByIdForCompany(purchaseRequestId, scope.companyId);
+  if (!request) throw createHttpError(404, 'Solicitud de compra no encontrada', 'not_found');
+  if (request.status !== 'OPEN') throw createHttpError(409, 'La solicitud de compra no está abierta', 'conflict');
+
+  const notes = normalizeOptionalText(payload.notes);
+  const createdOrders = [];
+
+  for (const entry of payload.orders) {
+    const selection = await procurementRepository.findSupplierSelectionByIdForCompany(
+      BigInt(entry.selectionId), scope.companyId,
+    );
+    if (!selection || selection.purchaseRequestId !== request.id) {
+      throw createHttpError(404, `Selección ${entry.selectionId} no encontrada para esta solicitud`, 'not_found');
+    }
+    if (selection.approvalRequired && selection.approvalStatus !== 'APPROVED') {
+      throw createHttpError(409, `La selección ${entry.selectionId} requiere aprobación previa`, 'conflict');
+    }
+
+    const quotation = selection.quotation;
+    const sourceItems = Array.isArray(entry.items) && entry.items.length > 0
+      ? entry.items
+      : (quotation.items || []).map((i) => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, notes: i.notes }));
+
+    const po = await procurementRepository.createPurchaseOrder({
+      companyId: scope.companyId,
+      purchaseRequestId: request.id,
+      quotationId: quotation.id,
+      selectionId: selection.id,
+      supplierId: quotation.supplierId,
+      createdByUserId: scope.actorUserId,
+      notes,
+      items: {
+        create: sourceItems.map((item) => ({
+          productId: BigInt(item.productId),
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          notes: normalizeOptionalText(item.notes ?? null),
+        })),
+      },
+    });
+    createdOrders.push(serializePurchaseOrder(po));
+  }
+
+  // Close the request once — after ALL orders are created successfully.
+  await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'CLOSED' });
+
+  return { orders: createdOrders };
+}
+
 async function issuePurchaseOrder(orderId, auth) {
   const scope = assertCompanyScope(auth);
   const order = await procurementRepository.findPurchaseOrderByIdForCompany(BigInt(orderId), scope.companyId);
@@ -743,6 +800,7 @@ module.exports = {
   createPurchaseRequest,
   createAssistedQuotationRequest,
   selectMixedSupplierItems,
+  createPurchaseOrdersFromMixedSelections,
   listPurchaseRequests,
   listPurchaseOrders,
   listQuotableProducts,

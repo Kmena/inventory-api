@@ -110,6 +110,18 @@
     });
   }
 
+  /**
+   * Crea todas las órdenes de compra de una selección mixta en un solo request.
+   * payload: { notes?, orders: [{ selectionId, items? }] }
+   */
+  async function createPurchaseOrdersBatch(session, purchaseRequestId, payload) {
+    return inventoryAuth.fetchJson(session, `/api/procurement/requests/${purchaseRequestId}/purchase-orders-batch`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudieron crear las órdenes de compra.',
+    });
+  }
+
   async function createPurchaseOrder(session, purchaseRequestId, payload) {
     return inventoryAuth.fetchJson(session, `/api/procurement/requests/${purchaseRequestId}/purchase-orders`, {
       method: 'POST',
@@ -157,6 +169,7 @@
     getComparisonData,
     selectMixedItems,
     selectQuotation,
+    createPurchaseOrdersBatch,
     approveSelection,
     createPurchaseOrder,
     createDirectQuotation,

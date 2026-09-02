@@ -89,6 +89,22 @@ const selectMixedItemsSchema = z.object({
   items: z.array(mixedSelectionLineSchema).min(1),
 }).strict();
 
+// Batch PO creation from a mixed selection — avoids the 409 loop bug.
+const mixedPoOrderSchema = z.object({
+  selectionId: z.coerce.bigint(),
+  items: z.array(z.object({
+    productId: z.coerce.bigint(),
+    quantity: z.coerce.number().positive(),
+    unitPrice: z.coerce.number().nonnegative(),
+    notes: z.string().trim().max(500).optional().nullable(),
+  })).optional(),
+});
+
+const createMixedPurchaseOrdersSchema = z.object({
+  notes: z.string().trim().max(2000).optional().nullable(),
+  orders: z.array(mixedPoOrderSchema).min(1),
+}).strict();
+
 module.exports = {
   createPurchaseRequestSchema,
   createSupplierQuotationSchema,
@@ -97,4 +113,5 @@ module.exports = {
   approveSupplierSelectionSchema,
   createPurchaseOrderSchema,
   selectMixedItemsSchema,
+  createMixedPurchaseOrdersSchema,
 };

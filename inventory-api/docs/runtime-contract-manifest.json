@@ -366,6 +366,15 @@
     {
       "method": "POST",
       "mountPath": "/api/procurement",
+      "expressPath": "/requests/:id/purchase-orders-batch",
+      "routeFile": "src/routes/procurement.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "procurement-selection-outside-current-openapi-baseline",
+      "reason": "Batch PO creation for mixed-supplier selection — creates N POs in one transaction and closes the request once."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/procurement",
       "expressPath": "/requests/:id/select-items",
       "routeFile": "src/routes/procurement.routes.js",
       "contractStatus": "intentionally-excluded",
