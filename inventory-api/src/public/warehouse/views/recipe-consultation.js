@@ -102,8 +102,11 @@ function render(container, session, params) {
   if (!orderId) {
     container.innerHTML = `
       <div class="warehouse-section">
-        <p class="wh-alert wh-alert--warning">No se especifico ninguna orden de produccion.</p>
-        <button type="button" class="secondary-button" id="go-back">← Volver a produccion</button>
+        <p style="margin-bottom:0.75rem;">
+          Esta vista se abre desde el detalle de una orden de producción.<br/>
+          Andá a <strong>Producción</strong>, abrí una orden y tocá <em>📋 Ver receta</em>.
+        </p>
+        <button type="button" class="primary-button" id="go-back">← Ir a Producción</button>
       </div>
     `;
     container.querySelector('#go-back')?.addEventListener('click', () => app.navigate('production'));

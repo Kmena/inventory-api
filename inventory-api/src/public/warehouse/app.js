@@ -94,9 +94,11 @@ const TAB_DEFINITIONS = [
     /** @param {string[]} p */ permission: (p) => p.includes('production.execute') || p.includes('production.view') || p.includes('quality.inspect'),
   },
   {
+    // Sub-view of Produccion — accessed via '📋 Ver receta' button inside an order.
+    // Not shown as a top-level tab: it always requires ?orderId=<id>.
     view:       'recipe-consultation',
-    label:      'Recetas',
-    icon:       '📋',
+    label:      'Consulta de receta',
+    hidden:     true,
     /** @param {string[]} p */ permission: (p) => p.includes('warehouse.access'),
   },
   {
