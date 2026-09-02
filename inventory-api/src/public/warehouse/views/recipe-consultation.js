@@ -15,48 +15,114 @@ function escapeHtml(str) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function renderStageAccordion(stage, index) {
-  // Snapshot field names: stageInputs, qaMandatory, expectedParameters, stageOrder
-  const inputs    = stage.stageInputs || [];
+/**
+ * Aggregate stageInputs from all RECOLLECTION stages that precede this one.
+ * Used to show processing stages what materials are available from prior collection.
+ * @param {any} stage
+ * @param {any[]} allStages
+ * @returns {{ name: string, quantity: string|number, unit: string }[]}
+ */
+function computeRecollectedMaterials(stage, allStages) {
+  const thisOrder = stage.stageOrder ?? Infinity;
+  /** @type {Map<string, { name: string, quantity: number, unit: string }>} */
+  const map = new Map();
+
+  for (const s of allStages) {
+    if ((s.stageOrder ?? 0) >= thisOrder) { continue; }
+    if (s.stageType !== 'RECOLLECTION') { continue; }
+    for (const inp of (s.stageInputs || [])) {
+      const key = String(inp.productId || inp.name || '');
+      const qty = parseFloat(String(inp.quantity || '0')) || 0;
+      const existing = map.get(key);
+      if (existing) {
+        existing.quantity += qty;
+      } else {
+        map.set(key, {
+          name: inp.product?.name || inp.name || '—',
+          quantity: qty,
+          unit: inp.unit || '',
+        });
+      }
+    }
+  }
+  return [...map.values()];
+}
+
+const STAGE_TYPE_LABELS = /** @type {Record<string,string>} */ ({
+  RECOLLECTION: 'Recolección',
+  PROCESSING:   'Procesamiento',
+});
+
+/**
+ * @param {any}   stage
+ * @param {number} index
+ * @param {any[]}  allStages
+ */
+function renderStageAccordion(stage, index, allStages) {
+  const inputs     = stage.stageInputs || [];
   const qaRequired = stage.qaMandatory === true;
-  const stageId   = `recipe-stage-${index}`;
+  const stageId    = `recipe-stage-${index}`;
+  const typeLabel  = STAGE_TYPE_LABELS[stage.stageType] || stage.stageType || '';
+  const typeBadge  = typeLabel
+    ? `<span class="rc-stage-type-badge rc-stage-type-badge--${escapeHtml(String(stage.stageType || 'default').toLowerCase())}">${escapeHtml(typeLabel)}</span>`
+    : '';
 
-  let ingredientsHtml = '';
-  if (inputs.length > 0) {
-    ingredientsHtml = `
-      <div class="recipe-ingredients">
-        <h4 class="recipe-ingredients__title">Insumos</h4>
-        <ul class="recipe-ingredients__list">
-          ${inputs.map((/** @type {any} */ inp) => `
-            <li class="recipe-ingredients__item">
-              <span class="recipe-ingredients__name">${escapeHtml(inp.product?.name || inp.name || (inp.productId ? `Producto #${inp.productId}` : '—'))}</span>
-              <span class="recipe-ingredients__qty">${escapeHtml(String(inp.quantity || '—'))} ${escapeHtml(inp.unit || '')}</span>
-            </li>
-          `).join('')}
-        </ul>
-      </div>
-    `;
-  }
+  // Instructions block
+  const instructionsHtml = stage.instructions
+    ? `<div class="rc-stage-section">
+         <h4 class="rc-stage-section__title">📋 Instrucciones</h4>
+         <p class="recipe-stage__instructions">${escapeHtml(stage.instructions)}</p>
+       </div>`
+    : '';
 
-  let qaHtml = '';
-  if (qaRequired) {
-    const qaParams = stage.expectedParameters || [];
-    qaHtml = `
-      <div class="recipe-qa-params" role="note" aria-label="Parametros de QA obligatorios">
-        <p class="wh-qa-required-badge">🔍 QA Obligatorio</p>
-        ${qaParams.length > 0 ? `
-          <ul class="recipe-ingredients__list">
-            ${qaParams.map((/** @type {any} */ p) => `
-              <li class="recipe-ingredients__item">
-                <span class="recipe-ingredients__name">${escapeHtml(p.name || '—')}</span>
-                <span class="recipe-ingredients__qty">${escapeHtml(p.expectedValue || '—')} ${escapeHtml(p.unit || '')}</span>
-              </li>
-            `).join('')}
-          </ul>
-        ` : ''}
-      </div>
-    `;
-  }
+  // Own inputs (e.g. RECOLLECTION fetches from warehouse)
+  const inputsHtml = inputs.length > 0
+    ? `<div class="rc-stage-section">
+         <h4 class="rc-stage-section__title">📦 Insumos a recolectar</h4>
+         <ul class="recipe-ingredients__list">
+           ${inputs.map((/** @type {any} */ inp) => `
+             <li class="recipe-ingredients__item">
+               <span class="recipe-ingredients__name">${escapeHtml(inp.product?.name || inp.name || '—')}</span>
+               <span class="recipe-ingredients__qty">${escapeHtml(String(inp.quantity ?? '—'))} ${escapeHtml(inp.unit || '')}</span>
+             </li>
+           `).join('')}
+         </ul>
+       </div>`
+    : '';
+
+  // For stages with no own inputs, show what was recollected from prior stages
+  const recollected = inputs.length === 0 ? computeRecollectedMaterials(stage, allStages) : [];
+  const recollectedHtml = recollected.length > 0
+    ? `<div class="rc-stage-section">
+         <h4 class="rc-stage-section__title">🧪 Materiales de etapas anteriores</h4>
+         <ul class="recipe-ingredients__list">
+           ${recollected.map((m) => `
+             <li class="recipe-ingredients__item">
+               <span class="recipe-ingredients__name">${escapeHtml(m.name)}</span>
+               <span class="recipe-ingredients__qty">${escapeHtml(String(m.quantity))} ${escapeHtml(m.unit)}</span>
+             </li>
+           `).join('')}
+         </ul>
+       </div>`
+    : '';
+
+  // QA parameters
+  const qaParams = stage.expectedParameters || [];
+  const qaHtml = qaRequired
+    ? `<div class="rc-stage-section" role="note" aria-label="Parametros de QA obligatorios">
+         <h4 class="rc-stage-section__title">🔍 Control de calidad obligatorio</h4>
+         ${qaParams.length > 0 ? `
+           <ul class="recipe-ingredients__list">
+             ${qaParams.map((/** @type {any} */ p) => `
+               <li class="recipe-ingredients__item">
+                 <span class="recipe-ingredients__name">${escapeHtml(p.name || '—')}</span>
+                 <span class="recipe-ingredients__qty">${escapeHtml(p.expectedValue || '—')} ${escapeHtml(p.unit || '')}</span>
+               </li>
+             `).join('')}
+           </ul>
+         ` : '<p style="font-size:0.85rem;color:var(--muted)">Registrar parámetros de calidad antes de continuar.</p>'}
+       </div>`
+    : '';
 
   return `
     <li class="recipe-stage">
@@ -64,12 +130,16 @@ function renderStageAccordion(stage, index) {
               class="recipe-stage__toggle"
               aria-expanded="false"
               aria-controls="${escapeHtml(stageId)}">
-        <span>Etapa ${escapeHtml(String(stage.stageOrder || (index + 1)))} · ${escapeHtml(stage.name || `Etapa ${index + 1}`)}</span>
+        <span class="rc-toggle-label">
+          <span>Etapa ${escapeHtml(String(stage.stageOrder || (index + 1)))} · ${escapeHtml(stage.name || `Etapa ${index + 1}`)}</span>
+          ${typeBadge}
+        </span>
         <span class="recipe-stage__chevron" aria-hidden="true">▶</span>
       </button>
       <div id="${escapeHtml(stageId)}" class="recipe-stage__content">
-        ${stage.instructions ? `<p class="recipe-stage__instructions">${escapeHtml(stage.instructions)}</p>` : ''}
-        ${ingredientsHtml}
+        ${instructionsHtml}
+        ${inputsHtml}
+        ${recollectedHtml}
         ${qaHtml}
       </div>
     </li>
@@ -164,7 +234,7 @@ function render(container, session, params) {
       if (stages.length > 0) {
         const stagesList = document.createElement('ul');
         stagesList.className = 'recipe-stages-list';
-        stagesList.innerHTML = stages.map((/** @type {any} */ stage, idx) => renderStageAccordion(stage, idx)).join('');
+        stagesList.innerHTML = stages.map((/** @type {any} */ stage, idx) => renderStageAccordion(stage, idx, stages)).join('');
         contentEl.append(stagesList);
         attachAccordionBehavior(contentEl);
       } else {
