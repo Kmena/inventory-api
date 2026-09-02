@@ -590,6 +590,11 @@
       if (directQuotationButton) directQuotationButton.hidden = !canManage;
       syncActiveRequestFromTracking();
       loadRfqInvitations();
+      // Re-render sidebar to highlight active item without a full API reload
+      if (rfqTrackingRegion && currentTrackingRequests.length) {
+        rfqTrackingRegion.innerHTML = renderers.renderOpenRequestsTable(currentTrackingRequests, purchaseRequestId);
+        bindTrackingContextButtons();
+      }
       // Refresh the inline comparison for this request
       comparison.refreshForRequest(purchaseRequestId);
     }
@@ -646,7 +651,7 @@
     }
 
     function bindTrackingContextButtons() {
-      rfqTrackingRegion.querySelectorAll('.quotations-open-request-context-button').forEach((button) => {
+      rfqTrackingRegion.querySelectorAll('.quotations-sidebar-item').forEach((button) => {
         button.addEventListener('click', () => {
           const purchaseRequestId = button.getAttribute('data-purchase-request-id');
           const selectedRequest = helpers.findTrackingRequestById(currentTrackingRequests, purchaseRequestId);

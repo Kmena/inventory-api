@@ -401,39 +401,51 @@
     `).join('');
   }
 
+  /**
+   * Renderiza la lista de solicitudes abiertas como ítems clickeables para el sidebar.
+   * Cada ítem completo actúa como botón — sin columna de acción separada.
+   */
   function renderOpenRequestsTable(trackingData, activeRequestId) {
     if (!trackingData || !trackingData.length) {
-      return '<div class="empty-state"><p class="muted">No hay solicitudes abiertas para mostrar.</p></div>';
+      return '<p class="muted" style="font-size:0.85rem;padding:0.5rem 0;">Sin solicitudes abiertas.</p>';
     }
 
-    return `
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Solicitud</th>
-              <th>Estado</th>
-              <th>Invitaciones</th>
-              <th>Respuestas</th>
-              <th>Creada</th>
-              <th>Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${trackingData.map((req) => `
-              <tr>
-                <td data-label="Solicitud"><strong>${rootShellUi.escapeHtml(req.title || `Solicitud #${req.purchaseRequestId}`)}</strong>${String(req.purchaseRequestId) === String(activeRequestId) ? ' <span class="badge badge-info">Activa</span>' : ''}</td>
-                <td data-label="Estado"><span class="badge">${rootShellUi.escapeHtml(req.status || '—')}</span></td>
-                <td data-label="Invitaciones">${rootShellUi.escapeHtml(String(req.invitations?.length || 0))}</td>
-                <td data-label="Respuestas">${rootShellUi.escapeHtml(String(req.respondedInvitationCount || 0))}</td>
-                <td data-label="Creada">${rootShellUi.escapeHtml(helpers.formatDate(req.createdAt))}</td>
-                <td data-label="Acción"><button class="secondary-button quotations-open-request-context-button" type="button" data-purchase-request-id="${rootShellUi.escapeHtml(String(req.purchaseRequestId))}">Ver en esta vista</button></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
+    const items = trackingData.map((req) => {
+      const isActive = String(req.purchaseRequestId) === String(activeRequestId);
+      const invCount = req.invitations?.length || 0;
+      const respCount = Number(req.respondedInvitationCount || 0);
+      const title = rootShellUi.escapeHtml(req.title || `Solicitud #${req.purchaseRequestId}`);
+      const date = rootShellUi.escapeHtml(helpers.formatDate(req.createdAt));
+      const statusLabel = rootShellUi.escapeHtml(req.status || '—');
+      const respBadge = respCount > 0
+        ? `<span class="badge badge-success" style="font-size:0.7rem;">${respCount} resp.</span>`
+        : '';
+
+      const activeStyle = isActive
+        ? 'background:var(--primary-color,#2563eb);color:#fff;border-color:transparent;'
+        : 'background:transparent;color:inherit;border-color:var(--border-color,#e5e7eb);';
+
+      return `
+        <li style="list-style:none;margin:0;padding:0;">
+          <button
+            class="quotations-sidebar-item"
+            type="button"
+            data-purchase-request-id="${rootShellUi.escapeHtml(String(req.purchaseRequestId))}"
+            aria-current="${isActive ? 'true' : 'false'}"
+            style="width:100%;text-align:left;padding:0.6rem 0.75rem;border:1px solid;border-radius:6px;cursor:pointer;${activeStyle}"
+          >
+            <div style="font-weight:600;font-size:0.85rem;line-height:1.3;">${title}</div>
+            <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;margin-top:0.3rem;">
+              <span class="badge" style="font-size:0.7rem;opacity:${isActive ? '0.85' : '1'};">${statusLabel}</span>
+              ${respBadge}
+              <span style="font-size:0.72rem;opacity:0.75;">${invCount} inv · ${date}</span>
+            </div>
+          </button>
+        </li>
+      `;
+    }).join('');
+
+    return `<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.35rem;">${items}</ul>`;
   }
 
   /**
