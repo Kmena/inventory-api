@@ -80,8 +80,8 @@ function attachAccordionBehavior(container) {
   container.querySelectorAll('.recipe-stage__toggle').forEach((btn) => {
     btn.addEventListener('click', () => {
       const isExpanded = btn.getAttribute('aria-expanded') === 'true';
-      const contentId = btn.getAttribute('aria-controls');
-      const content = contentId ? document.getElementById(contentId) : null;
+      // Traverse up to the <li> stage, then find the content panel sibling
+      const content = btn.closest('.recipe-stage')?.querySelector('.recipe-stage__content');
       const chevron = btn.querySelector('.recipe-stage__chevron');
 
       btn.setAttribute('aria-expanded', String(!isExpanded));
