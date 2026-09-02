@@ -86,9 +86,13 @@ async function render(containerEl, session, params) {
     </div>`;
 
   let products = [];
+  // freshStore: datos del API, siempre disponibles y actualizados (name, pendingBalance, etc.)
+  // Toma precedencia sobre cachedStore que puede ser undefined o stale.
+  let freshStore = cachedStore || null;
   try {
     const ctx = await api.fetchOrderContext(session, storeId);
-    products = ctx?.sellableProducts?.products || ctx?.products || [];
+    products   = ctx?.sellableProducts?.products || ctx?.products || [];
+    if (ctx?.store) freshStore = ctx.store;
   } catch (err) {
     containerEl.innerHTML = `
       <div class="agent-page">
@@ -158,8 +162,8 @@ async function render(containerEl, session, params) {
   containerEl.innerHTML = `
     <div class="agent-page" style="padding-bottom:120px;">
       <div class="agent-context-strip">
-        <strong>${helpers.escapeHtml(cachedStore?.name || '—')}</strong>
-        ${cachedStore?.pendingBalance != null ? `<span style="font-size:0.82rem;">Saldo: ${helpers.currency(cachedStore.pendingBalance)}</span>` : ''}
+        <strong>${helpers.escapeHtml(freshStore?.name || '—')}</strong>
+        ${freshStore?.pendingBalance != null ? `<span style="font-size:0.82rem;">Saldo: ${helpers.currency(freshStore.pendingBalance)}</span>` : ''}
       </div>
       <header class="agent-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:0;">
         <button type="button" id="order-back-btn" class="secondary-button">← Volver</button>
@@ -315,7 +319,7 @@ async function render(containerEl, session, params) {
     if (transferFieldsBlock) transferFieldsBlock.hidden = (val !== 'TRANSFER');
     // Show credit warning only when the store actually has a pending balance > 0.
     // isNearLimit tracks visit frequency, NOT credit usage — using it here was wrong.
-    const showCredit = val === 'CREDIT' && (Number(cachedStore?.pendingBalance) > 0);
+    const showCredit = val === 'CREDIT' && (Number(freshStore?.pendingBalance) > 0);
     if (creditWarningBanner) creditWarningBanner.hidden = !showCredit;
   }
 
