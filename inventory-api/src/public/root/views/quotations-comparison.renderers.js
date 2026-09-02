@@ -47,52 +47,49 @@
     return '<span class="badge badge-warning" style="font-size:0.75rem;">⏳ Sin respuesta del proveedor</span>';
   }
 
-  function renderComparisonTable(quotations) {
-    if (!quotations || !quotations.length) {
-      return '<p class="empty-state">No hay cotizaciones con respuesta para comparar.</p>';
-    }
-
-    const rows = quotations.map((q) => {
-      const supplierName = q.supplier?.name || q.supplierName || '—';
-      const leadTime = q.averageLeadTimeDays != null
-        ? `${Math.round(q.averageLeadTimeDays)} días`
-        : '—';
-      const itemsHtml = renderItemsList(q.items, q.currency);
-
-      return `
-        <tr>
-          <td data-label="Proveedor">
-            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-              <strong>${rootShellUi.escapeHtml(supplierName)}</strong>
-              ${responseSourceBadge(q.responseSource)}
-            </div>
-            <div style="margin-top:0.4rem;">${itemsHtml}</div>
-          </td>
-          <td data-label="Referencia"><span class="badge badge-info">${rootShellUi.escapeHtml(q.reference || '—')}</span></td>
-          <td data-label="Moneda">${rootShellUi.escapeHtml(q.currency || '—')}</td>
-          <td data-label="Precio total"><strong>${rootShellUi.escapeHtml(formatCurrency(q.totalAmount, q.currency))}</strong></td>
-          <td data-label="Lead time prom.">${rootShellUi.escapeHtml(leadTime)}</td>
-          <td data-label="Acción">
-            <button
-              type="button"
-              class="quotations-select-supplier-button"
-              data-quotation-id="${rootShellUi.escapeHtml(String(q.id))}"
-              data-supplier-name="${rootShellUi.escapeHtml(supplierName)}"
-              data-total-amount="${rootShellUi.escapeHtml(String(q.totalAmount || 0))}"
-              data-currency="${rootShellUi.escapeHtml(q.currency || '')}"
-              aria-label="Seleccionar a ${rootShellUi.escapeHtml(supplierName)} como proveedor"
-            >Seleccionar este proveedor</button>
-          </td>
-        </tr>
-      `;
-    }).join('');
+  function renderQuotationRow(q, showAction) {
+    const supplierName = q.supplier?.name || q.supplierName || '—';
+    const leadTime = q.averageLeadTimeDays != null
+      ? `${Math.round(q.averageLeadTimeDays)} días`
+      : '—';
+    const itemsHtml = renderItemsList(q.items, q.currency);
+    const actionCell = showAction
+      ? `<button
+           type="button"
+           class="quotations-select-supplier-button"
+           data-quotation-id="${rootShellUi.escapeHtml(String(q.id))}"
+           data-supplier-name="${rootShellUi.escapeHtml(supplierName)}"
+           data-total-amount="${rootShellUi.escapeHtml(String(q.totalAmount || 0))}"
+           data-currency="${rootShellUi.escapeHtml(q.currency || '')}"
+           aria-label="Seleccionar a ${rootShellUi.escapeHtml(supplierName)} como proveedor"
+         >Seleccionar este proveedor</button>`
+      : '<span class="muted" style="font-size:0.8rem;">Registrá una cotización para seleccionar</span>';
 
     return `
+      <tr>
+        <td data-label="Proveedor · Origen">
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            <strong>${rootShellUi.escapeHtml(supplierName)}</strong>
+            ${responseSourceBadge(q.responseSource)}
+          </div>
+          <div style="margin-top:0.4rem;">${itemsHtml}</div>
+        </td>
+        <td data-label="Referencia"><span class="badge badge-info">${rootShellUi.escapeHtml(q.reference || '—')}</span></td>
+        <td data-label="Moneda">${rootShellUi.escapeHtml(q.currency || '—')}</td>
+        <td data-label="Precio total"><strong>${rootShellUi.escapeHtml(formatCurrency(q.totalAmount, q.currency))}</strong></td>
+        <td data-label="Lead time prom.">${rootShellUi.escapeHtml(leadTime)}</td>
+        <td data-label="Acción">${actionCell}</td>
+      </tr>
+    `;
+  }
+
+  function renderTable(rows, label) {
+    return `
       <div class="table-wrapper">
-        <table aria-label="Comparación de cotizaciones por proveedor">
+        <table aria-label="${rootShellUi.escapeHtml(label)}">
           <thead>
             <tr>
-              <th scope="col">Proveedor · Productos</th>
+              <th scope="col">Proveedor · Origen</th>
               <th scope="col">Referencia</th>
               <th scope="col">Moneda</th>
               <th scope="col">Precio total ↑</th>
@@ -104,6 +101,39 @@
         </table>
       </div>
     `;
+  }
+
+  function renderComparisonTable(quotations) {
+    if (!quotations || !quotations.length) {
+      return '<p class="empty-state">No hay cotizaciones con respuesta para comparar.</p>';
+    }
+
+    const responded = quotations.filter((q) => q.responseSource);
+    const catalogOnly = quotations.filter((q) => !q.responseSource);
+
+    const sections = [];
+
+    if (responded.length) {
+      sections.push(`
+        <div class="stack-section">
+          <h4 style="margin:0 0 0.5rem;">Respuestas recibidas</h4>
+          <p class="muted" style="margin:0 0 0.75rem;font-size:0.85rem;">Precios confirmados por el proveedor · ordenados por precio total ascendente</p>
+          ${renderTable(responded.map((q) => renderQuotationRow(q, true)).join(''), 'Respuestas de proveedores')}
+        </div>
+      `);
+    }
+
+    if (catalogOnly.length) {
+      sections.push(`
+        <div class="stack-section">
+          <h4 style="margin:0 0 0.5rem;">Precio histórico de catálogo</h4>
+          <p class="muted" style="margin:0 0 0.75rem;font-size:0.85rem;">Estos proveedores aún no han enviado una cotización para esta solicitud. Los precios mostrados son los últimos registrados en el sistema y no están confirmados.</p>
+          ${renderTable(catalogOnly.map((q) => renderQuotationRow(q, false)).join(''), 'Precios de catálogo sin respuesta')}
+        </div>
+      `);
+    }
+
+    return sections.join('');
   }
 
   function renderCreatePoSummary(selection, items) {

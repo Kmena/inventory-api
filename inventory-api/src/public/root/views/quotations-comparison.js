@@ -177,7 +177,12 @@
         }
 
         section.removeAttribute('hidden');
-        summaryEl.textContent = `${quotations.length} proveedor(es) con respuesta · ordenados por precio total ascendente`;
+        const respondedCount = quotations.filter((q) => q.responseSource).length;
+        const catalogCount = quotations.length - respondedCount;
+        const parts = [];
+        if (respondedCount) parts.push(`${respondedCount} con respuesta`);
+        if (catalogCount) parts.push(`${catalogCount} solo precio histórico`);
+        summaryEl.textContent = parts.join(' · ');
         tableRegion.innerHTML = renderers.renderComparisonTable(quotations);
         bindSelectButtons();
       } catch (_error) {

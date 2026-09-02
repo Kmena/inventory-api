@@ -298,19 +298,23 @@ test('comparison renderers produce scannable comparison table and PO summary', (
   const rootShellWithComparison = createViewHarness();
   const renderers = rootShellWithComparison.require('views.quotationsComparisonRenderers');
 
+  // responseSource drives which section a row appears in.
+  // Rows with a responseSource → "Respuestas recibidas" (selectable).
+  // Rows without → "Precio histórico de catálogo" (read-only reference).
   const quotations = [
-    { id: 1, supplier: { name: 'Proveedor A' }, reference: 'QUOT-001', currency: 'CRC', totalAmount: 120000, averageLeadTimeDays: 7, source: 'Manual' },
-    { id: 2, supplier: { name: 'Proveedor B' }, reference: 'QUOT-002', currency: 'USD', totalAmount: 245, averageLeadTimeDays: 12, source: 'Portal' },
+    { id: 1, supplier: { name: 'Proveedor A' }, reference: 'QUOT-001', currency: 'CRC', totalAmount: 120000, averageLeadTimeDays: 7, responseSource: 'DIRECT_ENTRY', items: [] },
+    { id: 2, supplier: { name: 'Proveedor B' }, reference: 'QUOT-002', currency: 'USD', totalAmount: 245, averageLeadTimeDays: 12, responseSource: null, items: [] },
   ];
 
   const tableHtml = renderers.renderComparisonTable(quotations);
   assert.match(tableHtml, /Proveedor A/, 'table must include supplier A');
-  assert.match(tableHtml, /Proveedor B/, 'table must include supplier B');
+  assert.match(tableHtml, /Proveedor B/, 'table must include supplier B in catalog section');
   assert.match(tableHtml, /QUOT-001/, 'table must include reference');
-  assert.match(tableHtml, /Seleccionar este proveedor/, 'table must include action button');
+  assert.match(tableHtml, /Seleccionar este proveedor/, 'responded row must have action button');
   assert.match(tableHtml, /data-quotation-id/, 'button must carry quotation id data attribute');
-  assert.doesNotMatch(tableHtml, /Origen/, 'Origen column is not rendered — responseSource is not in comparison serializer');
-  assert.match(tableHtml, /7 días/, 'lead time must be rendered');
+  assert.match(tableHtml, /Registr/, 'catalog row must show prompt instead of select button');
+  assert.match(tableHtml, /Respuestas recibidas/, 'table must have responded section heading');
+  assert.match(tableHtml, /7 d/, 'lead time must be rendered');
 
   const selection = {
     currency: 'CRC',
