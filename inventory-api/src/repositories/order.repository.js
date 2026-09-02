@@ -90,6 +90,24 @@ async function updateOrder(id, companyId, data) {
   });
 }
 
+/**
+ * Like updateOrder but uses prisma.order.update (singular) which supports
+ * nested relation writes (e.g. items: { deleteMany, create }).
+ * companyId ownership must be validated by the caller before invoking this.
+ */
+async function updateOrderWithRelations(id, data) {
+  try {
+    return await prisma.order.update({
+      where: { id },
+      data,
+      include: includeOrder(),
+    });
+  } catch (err) {
+    if (err.code === 'P2025') return null; // record not found
+    throw err;
+  }
+}
+
 async function deleteOrder(id, companyId) {
   return prisma.$transaction(async (tx) => {
     const existingOrder = await tx.order.findFirst({
@@ -220,6 +238,7 @@ module.exports = {
   countCompanyProducts,
   createOrder,
   updateOrder,
+  updateOrderWithRelations,
   deleteOrder,
   findApprovedOrdersForDispatch,
   findOrderWithAllocations,

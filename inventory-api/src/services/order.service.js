@@ -302,10 +302,15 @@ async function updateOrderAsAgent(id, payload, companyId) {
   if (payload.notes !== undefined) data.notes = payload.notes;
   if (payload.responsible !== undefined) data.responsible = payload.responsible;
   if (payload.items) {
+    // updateMany doesn't support nested relation writes — use update (singular) instead.
     data.items = { deleteMany: {}, create: toOrderItemsCreate(payload.items) };
   }
-  const updated = await orderRepository.updateOrder(id, companyId, data);
+  const updated = await orderRepository.updateOrderWithRelations(id, data);
   if (!updated) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  // Verify the order belongs to this company (ownership check after update).
+  if (String(updated.companyId) !== String(companyId)) {
+    throw createHttpError(403, 'No tenés acceso a este pedido', 'forbidden');
+  }
   return updated;
 }
 
