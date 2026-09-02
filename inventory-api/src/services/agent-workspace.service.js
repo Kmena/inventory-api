@@ -392,6 +392,32 @@ async function createAgentPayment(storeId, payload, auth, req) {
   return createPaymentCore(normalizedPayload, context.companyId, auth, req);
 }
 
+/**
+ * Agent corrects a REJECTED order and resubmits it in one step.
+ * Uses agent.workspace.access — no order.update permission required.
+ * @param {string|bigint} orderId
+ * @param {any} payload  Same shape as createAgentStoreOrder payload.
+ * @param {any} auth
+ */
+async function correctAndResubmitAgentOrder(orderId, payload, auth) {
+  const context = await getAgentContext(auth);
+  const order   = await orderService.getOrderForAgent(orderId, context.companyId, context.userId);
+
+  if (order.status !== 'REJECTED') {
+    throw createHttpError(409, 'Solo se pueden corregir pedidos devueltos (estado REJECTED)', 'conflict');
+  }
+  if (!payload.items?.length) {
+    throw createHttpError(400, 'Debe incluir al menos un producto', 'validation_error');
+  }
+
+  const sellableProducts = await getAgentSellableProductSnapshot(context.companyId, [], { requireWarehouse: true });
+  assertAgentOrderItemsAvailable(payload.items, sellableProducts);
+
+  // Update items + fields, then flip back to DRAFT (resubmit).
+  await orderService.updateOrderAsAgent(orderId, payload, context.companyId);
+  return orderService.resubmitOrder(orderId, auth);
+}
+
 module.exports = {
   listAgentDashboard,
   listAgentStores,
@@ -403,6 +429,7 @@ module.exports = {
   getAgentStoreSellableProducts,
   getAgentStoreOrderContext,
   createAgentStoreOrder,
+  correctAndResubmitAgentOrder,
   listAgentOrders,
   createAgentPayment,
 };

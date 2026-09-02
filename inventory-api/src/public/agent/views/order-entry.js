@@ -479,9 +479,8 @@ async function render(containerEl, session, params) {
       try {
         let orderNumber;
         if (orderId) {
-          // Edit mode: update the existing REJECTED order then resubmit it
-          await api.updateOrderItems(session, orderId, payload);
-          await api.resubmitOrder(session, orderId);
+          // Edit mode: correct + resubmit in one agent-scoped call (no order.update perm needed)
+          await api.correctAndResubmitOrder(session, orderId, payload);
           orderNumber = orderId;
         } else {
           const response = await api.postOrder(session, storeId, payload);

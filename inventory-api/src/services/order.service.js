@@ -279,11 +279,43 @@ async function getOrderForDispatch(id, auth) {
   return order;
 }
 
+/**
+ * Fetch a specific order scoped by companyId + userId (for agent self-service).
+ * Throws 404 if not found or doesn't belong to this agent.
+ */
+async function getOrderForAgent(id, companyId, userId) {
+  const order = await orderRepository.findOrderById(id, companyId);
+  if (!order) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  if (String(order.userId) !== String(userId)) {
+    throw createHttpError(403, 'No tenés acceso a este pedido', 'forbidden');
+  }
+  return order;
+}
+
+/**
+ * Update order items without full auth policy check — used by agent correction flow.
+ * Only updates items and basic fields; does not change status.
+ */
+async function updateOrderAsAgent(id, payload, companyId) {
+  const data = {};
+  if (payload.paymentCondition) data.paymentCondition = payload.paymentCondition;
+  if (payload.notes !== undefined) data.notes = payload.notes;
+  if (payload.responsible !== undefined) data.responsible = payload.responsible;
+  if (payload.items) {
+    data.items = { deleteMany: {}, create: toOrderItemsCreate(payload.items) };
+  }
+  const updated = await orderRepository.updateOrder(id, companyId, data);
+  if (!updated) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+  return updated;
+}
+
 module.exports = {
   listOrders,
   getOrder,
+  getOrderForAgent,
   createOrder,
   updateOrder,
+  updateOrderAsAgent,
   approveOrder,
   rejectOrder,
   resubmitOrder,

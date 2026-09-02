@@ -103,14 +103,15 @@ async function postPayment(session, storeId, payload) {
 }
 
 /**
- * PATCH /api/orders/:id — update items/fields of an existing REJECTED order before resubmitting.
+ * POST /api/agent/orders/:id/correct — update + resubmit a REJECTED order in one step.
+ * Uses agent.workspace.access — no order.update permission needed.
  * @param {any} session
  * @param {string|number} orderId
- * @param {any} payload
+ * @param {any} payload  Same shape as postOrder.
  */
-async function updateOrderItems(session, orderId, payload) {
-  return inventoryAuth.fetchJson(session, `/api/orders/${encodeURIComponent(orderId)}`, {
-    method: 'PATCH',
+async function correctAndResubmitOrder(session, orderId, payload) {
+  return inventoryAuth.fetchJson(session, `${BASE}/orders/${encodeURIComponent(orderId)}/correct`, {
+    method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -136,7 +137,7 @@ AgentShell.register('api.agentApi', {
   fetchStoreDetail,
   fetchOrderContext,
   fetchOrders,
-  updateOrderItems,
+  correctAndResubmitOrder,
   resubmitOrder,
   postVisit,
   postOrder,

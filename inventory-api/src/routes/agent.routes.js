@@ -95,6 +95,15 @@ router.get('/orders', authorizeAccessPolicy('agent.workspace.access'), async (re
   }
 });
 
+// Agent corrects a REJECTED order and resubmits it atomically (no order.update perm needed).
+router.post('/orders/:orderId/correct', authorizeAccessPolicy('agent.workspace.access'), validate(createAgentOrderSchema), async (req, res, next) => {
+  try {
+    return res.json(await agentWorkspaceService.correctAndResubmitAgentOrder(parseBigIntId(req.params.orderId, 'orderId'), req.body, req.auth));
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/stores/:storeId/orders', authorizeAccessPolicy('agent.workspace.access'), validate(createAgentOrderSchema), async (req, res, next) => {
   try {
     return res.status(201).json(await agentWorkspaceService.createAgentStoreOrder(parseBigIntId(req.params.storeId, 'storeId'), req.body, req.auth));

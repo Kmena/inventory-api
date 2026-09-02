@@ -302,6 +302,15 @@
     },
     {
       "method": "POST",
+      "mountPath": "/api/agent",
+      "expressPath": "/orders/:orderId/correct",
+      "routeFile": "src/routes/agent.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "agent-self-service-outside-current-openapi-baseline",
+      "reason": "Endpoint de corrección y reenvío de pedidos rechazados para agentes. Usa agent.workspace.access; fuera del contrato OpenAPI parcial actual."
+    },
+    {
+      "method": "POST",
       "mountPath": "/api/orders",
       "expressPath": "/:id/resubmit",
       "routeFile": "src/routes/order.routes.js",
