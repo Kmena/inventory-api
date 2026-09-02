@@ -507,10 +507,20 @@ async function compareSupplierQuotations(purchaseRequestId, auth) {
     }))
     .sort((left, right) => left.totalAmount - right.totalAmount);
 
+  // Collect productIds that already have an active (non-CANCELLED) purchase order
+  // for this request. The matrix uses this to lock those rows and prevent duplicate OCs.
+  const activePurchaseOrders = (request.purchaseOrders || []).filter((po) => po.status !== 'CANCELLED');
+  const activeOrderedProductIds = [
+    ...new Set(
+      activePurchaseOrders.flatMap((po) => (po.items || []).map((item) => String(item.productId))),
+    ),
+  ];
+
   return {
     purchaseRequestId: request.id,
     requestTitle: request.title,
     quotations,
+    activeOrderedProductIds,
   };
 }
 

@@ -173,6 +173,7 @@
       try {
         const data = await quotationsApi.getComparisonData(session, requestId);
         const quotations = Array.isArray(data.quotations) ? data.quotations : [];
+        const activeOrderedProductIds = new Set(data.activeOrderedProductIds || []);
 
         if (!quotations.length) {
           section.hidden = true;
@@ -191,9 +192,16 @@
 
         if (responded.length >= 2) {
           // Multiple suppliers → show product matrix for line-level selection
+          const hasLocked = activeOrderedProductIds.size > 0;
+          const lockedBanner = hasLocked
+            ? `<div style="background:#fef9c3;border:1px solid #fde047;border-radius:6px;padding:0.6rem 0.75rem;margin-bottom:0.75rem;font-size:0.82rem;">
+                ⚠️ Las filas en gris ya tienen una OC activa — no se pueden volver a seleccionar para evitar duplicados.
+               </div>`
+            : '';
           tableRegion.innerHTML = `
             <p class="muted" style="font-size:0.85rem;margin:0 0 0.75rem;">Seleccioná el proveedor más conveniente por cada línea de producto. El precio más bajo está pre-seleccionado en verde.</p>
-            ${renderers.renderProductMatrix(responded)}
+            ${lockedBanner}
+            ${renderers.renderProductMatrix(responded, activeOrderedProductIds)}
             ${catalogOnly.length ? '<div style="margin-top:1.5rem;">' + buildCatalogSection(catalogOnly) + '</div>' : ''}
           `;
           updateMatrixFooter();
@@ -221,9 +229,9 @@
       const matrixFooter = tableRegion.querySelector('#quotations-matrix-footer');
       if (!matrixFooter) return;
 
-      // Aggregate selected lines by quotation
+      // Aggregate selected lines by quotation (skip locked/disabled rows)
       const byQuotation = new Map(); // quotationId → { supplierName, currency, totalAmount, itemCount }
-      const radios = tableRegion.querySelectorAll('.quotations-matrix-radio:checked');
+      const radios = tableRegion.querySelectorAll('.quotations-matrix-radio:checked:not([disabled])');
       radios.forEach((radio) => {
         const qid = radio.getAttribute('data-quotation-id');
         const qty = Number(radio.getAttribute('data-quantity') || 0);
@@ -261,9 +269,9 @@
 
     function openMixedConfirmDialog() {
       if (!canManage) return;
-      // Build a summary of the current matrix selection
+      // Build a summary of the current matrix selection (skip locked/disabled rows)
       const lines = [];
-      tableRegion.querySelectorAll('.quotations-matrix-radio:checked').forEach((radio) => {
+      tableRegion.querySelectorAll('.quotations-matrix-radio:checked:not([disabled])').forEach((radio) => {
         lines.push({
           productId: radio.getAttribute('data-product-id'),
           quotationId: radio.getAttribute('data-quotation-id'),

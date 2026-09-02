@@ -198,7 +198,11 @@
    * @param {object[]} respondedQuotations - Cotizaciones con responseSource != null
    * @returns {string} HTML
    */
-  function renderProductMatrix(respondedQuotations) {
+  /**
+   * @param {any[]} respondedQuotations
+   * @param {Set<string>} [lockedProductIds] - products already covered by an active OC
+   */
+  function renderProductMatrix(respondedQuotations, lockedProductIds = new Set()) {
     if (!respondedQuotations || !respondedQuotations.length) return '';
 
     // Build set of all products across all quotations
@@ -241,19 +245,27 @@
 
     // Product rows
     const productRows = [...productMap.entries()].map(([pid, product]) => {
+      const isLocked = lockedProductIds.has(pid);
+      const rowStyle = isLocked
+        ? 'opacity:0.45;background:#f3f4f6;pointer-events:none;'
+        : '';
+      const lockedBadge = isLocked
+        ? `<span class="badge" style="font-size:0.65rem;background:#d1d5db;color:#374151;margin-left:0.4rem;" title="Ya tiene OC activa">OC activa</span>`
+        : '';
+
       const cells = respondedQuotations.map((q) => {
         const item = (q.items || []).find((i) => String(i.productId) === pid);
         if (!item) {
           return `<td style="text-align:center;color:var(--muted-color,#9ca3af);">—</td>`;
         }
         const qid = String(q.id);
-        const defaultChecked = cheapestByProduct.get(pid) === qid ? 'checked' : '';
+        const defaultChecked = !isLocked && cheapestByProduct.get(pid) === qid ? 'checked' : '';
         const isCheapest = cheapestByProduct.get(pid) === qid;
         const priceLabel = rootShellUi.escapeHtml(formatCurrency(item.unitPrice, q.currency));
         const leadLabel = item.leadTimeDays != null ? `${item.leadTimeDays}d` : '—';
         return `
           <td style="text-align:center;">
-            <label style="display:flex;flex-direction:column;align-items:center;gap:0.2rem;cursor:pointer;">
+            <label style="display:flex;flex-direction:column;align-items:center;gap:0.2rem;${isLocked ? '' : 'cursor:pointer;'}">
               <input
                 type="radio"
                 name="product-${rootShellUi.escapeHtml(pid)}"
@@ -265,16 +277,19 @@
                 data-currency="${rootShellUi.escapeHtml(q.currency || 'CRC')}"
                 class="quotations-matrix-radio"
                 ${defaultChecked}
+                ${isLocked ? 'disabled aria-disabled="true"' : ''}
               />
-              <strong style="font-size:0.8rem;${isCheapest ? 'color:var(--success-color,#16a34a);' : ''}">${priceLabel}</strong>
+              <strong style="font-size:0.8rem;${isCheapest && !isLocked ? 'color:var(--success-color,#16a34a);' : ''}">${priceLabel}</strong>
               <span class="badge" style="font-size:0.65rem;">${rootShellUi.escapeHtml(leadLabel)}</span>
             </label>
           </td>
         `;
       }).join('');
       return `
-        <tr>
-          <td style="font-weight:600;white-space:nowrap;">${rootShellUi.escapeHtml(product.name)}</td>
+        <tr style="${rowStyle}">
+          <td style="font-weight:600;white-space:nowrap;">
+            ${rootShellUi.escapeHtml(product.name)}${lockedBadge}
+          </td>
           ${cells}
         </tr>
       `;
