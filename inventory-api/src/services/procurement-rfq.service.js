@@ -622,7 +622,10 @@ async function getRfqTrackingSummary(auth) {
       const relatedInvitation = invitations.find((invitation) => String(invitation.quotationId) === String(quotation.id));
       // Distinguish direct-entry quotations (tagged with evidence._source) from
       // catalog-assisted ones (evidence: null). Only the former count as responses.
-      const isDirectEntry = quotation.evidence?._source === 'DIRECT_ENTRY';
+      // Cast to any-typed object to safely read the _source meta-key we embed;
+      // evidence is JsonValue (Prisma) so TS won't infer object properties directly.
+      const evidenceMeta = /** @type {Record<string, unknown>|null} */ (quotation.evidence && typeof quotation.evidence === 'object' && !Array.isArray(quotation.evidence) ? quotation.evidence : null);
+      const isDirectEntry = evidenceMeta?._source === 'DIRECT_ENTRY';
       const responseSource = relatedInvitation?.responseSource || (isDirectEntry ? 'DIRECT_ENTRY' : null);
       return {
         ...serializeQuotationResponseSummary(quotation, responseSource),

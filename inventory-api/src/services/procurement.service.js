@@ -117,7 +117,15 @@ function serializeSupplierQuotation(quotation) {
     currency: quotation.currency,
     notes: quotation.notes,
     // Evidence may be a tagged object { _source, data? } or a legacy raw value.
-    evidence: quotation.evidence?._source ? (quotation.evidence.data ?? null) : quotation.evidence,
+    // Narrow JsonValue to plain object before accessing our meta-key.
+    evidence: (() => {
+      const ev = quotation.evidence;
+      if (ev && typeof ev === 'object' && !Array.isArray(ev)) {
+        const meta = /** @type {Record<string, unknown>} */ (ev);
+        return meta._source ? (meta.data ?? null) : ev;
+      }
+      return ev;
+    })(),
     status: quotation.status,
     submittedAt: quotation.submittedAt,
     createdAt: quotation.createdAt,
@@ -442,7 +450,11 @@ async function compareSupplierQuotations(purchaseRequestId, auth) {
   // Separate catalog-assisted (evidence._source absent → null evidence) from
   // actual responses (evidence._source === 'DIRECT_ENTRY', or linked to an RFQ
   // invitation via rfqInvitations relation).
-  const isActualResponse = (q) => q.evidence?._source === 'DIRECT_ENTRY' || (q.rfqInvitations?.length > 0);
+  // evidence is JsonValue; narrow to plain object before reading our _source meta-key.
+  const getEvidenceMeta = (q) => (q.evidence && typeof q.evidence === 'object' && !Array.isArray(q.evidence)
+    ? /** @type {Record<string, unknown>} */ (q.evidence)
+    : null);
+  const isActualResponse = (q) => getEvidenceMeta(q)?._source === 'DIRECT_ENTRY' || (q.rfqInvitations?.length > 0);
 
   // Group by supplierId. For each supplier, prefer actual responses over catalog-
   // assisted ones. If a supplier only has catalog-assisted quotations, keep those
