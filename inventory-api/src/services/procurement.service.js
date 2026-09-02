@@ -116,7 +116,8 @@ function serializeSupplierQuotation(quotation) {
     reference: quotation.reference,
     currency: quotation.currency,
     notes: quotation.notes,
-    evidence: quotation.evidence,
+    // Evidence may be a tagged object { _source, data? } or a legacy raw value.
+    evidence: quotation.evidence?._source ? (quotation.evidence.data ?? null) : quotation.evidence,
     status: quotation.status,
     submittedAt: quotation.submittedAt,
     createdAt: quotation.createdAt,
@@ -400,6 +401,11 @@ async function createSupplierQuotation(purchaseRequestId, payload, auth) {
     }
   }
 
+  // Tag the evidence JSON with _source so tracking logic can distinguish
+  // direct-entry quotations from catalog-assisted ones (which have evidence: null).
+  const evidencePayload = payload.evidence ? toSnapshotValue(payload.evidence) : null;
+  const evidenceWithMeta = { _source: 'DIRECT_ENTRY', ...(evidencePayload ? { data: evidencePayload } : {}) };
+
   const quotation = await procurementRepository.createSupplierQuotation({
     companyId: scope.companyId,
     purchaseRequestId: request.id,
@@ -408,7 +414,7 @@ async function createSupplierQuotation(purchaseRequestId, payload, auth) {
     reference: normalizeOptionalText(payload.reference),
     currency: payload.currency?.trim() || 'CRC',
     notes: normalizeOptionalText(payload.notes),
-    evidence: toSnapshotValue(payload.evidence),
+    evidence: evidenceWithMeta,
     items: {
       create: payload.items.map((item) => ({
         productId: item.productId,

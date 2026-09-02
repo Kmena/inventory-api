@@ -620,14 +620,19 @@ async function getRfqTrackingSummary(auth) {
 
     const serializedQuotations = (req.quotations || []).map((quotation) => {
       const relatedInvitation = invitations.find((invitation) => String(invitation.quotationId) === String(quotation.id));
+      // Distinguish direct-entry quotations (tagged with evidence._source) from
+      // catalog-assisted ones (evidence: null). Only the former count as responses.
+      const isDirectEntry = quotation.evidence?._source === 'DIRECT_ENTRY';
+      const responseSource = relatedInvitation?.responseSource || (isDirectEntry ? 'DIRECT_ENTRY' : null);
       return {
-        ...serializeQuotationResponseSummary(quotation, relatedInvitation?.responseSource || null),
+        ...serializeQuotationResponseSummary(quotation, responseSource),
         invitationId: relatedInvitation?.id || null,
         invitationStatus: relatedInvitation?.status || null,
       };
     });
 
     const respondedInvitations = serializedInvitations.filter((invitation) => invitation.status === 'RESPONDED');
+    const directEntryCount = serializedQuotations.filter((q) => q.responseSource === 'DIRECT_ENTRY').length;
 
     return {
       purchaseRequestId: req.id,
@@ -641,6 +646,7 @@ async function getRfqTrackingSummary(auth) {
       respondedInvitationCount: respondedInvitations.length,
       manualResponseCount: respondedInvitations.filter((invitation) => invitation.responseSource === 'MANUAL_OFFICE_EMAIL').length,
       publicResponseCount: respondedInvitations.filter((invitation) => invitation.responseSource === 'PUBLIC_TOKEN').length,
+      directEntryCount,
       items: (req.items || []).map((item) => ({
         id: item.id,
         productId: item.productId,

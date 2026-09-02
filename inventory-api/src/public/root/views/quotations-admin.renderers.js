@@ -329,9 +329,10 @@
         </div>
         <div class="tag-list">
           <span class="badge ${hasInvitations ? 'badge-info' : ''}">${rootShellUi.escapeHtml(hasInvitations ? `Invitaciones: ${activeRequest.invitations?.length || 0}` : 'Sin invitaciones')}</span>
-          <span class="badge badge-success">${rootShellUi.escapeHtml(`Respuestas: ${activeRequest.respondedInvitationCount || 0}`)}</span>
+          <span class="badge badge-success">${rootShellUi.escapeHtml(`Respondidas: ${activeRequest.respondedInvitationCount || 0}`)}</span>
           <span class="badge">${rootShellUi.escapeHtml(`Manual: ${activeRequest.manualResponseCount || 0}`)}</span>
           <span class="badge">${rootShellUi.escapeHtml(`Pública: ${activeRequest.publicResponseCount || 0}`)}</span>
+          <span class="badge badge-info">${rootShellUi.escapeHtml(`Ingresadas: ${activeRequest.directEntryCount || 0}`)}</span>
         </div>
         <p class="muted">${rootShellUi.escapeHtml(hasInvitations ? 'Solicitud activa: continúa con invitaciones y consulta respuestas sin salir del workspace.' : 'Esta solicitud todavía no tiene invitaciones RFQ. Genera invitaciones para solicitar respuesta a los proveedores seleccionados.')}</p>
       </div>
@@ -350,6 +351,7 @@
           <span class="badge">${rootShellUi.escapeHtml(`Productos cotizados: ${summary.quotedProductCount}`)}</span>
           <span class="badge">${rootShellUi.escapeHtml(`Manual: ${summary.manualResponseCount}`)}</span>
           <span class="badge">${rootShellUi.escapeHtml(`Pública: ${summary.publicResponseCount}`)}</span>
+          <span class="badge badge-info">${rootShellUi.escapeHtml(`Ingresadas: ${summary.directEntryCount || 0}`)}</span>
         </div>
       </div>
     `;

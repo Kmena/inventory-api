@@ -19,20 +19,39 @@
     }
   }
 
+  function renderItemsList(items, currency) {
+    if (!items || !items.length) return '<p class="muted" style="margin:0.25rem 0 0;">Sin productos detallados.</p>';
+    return items.map((item) => {
+      const name = item.product?.name || item.productName || `Producto #${item.productId}`;
+      const qty  = Number(item.quantity || 0);
+      const up   = Number(item.unitPrice || 0);
+      const lead = item.leadTimeDays != null ? `${item.leadTimeDays}d` : '—';
+      return `<span style="display:flex;gap:0.5rem;font-size:0.8rem;padding:0.1rem 0;">
+        <strong style="flex:1;">${rootShellUi.escapeHtml(name)}</strong>
+        <span class="muted">${rootShellUi.escapeHtml(String(qty))} u · ${rootShellUi.escapeHtml(formatCurrency(up, currency))}</span>
+        <span class="badge" style="font-size:0.7rem;padding:0 0.3rem;">${rootShellUi.escapeHtml(lead)}</span>
+      </span>`;
+    }).join('');
+  }
+
   function renderComparisonTable(quotations) {
     if (!quotations || !quotations.length) {
       return '<p class="empty-state">No hay cotizaciones con respuesta para comparar.</p>';
     }
 
     const rows = quotations.map((q) => {
-      const supplierName = q.supplier?.name || '—';
+      const supplierName = q.supplier?.name || q.supplierName || '—';
       const leadTime = q.averageLeadTimeDays != null
         ? `${Math.round(q.averageLeadTimeDays)} días`
         : '—';
+      const itemsHtml = renderItemsList(q.items, q.currency);
 
       return `
         <tr>
-          <td data-label="Proveedor"><strong>${rootShellUi.escapeHtml(supplierName)}</strong></td>
+          <td data-label="Proveedor">
+            <strong>${rootShellUi.escapeHtml(supplierName)}</strong>
+            <div style="margin-top:0.4rem;">${itemsHtml}</div>
+          </td>
           <td data-label="Referencia"><span class="badge badge-info">${rootShellUi.escapeHtml(q.reference || '—')}</span></td>
           <td data-label="Moneda">${rootShellUi.escapeHtml(q.currency || '—')}</td>
           <td data-label="Precio total"><strong>${rootShellUi.escapeHtml(formatCurrency(q.totalAmount, q.currency))}</strong></td>
@@ -57,7 +76,7 @@
         <table aria-label="Comparación de cotizaciones por proveedor">
           <thead>
             <tr>
-              <th scope="col">Proveedor</th>
+              <th scope="col">Proveedor · Productos</th>
               <th scope="col">Referencia</th>
               <th scope="col">Moneda</th>
               <th scope="col">Precio total ↑</th>
