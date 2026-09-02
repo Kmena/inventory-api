@@ -347,10 +347,14 @@ async function listAgentOrders(auth) {
       paymentCondition: order.paymentCondition,
       storeName: order.clientStore?.name || null,
       clientName: order.client?.name || null,
+      clientStoreId: order.clientStoreId ?? null,
       itemCount: (order.items || []).length,
-      // Rejection info — present only when status === 'REJECTED'
+      // Rejection info + editable items — present only when status === 'REJECTED'
       rejectionReason: order.rejectionReason ?? null,
       rejectedAt: order.rejectedAt ?? null,
+      existingItems: order.status === 'REJECTED'
+        ? (order.items || []).map((item) => ({ productId: String(item.productId), quantity: Number(item.quantity) }))
+        : undefined,
     })),
   };
 }

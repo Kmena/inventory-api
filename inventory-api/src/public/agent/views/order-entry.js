@@ -47,12 +47,12 @@ function renderProductRow(product, qty) {
 
 // ─── SuccessOverlay ───────────────────────────────────────────────────────────
 
-function renderSuccessOverlay(orderNumber, storeId) {
+function renderSuccessOverlay(orderNumber, storeId, title = '¡Pedido creado!') {
   return `
     <div class="agent-success-overlay" id="order-success-overlay">
       <div class="agent-success-card">
         <div style="font-size:3rem;">✅</div>
-        <h2 style="margin:0;font-size:1.3rem;">¡Pedido creado!</h2>
+        <h2 style="margin:0;font-size:1.3rem;">${AgentShell.require('helpers').escapeHtml(title)}</h2>
         <p style="margin:0;color:#64748b;">Número de pedido: <strong>#${AgentShell.require('helpers').escapeHtml(String(orderNumber || '—'))}</strong></p>
         <div style="display:grid;gap:8px;margin-top:8px;">
           <button type="button" id="order-success-to-store" class="btn" data-store-id="${AgentShell.require('helpers').escapeHtml(String(storeId))}">Ver ficha de tienda</button>
@@ -65,7 +65,9 @@ function renderSuccessOverlay(orderNumber, storeId) {
 // ─── Render principal ─────────────────────────────────────────────────────────
 
 async function render(containerEl, session, params) {
-  const storeId  = params?.storeId;
+  const storeId       = params?.storeId;
+  const orderId       = params?.orderId    || null;   // present when correcting a REJECTED order
+  const existingItems = params?.existingItems || [];  // [{ productId, quantity }] pre-fill
   const api      = AgentShell.require('api.agentApi');
   const state    = AgentShell.require('state');
   const helpers  = AgentShell.require('helpers');
@@ -108,8 +110,13 @@ async function render(containerEl, session, params) {
   }
 
   // Fuente de verdad de cantidades (Map<productId, qty>)
+  // Pre-fill from existingItems when correcting a rejected order.
   const qtyMap = new Map();
   products.forEach((p) => qtyMap.set(String(p.id), 0));
+  existingItems.forEach(({ productId, quantity }) => {
+    const pid = String(productId);
+    if (qtyMap.has(pid)) qtyMap.set(pid, Number(quantity) || 0);
+  });
 
   let visibleProducts = products.slice();
   let searchQuery = '';
@@ -167,7 +174,7 @@ async function render(containerEl, session, params) {
       </div>
       <header class="agent-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:0;">
         <button type="button" id="order-back-btn" class="secondary-button">← Volver</button>
-        <h1 style="margin:0;font-size:1.2rem;flex:1;">Nuevo pedido</h1>
+        <h1 style="margin:0;font-size:1.2rem;flex:1;">${orderId ? 'Corregir pedido' : 'Nuevo pedido'}</h1>
       </header>
 
       <div id="order-error-banner" hidden class="agent-error-banner"></div>
@@ -234,7 +241,7 @@ async function render(containerEl, session, params) {
         <div style="font-size:0.75rem;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">Total estimado</div>
         <span class="agent-summary-bar__total" id="order-total-value">${helpers.currency(0)}</span>
       </div>
-      <button type="button" id="order-confirm-btn" class="btn" disabled>Confirmar pedido</button>
+      <button type="button" id="order-confirm-btn" class="btn" disabled>${orderId ? 'Reenviar pedido' : 'Confirmar pedido'}</button>
     </div>`;
 
   // ─── Binding de eventos ───────────────────────────────────────────────────
@@ -468,13 +475,23 @@ async function render(containerEl, session, params) {
       if (errorBanner) errorBanner.hidden = true;
 
       try {
-        const response = await api.postOrder(session, storeId, payload);
-        const order = response?.order || response;
-        const orderNumber = order?.orderNumber || order?.id;
+        let orderNumber;
+        if (orderId) {
+          // Edit mode: update the existing REJECTED order then resubmit it
+          await api.updateOrderItems(session, orderId, payload);
+          await api.resubmitOrder(session, orderId);
+          orderNumber = orderId;
+        } else {
+          const response = await api.postOrder(session, storeId, payload);
+          const order = response?.order || response;
+          orderNumber = order?.orderNumber || order?.id;
+        }
 
         // SuccessOverlay — no responde a Escape ni click fuera (ADR-006)
         const overlayEl = document.createElement('div');
-        overlayEl.innerHTML = renderSuccessOverlay(orderNumber, storeId);
+        overlayEl.innerHTML = orderId
+          ? renderSuccessOverlay(orderNumber, storeId, '¡Pedido reenviado!')
+          : renderSuccessOverlay(orderNumber, storeId);
         const overlayNode = overlayEl.firstElementChild;
         document.body.appendChild(overlayNode);
 
@@ -499,7 +516,7 @@ async function render(containerEl, session, params) {
           errorBanner.textContent = err.message || 'No se pudo crear el pedido. Intenta de nuevo.';
           errorBanner.hidden = false;
         }
-        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Confirmar pedido'; }
+        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = orderId ? 'Reenviar pedido' : 'Confirmar pedido'; }
         // Restore payment condition visibility after network error
         updatePaymentConditionVisibility();
         recalcTotal(); // re-evalúa disabled según qtyMap

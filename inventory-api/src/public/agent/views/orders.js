@@ -33,6 +33,8 @@ function renderOrderCard(order) {
       <p style="margin:0;font-size:.83rem;color:#7F1D1D;">${h.escapeHtml(order.rejectionReason || 'Sin motivo especificado')}</p>
       <button type="button" class="agent-resubmit-btn btn"
               data-order-id="${h.escapeHtml(String(order.id))}"
+              data-store-id="${h.escapeHtml(String(order.clientStoreId || ''))}"
+              data-existing-items="${h.escapeHtml(JSON.stringify(order.existingItems || []))}"
               style="margin-top:10px;background:#2563EB;font-size:.85rem;width:100%;">
         ✏️ Corregir y reenviar
       </button>
@@ -107,21 +109,14 @@ async function render(containerEl, session, _params) {
           </div>
         </div>`;
 
-      // Wire resubmit buttons
+      // Resubmit buttons → open order-entry in edit mode so agent can correct before resubmitting
       containerEl.querySelectorAll('.agent-resubmit-btn').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const orderId = btn.getAttribute('data-order-id');
-          btn.disabled = true;
-          btn.textContent = 'Enviando…';
-          try {
-            await api.resubmitOrder(session, orderId);
-            // Reload orders so the card reflects DRAFT status
-            await render(containerEl, session, _params);
-          } catch (err) {
-            btn.disabled = false;
-            btn.textContent = '✏️ Corregir y reenviar';
-            alert(err.message || 'Error al reenviar el pedido.');
-          }
+        btn.addEventListener('click', () => {
+          const orderId     = btn.getAttribute('data-order-id');
+          const storeId     = btn.getAttribute('data-store-id');
+          const itemsJson   = btn.getAttribute('data-existing-items');
+          const existingItems = itemsJson ? JSON.parse(itemsJson) : [];
+          navigate('order-entry', { storeId, orderId, existingItems });
         });
       });
     }
