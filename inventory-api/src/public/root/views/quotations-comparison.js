@@ -472,10 +472,10 @@
         section.hidden = true;
         setShellStatus('Orden(es) de compra creada(s) correctamente.');
       } catch (error) {
-        createPoMessage.innerHTML = rootShellUi.renderInlineMessage(
-          error.message || 'Error al crear la(s) orden(es) de compra.',
-          'error',
-        );
+        const msg = error.message || 'Error al crear la(s) orden(es) de compra.';
+        // Scroll the dialog to top so the error is visible
+        createPoMessage.innerHTML = rootShellUi.renderInlineMessage(msg, 'error');
+        createPoMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } finally {
         createPoSubmit.disabled = false;
         createPoSubmit.textContent = 'Crear orden(es) de compra';

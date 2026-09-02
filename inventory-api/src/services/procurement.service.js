@@ -736,7 +736,10 @@ async function createPurchaseOrdersFromMixedSelections(purchaseRequestId, payloa
   const scope = assertCompanyScope(auth);
   const request = await procurementRepository.findPurchaseRequestByIdForCompany(purchaseRequestId, scope.companyId);
   if (!request) throw createHttpError(404, 'Solicitud de compra no encontrada', 'not_found');
-  if (request.status !== 'OPEN') throw createHttpError(409, 'La solicitud de compra no está abierta', 'conflict');
+  // Allow CLOSED as well: a partial previous attempt may have closed the request
+  // after creating only some POs. This endpoint is idempotent — it creates any
+  // outstanding POs and only re-closes the request when it's still OPEN.
+  if (request.status === 'CANCELLED') throw createHttpError(409, 'La solicitud de compra está cancelada', 'conflict');
 
   const notes = normalizeOptionalText(payload.notes);
   const createdOrders = [];
@@ -777,8 +780,11 @@ async function createPurchaseOrdersFromMixedSelections(purchaseRequestId, payloa
     createdOrders.push(serializePurchaseOrder(po));
   }
 
-  // Close the request once — after ALL orders are created successfully.
-  await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'CLOSED' });
+  // Close the request once — only if it is still OPEN (idempotent: a partial
+  // previous attempt may have already closed it).
+  if (request.status === 'OPEN') {
+    await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'CLOSED' });
+  }
 
   return { orders: createdOrders };
 }
