@@ -431,11 +431,32 @@ async function compareSupplierQuotations(purchaseRequestId, auth) {
     throw createHttpError(404, 'Solicitud de compra no encontrada', 'not_found');
   }
 
-  const quotations = ((/** @type {any} */ (request).quotations) || []).map(serializeSupplierQuotation)
-    .map((quotation) => ({
-      ...quotation,
-      averageLeadTimeDays: quotation.items.length > 0
-        ? quotation.items.reduce((sum, item) => sum + Number(item.leadTimeDays ?? 0), 0) / quotation.items.length
+  const raw = ((/** @type {any} */ (request).quotations) || []).map(serializeSupplierQuotation);
+
+  // Group by supplierId — a supplier can have multiple quotation records
+  // (e.g. one from RFQ invitation + one from direct entry). Merge them into a
+  // single comparison row: combined items, summed total, averaged lead time.
+  const bySupplier = new Map();
+  for (const q of raw) {
+    const key = String(q.supplierId);
+    if (bySupplier.has(key)) {
+      const merged = bySupplier.get(key);
+      merged.items = [...merged.items, ...q.items];
+      merged.totalAmount += q.totalAmount;
+      // Keep the most recent reference if different
+      if (q.reference && q.reference !== merged.reference) {
+        merged.reference = [merged.reference, q.reference].filter(Boolean).join(' / ');
+      }
+    } else {
+      bySupplier.set(key, { ...q, items: [...q.items] });
+    }
+  }
+
+  const quotations = [...bySupplier.values()]
+    .map((q) => ({
+      ...q,
+      averageLeadTimeDays: q.items.length > 0
+        ? q.items.reduce((sum, item) => sum + Number(item.leadTimeDays ?? 0), 0) / q.items.length
         : null,
     }))
     .sort((left, right) => left.totalAmount - right.totalAmount);
