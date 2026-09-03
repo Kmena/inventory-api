@@ -405,6 +405,7 @@ model User {
   auditEvents           AuditEvent[]            @relation("audit_event_actor")
   rfqInvitationsCreated SupplierQuotationInvitation[] @relation("rfq_invitation_created_by_user")
   rfqInvitationsManualResponse SupplierQuotationInvitation[] @relation("rfq_invitation_manual_response_by_user")
+  submittedPayments     Payment[]               @relation("payment_submitter")
 
   @@index([companyId, id])
   @@map("users")
@@ -1517,6 +1518,7 @@ model Payment {
   updatedAt         DateTime               @updatedAt @map("updated_at")
   invoice           Invoice                @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   receipts          PaymentReceipt[]
+  submittedByUser   User?                  @relation("payment_submitter", fields: [submittedByUserId], references: [id])
 
   @@index([invoiceId, status])
   @@index([status])

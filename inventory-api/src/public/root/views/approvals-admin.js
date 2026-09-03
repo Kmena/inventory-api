@@ -107,8 +107,8 @@ function renderOrderRow(order) {
         <button type="button" class="secondary-button approvals-reject-btn" data-order-id="${escapeHtml(String(order.id))}" style="color:#DC2626;border-color:#DC2626;flex:1;min-width:120px;">✗ Rechazar</button>
       </div>` : ''}
       ${isApproved ? `
-      <div style="display:flex;gap:8px;margin-top:12px;">
-        <button type="button" class="btn approvals-dispatch-btn" data-order-id="${escapeHtml(String(order.id))}" style="background:#2563EB;flex:1;min-width:120px;">🚚 Despachar</button>
+      <div style="margin-top:10px;padding:8px 12px;background:#EFF6FF;border-radius:8px;font-size:0.82rem;color:#1D4ED8;">
+        📦 Pedido aprobado — el despacho se confirma desde <strong>Bodega</strong>.
       </div>` : ''}
     </div>`;
 }
