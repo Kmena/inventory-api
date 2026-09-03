@@ -23,7 +23,7 @@ function buildPaymentInclude() {
       orderBy: buildReceiptsOrderBy(),
     },
     submittedByUser: {
-      select: { id: true, name: true, email: true },
+      select: { id: true, fullName: true, email: true },
     },
   });
 }

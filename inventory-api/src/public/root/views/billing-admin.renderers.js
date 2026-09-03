@@ -117,7 +117,7 @@
                 reference: pmt.reference || null,
                 invoiceNumber: pmt.invoice?.invoiceNumber || null,
                 clientName: pmt.invoice?.client?.name || pmt.clientName || null,
-                agentName: pmt.submittedByUser?.name || null,
+                agentName: pmt.submittedByUser?.fullName || null,
                 agentEmail: pmt.submittedByUser?.email || null,
                 submittedAt: pmt.submittedAt || pmt.createdAt || null,
               }))}">
