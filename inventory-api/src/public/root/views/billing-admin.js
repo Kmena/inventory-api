@@ -309,16 +309,86 @@
       }
     }
 
+    /**
+     * Shows a confirmation modal with payment details before approving.
+     * @param {any} pmt  — parsed payment summary from data-payment attribute
+     * @returns {Promise<string|null>}  — receiver note or null if cancelled
+     */
+    function showApproveConfirmModal(pmt) {
+      return new Promise((resolve) => {
+        const existing = document.getElementById('billing-approve-confirm-dialog');
+        if (existing) { existing.remove(); }
+
+        const methodLabel = helpers.paymentMethodLabel?.(pmt.paymentMethod) || pmt.paymentMethod || '—';
+        const amountLabel = helpers.formatCurrency?.(pmt.amount) || `₡${pmt.amount}`;
+        const dateLabel   = helpers.formatDateTime?.(pmt.submittedAt) || pmt.submittedAt || '—';
+
+        const dialog = document.createElement('dialog');
+        dialog.id = 'billing-approve-confirm-dialog';
+        dialog.style.cssText = 'border:none;border-radius:12px;padding:0;max-width:420px;width:94%;box-shadow:0 8px 32px rgba(0,0,0,0.18);';
+        dialog.innerHTML = `
+          <form method="dialog" style="padding:24px;display:grid;gap:16px;">
+            <h3 style="margin:0;font-size:1rem;">Confirmar aprobación de cobro</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+              <tr><td style="color:#57606a;padding:4px 0;">Cliente</td>     <td style="font-weight:600;text-align:right;">${helpers.escapeHtml(pmt.clientName || '—')}</td></tr>
+              <tr><td style="color:#57606a;padding:4px 0;">Factura</td>     <td style="font-weight:600;text-align:right;">${helpers.escapeHtml(pmt.invoiceNumber || '—')}</td></tr>
+              <tr><td style="color:#57606a;padding:4px 0;">Monto</td>       <td style="font-weight:700;text-align:right;color:#16A34A;font-size:1rem;">${helpers.escapeHtml(amountLabel)}</td></tr>
+              <tr><td style="color:#57606a;padding:4px 0;">Método</td>      <td style="text-align:right;">${helpers.escapeHtml(methodLabel)}</td></tr>
+              ${pmt.reference ? `<tr><td style="color:#57606a;padding:4px 0;">Referencia</td><td style="text-align:right;">${helpers.escapeHtml(pmt.reference)}</td></tr>` : ''}
+              <tr><td style="color:#57606a;padding:4px 0;">Agente</td>      <td style="text-align:right;">${helpers.escapeHtml(pmt.agentName || pmt.agentEmail || '—')}</td></tr>
+              <tr><td style="color:#57606a;padding:4px 0;">Enviado</td>     <td style="text-align:right;">${helpers.escapeHtml(dateLabel)}</td></tr>
+            </table>
+            <label style="display:grid;gap:4px;font-size:0.85rem;">
+              <span>Recibido por (oficina) <span style="color:#57606a;">— opcional</span></span>
+              <input id="billing-approve-receiver" type="text" placeholder="Nombre de quien recibe el dinero"
+                style="padding:7px 10px;border:1px solid #d0d7de;border-radius:6px;font-size:0.88rem;font-family:inherit;" />
+            </label>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+              <button type="button" id="billing-approve-cancel-btn" class="secondary-button">Cancelar</button>
+              <button type="submit" id="billing-approve-confirm-btn" style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:0.88rem;cursor:pointer;font-weight:600;">✓ Confirmar aprobación</button>
+            </div>
+          </form>
+        `;
+
+        document.body.appendChild(dialog);
+        dialog.showModal();
+        dialog.querySelector('#billing-approve-receiver')?.focus();
+
+        dialog.querySelector('#billing-approve-cancel-btn')?.addEventListener('click', () => {
+          dialog.close();
+          dialog.remove();
+          resolve(null);
+        });
+
+        dialog.querySelector('form')?.addEventListener('submit', () => {
+          const receiver = /** @type {HTMLInputElement|null} */ (dialog.querySelector('#billing-approve-receiver'));
+          const note = receiver?.value?.trim() || '';
+          dialog.remove();
+          resolve(note);
+        });
+
+        dialog.addEventListener('cancel', () => { dialog.remove(); resolve(null); });
+      });
+    }
+
     function bindPendingPaymentActions(panel, sess) {
       panel.querySelectorAll('.billing-approve-btn').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const paymentId = btn.getAttribute('data-payment-id');
           if (!paymentId) return;
+
+          // Parse the embedded payment summary for the confirmation modal
+          let pmtSummary = {};
+          try { pmtSummary = JSON.parse(btn.getAttribute('data-payment') || '{}'); } catch (_) { /* ignore */ }
+
+          const receiverNote = await showApproveConfirmModal(pmtSummary);
+          if (receiverNote === null) { return; } // cancelled
+
           /** @type {HTMLButtonElement} */ (btn).disabled = true;
           const siblingReject = panel.querySelector(`.billing-reject-btn[data-payment-id="${paymentId}"]`);
           if (siblingReject) /** @type {HTMLButtonElement} */ (siblingReject).disabled = true;
           try {
-            await billingApi.approvePayment(sess, paymentId);
+            await billingApi.approvePayment(sess, paymentId, receiverNote);
             await loadPendingPayments();
           } catch (err) {
             /** @type {HTMLButtonElement} */ (btn).disabled = false;

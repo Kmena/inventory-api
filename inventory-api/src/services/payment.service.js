@@ -313,9 +313,13 @@ async function approvePayment(id, payload, auth, req = null) {
       where: { id: transactionalPayment.invoiceId },
       select: { orderId: true, clientId: true },
     });
+    // Guard: client.creditBalance is only incremented when a payment is reversed,
+    // NOT when an order is approved (only clientStore.creditBalance tracks order debt).
+    // Use updateMany + gte to silently skip if balance is already 0 — prevents
+    // the clients_credit_balance_floor constraint violation (code: 23514).
     if (approvedInvoice?.clientId) {
-      await tx.client.update({
-        where: { id: approvedInvoice.clientId },
+      await tx.client.updateMany({
+        where: { id: approvedInvoice.clientId, creditBalance: { gte: transactionalPayment.amount } },
         data: { creditBalance: { decrement: transactionalPayment.amount } },
       });
     }

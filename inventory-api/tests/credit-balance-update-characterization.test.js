@@ -139,7 +139,8 @@ function buildApprovalHarness({ invoiceClientId }) {
         },
       },
       client: {
-        update: async (args) => { clientUpdateCalls.push(args); return null; },
+        // Service uses updateMany + gte guard to avoid floor constraint violations
+        updateMany: async (args) => { clientUpdateCalls.push(args); return { count: 1 }; },
       },
     };
     return work(tx);
@@ -174,8 +175,10 @@ test('TASK-015: approvePayment decrements creditBalance when invoice has clientI
     () => paymentService.approvePayment(11n, {}, auth),
   );
 
-  assert.equal(clientUpdateCalls.length, 1, 'tx.client.update must be called once');
+  assert.equal(clientUpdateCalls.length, 1, 'tx.client.updateMany must be called once');
   assert.equal(clientUpdateCalls[0].where.id, 42n);
+  // Guard: also filters by creditBalance >= amount to prevent floor constraint violation
+  assert.deepEqual(clientUpdateCalls[0].where.creditBalance, { gte: 150 });
   assert.deepEqual(clientUpdateCalls[0].data, { creditBalance: { decrement: 150 } });
 });
 

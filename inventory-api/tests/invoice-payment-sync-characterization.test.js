@@ -125,7 +125,8 @@ function createPaymentFinancialTransactionHarness({ paymentStatus, throwOnInvoic
             },
           },
           client: {
-            update: async () => null, // no-op: balance tracking not asserted in legacy tests
+            update:     async () => null, // kept for compat; service now uses updateMany
+            updateMany: async () => ({ count: 0 }), // no-op: balance tracking not asserted here
           },
         };
 

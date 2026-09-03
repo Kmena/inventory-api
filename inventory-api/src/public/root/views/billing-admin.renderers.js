@@ -109,7 +109,18 @@
           <td>${bh.formatDateTime(pmt.submittedAt || pmt.createdAt)}</td>
           <td style="white-space:nowrap;">
             <button type="button" class="billing-approve-btn" style="font-size:0.8rem;padding:4px 10px;background:#16A34A;color:#fff;border:none;border-radius:6px;cursor:pointer;margin-right:4px;"
-              data-payment-id="${bh.escapeHtml(String(pmt.id))}">
+              data-payment-id="${bh.escapeHtml(String(pmt.id))}"
+              data-payment="${bh.escapeHtml(JSON.stringify({
+                id: pmt.id,
+                amount: pmt.amount,
+                paymentMethod: pmt.paymentMethod,
+                reference: pmt.reference || null,
+                invoiceNumber: pmt.invoice?.invoiceNumber || null,
+                clientName: pmt.invoice?.client?.name || pmt.clientName || null,
+                agentName: pmt.submittedByUser?.name || null,
+                agentEmail: pmt.submittedByUser?.email || null,
+                submittedAt: pmt.submittedAt || pmt.createdAt || null,
+              }))}">
               ✓ Aprobar
             </button>
             <button type="button" class="billing-reject-btn secondary-button" style="font-size:0.8rem;padding:4px 10px;"

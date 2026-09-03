@@ -263,7 +263,7 @@ test('views/recipe-consultation.js renders frozen recipe as read-only (FR-038)',
   const source = readWarehouseFile('views/recipe-consultation.js');
   assert.match(source, /solo lectura/i);
   assert.match(source, /Receta congelada/i);
-  assert.match(source, /frozenRecipeSnapshot/);
+  assert.match(source, /recipeVersionSnapshot/); // field name corrected from frozenRecipeSnapshot
   // No edit action buttons (form inputs, edit buttons — only informational text allowed)
   assert.doesNotMatch(source, /<input[^>]*type="text"[^>]*(?:edit|edicion)/i);
   assert.doesNotMatch(source, /warehouseApi\.(?:updateRecipe|approveRecipe|createRecipeVersion)/i);
