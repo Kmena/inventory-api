@@ -1058,8 +1058,8 @@ code { background: #eef2ff; padding: 2px 6px; border-radius: 6px; }
 .modal-card {
   position: relative;
   z-index: 81;
-  width: min(100%, 860px);
-  max-height: min(90vh, 760px);
+  width: min(100%, 920px);
+  max-height: min(92vh, 880px);
   overflow: auto;
   background: var(--card);
   border: 1px solid var(--border);

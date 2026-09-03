@@ -325,18 +325,18 @@
 
         const dialog = document.createElement('dialog');
         dialog.id = 'billing-approve-confirm-dialog';
-        dialog.style.cssText = 'border:none;border-radius:12px;padding:0;max-width:420px;width:94%;box-shadow:0 8px 32px rgba(0,0,0,0.18);';
+        dialog.style.cssText = 'border:none;border-radius:12px;padding:0;max-width:560px;width:96%;box-shadow:0 8px 32px rgba(0,0,0,0.18);';
         dialog.innerHTML = `
           <form method="dialog" style="padding:24px;display:grid;gap:16px;">
             <h3 style="margin:0;font-size:1rem;">Confirmar aprobación de cobro</h3>
-            <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
-              <tr><td style="color:#57606a;padding:4px 0;">Cliente</td>     <td style="font-weight:600;text-align:right;">${helpers.escapeHtml(pmt.clientName || '—')}</td></tr>
-              <tr><td style="color:#57606a;padding:4px 0;">Factura</td>     <td style="font-weight:600;text-align:right;">${helpers.escapeHtml(pmt.invoiceNumber || '—')}</td></tr>
-              <tr><td style="color:#57606a;padding:4px 0;">Monto</td>       <td style="font-weight:700;text-align:right;color:#16A34A;font-size:1rem;">${helpers.escapeHtml(amountLabel)}</td></tr>
-              <tr><td style="color:#57606a;padding:4px 0;">Método</td>      <td style="text-align:right;">${helpers.escapeHtml(methodLabel)}</td></tr>
-              ${pmt.reference ? `<tr><td style="color:#57606a;padding:4px 0;">Referencia</td><td style="text-align:right;">${helpers.escapeHtml(pmt.reference)}</td></tr>` : ''}
-              <tr><td style="color:#57606a;padding:4px 0;">Agente</td>      <td style="text-align:right;">${helpers.escapeHtml(pmt.agentName || pmt.agentEmail || '—')}</td></tr>
-              <tr><td style="color:#57606a;padding:4px 0;">Enviado</td>     <td style="text-align:right;">${helpers.escapeHtml(dateLabel)}</td></tr>
+            <table style="width:100%;border-collapse:collapse;font-size:0.88rem;background:#f8fafc;border-radius:8px;overflow:hidden;">
+              <tr><td style="color:#57606a;padding:6px 12px;border-bottom:1px solid #e2e8f0;">Cliente</td>     <td style="font-weight:600;text-align:right;padding:6px 12px;border-bottom:1px solid #e2e8f0;">${helpers.escapeHtml(pmt.clientName || '—')}</td></tr>
+              <tr><td style="color:#57606a;padding:6px 12px;border-bottom:1px solid #e2e8f0;">Factura</td>     <td style="font-weight:600;text-align:right;padding:6px 12px;border-bottom:1px solid #e2e8f0;">${helpers.escapeHtml(pmt.invoiceNumber || '—')}</td></tr>
+              <tr><td style="color:#57606a;padding:6px 12px;border-bottom:1px solid #e2e8f0;">Monto</td>       <td style="font-weight:700;text-align:right;color:#16A34A;font-size:1.05rem;padding:6px 12px;border-bottom:1px solid #e2e8f0;">${helpers.escapeHtml(amountLabel)}</td></tr>
+              <tr><td style="color:#57606a;padding:6px 12px;border-bottom:1px solid #e2e8f0;">Método</td>      <td style="text-align:right;padding:6px 12px;border-bottom:1px solid #e2e8f0;">${helpers.escapeHtml(methodLabel)}</td></tr>
+              ${pmt.reference ? `<tr><td style="color:#57606a;padding:6px 12px;border-bottom:1px solid #e2e8f0;">Referencia</td><td style="text-align:right;padding:6px 12px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:0.85rem;">${helpers.escapeHtml(pmt.reference)}</td></tr>` : ''}
+              <tr><td style="color:#57606a;padding:6px 12px;border-bottom:1px solid #e2e8f0;">Agente</td>      <td style="text-align:right;padding:6px 12px;border-bottom:1px solid #e2e8f0;">${helpers.escapeHtml(pmt.agentName || pmt.agentEmail || '—')}</td></tr>
+              <tr><td style="color:#57606a;padding:6px 12px;">Enviado</td>               <td style="text-align:right;padding:6px 12px;">${helpers.escapeHtml(dateLabel)}</td></tr>
             </table>
             <label style="display:grid;gap:4px;font-size:0.85rem;">
               <span>Recibido por (oficina) <span style="color:#57606a;">— opcional</span></span>
