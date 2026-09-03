@@ -41,6 +41,7 @@ Estas reglas aplican a:
 - La UI debe presentar mensajes operables y breves para fallos esperables de red, autorización o validación.
 - No asumir que toda respuesta contiene JSON válido; cuando el código actual ya contempla parse defensivo, mantener ese patrón.
 - El estado visual del formulario o acción debe restaurarse después de errores (`disabled`, labels de botón, mensajes).
+- Las validaciones locales de UX pueden prevenir roundtrips innecesarios, pero deben degradarse graciosamente: si el dato en memoria no es suficiente o falla la verificación local, el flujo debe poder continuar hacia la validación autoritativa del backend.
 - No ocultar silenciosamente errores críticos de carga inicial; deben reflejarse en la pantalla con un mensaje visible.
 - Si existe una sesión legacy o corrupta en storage, debe limpiarse y permitirse continuar con login normal.
 
@@ -51,6 +52,7 @@ Estas reglas aplican a:
   - renderizar listas, métricas y estados visuales
   - aplicar validaciones básicas de experiencia de usuario
   - resolver composición responsive y jerarquía visual
+  - reutilizar helpers browser registrados en `RootShell` para evitar duplicación de lógica visual o de validación liviana
 - La UI no debe convertirse en la fuente principal de:
   - autorización
   - tenant scoping
@@ -58,6 +60,7 @@ Estas reglas aplican a:
   - validaciones de ownership
   - decisiones críticas de negocio
 - Si una regla es importante para integridad del negocio, debe vivir también en backend.
+- Ejemplo actual: `views.productsAdminHelpers.checkSubcategoryNameDuplicate(...)` mejora UX en el formulario de productos, pero no sustituye la validación backend de duplicados.
 
 ## 5. Protected files and downloads
 - Los documentos privados y comprobantes no deben exponerse mediante rutas estáticas públicas.
@@ -72,6 +75,7 @@ Estas reglas aplican a:
 ## 7. Shared helpers and duplication control
 - Si varias pantallas usan el mismo patrón de headers, mensajes, descarga o formatting, preferir helpers compartidos ya existentes.
 - No duplicar lógica de sesión/autorización si ya existe un helper razonable en `*.shared.js`.
+- Los helpers exportados vía `rootShell.register(...)` deben encapsular utilidades pequeñas, explícitas y reutilizables; cuando una validación o transformación de UI se use desde la vista principal, preferir helper exportado antes que duplicación inline.
 - No introducir abstracciones genéricas innecesarias; mantener helpers pequeños y explícitos.
 - `login.js` puede seguir siendo el orquestador principal del login mientras el contrato permanezca pequeño y estable.
 
@@ -106,10 +110,19 @@ Estas reglas aplican a:
 - `warehouse/products.js` oculta capacidades de importación/gestión según permisos efectivos.
 - `agent/workspace.js` consume dashboard, tiendas, metas y visitas como parte del runtime soportado.
 - `root/client-detail.shared.js` usa fetch autenticado para descargas privadas.
+- `src/public/root/views/products-admin.js` usa dialogs nativos apilados para crear subcategorías inline desde el formulario de producto y mantiene el retorno de foco por dialog mediante triggers separados.
+- `src/public/root/views/products-admin.helpers.js` exporta `checkSubcategoryNameDuplicate(...)` como validación local, case-insensitive y trim-normalizada, con fallback al backend si la data en memoria no alcanza.
 
-## 11. Out-of-scope assumptions to avoid
+## 11. Browser-native dialog usage
+- Si una vista usa `<dialog>.showModal()` sobre otro dialog activo, tratar ese apilado como una dependencia explícita del navegador, no como comportamiento implícito garantizado.
+- El manejo de foco debe seguir el dialog real que abrió la interacción; evitar una sola referencia global de trigger cuando haya múltiples dialogs que puedan apilarse.
+- Cuando exista una nota de compatibilidad en el README para una capacidad UI concreta, esa nota pasa a ser parte del baseline operativo del frontend embebido.
+- Si el navegador objetivo no soporta correctamente el apilado requerido, documentar y preservar un flujo alterno no apilado.
+
+## 12. Out-of-scope assumptions to avoid
 - No asumir que `src/public/` es solo demo local.
 - No asumir que existe un SPA separado fuera de este repo.
 - No asumir que README/PRD equivalen automáticamente a pantalla runtime disponible.
 - No asumir que una capacidad documentada en Prisma o en visión de producto ya tiene UI operable.
 - No asumir que un refresh visual habilita por sí mismo nuevas capacidades de autenticación o recuperación de cuenta.
+- No asumir soporte universal de stacked dialogs: cuando una vista dependa de esa capacidad, debe existir nota de compatibilidad visible para el proyecto y, si aplica, un flujo alterno documentado.

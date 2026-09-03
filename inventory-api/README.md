@@ -804,6 +804,25 @@ Para entornos controlados, configure valores privados fuera de Git mediante las 
 - `docs/er_mvp_prd.md`
 - `docs/ERD_v1.md`
 
+## Compatibilidad de navegador
+
+### Función: crear subcategoría desde el formulario de producto
+
+El botón **"+ Nueva subcategoría"** dentro del formulario de creación/edición de productos
+usa apilado de diálogos nativos (`<dialog>.showModal()` sobre otro `showModal()` activo).
+Esta funcionalidad requiere un navegador moderno:
+
+| Navegador | Versión mínima |
+|-----------|---------------|
+| Chrome / Chromium | 37+ |
+| Firefox | 98+ |
+| Safari | 15.4+ |
+| Edge (Chromium) | 79+ |
+
+En navegadores que no soporten apilado de diálogos, el flujo alternativo siempre está
+disponible: usar el botón **"Categorías"** en el header de la vista de productos para
+crear la subcategoría antes de abrir el formulario de producto.
+
 ## Nota de alcance
 
 El backend actual es una base operativa del producto, no el cierre completo del MVP. Antes de ampliar pantallas o CRUDs aislados, conviene alinear el modelo con multi-bodega, lotes obligatorios, aprobaciones, auditoria, credito y produccion real.

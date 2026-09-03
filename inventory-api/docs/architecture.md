@@ -1,6 +1,6 @@
 # Architecture
 ## 1. Purpose and scope
-This document describes the architecture currently implemented in the repository, with emphasis on the active production, QA, recipe, and warehouse-browser flows after the `qa-rejection-material-reconciliation-amendment` implementation.
+This document describes the architecture currently implemented in the repository, with emphasis on the active production, QA, recipe, warehouse-browser, and root-shell product-catalog browser flows after the `qa-rejection-material-reconciliation-amendment` and `create-product-with-subcategory` implementations.
 
 It documents current reality only: active runtime components, current boundaries, dependency rules in effect, and architectural limitations still present.
 
@@ -14,11 +14,13 @@ Active production/quality architecture is layered:
 - persistence adapters in `src/repositories/production.repository.js` and `inventory.repository.js`
 - browser input adapters in `src/public/warehouse/` and `src/public/root/`
 
-The amendment did not introduce a full hexagonal module split. It extended the existing layering with clearer service-level seams:
+The recent amendments did not introduce a full hexagonal module split. They extended the existing layering with clearer service/UI seams:
 - a dedicated relevant-input scope resolver
 - dedicated recolection/reconciliation service logic
 - repository includes for recolection entries and reconciliations
 - SPA state/rendering support for replacement recovery and reconciliation
+- root-shell product-admin support for stacked native dialogs during inline subcategory creation
+- browser helper export of `checkSubcategoryNameDuplicate(...)` for local UX validation ahead of the unchanged backend category API
 
 ## 3. Active architectural style and module boundaries
 ### Runtime style
@@ -37,6 +39,7 @@ Logical module groupings currently in effect:
 - Production / QA
 - Procurement / Receipts
 - Sales / Orders / Billing / Payments
+- Root-shell browser views and helpers
 
 For the amended feature, the most relevant boundary is the Production + QA cluster:
 - recipe definitions provide stage contract metadata
@@ -56,6 +59,7 @@ These are separate files and services, but still part of one tightly-coupled app
 | Quality | inspections, rejection handling, relevant-input scope, continuation rules | `src/services/quality*.js` |
 | Recolection / Recovery | pending recovery gates, lot-level entry capture, reconciliation outcomes | `src/services/production-recolection.service.js`, `src/repositories/production.repository.js` |
 | Warehouse UI | operator-facing rendering and controller wiring for execution, QA, recovery, reconciliation | `src/public/warehouse/` |
+| Root-shell Product Admin UI | product listing/detail, product form dialog, categories dialog, inline subcategory creation, local duplicate validation | `src/public/root/views/products-admin*.js` |
 
 ## 5. Current runtime components and responsibilities
 ### `production.routes.js`
@@ -119,6 +123,21 @@ Responsibilities:
 - call QA inspection, recolection confirmation, and reconciliation endpoints
 - derive replacement-recovery pending/completed states in browser state logic
 
+### Root-shell product admin SPA components
+Relevant files:
+- `src/public/root/views/products-admin.js`
+- `src/public/root/views/products-admin.helpers.js`
+- `src/public/root/views/products-admin.renderers.js`
+- `src/public/root/categories-api.js`
+- `src/public/root/products-api.js`
+
+Responsibilities:
+- render the products list, detail pane, product form dialog, deactivate dialog, and categories dialog
+- allow inline subcategory creation from within the product form through a second stacked native `<dialog>`
+- keep dialog trigger state per modal via `lastFormDialogTrigger`, `lastCategoriesDialogTrigger`, and `lastDeactivateDialogTrigger` for focus restoration when dialogs stack
+- export reusable browser helper logic via `rootShell.register('views.productsAdminHelpers', ...)`, including `checkSubcategoryNameDuplicate(categories, categoryId, name)`
+- perform local duplicate prevention as a UX optimization only; backend category creation remains the authoritative integrity boundary
+
 ## 6. Current dependency rules
 Implemented dependency direction is mostly:
 - route → service → repository → Prisma
@@ -129,12 +148,15 @@ Current rules actually followed in the amended area:
 - services derive company scope from authenticated actor, not from client payload
 - repositories own Prisma include graphs and row creation for production aggregates
 - browser renderers/controllers remain presentation adapters and do not access Prisma directly
+- root-shell product helpers are exported through the browser registry and reused from the product-admin view instead of duplicating that helper logic inline in submit handlers
+- local SPA duplicate validation degrades gracefully to existing backend validation rather than replacing it
 
 Current violations still present:
 - services still hold substantial business logic instead of a separate domain layer
 - service modules call repositories directly without explicit ports
 - serialization logic and business rules are mixed in service files
 - root-shell recipe editor currently embeds a process-code catalog that can diverge from backend validation
+- products-admin remains a large page-centric browser module with view rendering, local state, modal orchestration, and API-calling logic in one file
 
 ## 7. Current database ownership and transaction boundaries
 ### Logical ownership
@@ -165,10 +187,12 @@ Current violations still present:
   - returns computed remaining balance data
 - `GET /api/production/orders/:id`
   - currently includes `recolectionStages`, each serialized with `recoveryType`, `entries`, and `reconciliations`
+- the root-shell products admin continues consuming the existing product and category browser adapters; `create-product-with-subcategory` introduced no backend endpoint, payload-contract, or database change
 
 ### Current integration model
 - no new external integration was added by this amendment
 - the flow remains internal to Express, Prisma, and browser SPA clients
+- the stacked-dialog subcategory flow depends on native browser `<dialog>.showModal()` behavior; browser support is documented in `README.md` as an active runtime compatibility note
 
 ## 9. Current security boundaries
 Active security boundaries:
@@ -220,20 +244,25 @@ Current limitation:
 - Same-lot validation is enforced only when a completed recovery/recolection stage has persisted lot-level entries, preserving backward compatibility for older data/flows.
 - Reconciliation outcomes are currently limited to `USED`, `RETURNED`, and `DISCARDED`.
 - Production order read models now expose recolection stages with entries and reconciliations to support warehouse UI state and server-side validation.
+- In the root-shell products admin, dialog focus restoration is managed per modal instance (`lastFormDialogTrigger`, `lastCategoriesDialogTrigger`, `lastDeactivateDialogTrigger`) rather than through one shared trigger variable.
+- Local duplicate subcategory detection in the browser is an active UX optimization implemented through `views.productsAdminHelpers.checkSubcategoryNameDuplicate(...)`; backend category creation remains the final source of truth.
+- Native stacked `<dialog>` behavior is an accepted dependency for inline subcategory creation in supported browsers, with the README compatibility note documenting the expected browser baseline.
 
 ## 13. Known architectural limitations
-- no explicit domain layer for Production, Quality, or Inventory
+- no explicit domain layer for Production, Quality, Inventory, or Product Catalog UI workflows
 - no formal input/output port abstraction
 - production order aggregate loading uses broad include graphs and service-level serialization
 - QA relevant-input scope is computed dynamically rather than persisted as an immutable rejection snapshot
 - browser UIs remain tightly coupled to server DTO structure
 - root-shell recipe editor process-code option set is not centrally derived from the backend schema catalog
+- products-admin dialog orchestration, local state, helper invocation, and API calling remain concentrated in one browser module instead of smaller focused UI components
 
 ## 14. Open decisions requiring clarification
 - Should relevant-input scope remain computed on demand, or be stored as a persisted audit snapshot per rejection event?
 - Should the root-shell recipe editor derive its process-code catalog from a shared backend-owned contract to eliminate drift?
 - Is stronger end-to-end evidence required before the amended warehouse flow is treated as operationally complete?
 - Should legacy `recolection` path names remain indefinitely, or should a versioned rename strategy be planned later?
+- If the root-shell product admin keeps growing, should its dialog orchestration and helper usage be split into smaller browser modules in a future UI-maintenance cycle?
 
 ## 15. Documentation governance
 The canonical reviewed artifacts under `docs/**` represent implemented reality and are the authoritative reference for runtime contracts. The workflow-baseline validators and characterization tests intentionally read hosted workflow truth from that parent-root workflow tree.

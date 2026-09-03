@@ -1,5 +1,16 @@
 # Changelog
 
+## 2025-07 — create-product-with-subcategory (UX-001..006)
+- **TASK-001 (UX-003):** Corregido texto del botón en el `finally` block del submit del formulario de categorías: `'Crear categoria'` → `'Crear subcategoria'`.
+- **TASK-002 (UX-004):** Corregido label del filtro del listado de productos: `<span>Categoria</span>` → `<span>Subcategoria</span>` para reflejar que filtra por `subcategoryId`.
+- **TASK-003 (UX-005):** El fieldset "Nueva subcategoría" ahora tiene `id="products-create-subcategory-fieldset"` y se oculta completamente (`hidden=true`) para usuarios sin `products.manage` ni `inventory.manage`, eliminando el ruido visual de campos deshabilitados.
+- **TASK-004 (UX-006):** Agregada función `checkSubcategoryNameDuplicate(categories, categoryId, name)` en `products-admin.helpers.js`, exportada en `rootShell.register('views.productsAdminHelpers')`. Integrada en el submit del formulario de categorías para validar localmente antes de llamar al API, con degradación graciosa. La validación es case-insensitive, trim-normalizada y opera por scope de categoría padre.
+- **TASK-005 (UX-001):** Implementada variable `lastCreatedSubcategoryId` (consume-once) en el scope de `mount()`. Al crear una subcategoría exitosamente, persiste su ID. Cuando el usuario abre el formulario de producto en modo `create`, `openFormDialog()` lo aplica post-`resetFormDialog()` y limpia la variable. Resuelve la pérdida de pre-selección del flujo Path A.
+- **TASK-006 (UX-002):** Agregado botón `#products-form-add-subcategory-button` (`type="button"`) adyacente al selector de subcategoría en el formulario de producto. Separado `lastDialogTrigger` en `lastFormDialogTrigger`, `lastCategoriesDialogTrigger` y `lastDeactivateDialogTrigger` para focus management correcto con dialogs apilados. El botón abre el dialog de categorías sobre el formulario de producto preservando todos los datos (Path B). Visibilidad controlada por `canListCategories`; estado por `canCreateCategories` (D-005).
+- **TASK-007:** 2 nuevos tests de caracterización en `tests/products-view-characterization.test.js`: `checkSubcategoryNameDuplicate` (9 casos incluyendo cross-categoría BR-002) y `render()` con assertions para label, botón e id de fieldset. Suite: 9 pass, 0 fail.
+- **TASK-008 (D-008):** Agregada sección "Compatibilidad de navegador" en `README.md` documentando el requisito de Chrome 37+/Firefox 98+/Safari 15.4+/Edge 79+ para el stacking de dialogs, con mención del flujo alternativo (botón "Categorías" del header).
+- Tests: 9 pass, 0 fail (products-view-characterization). No regresiones.
+
 ## 2026-09-01 — audit-findings-resolution
 - **AUD-025 (Medium — CLOSED):** `GET /api/roles/company/:roleId` added to `docs/runtime-endpoint-catalog.md`.
 - **AUD-002 (Low — CLOSED):** `docs/current-state.md` §7 updated with `Client.creditLimit`, `Client.creditBalance`, `ClientStore` credit fields; §8 updated with `GET /api/clients/:id/ledger` and TASK-015 credit lifecycle description.

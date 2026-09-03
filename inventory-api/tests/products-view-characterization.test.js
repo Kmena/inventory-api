@@ -203,6 +203,136 @@ test('buildProductPayload includes LENGTH size fields with kgConversionFactor (T
   assert.equal(payload.kgConversionFactor, 0.35);
 });
 
+// ─── TASK-004: checkSubcategoryNameDuplicate ────────────────────────────────
+
+test('checkSubcategoryNameDuplicate detecta duplicados y degrada graciosamente', () => {
+  const rootShell = createHarness();
+  const helpers = rootShell.require('views.productsAdminHelpers');
+
+  const categories = [
+    {
+      id: 1, name: 'Producto Terminado', categoryType: 'PT',
+      subcategories: [
+        { id: 10, name: 'Shampoo' },
+        { id: 11, name: 'Aceite' },
+      ],
+    },
+    {
+      id: 2, name: 'Materia Prima', categoryType: 'MP',
+      subcategories: [
+        { id: 20, name: 'Aceite' },
+      ],
+    },
+    {
+      id: 3, name: 'Empaques', categoryType: 'EM',
+      subcategories: [],
+    },
+  ];
+
+  // Caso: nombre duplicado (case-insensitive) en la misma categoría padre
+  const dupMsg = helpers.checkSubcategoryNameDuplicate(categories, '1', 'shampoo');
+  assert.ok(dupMsg !== null, 'Debe retornar mensaje cuando el nombre existe en la misma categoría padre');
+  assert.ok(dupMsg.includes('Producto Terminado'), 'El mensaje debe incluir el nombre de la categoría padre');
+
+  // Caso: nombre disponible en la categoría
+  const okMsg = helpers.checkSubcategoryNameDuplicate(categories, '1', 'Gel de Baño');
+  assert.equal(okMsg, null, 'Debe retornar null cuando el nombre no existe en esa categoría padre');
+
+  // CASO CLAVE (D-007, BR-002): mismo nombre en DIFERENTE categoría padre → NO es duplicado
+  // 'Aceite' existe en PT (id=1) y MP (id=2). Crearlo en EM (id=3) es válido.
+  const crossCatMsg = helpers.checkSubcategoryNameDuplicate(categories, '3', 'Aceite');
+  assert.equal(crossCatMsg, null, 'Aceite en Empaques no es duplicado porque no existe allí');
+
+  // Duplicado en MP: 'Aceite' ya existe en MP
+  const dupInMP = helpers.checkSubcategoryNameDuplicate(categories, '2', 'aceite');
+  assert.ok(dupInMP !== null, 'Aceite en MP sí es duplicado (case-insensitive)');
+  assert.ok(dupInMP.includes('Materia Prima'), 'El mensaje menciona Materia Prima como categoría padre');
+
+  // Caso: categoría padre no encontrada (degradación graciosa)
+  const unknownCat = helpers.checkSubcategoryNameDuplicate(categories, '99', 'Shampoo');
+  assert.equal(unknownCat, null, 'Debe retornar null cuando la categoría padre no se encuentra');
+
+  // Casos: datos vacíos (degradación graciosa)
+  assert.equal(helpers.checkSubcategoryNameDuplicate([], '1', 'Shampoo'), null, 'Array vacío → null');
+  assert.equal(helpers.checkSubcategoryNameDuplicate(null, '1', 'Shampoo'), null, 'null categories → null');
+  assert.equal(helpers.checkSubcategoryNameDuplicate(categories, null, 'Shampoo'), null, 'null categoryId → null');
+  assert.equal(helpers.checkSubcategoryNameDuplicate(categories, '1', ''), null, 'nombre vacío → null');
+});
+
+// ─── Helper para cargar products-admin.js en el harness ──────────────────────
+
+function createHarnessWithView() {
+  const browserWindow = {};
+  const context = vm.createContext({
+    URLSearchParams,
+    window: browserWindow,
+  });
+  browserWindow.window = browserWindow;
+
+  executeRootScript('registry.js', context);
+  executeRootScript('ui.js', context);
+  executeRootScript('views/products-admin.helpers.js', context);
+  executeRootScript('views/products-admin.state.js', context);
+  executeRootScript('views/products-admin.renderers.js', context);
+
+  // Stubs para las dependencias que products-admin.js necesita al cargarse
+  const rootShell = browserWindow.RootShell;
+  rootShell.register('productsApi', {
+    listProducts: () => {},
+    getProduct: () => {},
+    createProduct: () => {},
+    updateProduct: () => {},
+    deactivateProduct: () => {},
+  });
+  rootShell.register('categoriesApi', {
+    listCategories: () => {},
+    createCategory: () => {},
+  });
+  rootShell.register('sessionAdapter', { hasPermission: () => false });
+
+  executeRootScript('views/products-admin.js', context);
+  return rootShell;
+}
+
+// ─── TASK-001/002/003/006: render() HTML assertions ──────────────────────────
+
+test('products-admin render() contiene las correcciones UX de labels, botón y fieldset', () => {
+  const rootShell = createHarnessWithView();
+  const productsAdmin = rootShell.require('views.productsAdmin');
+  const html = productsAdmin.render();
+
+  // TASK-002: label del filtro debe decir 'Subcategoria'
+  assert.ok(html.includes('<span>Subcategoria</span>'), 'El label del filtro debe decir Subcategoria');
+
+  // TASK-001: el botón de submit del form de categorías debe decir 'Crear subcategoria'
+  assert.ok(html.includes('Crear subcategoria'), 'El botón de submit debe decir Crear subcategoria');
+
+  // TASK-003: el fieldset de nueva subcategoría debe tener su id
+  assert.ok(
+    html.includes('id="products-create-subcategory-fieldset"'),
+    'El fieldset de nueva subcategoría debe tener id products-create-subcategory-fieldset',
+  );
+
+  // TASK-006: el formulario de producto debe incluir el botón de nueva subcategoría
+  assert.ok(
+    html.includes('id="products-form-add-subcategory-button"'),
+    'El formulario debe incluir id="products-form-add-subcategory-button"',
+  );
+
+  // TASK-006: el botón de nueva subcategoría debe ser type="button" para no disparar el submit del form
+  // Verificar que el botón específico tiene type="button" buscando su id en el contexto del atributo
+  const addBtnIdx = html.indexOf('id="products-form-add-subcategory-button"');
+  assert.ok(addBtnIdx !== -1, 'El botón products-form-add-subcategory-button debe existir en el HTML');
+  // El type="button" debe aparecer antes del cierre del tag del botón (dentro del mismo elemento)
+  const btnContext = html.slice(Math.max(0, addBtnIdx - 60), addBtnIdx + 100);
+  assert.ok(
+    btnContext.includes('type="button"'),
+    'El botón #products-form-add-subcategory-button debe tener type="button" para no disparar el form submit',
+  );
+});
+
+// ─── Regressions: existing tests must still pass ──────────────────────────────
+
 test('products-admin.js form HTML includes the presentation fieldset with all conditional elements (TASK-006)', () => {
   const source = require('node:fs').readFileSync(
     require('node:path').join(__dirname, '..', 'src', 'public', 'root', 'views', 'products-admin.js'),

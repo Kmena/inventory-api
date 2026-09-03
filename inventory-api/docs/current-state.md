@@ -3,8 +3,11 @@
 <!-- MAINT-002: per-section update log — append a row when a section is materially changed -->
 | Section | Last updated | Change summary |
 |---|---|---|
+| §4 Existing domains and modules | 2026-09-01 | Documented products-admin SPA inline subcategory creation support and exported helper usage |
+| §6 Current data flows | 2026-09-01 | Added stacked-dialog product/subcategory flow in root-shell product admin |
+| §8 APIs and integrations | 2026-09-01 | Clarified no backend/API changes for create-product-with-subcategory; documented existing category/product endpoint consumption |
+| §12 Current testing strategy | 2026-09-01 | Added products SPA characterization coverage for duplicate helper and render contract |
 | §7 Database and persistence | 2026-09-01 | Added Client.creditLimit/creditBalance and ClientStore credit fields |
-| §8 APIs and integrations | 2026-09-01 | Added GET /api/clients/:id/ledger and TASK-015 credit lifecycle |
 | §14 Known defects | 2026-09-01 | Removed DEF-PRD-001 (resolved); DEF-PRD-002 remains open |
 
 ## 1. System overview
@@ -83,6 +86,21 @@ Current production-related behavior:
 - `processLabel` is required only when `processCode = OTHER`
 - legacy stages without `stageType` are treated as `PROCESSING` in serialization/service logic
 
+### Product Catalog Admin SPA
+Current code:
+- `src/public/root/views/products-admin.js`
+- `src/public/root/views/products-admin.helpers.js`
+- `src/public/root/views/products-admin.renderers.js`
+- `tests/products-view-characterization.test.js`
+
+Current behavior:
+- the root-shell products view exposes a product form dialog and a categories dialog using native `<dialog>` elements
+- the product form now supports inline subcategory creation through `#products-form-add-subcategory-button`, which opens the categories dialog stacked over the still-open product form
+- focus-return tracking is maintained per dialog through `lastFormDialogTrigger`, `lastCategoriesDialogTrigger`, and `lastDeactivateDialogTrigger`
+- `lastCreatedSubcategoryId` is used as consume-once UI state so the next product-create dialog can preselect a newly created subcategory after `resetFormDialog()`
+- `views.productsAdminHelpers` now exports `checkSubcategoryNameDuplicate(categories, categoryId, name)` for case-insensitive, trim-normalized duplicate checks scoped to the selected parent category, with graceful fallback to backend validation when local data is unavailable
+- the categories dialog hides the `Nueva subcategoria` fieldset for read-only users when `canCreateCategories = false`
+
 ### Inventory and Lots
 Current code:
 - `src/services/inventory.service.js`
@@ -148,6 +166,7 @@ Implemented and observable from code:
 - block stage re-execution while required losses or pending recovery/recolection remain unresolved
 - record reconciliation outcomes for recovered material
 - compute order-level stage status in the warehouse SPA, including replacement recovery pending/completed states
+- create a product from the root-shell products admin while opening a stacked categories dialog to register a missing subcategory inline without clearing the product form
 
 ## 6. Current data flows
 ### QA rejection with relevant-input scope
@@ -174,6 +193,15 @@ Implemented and observable from code:
 2. `production-recolection.service.js` validates scope, stage state, allowed outcome catalog, and quantity limits against recolection entries.
 3. Reconciliation rows are created.
 4. The response includes a computed balance with `complete` and `remainingBalances`.
+
+### Product create with inline subcategory flow
+1. Root-shell user opens the products admin view and launches `#products-form-dialog` from `#products-open-create-button`.
+2. If the required subcategory does not exist, the user can open `#products-categories-dialog` from `#products-form-add-subcategory-button` without closing the product form.
+3. `products-admin.js` keeps product-form state in place while the categories dialog is stacked with `showModal()` over the product dialog.
+4. Before calling the existing category API, the categories submit handler uses `productsHelpers.checkSubcategoryNameDuplicate(...)` for local duplicate prevention within the selected parent category; if data is unavailable, the flow degrades gracefully and the backend remains the final validator.
+5. After successful subcategory creation, the view stores `lastCreatedSubcategoryId`, refreshes category options, and applies the new subcategory immediately when the product form is still open.
+6. When the product form is opened later from the header flow, `openFormDialog('create')` consumes `lastCreatedSubcategoryId` once after `resetFormDialog()` to preselect the newly created subcategory.
+7. Closing each dialog returns focus according to the dialog-specific trigger variable rather than one shared trigger reference.
 
 ## 7. Database and persistence
 Primary persistence stack:
@@ -212,6 +240,7 @@ Feature-relevant API endpoints currently implemented:
 - `GET /api/production/orders/:id`
 - `GET /api/production/orders`
 - `GET /api/clients/:id/ledger` — exposes `client.creditLimit` and `client.creditBalance` (TASK-015 cycle)
+- existing root-shell product/category endpoints consumed by `products-admin.js` remained unchanged for `create-product-with-subcategory`; the implementation uses the already-registered `productsApi` and `categoriesApi` browser adapters rather than new backend contracts
 
 Credit balance lifecycle (TASK-015):
 - `paymentService.approvePayment` decrements `Client.creditBalance` via `tx.client.update` inside the Prisma transaction
@@ -225,6 +254,7 @@ Current contract behavior:
 
 External integration posture in this feature area:
 - none added; this amendment stays within production, quality, inventory, Prisma, and warehouse/root-shell UI layers
+- the create-product-with-subcategory implementation is frontend-only and does not add backend, database, or infrastructure integrations
 
 ## 9. Authentication and authorization
 Observed current behavior:
@@ -259,10 +289,11 @@ Feature-specific tests present:
 - `tests/production-same-lot-validation.service.test.js`
 - `tests/production-replacement-recovery-gate.test.js`
 - `tests/production-reconciliation-outcomes.service.test.js`
+- `tests/products-view-characterization.test.js` covers `views.productsAdminHelpers`, renderer/state behavior, `checkSubcategoryNameDuplicate`, and `products-admin.render()` markup for the subcategory label, inline add button, and create-subcategory fieldset contract
 
 Evidence available in repository docs:
 - `specs/qa-rejection-material-reconciliation-amendment/implementation-report.md` records command results for targeted tests and a full suite pass after implementation
-- the user request also reports `npm run test -- --silent` as 1531/1531 pass and `node --test tests/governance-baseline-sync-guardrails.test.js` as pass
+- the user request for `create-product-with-subcategory` reports `tests/products-view-characterization.test.js` as 9 pass, 0 fail after adding duplicate-helper and render-contract assertions
 
 This document records that evidence as repository/user-reported validation. It does not independently re-execute the test suite.
 
@@ -274,6 +305,7 @@ This document records that evidence as repository/user-reported validation. It d
 - transactional inventory reductions and movement recording during production execution
 - same-lot validation only when actual recolection entries exist, preserving legacy compatibility for older flows
 - production order read model including recolection stages, entries, and reconciliations
+- in the root-shell products admin, inline subcategory creation must preserve the product-form data while the categories dialog is stacked, and focus return must remain dialog-specific
 
 ## 14. Known defects
 ### DEF-PRD-002 Manual end-to-end evidence gap for amended warehouse flow — Medium
@@ -304,10 +336,12 @@ Unknown from repository inspection alone:
 - whether warehouse operators have completed live/manual validation of the full rejected-stage replacement and reconciliation workflow
 - whether all existing client consumers are already adapted to the enriched QA inspection envelope in real deployments
 - whether relevant-input scope should remain computed dynamically or eventually be persisted for audit replay stability
+- whether all supported user browsers in deployed environments satisfy the native stacked-`<dialog>` compatibility note now documented in `README.md`
 
 Assumptions used in this refresh:
 - implementation status is taken from the checked-in specification docs and the user-provided validation summary
 - documentation intentionally avoids claiming full operational completeness beyond the automated and recorded evidence currently present
+- the browser compatibility note in `README.md` is treated as the current source of truth for stacked-dialog expectations in the products admin UI
 
 ## 18. Documentation governance
 The canonical runtime-contract governance lives under `docs/**`. This includes `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/audit/`. Documentation ownership boundaries are defined in `docs/documentation-ownership-map.md`. CI workflow definitions live under `../.github/workflows/**` and are the authoritative hosted source consumed by workflow-baseline validators.
