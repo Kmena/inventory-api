@@ -325,7 +325,7 @@
 
         const dialog = document.createElement('dialog');
         dialog.id = 'billing-approve-confirm-dialog';
-        dialog.style.cssText = 'border:none;border-radius:12px;padding:0;max-width:560px;width:96%;box-shadow:0 8px 32px rgba(0,0,0,0.18);';
+        dialog.style.cssText = 'border:none;border-radius:12px;padding:0;max-width:min(720px,92vw);width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.18);';
         dialog.innerHTML = `
           <form method="dialog" style="padding:24px;display:grid;gap:16px;">
             <h3 style="margin:0;font-size:1rem;">Confirmar aprobación de cobro</h3>
