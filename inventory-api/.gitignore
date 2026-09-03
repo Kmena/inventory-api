@@ -26,6 +26,9 @@ prisma/dev.db
 # Keep the audit directory ignored in public mode.
 docs/audit/**
 
+# UI/UX analysis files — local working notes, not part of the codebase.
+docs/uiux_analisis/**
+
 # Internal auxiliary technical artifacts kept out of the reviewed contract baseline.
 internal-docs/generated/**
 internal-docs/tmp/**
