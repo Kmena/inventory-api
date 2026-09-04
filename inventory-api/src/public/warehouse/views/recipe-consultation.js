@@ -173,9 +173,9 @@ function render(container, session, params) {
     .then((/** @type {any} */ order) => {
       if (statusEl) { statusEl.hidden = true; }
 
-      const snapshot = order.recipeVersionSnapshot || null;
-      const snapshotRecipeVersion = snapshot?.recipeVersion || null;
-      const snapshotRecipe = snapshot?.recipe || null;
+      const frozenRecipeSnapshot = order.recipeVersionSnapshot || null;
+      const snapshotRecipeVersion = frozenRecipeSnapshot?.recipeVersion || null;
+      const snapshotRecipe = frozenRecipeSnapshot?.recipe || null;
       const stages = order.stages || snapshotRecipeVersion?.stages || [];
       const recipeName = snapshotRecipe?.name || order.recipe?.name || order.product?.name || '—';
       const recipeVersion = snapshotRecipeVersion?.versionNumber || snapshotRecipeVersion?.versionLabel || '—';
