@@ -97,6 +97,8 @@ Two new minor findings are raised in this pass:
 
 No architectural changes were introduced in this cycle.
 
+**Documentation ownership:** `docs/architecture.md` describes active runtime architecture and is the canonical reviewed artifact under `docs/**`. `docs/current-state.md` describes implemented behavior and is kept current after each feature cycle. Bounded OpenAPI/runtime artifacts under `docs/**` remain governed by the existing characterization and governance tests.
+
 ---
 
 ## Documentation Findings
