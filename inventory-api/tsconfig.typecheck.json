@@ -80,7 +80,14 @@
     "src/public/root/views/routes-admin.helpers.js",
     "src/public/root/views/routes-admin.renderers.js",
     "src/public/root/views/routes-admin.state.js",
-    "src/public/root/views/routes-admin.js"
+    "src/public/root/views/routes-admin.js",
+    "src/public/root/recipes-api.js",
+    "src/public/root/products-api.js",
+    "src/public/root/views/recipes-admin.helpers.js",
+    "src/public/root/views/recipes-admin.state.js",
+    "src/public/root/views/recipes-admin.renderers.js",
+    "src/public/root/views/recipes-admin.version-editor.js",
+    "src/public/root/views/recipes-admin.js"
   ],
   "exclude": [
     "node_modules",

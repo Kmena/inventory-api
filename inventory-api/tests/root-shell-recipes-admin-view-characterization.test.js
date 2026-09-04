@@ -56,6 +56,29 @@ test('recipesAdmin render exposes administrative workspace instead of introducto
   assert.doesNotMatch(markup, /Siguiente incremento/);
 });
 
+test('recipes admin workspace render includes approval confirmation dialog seam (recipe-approval-ux)', () => {
+  const { browserWindow, context } = createBrowserContext();
+
+  executeRootScript('registry.js', context);
+  browserWindow.RootShell.register('ui', {
+    escapeHtml: (value) => String(value || ''),
+    formatDate: () => '01/01/2026',
+    renderInlineMessage: (message) => message || '',
+    renderStatusBadge: () => '<span>badge</span>',
+  });
+  browserWindow.RootShell.register('views.recipesAdminState', {});
+
+  executeRootScript(path.join('views', 'recipes-admin.renderers.js'), context);
+
+  const renderers = browserWindow.RootShell.require('views.recipesAdminRenderers');
+  const markup = renderers.renderWorkspace();
+
+  assert.match(markup, /recipes-approval-dialog/);
+  assert.match(markup, /Esta accion es irreversible/);
+  assert.match(markup, /Confirmar aprobacion/);
+  assert.match(markup, /Cancelar/);
+});
+
 test('recipes admin state and renderers keep shared-recipe and version-ambiguity visible', () => {
   const { browserWindow, context } = createBrowserContext();
 
@@ -102,6 +125,39 @@ test('recipes admin state and renderers keep shared-recipe and version-ambiguity
   assert.match(detailMarkup, /Compartida por 2 productos/);
   assert.match(detailMarkup, /No definida explicitamente/);
   assert.match(detailMarkup, /Asignar a producto/);
+});
+
+test('recipes admin version cards render local feedback and incomplete state markers (recipe-approval-ux)', () => {
+  const { browserWindow, context } = createBrowserContext();
+
+  executeRootScript('registry.js', context);
+  browserWindow.RootShell.register('ui', {
+    escapeHtml: (value) => String(value || ''),
+    formatDate: () => '01/01/2026',
+    renderInlineMessage: (message) => message || '',
+    renderStatusBadge: () => '<span>badge</span>',
+  });
+  browserWindow.RootShell.register('views.recipesAdminState', {});
+
+  executeRootScript(path.join('views', 'recipes-admin.renderers.js'), context);
+
+  const renderers = browserWindow.RootShell.require('views.recipesAdminRenderers');
+  const detailMarkup = renderers.renderRecipeDetail({ id: 5, name: 'Base', code: 'B-1', recipeType: 'BASE', updatedAt: '2026-01-01' }, {
+    detailState: 'ready',
+    activeTab: 'versions',
+    versions: [{ id: 9, versionNumber: 4, status: 'DRAFT', ingredients: [], stages: [] }],
+    associatedProducts: [],
+    permissions: { canAssignRecipesToProducts: false, canManageRecipes: true, canApproveRecipes: true },
+    versionFeedbackById: {
+      9: { versionId: 9, tone: 'error', summary: 'No se pudo aprobar esta version.', detail: 'Falta asignar producto', showRepairAction: true },
+    },
+    incompleteVersionIds: { 9: true },
+  });
+
+  assert.match(detailMarkup, /data-version-feedback="9"/);
+  assert.match(detailMarkup, /Reparar borrador/);
+  assert.match(detailMarkup, /Incompleta/);
+  assert.match(detailMarkup, /no puede aprobarse todavia/i);
 });
 
 test('recipes admin version editor module remains registered as dedicated task-010 split seam', () => {
@@ -188,4 +244,158 @@ test('recipes-admin.version-editor.js shows remaining available quantity per rec
     /disponible|remaining|Disponible/,
     'version-editor must indicate remaining available quantity per recollected product',
   );
+});
+
+test('recipes-admin.js gates approval behind a custom confirmation dialog and local feedback state (recipe-approval-ux)', () => {
+  const source = readRootFile(path.join('views', 'recipes-admin.js'));
+
+  assert.match(source, /openApprovalDialog/);
+  assert.match(source, /recipes-approval-dialog/);
+  assert.match(source, /confirmApprovalButton\.addEventListener\('click'/);
+  assert.match(source, /setVersionFeedback/);
+  assert.match(source, /scrollVersionCardFeedbackIntoView/);
+  assert.match(source, /shouldMarkDraftIncompleteFromApprovalError/);
+  assert.match(source, /findUnderAllocatedRepairHighlight/);
+  assert.match(source, /fue recolectado pero no se usa completamente en una etapa posterior/);
+  assert.match(source, /Revisa las etapas de procesamiento posteriores/);
+});
+
+test('recipes-admin.version-editor.js implements stage-type-aware incomplete row handling and repair highlight hooks (recipe-approval-ux)', () => {
+  const source = readRootFile(path.join('views', 'recipes-admin.version-editor.js'));
+
+  assert.match(source, /inspectIncompleteStageInputs/);
+  assert.match(source, /validateStageStructureInline/);
+  assert.match(source, /focusValidationTarget/);
+  assert.match(source, /Codigo de proceso/);
+  assert.match(source, /Descripcion del proceso/);
+  assert.match(source, /No se puede guardar el borrador\. Completa las filas incompletas de RECOLLECTION/);
+  assert.match(source, /Hay filas incompletas en PROCESSING\. Guardaremos el borrador como incompleto/);
+  assert.match(source, /applyRepairHighlight/);
+  assert.match(source, /data\.stageInputName|dataset\.stageInputName/);
+  assert.match(source, /data\.stageName|dataset\.stageName/);
+});
+
+// ─── AUD-001: processCode catalog alignment ───────────────────────────────────
+
+test('recipes-admin.version-editor.js PROCESS_CODE_OPTIONS includes every backend RECIPE_STAGE_PROCESS_CODES value (AUD-001)', () => {
+  const backendSource = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'schemas', 'recipe.schema.js'),
+    'utf8',
+  );
+  const editorSource = readRootFile(path.join('views', 'recipes-admin.version-editor.js'));
+
+  // Extract backend codes from RECIPE_STAGE_PROCESS_CODES array literal
+  const backendMatch = backendSource.match(/const RECIPE_STAGE_PROCESS_CODES\s*=\s*\[([ \s\S]*?)\];/);
+  assert.ok(backendMatch, 'backend source must define RECIPE_STAGE_PROCESS_CODES');
+  const backendCodes = [...backendMatch[1].matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+  assert.ok(backendCodes.length > 0, 'backend must expose at least one process code');
+
+  // Every backend code must appear in the editor's PROCESS_CODE_OPTIONS as a value field
+  for (const code of backendCodes) {
+    assert.ok(
+      editorSource.includes(`value: '${code}'`) || editorSource.includes(`value:'${code}'`),
+      `PROCESS_CODE_OPTIONS in version-editor must include backend code ${code}`,
+    );
+  }
+});
+
+// ─── AUD-009: buildRepairHighlight behavioral tests ───────────────────────────
+
+function loadRecipesAdminWithMocks(browserWindow, context) {
+  executeRootScript('registry.js', context);
+  browserWindow.RootShell.register('recipesApi', {});
+  browserWindow.RootShell.register('productsApi', {});
+  browserWindow.RootShell.register('ui', {
+    escapeHtml: (v) => String(v || ''),
+    formatDate: () => '01/01/2026',
+    renderInlineMessage: (msg) => msg || '',
+    renderStatusBadge: () => '',
+  });
+  browserWindow.RootShell.register('sessionAdapter', {});
+  browserWindow.RootShell.register('views.recipesAdminHelpers', {});
+  browserWindow.RootShell.register('views.recipesAdminState', {});
+  browserWindow.RootShell.register('views.recipesAdminVersionEditor', {});
+  browserWindow.RootShell.register('views.recipesAdminRenderers', {
+    renderWorkspace: () => '<section id="w"></section>',
+  });
+  executeRootScript(path.join('views', 'recipes-admin.js'), context);
+  return browserWindow.RootShell.require('views.recipesAdmin');
+}
+
+test('buildRepairHighlight returns null when no version provided (AUD-009)', () => {
+  const { browserWindow, context } = createBrowserContext();
+  const admin = loadRecipesAdminWithMocks(browserWindow, context);
+  const result = admin._buildRepairHighlight(null, 'cualquier mensaje');
+  assert.strictEqual(result, null);
+});
+
+test('buildRepairHighlight returns null when message is empty (AUD-009)', () => {
+  const { browserWindow, context } = createBrowserContext();
+  const admin = loadRecipesAdminWithMocks(browserWindow, context);
+  const version = { stages: [{ stageType: 'RECOLLECTION', name: 'Recoleccion', stageInputs: [{ name: 'Tapa 3M', productId: 1 }] }] };
+  assert.strictEqual(admin._buildRepairHighlight(version, ''), null);
+  assert.strictEqual(admin._buildRepairHighlight(version, null), null);
+});
+
+test('buildRepairHighlight highlights RECOLLECTION input for under-allocation error (AUD-009)', () => {
+  const { browserWindow, context } = createBrowserContext();
+  const admin = loadRecipesAdminWithMocks(browserWindow, context);
+
+  const version = {
+    stages: [
+      {
+        stageType: 'RECOLLECTION',
+        name: 'Recoleccion',
+        stageInputs: [{ name: 'Tapa 3M', productId: 1, quantity: 10 }],
+      },
+      {
+        stageType: 'PROCESSING',
+        name: 'Tapado',
+        stageInputs: [{ name: 'Tapa 3M', productId: 1, quantity: 5 }],
+      },
+    ],
+  };
+
+  // Backend message for under-allocation: includes 'insumo "X" tiene N sin asignar'
+  const message = 'Para aprobar la receta, todos los materiales recolectados deben ser usados completamente. El insumo "Tapa 3M" tiene 5 sin asignar';
+  const result = admin._buildRepairHighlight(version, message);
+
+  assert.ok(result, 'should produce a highlight for under-allocation');
+  assert.strictEqual(result.stageName, 'Recoleccion', 'should point to the RECOLLECTION stage');
+  assert.strictEqual(result.inputName, 'Tapa 3M', 'should name the under-allocated input');
+  assert.match(result.message, /Tapa 3M/, 'message should mention the input name');
+  assert.match(result.message, /etapa posterior|procesamiento/i, 'message should guide user toward a later stage');
+});
+
+test('buildRepairHighlight returns null for under-allocation when RECOLLECTION stage not found (AUD-009)', () => {
+  const { browserWindow, context } = createBrowserContext();
+  const admin = loadRecipesAdminWithMocks(browserWindow, context);
+
+  // Version has no RECOLLECTION stage that matches the input
+  const version = {
+    stages: [
+      { stageType: 'PROCESSING', name: 'Mezclado', stageInputs: [{ name: 'Otro insumo', productId: 2, quantity: 3 }] },
+    ],
+  };
+
+  const message = 'El insumo "Tapa 3M" tiene 5 sin asignar';
+  const result = admin._buildRepairHighlight(version, message);
+  assert.strictEqual(result, null, 'should return null when no matching RECOLLECTION stage exists');
+});
+
+test('buildRepairHighlight matches stage name from generic backend message (AUD-009)', () => {
+  const { browserWindow, context } = createBrowserContext();
+  const admin = loadRecipesAdminWithMocks(browserWindow, context);
+
+  const version = {
+    stages: [
+      { stageType: 'PROCESSING', name: 'Mezclado', stageInputs: [] },
+      { stageType: 'RECOLLECTION', name: 'Recoleccion', stageInputs: [] },
+    ],
+  };
+
+  // Message mentioning only a stage name (not under-allocation)
+  const result = admin._buildRepairHighlight(version, 'La etapa "Mezclado" excede la cantidad disponible');
+  assert.ok(result, 'should produce a highlight when stage name appears in message');
+  assert.strictEqual(result.stageName, 'Mezclado');
 });

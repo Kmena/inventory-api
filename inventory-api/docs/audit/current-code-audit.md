@@ -1,460 +1,444 @@
-# Current Code Audit — post-audit-hardening cycle
-**Agent ID:** baseline-audit-agent-748380
-**Audit scope:** Full repository re-audit following seven fixes applied since the prior baseline (score 8.1/10):
-- AUD-025 (Medium): `GET /api/roles/company/:roleId` added to `docs/runtime-endpoint-catalog.md`
-- AUD-002 (Low): `docs/current-state.md` §7 updated with `Client.creditLimit`, `Client.creditBalance`, `ClientStore.creditLimit`, `ClientStore.creditBalance`; §8 updated with `GET /api/clients/:id/ledger` and TASK-015 credit lifecycle description
-- AUD-005 (Low): Comment added to `computeRecollectedBalances` in `recipes-admin.version-editor.js` documenting floating-point precision limitation and Decimal.js upgrade path
-- AUD-013 (Low): New test added — `approveRecipeVersion` rejects when one product is fully allocated but another is partially allocated (multi-product under-allocation)
-- AUD-014 (Low): Comment added to `root-shell-recipes-admin-view-characterization.test.js` documenting the DOM execution gap and E2E future path
-- AUD-016 (Low): Comment added clarifying that legacy fixtures without `stageType` are intentional backward-compat cases
-- AUD-019 (Low): `assertRecipeStageLineageAndAllocation` exported via `__private__` in `recipe.service.js`
+# Current Code Audit — recipe-approval-ux (AUD-001 / AUD-002 / AUD-003 Resolution Cycle)
 
-**Prior audit agent:** baseline-audit-agent-20ddf6
-**Prior audit score:** 8.1 / 10 — Acceptable
-**Audit date:** 2026
-**Test suite at audit time:** 1 542 pass · 0 fail · 3 skipped (DB-gated) · 1 545 total
-**ESLint:** 0 warnings. **TypeScript typecheck:** clean.
-**Canonical docs:** `docs/current-state.md` describes implemented reality; `docs/architecture.md` describes active runtime architecture.
-**Coverage posture:** focused post-implementation baseline audit under the bounded runtime governance model; test suite exercises the observable runtime surface, not exhaustive OpenAPI contract coverage.
+## Audit Metadata
+
+- **Audit Agent ID:** `baseline-audit-agent-c763e9`
+- **Repository:** `inventory-api`
+- **Feature slice reviewed:** `recipe-approval-ux` — three targeted findings (AUD-001, AUD-002, AUD-003) resolved by `sdd-implementation-agent-d75f97`
+- **Spec path:** `inventory-api/specs/recipe-approval-ux/` *(see AUD-REC-002: directory is present but empty)*
+- **Prior baseline score:** 9.2 / 10 — recorded by `baseline-audit-agent-1fab9c` (purchase-orders-workspace cycle)
+- **Inspection method:** Targeted repository traversal — changed files, schema alignment, typecheck config, test file, and all referenced dependencies
 
 ---
 
 ## Executive Summary
 
-All seven declared fixes have been verified against the live source code and all are correctly implemented. Additionally, three findings open from the prior audit (AUD-027, AUD-028, AUD-029) were resolved between audit cycles and are confirmed closed in this pass. One new Low-severity finding is identified (AUD-030).
+This audit is the resolution-verification pass for three findings identified in the `recipe-approval-ux` implementation cycle. All three findings are confirmed **RESOLVED** based on direct code inspection. No regressions are detected against the prior baseline.
 
-**AUD-025 (Medium — CLOSED):** `GET /api/roles/company/:roleId` is present at line 89 of `docs/runtime-endpoint-catalog.md` with the entry `| GET | /api/roles/company/:roleId | Sí | authorizeAccessPolicy('role.company.list') | Obtener rol de compañía por ID | Tenant isolation; devuelve 404 si el rol no pertenece a la compañía |`. The only remaining Medium-severity finding in the prior audit is now closed.
+| Finding | Severity | Prior Status | Current Status |
+|---|---|---|---|
+| AUD-001: PROCESS_CODE_OPTIONS had only 8 of 28 backend process codes | High | Open | ✅ RESOLVED |
+| AUD-002: tsconfig.typecheck.json excluded all recipe-admin browser files | Medium | Open | ✅ RESOLVED |
+| AUD-003: No behavioral tests for `buildRepairHighlight` | Medium | Open | ✅ RESOLVED |
 
-**AUD-002 (Low — CLOSED):** `docs/current-state.md` §7 now lists `Client.creditLimit`, `Client.creditBalance` (migration `20260924020000_add_credit_fields_to_client`), `ClientStore.creditLimit`, and `ClientStore.creditBalance`. Section §8 now includes `GET /api/clients/:id/ledger` and the full TASK-015 credit lifecycle description covering `approvePayment`/`reversePayment` logic at both client and store levels.
+Two new minor findings are raised in this pass:
 
-**AUD-005 (Low — ACKNOWLEDGED):** Comment block added above `computeRecollectedBalances` in `recipes-admin.version-editor.js` documenting the JavaScript floating-point limitation and the `Decimal.js` upgrade path. Technical debt is now documented in-line; the underlying arithmetic has not changed.
-
-**AUD-013 (Low — CLOSED):** New test `approveRecipeVersion rejects when one product is fully allocated but another is partially allocated (AUD-013, multi-product under-allocation)` confirmed at line 673 of `tests/recipe-service-foundation.test.js`. The test uses productId 20 (Agua: 10 recollected, 10 used → OK) and productId 21 (Sal: 5 recollected, 3 used → fails) and asserts `statusCode 400`, `code 'validation_error'`, and that the error message matches `/Sal/i` (the under-allocated product, not the OK one). The test is precise and meaningful.
-
-**AUD-014 (Low — ACKNOWLEDGED):** Two-line comment added at the top of `root-shell-recipes-admin-view-characterization.test.js` (`AUD-014: These tests exercise source-level structural contracts (regex over source text) and Node vm-sandboxed execution where possible. Full DOM execution would require a headless browser environment (e.g. Playwright) and is tracked as a future E2E concern.`). Gap is now documented; underlying limitation remains.
-
-**AUD-016 (Low — ACKNOWLEDGED):** Comment added at lines 4–6 of `root-shell-recipes-admin-view-characterization.test.js` (`AUD-016: All PROCESSING stage fixtures in this file intentionally omit stageType where they test the legacy backward-compat path (stageType defaults to PROCESSING). All explicitly typed PROCESSING stages include processCode, verified by linting the fixtures.`). The legacy-fixture pattern is now explicitly documented as intentional backward-compat behavior, not an oversight.
-
-**AUD-019 (Low — CLOSED):** `assertRecipeStageLineageAndAllocation` is exported via the `__private__` block at line 629 of `src/services/recipe.service.js`. The export block reads `__private__: { assertAllStageInputsHaveProductId, assertRecipeStageLineageAndAllocation }`. The function is now directly accessible to unit tests without reaching through the full service API.
-
-**Between-cycle resolutions (confirmed in this audit, not in the seven stated fixes):**
-- **AUD-027 (Low — CLOSED):** `docs/current-state.md` §14 no longer lists `DEF-PRD-001`. Only `DEF-PRD-002` (manual E2E evidence gap) remains as a known defect. `docs/action-plan.md` §16 Risks marks the process-code catalog item `~~Medium~~ | RESOLVED`. Both stale entries from the prior audit are gone.
-- **AUD-028 (Low — CLOSED):** Two AUD-028-labeled tests confirmed in `tests/credit-balance-update-characterization.test.js` at lines 440 and 460: one asserts `tx.clientStore.update` is called once with `{ creditBalance: { decrement: 200 } }` when `clientStoreId` is populated; the other asserts `tx.clientStore.update` is NOT called when the order has no `clientStoreId`. Both branches are now covered.
-- **AUD-029 (Low — CLOSED):** `CHANGELOG.md` entry `2026-09-01 — credit-and-catalog-alignment` covers DEF-002, AUD-026, TASK-015, the credit-fields migration, `creditLimit` in `allowedFields`, ledger exposure, and the AUD-028 tests. The prior cycle's operational history is documented.
-
-**Test count:** 1 542 pass vs 1 539 in the prior audit (+3 new passing tests: 1 from AUD-013 multi-product under-allocation + 2 from AUD-028 store-level credit path). Zero failures. Zero ESLint warnings. Clean TypeScript typecheck.
-
-**New finding — AUD-030 (Low):** The seven fixes applied in this cycle (AUD-025, AUD-002, AUD-005, AUD-013, AUD-014, AUD-016, AUD-019) have no corresponding CHANGELOG.md entry. The CHANGELOG's most recent dated entry (`2026-09-01`) covers the prior cycle. This is a Low-severity documentation gap consistent with prior AUD-029.
-
-**Score update: 8.1 → 8.4 / 10 — Acceptable**
+| Finding | Severity | Category |
+|---|---|---|
+| AUD-REC-001: Test file labels behavioral tests "AUD-009", not "AUD-003" | Low | Documentation — ID traceability gap |
+| AUD-REC-002: `specs/recipe-approval-ux/` directory is present but contains 0 files | Low | Documentation — Missing spec artifacts |
 
 ---
 
 ## Overall Score
 
-**Overall Score: 8.4 / 10**
+**Overall Score: 9.4 / 10**
 
-| Dimension | Prior (8.1) | Current (8.4) | Δ | Notes |
-|---|---|---|---|---|
-| Backend correctness | 9.2 | 9.2 | — | No backend logic changes in this cycle |
-| Tenant isolation | 9.5 | 9.5 | — | Unchanged |
-| Frontend correctness | 8.0 | 8.0 | — | AUD-005 comment only; arithmetic unchanged |
-| Test coverage | 8.2 | 8.5 | +0.3 | AUD-013 (multi-product under-alloc) + AUD-028 (store-level credit) both resolved |
-| Pattern adherence | 8.5 | 8.5 | — | No regressions; structural debt unchanged |
-| Security posture | 9.0 | 9.0 | — | No changes |
-| Documentation accuracy | 6.9 | 7.8 | +0.9 | AUD-025, AUD-002, AUD-027, AUD-029 all closed; minus AUD-030 (new CHANGELOG gap −0.1) |
+### Score derivation from prior baseline of 9.2
 
-**Score derivation:**
-- AUD-025 (Medium, closed): +0.10 — the only remaining Medium finding eliminated; endpoint catalog now complete
-- AUD-013 (Low, closed via test): +0.05 — multi-product under-allocation edge case now verified
-- AUD-028 (Low, closed between cycles): +0.04 — store-level credit path now tested with two targeted assertions
-- AUD-019 (Low, closed via export): +0.03 — `assertRecipeStageLineageAndAllocation` now independently testable
-- AUD-002 (Low, closed via doc update): +0.03 — credit fields and TASK-015 now in current-state.md
-- AUD-027 (Low, closed between cycles): +0.03 — stale DEF-PRD-001 removed from current-state and action-plan
-- AUD-029 (Low, closed between cycles): +0.02 — prior cycle operational history now in CHANGELOG
-- AUD-005 (Low, acknowledged): +0.01 — floating-point debt now documented in-line
-- AUD-014 (Low, acknowledged): +0.01 — DOM execution gap now documented in test file
-- AUD-016 (Low, acknowledged): +0.01 — legacy fixture intent now documented in test file
-- AUD-030 (Low, new CHANGELOG gap): −0.02 — current cycle's fixes not in CHANGELOG
+| Factor | Delta |
+|---|---|
+| AUD-001 resolved — PROCESS_CODE_OPTIONS expanded from 8 to all 28 backend codes | +0.10 |
+| AUD-002 resolved — 7 recipe-admin files added to typecheck scope with full JSDoc annotations | +0.05 |
+| AUD-003 resolved — 5 behavioral VM tests + 1 catalog alignment test for `buildRepairHighlight` | +0.03 |
+| AUD-REC-001 (new, Low): test labels say AUD-009, implementation agent said AUD-003 | −0.01 |
+| AUD-REC-002 (new, Low): `specs/recipe-approval-ux/` exists but is empty | −0.01 |
+| **Net improvement** | **+0.16** |
 
-**Net Δ = +0.29 → rounded to +0.3 → 8.4**
+### Persistent deductions (carried from prior baseline, unchanged)
 
-**Verdict: Acceptable.** The codebase continues in good health. All seven declared fixes are correctly implemented. The sole remaining Medium item from the prior audit (AUD-025) is closed. Zero Medium or higher open findings remain. All open items are Low severity: one new finding (AUD-030), two acknowledged technical debts (AUD-005, AUD-014), and two pre-existing structural constraints (DB-001, DB-003). The structural architectural debt of the layered monolith is well-understood and fully documented.
+| Factor | Impact |
+|---|---|
+| AD-001: Two-mode access control coexistence (legacy `authorizePermission` + new `authorizeAccessPolicy`) | −0.15 |
+| AD-002: Two-step browser payment flow without server-side atomic op | −0.10 |
+| AD-003: `creditBalance` as mutable aggregate, not event-sourced | −0.10 |
+| AD-005: Billing trigger best-effort with no retry/alert | −0.10 |
+| AUD-017: Missing E2E tests for billing UI flows | −0.10 |
+| Partial OpenAPI coverage (intentional, bounded by exclusion manifest) | −0.10 |
+| `.env` committed with weak JWT secret | −0.05 |
+| AUD-018: `_activeTab` assigned but never read in `billing-admin.js` | −0.02 |
+| MAINT-001: `escapeHtml` duplicated across 5 warehouse files | −0.02 |
+| TEST-003: Leaked `tmp-prisma-lock-*` directories in `tests/` | −0.02 |
+| SEC-002: `resolveView` bypasses permission gate for `receive-from-po` (UI-layer only) | −0.02 |
+
+**Verdict: Acceptable**
 
 ---
 
 ## Repository Overview
 
-| Property | Value |
+| Attribute | Value |
 |---|---|
-| Language / Runtime | Node.js 24 (CommonJS), TypeScript typecheck only |
-| Framework | Express 4.22 |
-| ORM | Prisma 5.22 + PostgreSQL |
-| Session | Redis (production) / in-memory (dev/test) |
-| Test runner | `node:test` (built-in) |
-| Total migrations | 68 committed |
-| Total test files | 198 |
-| Total passing tests | 1 542 (0 fail, 3 DB-gated skipped) |
-| ESLint warnings | 0 |
-| TypeScript errors | 0 |
-| Docker | Multi-stage, non-root user `inventory`, healthcheck on `/health/ready` |
+| Runtime | Node.js 24, Express 4.22, Prisma 5.22 |
+| Database | PostgreSQL 16 (via Prisma) |
+| Browser runtime | Vanilla JS SPA shells: `src/public/root/`, `src/public/warehouse/`, `src/public/agent/`, `src/public/supplier-quote/` |
+| Test runner | `node --test` (native Node.js) + Playwright E2E |
+| Total test files | ~176+ files in `tests/` |
+| Migrations | 63 directories, latest `20260926000000_add_recipe_stage_input_quantity_basis` |
+| Active runtime dependencies | 8 (`express`, `@prisma/client`, `zod`, `jsonwebtoken`, `bcrypt`, `morgan`, `cors`, `dotenv`) |
+| Open npm vulnerabilities | 0 (enforced by `audit-baseline.json` + CI) |
 
 ---
 
 ## Current Architecture
 
-The system is a **layered Express + Prisma monolith** that simultaneously serves JSON APIs and browser SPAs from one process.
+**Style:** Layered modular monolith. Not hexagonal. Unchanged from previous baseline.
 
-```
-HTTP Routes (src/routes/)
-  └── Zod validation (src/schemas/)
-       └── Service layer (src/services/)         ← business orchestration
-            └── Repository layer (src/repositories/)
-                 └── Prisma client (src/lib/prisma.js)
-                      └── PostgreSQL
+**Layers (bottom to top):**
+1. **Persistence** — Prisma ORM + PostgreSQL; repositories own all Prisma access
+2. **Repository layer** — tenant-scoped query wrappers; no business logic
+3. **Service layer** — business orchestration, `assertCompanyScope`, audit trail coordination
+4. **HTTP boundary** — Express routes + Zod validation + access policy middleware
+5. **Browser delivery** — `express.static(src/public/)` serving SPA shells
+6. **Root SPA shell** — actor-aware hash router + `window.RootShell` module registry
+7. **Warehouse SPA** — bounded `window.WarehouseShell` registry with permission-gated hash routing
+8. **Agent SPA** — standalone sales-agent workspace
+9. **Governance layer** — scripts, validators, characterization tests, GitHub Actions workflows
 
-Browser SPAs (src/public/root/, src/public/warehouse/, src/public/agent/)
-  └── in-repo API wrapper modules
-       └── same backend routes via HTTP
-```
+No architectural changes were introduced in this cycle.
 
-Active module groupings: Identity & Access · Customer / Company / Roles / Users · Products / Recipes · Inventory / Warehouses / Lots · Production / QA · Procurement / Receipts · Sales / Orders / Billing / Payments · Supplier Quotations.
-
-No event bus, no message queue, no async workers. All writes are synchronous request/response.
+**Documentation ownership:** `docs/architecture.md` describes active runtime architecture and is the canonical reviewed artifact under `docs/**`. `docs/current-state.md` describes implemented behavior and is kept current after each feature cycle. Bounded OpenAPI/runtime artifacts under `docs/**` remain governed by the existing characterization and governance tests.
 
 ---
 
 ## Documentation Findings
 
-### DOC-001 — Current cycle fixes absent from CHANGELOG.md
-**ID:** AUD-030
-**Severity:** Low
-**Category:** Missing documentation
-**Location:** `CHANGELOG.md`
-**Evidence:** The most recent CHANGELOG entry is `2026-09-01 — credit-and-catalog-alignment`, which covers the prior audit cycle. The seven fixes applied in this cycle (AUD-025 endpoint catalog, AUD-002 current-state doc, AUD-005 FP comment, AUD-013 new test, AUD-014 DOM comment, AUD-016 legacy-fixture comment, AUD-019 `__private__` export) have no corresponding CHANGELOG entry. Test count grew from 1 539 to 1 542 (net +3 new passing tests).
-**Concern type:** Missing documentation.
-**Impact:** Operational history is incomplete for this cycle. Engineers performing triage will not find the AUD-013 test addition or the AUD-019 export in the changelog.
-**Recommendation:** Add a dated CHANGELOG entry covering AUD-025 catalog addition, AUD-002 doc refresh, AUD-005/AUD-014/AUD-016 comments, AUD-013 test, and AUD-019 export. Include test-suite delta (1 539 → 1 542).
+### AUD-REC-001 — Audit Finding ID Mismatch Between Implementation Report and Test File
+- **ID:** AUD-REC-001
+- **Severity:** Low
+- **Category:** Documentation — ID traceability gap
+- **Location:** `tests/root-shell-recipes-admin-view-characterization.test.js` lines 259–310 (behavioral tests); implementation agent message (finding references)
+- **Evidence:** The implementation agent identifies the behavioral test finding as **AUD-003**. The test file labels all five behavioral VM tests for `buildRepairHighlight` as **AUD-009** in every test description string (e.g., `'buildRepairHighlight returns null when no version provided (AUD-009)'`). The catalog alignment test correctly references **AUD-001**.
+- **Impact:** A developer searching tests for AUD-003 would find nothing. A developer searching for AUD-009 in the audit file would find no matching entry. Traceability between audit findings and test coverage is partially broken.
+- **Recommendation:** Either update the test descriptions from `AUD-009` to `AUD-003`, or add an `AUD-003 → AUD-009` alias note in the audit document. Low effort to correct.
+- **Documentation separation assessment:** This is a current-state accuracy issue, not a mixed current/future-state issue.
+
+### AUD-REC-002 — Empty Specification Directory
+- **ID:** AUD-REC-002
+- **Severity:** Low
+- **Category:** Documentation — Missing spec artifacts
+- **Location:** `inventory-api/specs/` (directory exists; `inventory-api/specs/recipe-approval-ux/` referenced by implementation agent but no files present)
+- **Evidence:** `list_files(directory="inventory-api/specs", recursive=True)` returns `0 directories, 0 files`. The specs folder is entirely empty. The implementation agent states `inventory-api/specs/recipe-approval-ux/` as the specification path but no specification, task list, traceability matrix, or implementation report exists there.
+- **Impact:** Future agents cannot locate the feature specification. Traceability from requirements to implementation is severed. The `current-state.md` references `specs/qa-rejection-material-reconciliation-amendment/` for a prior feature, establishing a precedent that specs should live in this directory.
+- **Recommendation:** Either commit the recipe-approval-ux specification artifacts to `specs/recipe-approval-ux/`, or remove the specs directory if no spec management is intended going forward.
+- **Documentation separation assessment:** This is a missing-documentation finding, not a mixed current/future-state issue.
 
 ---
 
-### DOC-002 — Documentation separation assessment (positive)
-**Severity:** Informational
-**Location:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`
-**Assessment:** Documentation separation is in very good shape in this cycle.
-- `docs/current-state.md` correctly describes observable current truth. §14 now contains only `DEF-PRD-002` (manual E2E evidence gap); the stale `DEF-PRD-001` entry has been removed. §7 and §8 now accurately reflect the credit lifecycle.
-- `docs/architecture.md` correctly describes the active runtime architecture, including known limitations (no domain layer, no formal ports, service-layer coupling). Future proposals are absent from this document.
-- `docs/action-plan.md` is the forward-looking tracker. §16 Risks correctly marks the process-code catalog item as `RESOLVED`. §5 Problems-still-open correctly lists only unresolved items (manual E2E evidence gap and service-heavy coupling). No current/future conflation detected.
-- `docs/future-architecture.md` is not present, which is correct — no target-state vision has been approved.
-- `docs/documentation-ownership-map.md` defines clear canonical vs auxiliary ownership with auto-validated artifacts called out.
-**Conclusion:** No penalty. The concern separation is clean and internally consistent. The only documentation gap is AUD-030 (CHANGELOG omission for this cycle).
+## AUD-001 Resolution Verification — PROCESS_CODE_OPTIONS Catalog Alignment
 
----
+- **ID:** AUD-001
+- **Severity:** High (prior) → **RESOLVED**
+- **Category:** Known Defect — Frontend/backend catalog mismatch
+- **Location:** `src/public/root/views/recipes-admin.version-editor.js` lines 258–297 (`PROCESS_CODE_OPTIONS`)
+- **Prior state:** PROCESS_CODE_OPTIONS had only 8 entries. 20 of 28 backend `RECIPE_STAGE_PROCESS_CODES` values were missing from the UI dropdown. Users editing a PROCESSING stage could only select from a fraction of the approved catalog.
+- **Current state:** PROCESS_CODE_OPTIONS now contains **28 entries** exactly matching `RECIPE_STAGE_PROCESS_CODES` in `src/schemas/recipe.schema.js`.
 
-## Main Modules
+**Verified alignment (28/28 entries):**
 
-| Module area | Files | Primary responsibility |
+| Category | Backend codes | Present in UI |
 |---|---|---|
-| Routes | `src/routes/*.routes.js` (27 files) | HTTP adapter; Zod validation middleware; no business logic |
-| Services | `src/services/*.service.js` (40+ files) | Business orchestration, permission checks, serialization |
-| Repositories | `src/repositories/*.repository.js` (22 files) | Prisma queries; no business logic |
-| Schemas | `src/schemas/*.schema.js` (24 files) | Zod request validation |
-| Security | `src/security/` | Permission governance, access policies, role bundles |
-| Middleware | `src/middlewares/` | authenticate, authorize, throttle, payload governance |
-| Lib | `src/lib/` | money, pagination, audit, Prisma singleton, logging |
-| Root SPA | `src/public/root/` | Admin SPA (vanilla JS, no bundler) |
-| Warehouse SPA | `src/public/warehouse/` | Operator SPA |
-| Agent SPA | `src/public/agent/` | Field-agent mobile SPA |
+| Thermal | HEATING, COOLING, FREEZING, DRYING, PASTEURIZATION, STERILIZATION | ✅ All 6 |
+| Mixing / transformation | MIXING, BLENDING, DISSOLUTION, DILUTION, EMULSIFICATION | ✅ All 5 |
+| Mechanical | MILLING, GRINDING, CUTTING, SIEVING, FILTERING | ✅ All 5 |
+| Reaction / maturation | FERMENTATION, CURING, RESTING, HYDRATION | ✅ All 4 |
+| Forming / production | FORMING, COOKING, BAKING | ✅ All 3 |
+| Finishing | PACKING_PREP, LABELING_PREP, CAPPING, SEALING | ✅ All 4 |
+| Escape hatch | OTHER | ✅ 1 |
+
+**Evidence:** Direct file inspection at lines 258–297. Each `{ value: 'CODE', label: '...' }` entry confirmed present. A synchronization comment was added at the catalog definition:
+
+```javascript
+// AUD-001: full catalog aligned with backend — do not add or remove values without
+// updating RECIPE_STAGE_PROCESS_CODES in src/schemas/recipe.schema.js simultaneously.
+```
+
+**Regression guard:** Test `recipes-admin.version-editor.js PROCESS_CODE_OPTIONS includes every backend RECIPE_STAGE_PROCESS_CODES value (AUD-001)` in `root-shell-recipes-admin-view-characterization.test.js` programmatically extracts all codes from `src/schemas/recipe.schema.js` via regex and asserts each one appears in the editor source as `value: 'CODE'`. This is a structural regression gate that will catch future drift automatically.
+
+**Status: RESOLVED.** Finding is closed.
+
+---
+
+## AUD-002 Resolution Verification — TypeScript Typecheck Coverage for Recipe Admin Files
+
+- **ID:** AUD-002
+- **Severity:** Medium (prior) → **RESOLVED**
+- **Category:** Testing — Missing static-analysis coverage
+- **Location:** `inventory-api/tsconfig.typecheck.json`
+- **Prior state:** All recipe-admin browser files were absent from the `include` list in `tsconfig.typecheck.json`. Type errors in these files were not caught by CI.
+- **Current state:** Seven recipe-admin files are now included in the typecheck scope.
+
+**Verified additions to `tsconfig.typecheck.json`:**
+
+```json
+"src/public/root/recipes-api.js",
+"src/public/root/products-api.js",
+"src/public/root/views/recipes-admin.helpers.js",
+"src/public/root/views/recipes-admin.state.js",
+"src/public/root/views/recipes-admin.renderers.js",
+"src/public/root/views/recipes-admin.version-editor.js",
+"src/public/root/views/recipes-admin.js"
+```
+
+**JSDoc annotations added to `recipes-admin.version-editor.js`:** 30+ `@type` annotations were added to resolve TypeScript `checkJs` errors that emerged when the file entered typecheck scope. Representative examples verified:
+
+```javascript
+const productSelect = /** @type {HTMLSelectElement} */ (row.querySelector('.si-product'));
+const nameInput    = /** @type {HTMLInputElement} */ (row.querySelector('.si-name'));
+const qaCheckbox   = /** @type {HTMLInputElement} */ (section.querySelector('.stage-qa'));
+const stageTypeEl  = /** @type {HTMLSelectElement | null} */ (section.querySelector('.stage-type'));
+```
+
+All seven files use `/** @type {any} */ (globalScope).RootShell` patterns that allow typecheck to pass in a browser-global context without a DOM harness.
+
+**Gap noted (Suggestion):** `typecheck-ci-hardening-governance.test.js` does not yet assert that recipe-admin files are present in `tsconfig.typecheck.json`. If these entries were accidentally removed, the governance test would not detect the regression. The typecheck run itself would still pass (it only checks included files), but the coverage reduction would be silent. This is a governance gap, not a defect.
+
+**Status: RESOLVED.** Finding is closed.
+
+---
+
+## AUD-003 Resolution Verification — Behavioral Tests for `buildRepairHighlight`
+
+- **ID:** AUD-003
+- **Severity:** Medium (prior) → **RESOLVED**
+- **Category:** Testing — Missing unit test coverage for key business function
+- **Location:** `src/public/root/views/recipes-admin.js` (function definition and export); `tests/root-shell-recipes-admin-view-characterization.test.js` (tests)
+- **Prior state:** `buildRepairHighlight` existed in `recipes-admin.js` but was not exposed for isolated testing. No behavioral tests existed. The function is responsible for parsing backend approval-failure messages and mapping them to specific stages or inputs to guide the user toward a repair action — a non-trivial parsing concern.
+- **Current state:** The function was moved to IIFE scope (inside `attachRootShellRecipesAdminView`) and explicitly exposed as `_buildRepairHighlight` on the registered module:
+
+```javascript
+rootShell.register('views.recipesAdmin', {
+  mount,
+  render,
+  // Exposed for isolated unit testing only — do not call from application code.
+  _buildRepairHighlight: buildRepairHighlight,
+});
+```
+
+**Five behavioral VM tests verified present** (labeled AUD-009 in test descriptions — see AUD-REC-001):
+
+| Test | Scenario | Key Assertion |
+|---|---|---|
+| `buildRepairHighlight returns null when no version provided (AUD-009)` | `null` version arg | Returns `null` |
+| `buildRepairHighlight returns null when message is empty (AUD-009)` | Empty/null message | Returns `null` for both `''` and `null` |
+| `buildRepairHighlight highlights RECOLLECTION input for under-allocation error (AUD-009)` | Backend message `El insumo "Tapa 3M" tiene 5 sin asignar` | Returns `{ stageName: 'Recoleccion', inputName: 'Tapa 3M', message: /etapa posterior|procesamiento/i }` |
+| `buildRepairHighlight returns null for under-allocation when RECOLLECTION stage not found (AUD-009)` | No RECOLLECTION stage matching the input name | Returns `null` |
+| `buildRepairHighlight matches stage name from generic backend message (AUD-009)` | Message contains stage name `"Mezclado"` | Returns `{ stageName: 'Mezclado' }` |
+
+**Test harness:** All five tests use `loadRecipesAdminWithMocks(browserWindow, context)` — a full VM-sandboxed execution of `recipes-admin.js` with all dependencies mocked. The tests access `admin._buildRepairHighlight(...)` directly. This is a genuine behavioral test, not a source-pattern assertion.
+
+**`findUnderAllocatedRepairHighlight` helper verified:** The internal helper that detects under-allocation messages (`/insumo\s+"([^"]+)".*sin asignar/i`) is also defined at IIFE scope. It correctly searches for a RECOLLECTION stage containing the named input before returning the repair hint.
+
+**Status: RESOLVED.** Finding is closed.
+
+---
+
+## Main Modules (Recipe Admin — Current State)
+
+| Module | Location | Typecheck | Behavioral Tests |
+|---|---|---|---|
+| `recipes-api.js` | `src/public/root/` | ✅ Included | Contract via `root-shell-recipes-api-characterization.test.js` |
+| `products-api.js` | `src/public/root/` | ✅ Included | Indirect via products view characterization |
+| `recipes-admin.helpers.js` | `src/public/root/views/` | ✅ Included | VM harness via characterization test |
+| `recipes-admin.state.js` | `src/public/root/views/` | ✅ Included | VM harness via characterization test |
+| `recipes-admin.renderers.js` | `src/public/root/views/` | ✅ Included | VM harness via characterization test |
+| `recipes-admin.version-editor.js` | `src/public/root/views/` | ✅ Included (30+ JSDoc annotations) | Source-pattern tests |
+| `recipes-admin.js` | `src/public/root/views/` | ✅ Included | VM harness, including `_buildRepairHighlight` behavioral tests |
 
 ---
 
 ## Main Dependencies
 
-| Package | Version | Role | Notes |
-|---|---|---|---|
-| `express` | ^4.22.2 | HTTP framework | Stable; no security flags |
-| `@prisma/client` | ^5.22.0 | ORM | Current; `prisma` in devDeps |
-| `bcrypt` | ^6.0.0 | Password hashing | Updated; supply chain closed |
-| `jsonwebtoken` | ^9.0.2 | JWT auth | Current |
-| `zod` | ^3.23.8 | Schema validation | Current |
-| `dotenv` | ^16.6.1 | Env config | Standard |
-| `cors` | ^2.8.5 | CORS | Standard |
-| `morgan` | ^1.11.0 | HTTP logging | Standard |
-| `body-parser` override | 1.20.6 | CVE mitigation | Pinned via overrides |
-| `brace-expansion` override | 1.1.18 | CVE mitigation | Pinned via overrides |
-
-**Dependency hygiene:** `npm audit` baseline is governed. No known unfixed critical CVEs at time of audit; `body-parser` and `brace-expansion` are overridden for known issues. `validate:dependency-hygiene` script is wired into the `verify` pipeline.
+No new runtime dependencies introduced. All 8 existing production dependencies unchanged. Zero npm audit vulnerabilities.
 
 ---
 
 ## Database Findings
 
-### DB-001 — Dual credit balance at client and store levels (pre-existing, unchanged)
-**ID:** AUD-DB-001
-**Severity:** Low
-**Category:** Schema design / consistency risk
-**Location:** `prisma/schema.prisma` — `Client` model; `ClientStore` model; `src/services/payment.service.js`
-**Evidence:**
-- `Client.creditBalance` and `ClientStore.creditBalance` are updated independently in `approvePayment` and `reversePayment`.
-- The `ClientStore.creditBalance` path is conditional on `invoice.orderId → order.clientStoreId` being navigable.
-- An invoice without `orderId` (nullable in the schema) updates only `Client.creditBalance`, creating a structural asymmetry between client-level and store-level balances.
-- No `CHECK (credit_balance >= 0)` constraint exists on either `clients` or `client_stores` tables.
-- No enforced relationship ensures `sum(store.creditBalance) == client.creditBalance`.
-**Impact:** Silent divergence possible if the invoice-without-orderId path is exercised in production. `creditBalance` can go negative in the database if payment approval precedes order approval.
-**Recommendation:** Consider adding a `CHECK (credit_balance >= 0)` DB constraint in a future migration. Document the intended credit-flow sequencing assumption in `docs/current-state.md`. Consider an application-level guard before the decrement.
+No database changes in this cycle. All prior database findings carry unchanged.
 
----
-
-### DB-002 — Additive migrations are consistently safe (positive observation)
-**Severity:** —
-**Category:** Migration quality
-**Location:** `prisma/migrations/`
-**Evidence:** All 68 committed migrations use `ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN` with safe defaults, or data backfills. No destructive rewrite or column removal detected in the migration history. Decimal precision `(14,2)` is consistent across all monetary columns.
-**Impact:** No risk. Migration hygiene is excellent.
-
----
-
-### DB-003 — No index on `Client.creditBalance` / `Client.creditLimit` (pre-existing, unchanged)
-**ID:** AUD-DB-003
-**Severity:** Low
-**Category:** Missing index
-**Location:** `prisma/schema.prisma` — `Client` model
-**Evidence:** `creditBalance` and `creditLimit` have no explicit Prisma `@@index`. Current ledger query fetches by `clientId` (PK). No billing dashboard filter/sort by credit exposure is active.
-**Impact:** Negligible for current query patterns. Relevant if credit-based dashboards are added later.
-**Recommendation:** Defer until a query pattern requiring it is identified.
+### DB-001 — Committed Development Credentials (Carried)
+- **ID:** DB-001
+- **Severity:** Low
+- **Location:** `inventory-api/.env`
+- **Evidence:** `JWT_SECRET=change_this_super_secret_key`, `DATABASE_URL=postgresql://tracksys:tracksys@localhost:5432/tracksys`. Pre-existing.
 
 ---
 
 ## API Findings
 
-### API-001 — `GET /api/roles/company/:roleId` now present in endpoint catalog (CLOSED)
-**Prior ID:** AUD-025 / DOC-004
-**Status:** CLOSED this cycle.
-**Evidence:** Line 89 of `docs/runtime-endpoint-catalog.md` now reads `| GET | /api/roles/company/:roleId | Sí | authorizeAccessPolicy('role.company.list') | Obtener rol de compañía por ID | Tenant isolation; devuelve 404 si el rol no pertenece a la compañía |`. Route was already implemented and in OpenAPI; catalog omission is now corrected.
-
----
-
-### API-002 — `ClientStore.update` inside payment approval does not re-scope by `companyId` (pre-existing, Low)
-**ID:** AUD-API-002
-**Severity:** Low
-**Category:** Pattern deviation
-**Location:** `src/services/payment.service.js` — `approvePayment`
-**Evidence:** `tx.clientStore.update({ where: { id: invoiceOrder.clientStoreId }, data: ... })` uses only `id` as the WHERE clause. Company scope is inherited transitively from the invoice→client scope validated earlier in the transaction rather than from an explicit `companyId` predicate.
-**Impact:** Not a practical security issue in the current flow. Becomes a risk if the service is extended to accept external `orderId` inputs.
-**Recommendation:** Low priority. Consider adding `companyId` to the WHERE clause for pattern consistency, or document the scope-provenance assumption in a comment.
+No API contract changes in this cycle. All prior API findings carry unchanged.
 
 ---
 
 ## Container Findings
 
-No changes to Docker configuration detected in this cycle. All prior findings remain valid:
-- Multi-stage `Dockerfile`; non-root user `inventory`; healthcheck targets `/health/ready` via `node -e "..."` inline HTTP probe.
-- `docker-compose.dev.yml` is explicitly marked dev-only with Postgres and Redis health checks.
-- `docker-compose.prod.yml` available for production deployment.
-- No secrets or credentials hard-coded in any Dockerfile or compose file.
-- `.dockerignore` present.
-
-No new container findings.
+No changes to `Dockerfile`, `docker-compose.yml`, `.dockerignore`. Container posture unchanged.
 
 ---
 
 ## Security Findings
 
-No security-relevant changes introduced in this cycle. All seven fixes are documentation, comment, test, or export changes with no impact on authentication, authorization, tenant isolation, or data validation.
+### SEC-001 — Committed Weak Credential (Carried)
+- **ID:** SEC-001
+- **Severity:** Low
+- **Location:** `inventory-api/.env:5`
+- **Evidence:** `JWT_SECRET=change_this_super_secret_key`. Pre-existing.
 
-The security posture from the prior audit remains:
-- Bearer-authenticated actor context enforced at route layer.
-- Permission-based route protection via `authorizeAccessPolicy` / `authorizePermission`.
-- Company scoping derived from `auth.companyId` (not from client payload) in all service entrypoints.
-- `creditBalance` is absent from `buildClientPayload` `allowedFields` — direct client-form manipulation is prevented by design.
-- AUD-028 (store-level credit path coverage) is now closed; both branches of the `clientStoreId` conditional are tested.
-- Residual HTTPS enforcement for browser sessions is tracked separately under `specs/p11-https-browser-session-migration/` and remains outside this cycle's scope.
+### SEC-002 — Warehouse SPA `resolveView` Bypasses Permission Gate for `receive-from-po` (Carried)
+- **ID:** SEC-002
+- **Severity:** Low
+- **Location:** `src/public/warehouse/app.js` — `resolveView` function
+- **Evidence:** `receive-from-po` is in `VIEW_MODULE_KEYS` but not in `TAB_DEFINITIONS`, so `!tabDef` is always true and the permission check is skipped. All backend APIs remain individually protected by `authorizeAccessPolicy`. UI-layer only. Pre-existing.
 
 ---
 
 ## Testing Findings
 
-### TEST-001 — Multi-product under-allocation test confirmed (CLOSED — AUD-013)
-**Severity:** —
-**Status:** CLOSED.
-**Location:** `tests/recipe-service-foundation.test.js` line 673
-**Evidence:** Test `approveRecipeVersion rejects when one product is fully allocated but another is partially allocated (AUD-013, multi-product under-allocation)` is correctly structured with two products, one fully allocated and one under-allocated, and asserts `statusCode 400`, `code 'validation_error'`, error message containing the under-allocated product name (Sal), and that the message matches `/sin asignar|asign|aloc/i`. The assertion against the under-allocated product by name (not just any product) is precise and meaningful.
+### TEST-001 — AUD-003 Behavioral Coverage Now Present (Resolved)
+- **Status:** Resolved per inspection above.
 
----
+### TEST-002 — Source-Pattern Test Limitation (Carried Observation)
+- **ID:** TEST-002
+- **Severity:** Suggestion
+- **Location:** Various source-pattern tests in `root-shell-recipes-admin-view-characterization.test.js`
+- **Evidence:** Source-pattern tests (`assert.match(source, /pattern/)`) cannot detect runtime field access errors, undefined references, or API contract violations. The AUD-001 catalog alignment test is a well-designed source-pattern test — it extracts real values from the backend schema rather than asserting fixed strings. This pattern should be used elsewhere for catalog-style assertions.
 
-### TEST-002 — Store-level creditBalance path now tested (CLOSED — AUD-028)
-**Severity:** —
-**Status:** CLOSED.
-**Location:** `tests/credit-balance-update-characterization.test.js` lines 440–475
-**Evidence:** Two tests labeled `AUD-028`:
-1. `approvePayment decrements ClientStore.creditBalance when invoice has orderId → clientStoreId` — asserts `storeUpdateCalls.length === 1`, correct `where.id`, and `data: { creditBalance: { decrement: 200 } }`.
-2. `approvePayment skips ClientStore.creditBalance when order has no clientStoreId` — asserts `storeUpdateCalls.length === 0`.
-Both branches of the `invoiceOrder?.clientStoreId` conditional are now exercised.
+### TEST-003 — Leaked Test Artifacts (Carried)
+- **ID:** TEST-003
+- **Severity:** Low
+- **Location:** `tests/tmp-prisma-lock-*/` (169+ directories)
+- **Evidence:** `prisma-windows-build-stabilization.test.js` uses `fs.mkdtempSync` inside `tests/`. Directories accumulate. Pre-existing.
 
----
-
-### TEST-003 — Pre-existing acknowledged items (unchanged)
-**Severity:** Low
-**Location:** Various
-**Items:**
-- **AUD-005:** `computeRecollectedBalances` uses JavaScript `Number` arithmetic. Comment now documents the limitation and the Decimal.js upgrade path. Technical debt remains; no functional regression.
-- **AUD-014:** Frontend characterization tests in `root-shell-recipes-admin-view-characterization.test.js` exercise source-level patterns via Node `vm` sandbox, not a live DOM. Comment now documents this as a known gap with Playwright as the future E2E path. Debt acknowledged; no change.
-- **AUD-016:** Older PROCESSING-stage fixtures in lineage tests omit `stageType`. Comment now documents these as intentional backward-compat cases. Pattern is clarified; no change.
-
----
-
-### TEST-004 — Test suite health summary
-**Severity:** —
-**Observation:** 1 542 pass, 0 fail, 3 skipped (DB-gated). Net +3 passing tests since the prior audit: 1 from AUD-013 (multi-product under-allocation) and 2 from AUD-028 (store-level credit path). Zero failures. Zero ESLint warnings. Clean TypeScript typecheck. The `verify` script chains lint → typecheck → public-runtime lint → validators → build → test. Suite is in excellent shape.
+### TEST-004 — Typecheck Governance Test Does Not Assert Recipe-Admin Files (New Suggestion)
+- **ID:** TEST-004
+- **Severity:** Suggestion
+- **Category:** Testing — Governance gap
+- **Location:** `tests/typecheck-ci-hardening-governance.test.js`
+- **Evidence:** The governance test verifies a fixed list of root-shell files in `tsconfig.typecheck.json` but does not include the 7 newly added recipe-admin files. If these entries were accidentally removed from `tsconfig.typecheck.json`, the governance test would not catch the regression. The `npm run typecheck` command would continue passing (it only checks what is included), silently losing coverage of the recipe-admin module group.
+- **Impact:** Low — the typecheck is also run as a standalone CI step, so type errors within these files would still surface. The missing governance assertion only affects regression detection for the *presence* of the files in scope.
+- **Recommendation:** Add recipe-admin file assertions to the existing `typecheck-ci-hardening-governance.test.js` loop.
 
 ---
 
 ## Maintainability Findings
 
-### MAINT-001 — Service layer mixes orchestration, business rules, and serialization (pre-existing, structural)
-**Severity:** Low (architectural debt, not a defect)
-**Location:** `src/services/payment.service.js`, `src/services/production.service.js`, others
-**Evidence:** `approvePayment` performs permission assertion → lifecycle assertion → overpayment check → payment approval → credit balance update → invoice financial state synchronization → audit recording — all in one function. `production-execution.service.js` similarly combines inventory lookup, same-lot validation, stock mutation, movement recording, and stage fact persistence.
-**Impact:** High cognitive load per function; difficult to test pure business rules in isolation without stubbing the full transaction machinery.
-**Recommendation:** Tracked as architectural debt. No actionable change in this cycle.
-
----
-
-### MAINT-002 — `docs/current-state.md` now requires multi-cycle structure
-**Severity:** Low
-**Location:** `docs/current-state.md`
-**Evidence:** The document has grown across multiple cycles and now covers QA/production amendments, credit lifecycle, and general system overview. There is no per-section "last updated" marker. Readers cannot easily determine which cycle introduced which content.
-**Impact:** The document remains accurate but becomes harder to maintain as a living reference as the system grows.
-**Recommendation:** Consider adding a `> Last updated:` block per major section or a header table summarizing which cycle last touched each section.
+### MAINT-001 — `escapeHtml` Duplicated Across Warehouse Files (Carried)
+- **ID:** MAINT-001
+- **Severity:** Low
+- **Location:** `src/public/warehouse/app.js`, `views/production.js`, `views/receipts.js`, `views/recipe-consultation.js`, `views/receive-from-po.js`
+- **Evidence:** Five files each define an identical local `escapeHtml(str)` function. Pre-existing.
 
 ---
 
 ## Technical Debt
 
-| ID | Severity | Area | Description | Status |
-|---|---|---|---|---|
-| AUD-005 | Low | Frontend | Floating-point precision in `computeRecollectedBalances`; comment added | Acknowledged |
-| AUD-014 | Low | Testing | Frontend characterization tests are source-level, not DOM execution; comment added | Acknowledged |
-| AUD-016 | Low | Testing | Legacy PROCESSING fixtures omit `stageType` for backward-compat; comment added | Acknowledged (intentional) |
-| AUD-030 | Low | Documentation | CHANGELOG.md not updated for the current cycle's seven fixes | Open |
-| AUD-DB-001 | Low | Schema | Dual credit balance at client and store levels; no `CHECK (credit_balance >= 0)` constraint | Open |
-| AUD-DB-003 | Low | Schema | No index on `Client.creditBalance` / `Client.creditLimit` | Open |
-| AUD-API-002 | Low | Pattern | `tx.clientStore.update` inside payment approval uses only `id` in WHERE; company scope inherited transitively | Open |
-| MAINT-001 | Low | Architecture | Service layer mixes orchestration, rules, and serialization | Open (structural) |
-| MAINT-002 | Low | Documentation | `docs/current-state.md` lacks per-section update markers as it grows across cycles | Open |
-| DEF-PRD-002 | Medium | Testing / Ops | Manual end-to-end evidence for replacement recovery → same-lot execution → reconciliation flow is incomplete in repository docs | Open |
+### Debt carried from prior baseline (unchanged)
 
-**Closed since prior audit:**
-
-| ID | Severity | Area | Resolution |
-|---|---|---|---|
-| AUD-025 | Medium | Documentation | `GET /api/roles/company/:roleId` added to endpoint catalog |
-| AUD-002 | Low | Documentation | `current-state.md` §7 and §8 updated with credit fields and TASK-015 |
-| AUD-013 | Low | Testing | Multi-product under-allocation test added |
-| AUD-019 | Low | Testability | `assertRecipeStageLineageAndAllocation` exported via `__private__` |
-| AUD-027 | Low | Documentation | `DEF-PRD-001` removed from current-state.md and action-plan.md |
-| AUD-028 | Low | Testing | Two AUD-028 tests covering both branches of store-level credit path |
-| AUD-029 | Low | Documentation | CHANGELOG updated for the credit-and-catalog-alignment cycle |
+| ID | Description | Severity |
+|---|---|---|
+| AD-001 | Two-mode access control coexistence | Medium |
+| AD-002 | Two-step browser payment flow without server-side atomic operation | Medium |
+| AD-003 | `creditBalance` as mutable aggregate, not derived from event log | Medium |
+| AD-005 | Billing trigger best-effort with no retry or alerting | Medium |
+| AUD-018 | `_activeTab` assigned but never read in `billing-admin.js` | Low |
+| MAINT-001 | `escapeHtml` duplicated in 5 warehouse view files | Low |
+| TEST-003 | 169+ `tmp-prisma-lock-*` directories leaked into `tests/` | Low |
+| SEC-002 | `resolveView` grants `receive-from-po` access without permission check (UI layer only) | Low |
 
 ---
 
 ## Behavior to Preserve
 
-1. **Company-scoped data access.** Every service function derives `companyId` from `auth.companyId` (not from client payload). Tenant cross-contamination is systematically prevented.
-2. **Payment lifecycle state machine.** `PENDING_APPROVAL → UNDER_REVIEW → APPROVED → REVERSED` with `REJECTED` as a terminal from PENDING/UNDER_REVIEW. `payment-lifecycle-support.service.js` lifecycle assertions must gate all transitions.
-3. **Credit balance increments on order APPROVED.** `inventory.service.js` `reserveStockForOrder` increments `Client.creditBalance` when `clientId && orderAmount > 0`. This is the source-of-truth for the balance growing.
-4. **Credit balance decrements on payment APPROVED.** `payment.service.js` `approvePayment` decrements `Client.creditBalance` inside the Prisma transaction.
-5. **Credit balance restores on payment REVERSED.** `reversePayment` increments `Client.creditBalance` by the original payment amount inside the Prisma transaction.
-6. **Dual-level credit update when orderId is present.** When a payment's invoice has an `orderId` and that order has a `clientStoreId`, both `Client.creditBalance` and `ClientStore.creditBalance` are updated symmetrically.
-7. **`creditBalance` is NOT settable via client form.** `buildClientPayload` deliberately excludes `creditBalance` from `allowedFields`. Only programmatic modification is permitted.
-8. **`creditLimit` is settable via client form.** `buildClientPayload` includes `creditLimit` in `allowedFields` and `numericFields`.
-9. **`getClientLedger` exposes both `creditLimit` and `creditBalance` as `Number`.** Prisma `Decimal` values are converted with `Number()` and guarded with `!= null`.
-10. **PROCESS_CODE_OPTIONS frontend catalog is a safe subset of backend `RECIPE_STAGE_PROCESS_CODES`.** All 8 frontend options (`MIXING`, `HEATING`, `COOLING`, `CAPPING`, `SEALING`, `LABELING_PREP`, `PACKING_PREP`, `OTHER`) are accepted by the backend Zod enum.
-11. **Availability hints in the recipe editor recompute live.** Both `productSelect change` events and `input` events on prior RECOLLECTION `.si-quantity` elements call `updateAvailHint()`. The `data-hint-wired` flag prevents duplicate listener registration.
-12. **Production execution lineage validation on both create and update paths.** `recipe.service.js` calls `assertRecipeStageLineageAndAllocation` when `payload.stages` is present in `updateRecipeVersion`, not only on `createRecipeVersion`.
-13. **Multi-product under-allocation blocks recipe version approval.** `approveRecipeVersion` rejects with `statusCode 400` if any recollected product has unallocated quantities, even when other products are fully allocated.
-14. **Payment approval transaction atomicity.** `executePaymentFinancialSyncTransaction` wraps payment status update, credit balance update, and invoice financial state synchronization in a single `prisma.$transaction`.
-15. **Legacy `VIRTUAL_RECOLECTION` compatibility.** Existing production recolection stages without `recoveryType` default to `VIRTUAL_RECOLECTION` and continue to function without modification.
-16. **Soft delete on clients.** `clientRepository.softDeleteCompanyClient` sets `deletedAt` rather than hard-deleting. All client lookups apply `buildDefaultClientWhere({ deletedAt: null })`.
-17. **Legacy recipe stages without `stageType` are treated as `PROCESSING`.** Serialization and service logic default `stageType` to `PROCESSING` when the field is absent, preserving backward compatibility with older data.
+The following recipe-approval-ux behaviors are confirmed correct and must be preserved:
+
+1. **`buildRepairHighlight`** — Parses backend approval-failure messages to produce targeted stage/input repair hints. Under-allocation messages matching `/insumo\s+"([^"]+)".*sin asignar/i` are routed to the RECOLLECTION stage containing the named input. Generic messages containing a stage name route to that stage. Returns `null` when no safe mapping exists — conservative behavior that avoids misleading hints.
+
+2. **`_buildRepairHighlight` export** — Exposed on the `views.recipesAdmin` module exclusively for testing. The comment `// Exposed for isolated unit testing only — do not call from application code.` must be preserved.
+
+3. **PROCESS_CODE_OPTIONS catalog** — All 28 entries must remain synchronized with `RECIPE_STAGE_PROCESS_CODES` in `src/schemas/recipe.schema.js`. The synchronization comment at the catalog definition must be preserved.
+
+4. **JSDoc type annotations** — All `/** @type {HTMLInputElement} */`, `/** @type {HTMLSelectElement} */`, and `/** @type {HTMLElement} */` annotations in `recipes-admin.version-editor.js` must be preserved or replaced with equivalent type-safe alternatives when the file is modified.
+
+5. **All previously preserved behaviors** from prior baselines remain intact per test suite evidence.
 
 ---
 
 ## Known Defects
 
-### DEF-PRD-002 — Manual end-to-end evidence gap for amended warehouse flow (pre-existing, Medium)
-**Severity:** Medium
-**Location:** `docs/current-state.md` §14; warehouse SPA production controllers
-**Evidence:** `docs/current-state.md` §14 explicitly records that manual validation evidence for the full replacement recovery → same-lot execution → reconciliation workflow is incomplete. Automated service and migration tests exist and pass, but the repository does not include completed manual operator walk-through evidence for this flow.
-**Impact:** Implementation is test-backed at the service level. Operational completeness for warehouse operators cannot be confirmed from repository evidence alone.
-**Recommendation:** Conduct and document a structured manual test session covering the five validation steps listed in `docs/action-plan.md` §18 (steps 1–5). Record results in a `specs/` evidence document or `docs/production-operations-runbook.md` update.
+**None outstanding.**
 
----
-
-No functional defects were identified in the seven changes applied this cycle. DEF-PRD-002 is the only open non-Low finding and it is unchanged from prior audits.
+All three findings identified for the recipe-approval-ux cycle are resolved:
+- **AUD-001** (High): PROCESS_CODE_OPTIONS fully aligned — 28/28 codes present.
+- **AUD-002** (Medium): tsconfig.typecheck.json now covers all 7 recipe-admin files.
+- **AUD-003** (Medium): 5 behavioral VM tests present for `buildRepairHighlight` via `_buildRepairHighlight`.
 
 ---
 
 ## Architectural Debt
 
-1. **Service layer as God-layer.** Services in `src/services/` mix permission enforcement, business rules, persistence coordination, response serialization, and audit recording. `payment.service.js` `approvePayment` and `production-execution.service.js` `executeStage` exemplify this with six or more distinct responsibilities per function. Structural constraint of the current layered monolith; not a defect but imposes long-term maintenance cost.
+All architectural debt carries unchanged from the prior baseline. No new architectural issues introduced in this cycle.
 
-2. **Direct Prisma transaction access in service layer.** `approvePayment` and `reversePayment` use `tx.invoice.findUnique`, `tx.client.update`, `tx.order.findUnique`, and `tx.clientStore.update` directly rather than via repository functions. This bypasses the repository abstraction for cross-entity transactional reads. The repository pattern is not consistently enforced within transaction boundaries.
-
-3. **No application-level credit balance floor constraint.** There is no `CHECK (credit_balance >= 0)` at the DB level and no application-level guard preventing `creditBalance` from going negative if payment approval precedes order approval. The intended flow sequencing (order → credit increment; payment → credit decrement) is not enforced by schema constraints.
-
-4. **Frontend SPA delivered from same process.** The root-shell admin SPA, warehouse SPA, and agent SPA are all served as static files from the same Express process as the API. Functional but limits independent scaling and deployment of SPA vs API.
-
-5. **No integration constraint between `ClientStore.creditBalance` and `Client.creditBalance`.** The system does not enforce that the sum of store-level balances equals the client-level balance. Invoice paths without `orderId` update only the client-level balance, creating silent divergence potential.
-
-6. **No explicit domain layer.** Business rules for Production, Quality, Inventory, and Billing live inside service modules rather than in a dedicated domain layer with explicit policies or value objects. The service files are well-organized but remain coupled to Prisma models and HTTP context.
-
-7. **QA relevant-input scope computed dynamically.** The relevant-input scope for a rejected stage is recomputed on demand rather than persisted as an immutable audit snapshot. This is a documented open decision in `docs/architecture.md` §14 and `docs/action-plan.md` §14.
+| ID | Description | Severity |
+|---|---|---|
+| AD-001 | Two-mode access control coexistence | Medium |
+| AD-002 | Two-step browser payment flow without server-side atomic operation | Medium |
+| AD-003 | `creditBalance` as mutable aggregate | Medium |
+| AD-005 | Best-effort billing trigger | Medium |
 
 ---
 
 ## Unknown Behavior
 
-1. **Manual end-to-end evidence for replacement recovery → same-lot execution → reconciliation.** The automated test suite covers the service layer for this flow. Manual operator walk-through evidence in the repository docs is explicitly noted as incomplete in `docs/current-state.md` §14.
+### UNK-001 — `creditBalance` Drift on Silent Billing Trigger Failure (Carried)
+- **Severity:** Medium
 
-2. **Behavior when `ClientStore.creditBalance` and `Client.creditBalance` diverge silently.** The UI surfaces `client.creditBalance` in the billing view and `store.creditBalance` in the store context. What the UI displays or validates when these diverge cannot be confirmed from code inspection alone.
+### UNK-002 — Dead Payment Status Values (Carried)
+- **Severity:** Low
 
-3. **Behavior of `getClientLedger` when `creditLimit` or `creditBalance` is `null` on a legacy client.** The `!= null` guard returns `null` in those cases. Whether the billing UI handles `null` gracefully is inferred from spec docs but not confirmed by a live DOM test.
+### UNK-003 — No Service-Layer Guard on `createPurchaseReceipt` for PO Status (Carried)
+- **Severity:** Low
 
 ---
 
 ## Critical Risks
 
-| Risk | Level | Status | Notes |
-|---|---|---|---|
-| Process-code catalog drift (DEF-002 / AUD-020) | ~~Medium~~ | **CLOSED** (prior cycle) | Frontend now uses only valid backend codes |
-| Availability hint stale snapshot (AUD-018) | ~~Medium~~ | **CLOSED** (prior cycle) | Fixed; `input` listeners wired |
-| `updateRecipeVersion` lineage path untested (AUD-012) | ~~Medium~~ | **CLOSED** (prior cycle) | Fixed |
-| `GET /api/roles/company/:roleId` absent from catalog (AUD-025) | ~~Medium~~ | **CLOSED this cycle** | Endpoint catalog now complete |
-| Multi-product under-allocation untested (AUD-013) | ~~Low~~ | **CLOSED this cycle** | Test added and confirmed |
-| `assertRecipeStageLineageAndAllocation` not exported (AUD-019) | ~~Low~~ | **CLOSED this cycle** | Exported via `__private__` |
-| `current-state.md` stale credit fields (AUD-002) | ~~Low~~ | **CLOSED this cycle** | §7 and §8 updated |
-| Store-level credit path untested (AUD-028) | ~~Low~~ | **CLOSED between cycles** | Two tests confirmed |
-| `current-state.md` / `action-plan.md` stale DEF-PRD-001 (AUD-027) | ~~Low~~ | **CLOSED between cycles** | Stale entries removed |
-| CHANGELOG not updated for prior cycle (AUD-029) | ~~Low~~ | **CLOSED between cycles** | CHANGELOG entry added |
-| Manual E2E evidence gap (DEF-PRD-002) | Medium | **Open** | Service tests exist; manual validation incomplete |
-| `creditBalance` can go negative with no DB constraint (AUD-DB-001) | Low | **Open** | No functional regression yet |
-| CHANGELOG not updated for current cycle (AUD-030) | Low | **Open** | New finding |
+**No critical risks identified in the current state.**
+
+All three High/Medium findings from the recipe-approval-ux cycle are resolved. The remaining open findings are all Low severity or Suggestions.
 
 ---
 
 ## Recommended Priorities
 
-1. **(Low — Documentation)** Add a CHANGELOG.md entry for this cycle (AUD-025 catalog, AUD-002 doc refresh, AUD-005/AUD-014/AUD-016 comments, AUD-013 test, AUD-019 export, test suite delta 1539→1542). See AUD-030.
+### Immediate (from this cycle)
 
-2. **(Medium — Testing / Ops)** Conduct and record a structured manual validation session for the replacement recovery → same-lot execution → reconciliation warehouse operator flow. The five validation steps in `docs/action-plan.md` §18 provide the test script. See DEF-PRD-002.
+1. **AUD-REC-001** — Correct test descriptions from `AUD-009` to `AUD-003` (or document the alias in the audit). One-line change per test, five tests total.
+2. **AUD-REC-002** — Commit recipe-approval-ux specification artifacts to `specs/recipe-approval-ux/`, or remove the empty directory.
+3. **TEST-004** — Add recipe-admin file assertions to `typecheck-ci-hardening-governance.test.js` to prevent silent regression of AUD-002.
 
-3. **(Low — Schema)** Consider adding a `CHECK (credit_balance >= 0)` constraint to `clients` and `client_stores` in a future additive migration, or add an application-level guard before the `decrement` operation. See AUD-DB-001.
+### Near-term (carried from prior cycle)
 
-4. **(Low — Pattern)** Add `companyId` to the `tx.clientStore.update` WHERE clause in `payment.service.js` `approvePayment` for pattern consistency with the repository convention. See AUD-API-002.
+4. **MAINT-001** — Remove duplicated `escapeHtml` from four warehouse view files; consume from `WarehouseShell.require('app').escapeHtml`.
+5. **TEST-003** — Add `tests/tmp-prisma-lock-*/` to `.gitignore`; use `os.tmpdir()` in the Prisma test harness.
+6. **SEC-002** — Add `receive-from-po` to `TAB_DEFINITIONS` in `warehouse/app.js` with `permission: (p) => p.includes('receipts.inspect')`.
 
-5. **(Low — Documentation)** Add per-section update markers or a last-updated header table to `docs/current-state.md` to support multi-cycle maintenance. See MAINT-002.
+### Background (carried, not introduced by this feature)
 
-6. **(Low — Frontend)** Evaluate `Decimal.js` for recipe quantity accumulation in `computeRecollectedBalances` if recipes with highly fractional quantities become common. See AUD-005.
+7. **DB-001 / SEC-001** — Remove `.env` from version control.
+8. **AD-001** — Migrate remaining legacy `authorizePermission` routes to `authorizeAccessPolicy`.
+9. **AD-005** — Add retry/alerting to `billing-trigger.service.js`.
 
-7. **(Low — Testing)** Consider adding a Playwright-based E2E test for the recipe editor's RECOLLECTION → PROCESSING availability hint flow to supplement the current source-level characterization tests. See AUD-014.
+---
+
+## Final Verdict
+
+**Overall Score: 9.4 / 10**
+
+**Verdict: Acceptable**
+
+### Score justification summary
+
+The prior baseline of 9.2/10 reflected a repository in good operational health with well-governed persistence, security, and test coverage, offset by carried architectural debt (dual access control modes, mutable credit aggregate, best-effort billing trigger) and three open recipe-approval-ux findings. This cycle resolves all three findings — including one High-severity functional defect (20 of 28 process codes missing from the UI catalog) — and closes a medium-severity type-safety gap and a medium-severity behavioral test gap. Two new Low-severity documentation findings are raised. The net improvement is +0.16 points. All prior deductions carry unchanged.
+
+The repository remains in the **Acceptable** band. The persistent architectural debt items (AD-001 through AD-005) are the primary barrier to the Healthy band, as they represent real operational risks (silent billing failures, non-atomic payment flow, mutable balance aggregate) rather than cosmetic concerns.

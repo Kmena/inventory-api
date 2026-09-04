@@ -127,6 +127,24 @@
         </form>
       </dialog>
 
+      <dialog id="recipes-approval-dialog" class="modal-card products-modal-card" aria-labelledby="recipes-approval-title">
+        <div class="products-modal-header">
+          <div>
+            <h3 id="recipes-approval-title">Aprobar version</h3>
+            <p class="muted" id="recipes-approval-subtitle">Esta accion es irreversible.</p>
+          </div>
+          <button id="recipes-close-approval-button" class="secondary-button" type="button">Cerrar</button>
+        </div>
+        <div class="stack-section">
+          <p id="recipes-approval-copy">Vas a aprobar una version borrador. Despues no podras editarla y cualquier correccion requerira crear un nuevo borrador.</p>
+          <p class="muted" id="recipes-approval-version-context"></p>
+        </div>
+        <div class="action-row products-modal-actions">
+          <button id="recipes-cancel-approval-button" class="secondary-button" type="button">Cancelar</button>
+          <button id="recipes-confirm-approval-button" type="button">Confirmar aprobacion</button>
+        </div>
+      </dialog>
+
       <dialog id="recipes-stages-modal" class="modal-card products-modal-card" style="max-width:720px">
         <div class="products-modal-header">
           <div>
@@ -272,7 +290,30 @@
     `;
   }
 
-  function renderVersionsTab(versions, permissions) {
+  function renderApprovalFeedback(feedback, permissions) {
+    if (!feedback) {
+      return '';
+    }
+
+    const summary = rootShellUi.escapeHtml(feedback.summary || '');
+    const detail = rootShellUi.escapeHtml(feedback.detail || '');
+    const tone = feedback.tone === 'success' ? 'success' : feedback.tone === 'warning' ? 'warning' : 'error';
+    const role = tone === 'success' ? 'status' : 'alert';
+    const prefix = tone === 'success' ? 'Exito:' : tone === 'warning' ? 'Advertencia:' : 'Error:';
+    const repairAction = feedback.showRepairAction && permissions.canManageRecipes
+      ? `<div class="action-row compact-action-row" style="margin-top:0.5rem"><button class="secondary-button" type="button" data-repair-recipe-version="${rootShellUi.escapeHtml(String(feedback.versionId || ''))}">Reparar borrador</button></div>`
+      : '';
+
+    return `
+      <div class="message ${tone}" data-version-feedback="${rootShellUi.escapeHtml(String(feedback.versionId || ''))}" role="${role}" tabindex="-1" style="margin-top:0.75rem">
+        ${summary ? `<p style="margin:0"><strong>${prefix}</strong> ${summary}</p>` : ''}
+        ${detail ? `<p style="margin:0.35rem 0 0">${detail}</p>` : ''}
+        ${repairAction}
+      </div>
+    `;
+  }
+
+  function renderVersionsTab(versions, permissions, options = {}) {
     if (!versions.length) {
       return `
         <div class="stack-section" data-recipes-tab-panel="versions">
@@ -282,13 +323,18 @@
       `;
     }
 
+    const versionFeedbackById = options.versionFeedbackById || {};
+    const incompleteVersionIds = options.incompleteVersionIds || {};
+
     return `
       <div class="stack-section" data-recipes-tab-panel="versions">
         ${permissions.canManageRecipes ? '<div class="action-row compact-action-row"><button type="button" id="recipes-open-create-version-button">Nueva version borrador</button></div>' : ''}
         ${versions.map((version) => {
           const isDraft = version?.status !== 'APPROVED';
+          const isIncomplete = Boolean(incompleteVersionIds[String(version?.id)]);
+          const versionFeedback = versionFeedbackById[String(version?.id)] || null;
           return `
-            <article class="products-entry-state">
+            <article class="products-entry-state" data-version-card-id="${rootShellUi.escapeHtml(String(version?.id || ''))}">
               <div class="page-header">
                 <div>
                   <h4>Version ${rootShellUi.escapeHtml(`v${version?.versionNumber || '?'}`)}</h4>
@@ -296,10 +342,12 @@
                 </div>
                 <div class="action-row compact-action-row">
                   <span class="badge ${isDraft ? 'badge-warning' : 'badge-success'}">${rootShellUi.escapeHtml(isDraft ? 'Borrador' : 'Aprobada')}</span>
+                  ${isDraft && isIncomplete ? '<span class="badge badge-warning">Incompleta</span>' : ''}
                   ${permissions.canManageRecipes && isDraft ? `<button class="secondary-button" type="button" data-edit-recipe-version="${rootShellUi.escapeHtml(version?.id)}">Editar borrador</button>` : ''}
-                  ${permissions.canApproveRecipes && isDraft ? `<button type="button" data-approve-recipe-version="${rootShellUi.escapeHtml(version?.id)}">Aprobar version</button>` : ''}
+                  ${permissions.canApproveRecipes && isDraft ? `<button type="button" data-approve-recipe-version="${rootShellUi.escapeHtml(version?.id)}" data-version-label="v${rootShellUi.escapeHtml(String(version?.versionNumber || '?'))}">Aprobar version</button>` : ''}
                 </div>
               </div>
+              ${isDraft && isIncomplete ? '<p class="muted" style="margin:0 0 0.75rem">Tiene datos pendientes y no puede aprobarse todavia.</p>' : ''}
               <div class="detail-grid">
                 <article class="detail-item"><span>Ingredientes</span><strong>${rootShellUi.escapeHtml(String((version?.ingredients || []).length))}</strong></article>
                 <article class="detail-item"><span>Etapas</span><strong>${rootShellUi.escapeHtml(String((version?.stages || []).length))}</strong></article>
@@ -315,6 +363,7 @@
                   🔬 Ver / Editar etapas
                 </button>
               </div>
+              ${renderApprovalFeedback(versionFeedback, permissions)}
             </article>
           `;
         }).join('')}
@@ -377,7 +426,10 @@
         ${renderDetailHeader(recipe, associatedProducts.length)}
         ${renderTabs(activeTab)}
         <div ${activeTab === 'summary' ? '' : 'hidden'}>${renderSummaryTab(recipe)}</div>
-        <div ${activeTab === 'versions' ? '' : 'hidden'}>${renderVersionsTab(versions, permissions)}</div>
+        <div ${activeTab === 'versions' ? '' : 'hidden'}>${renderVersionsTab(versions, permissions, {
+          versionFeedbackById: options.versionFeedbackById,
+          incompleteVersionIds: options.incompleteVersionIds,
+        })}</div>
         <div ${activeTab === 'products' ? '' : 'hidden'}>${renderAssociatedProductsTab(associatedProducts, permissions)}</div>
       </div>
     `;

@@ -2,6 +2,9 @@ const { z } = require('zod');
 
 const optionalDateSchema = z.union([z.coerce.date(), z.null()]).optional();
 
+// Defined early so it can be reused in recipeStageInputSchema (FR-001, BR-001).
+const recipeQuantityBasisSchema = z.enum(['PER_OUTPUT_KG', 'PER_FINISHED_UNIT']);
+
 // Approved processCode catalog for PROCESSING stages (FR-007, BR-011).
 const RECIPE_STAGE_PROCESS_CODES = [
   // Thermal
@@ -40,6 +43,8 @@ const recipeStageInputSchema = z.object({
   quantity: z.coerce.number().positive().optional().nullable(),
   unit: z.string().trim().min(1, 'La unidad es obligatoria cuando se selecciona un producto').max(30).optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),
+  // FR-001, BR-001: null = inherit from version basis. Optional for backward compat.
+  inputQuantityBasis: recipeQuantityBasisSchema.nullable().optional().default(null),
 }).strict().superRefine((stageInput, context) => {
   if (stageInput.productId && !stageInput.unit) {
     context.addIssue({
@@ -116,8 +121,6 @@ const updateRecipeSchema = recipeFieldsSchema.partial().refine(
   { message: 'Debe enviar al menos un campo para actualizar' },
 );
 
-const recipeQuantityBasisSchema = z.enum(['PER_OUTPUT_KG', 'PER_FINISHED_UNIT']);
-
 const recipeVersionFieldsObjectSchema = z.object({
   effectiveFrom: optionalDateSchema,
   effectiveTo: optionalDateSchema,
@@ -177,6 +180,7 @@ const approveRecipeVersionSchema = z.object({
 module.exports = {
   qaParameterSchema,
   recipeQuantityBasisSchema,
+  recipeStageInputSchema,
   recipeStageTypeSchema,
   recipeStageProcessCodeSchema,
   RECIPE_STAGE_PROCESS_CODES,

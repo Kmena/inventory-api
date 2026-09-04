@@ -360,3 +360,101 @@ test('sortLotsForAvailability does not mutate the input array (TASK-006)', () =>
     'Input array must not be mutated',
   );
 });
+
+// ── TASK-005 (recipe-input-per-unit-basis): per-input effective basis in lot scaling ──
+
+test('getAvailableLotsForStage scales PER_FINISHED_UNIT stageInput by plannedUnits in PER_OUTPUT_KG version (TASK-005)', async () => {
+  // version PER_OUTPUT_KG, plannedOutputKg=5 kg, plannedUnits=10 units
+  // stageInput A: 0.6 KG, inputQuantityBasis=null → required = 0.6 × 5 = 3 KG
+  // stageInput B: 1 UN, inputQuantityBasis='PER_FINISHED_UNIT' → required = 1 × 10 = 10 UN
+  const order = {
+    id: 77n,
+    companyId: 9n,
+    originWarehouseId: 1n,
+    quantity: 10,
+    plannedOutputKg: 5,
+    recipeVersionSnapshot: {
+      recipeVersion: {
+        quantityBasis: 'PER_OUTPUT_KG',
+        stages: [{
+          id: 101,
+          stageInputs: [
+            { productId: 201n, name: 'Harina', quantity: 0.6, unit: 'KG', inputQuantityBasis: null },
+            { productId: 202n, name: 'Tapa', quantity: 1, unit: 'UN', inputQuantityBasis: 'PER_FINISHED_UNIT' },
+          ],
+        }],
+      },
+    },
+  };
+
+  const capturedRequiredQuantities = {};
+
+  await withPatchedDependencies({
+    findProductionOrderById: async () => order,
+    findProductsByIds: async () => [
+      { id: 201n, code: 'HAR-001', name: 'Harina', unit: 'KG' },
+      { id: 202n, code: 'TAP-001', name: 'Tapa', unit: 'UN' },
+    ],
+    findReservableLotStocks: async (warehouseId, productId) => {
+      // Return one lot per product
+      return [{
+        lotId: Number(productId),
+        lot: { lotNumber: `L-${productId}`, expirationDate: null, entryDate: new Date() },
+        quantity: 100,
+        reservedQuantity: 0,
+      }];
+    },
+  }, async () => {
+    const auth = { companyId: '9', sub: '1', permissions: ['production.manage'] };
+    const result = await availabilityService.getAvailableLotsForStage(77n, 101, auth);
+
+    for (const p of result.products) {
+      capturedRequiredQuantities[String(p.productId)] = p.requiredQuantity;
+    }
+  });
+
+  assert.equal(capturedRequiredQuantities['201'], 3, 'gravimetric input must scale by plannedOutputKg');
+  assert.equal(capturedRequiredQuantities['202'], 10, 'discrete input must scale by plannedUnits');
+});
+
+test('getAvailableLotsForStage backward compat: no inputQuantityBasis uses version basis (TASK-005)', async () => {
+  // Legacy snapshot without inputQuantityBasis → falls back to version basis (PER_OUTPUT_KG)
+  const order = {
+    id: 78n,
+    companyId: 9n,
+    originWarehouseId: 1n,
+    quantity: 10,
+    plannedOutputKg: 4,
+    recipeVersionSnapshot: {
+      recipeVersion: {
+        quantityBasis: 'PER_OUTPUT_KG',
+        stages: [{
+          id: 102,
+          stageInputs: [
+            { productId: 203n, name: 'Agua', quantity: 0.5, unit: 'KG' },
+          ],
+        }],
+      },
+    },
+  };
+
+  let capturedRequired = null;
+
+  await withPatchedDependencies({
+    findProductionOrderById: async () => order,
+    findProductsByIds: async () => [{ id: 203n, code: 'AGU-001', name: 'Agua', unit: 'KG' }],
+    findReservableLotStocks: async () => [{
+      lotId: 203,
+      lot: { lotNumber: 'L-203', expirationDate: null, entryDate: new Date() },
+      quantity: 100,
+      reservedQuantity: 0,
+    }],
+  }, async () => {
+    const auth = { companyId: '9', sub: '1', permissions: ['production.manage'] };
+    const result = await availabilityService.getAvailableLotsForStage(78n, 102, auth);
+    capturedRequired = result.products[0].requiredQuantity;
+  });
+
+  // 0.5 × 4 kg = 2
+  assert.equal(capturedRequired, 2, 'legacy input without inputQuantityBasis must scale by plannedOutputKg');
+});

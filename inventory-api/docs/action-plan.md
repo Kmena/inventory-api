@@ -1,6 +1,6 @@
 # Architectural Action Plan
 ## 1. Objective
-Refresh the post-implementation plan for the production/QA material-reconciliation amendment so the repository distinguishes:
+Refresh the post-implementation plan for the implemented production/QA and recipe-admin UX slices so the repository distinguishes:
 - what is already implemented
 - what remains as follow-up hardening
 - what should not be overstated as complete
@@ -8,6 +8,7 @@ Refresh the post-implementation plan for the production/QA material-reconciliati
 ## 2. Scope
 This action plan covers the implemented feature area:
 - recipe stage typing and process definition
+- recipe approval UX safety and repair guidance in the root-shell admin
 - QA rejection relevant-input scope
 - replacement recovery stage support
 - lot-level recolection entry capture
@@ -30,11 +31,12 @@ This action plan covers the implemented feature area:
 | FR-001 / BR-001 | Implemented | `quality-relevant-input-scope.service.js`, `quality.service.js` |
 | FR-002, FR-010, FR-011, FR-013 | Implemented | lot-level recolection entries + same-lot validation gate |
 | FR-003 to FR-009 | Implemented in backend, partially follow-up in UI alignment | recipe schema/service + root-shell editor |
+| recipe-approval-ux FR-001 to FR-011 | Implemented in root-shell UI without backend contract changes | `src/public/root/views/recipes-admin.js`, `recipes-admin.renderers.js`, `recipes-admin.version-editor.js`, existing recipe route/service/schema |
 | FR-012 / BR-007 | Implemented | reconciliation endpoint + outcome validation |
 | FR-014 | Implemented | `createReplacementRecoveryStage` |
 | FR-015 | Implemented additively | production routes/schemas + runtime contract docs |
 | FR-016 | Implemented for current read model | serialized `recolectionStages`, entries, reconciliations |
-| FR-017 | Partially implemented with follow-up needed | UI owns labels, but root-shell catalog alignment still needs review |
+| FR-017 | Implemented | UI labels and process-code catalog are aligned with the backend-supported recipe editor contract |
 | FR-018 | Implemented additively with compatibility defaults | migration defaults and legacy wrapper behavior |
 | FR-019 | Implemented with remaining manual validation depth gap | warehouse SPA renderers/controllers updated |
 | FR-020 | Implemented | spec docs + runtime docs + this refresh |
@@ -48,9 +50,14 @@ Problems already corrected in code:
 - stage re-execution gate did not distinguish replacement recovery pending state
 - production order read model did not expose the full recolection/reconciliation detail needed by the warehouse UI
 - server-side same-lot validation was not active
+- draft recipe approval had no explicit irreversible-action confirmation step
+- recipe approval feedback was too distant from the triggering version-card actions
+- incomplete stage-input rows in recipe drafts could be silently discarded during save
+- recipe approval repair flow lacked direct draft-editor navigation and conservative highlight guidance
 
 Problems still open:
 - manual evidence for full warehouse operator flow remains incomplete in repository docs
+- manual browser evidence for recipe approval dialog focus/scroll behavior is not yet checked in
 - architecture is still service-heavy rather than domain/port oriented
 
 ## 6. Domains affected
@@ -60,6 +67,7 @@ Problems still open:
 - Inventory
 - Warehouse UI
 - Root-shell recipe administration
+- Root-shell recipe approval UX
 - Documentation/governance
 
 ## 7. Behavior to preserve
@@ -69,16 +77,20 @@ Problems still open:
 - server-side authority over lot validation and balance enforcement
 - transaction-based stock mutation for production execution
 - backward-compatible handling of legacy recipe stages without `stageType`
+- recipe approval must continue using the existing backend route and backend validation authority for product association, lineage, and allocation rules
+- warning-level incomplete `PROCESSING` rows may still be saved as draft work-in-progress, but the UI must keep those drafts visibly incomplete until corrected or successfully approved
 
 ## 8. Defects to correct
 ### Remaining follow-up defects
 1. missing stronger manual/integration evidence for the full recovery/reconciliation workflow
-2. ongoing architectural coupling across services, repositories, and browser DTOs
+2. manual browser evidence for recipe approval dialog focus/scroll behavior is not yet recorded in repository docs
+3. ongoing architectural coupling across services, repositories, and browser DTOs
 
 ## 9. Future architectural changes
 ### Near-term follow-up
-- centralize the process-code catalog so root-shell UI and backend validation cannot drift
 - add end-to-end characterization for QA rejection → replacement recovery → same-lot execution → reconciliation
+- record manual/browser validation evidence for recipe approval confirmation, local feedback focus, and repair navigation
+- evaluate whether incomplete recipe draft visibility needs persistence beyond the current frontend-only marker
 - strengthen operational documentation and manual validation evidence for warehouse users
 
 ### Medium-term follow-up
@@ -93,8 +105,9 @@ Already implemented:
 - `production_recolection_reconciliations`
 
 Potential follow-up DB changes:
-- none required immediately for the implemented feature
+- none required immediately for the implemented feature set
 - future audit-snapshot persistence only if the rejection-scope decision is approved later
+- no database change is currently justified for `recipe-approval-ux`; a persisted incomplete-draft marker would require separate approval if cross-session visibility becomes necessary
 
 ## 11. API and integration changes
 Already implemented:
@@ -105,6 +118,7 @@ Already implemented:
 Follow-up API concerns:
 - keep wording conservative around completeness of end-to-end operational validation
 - review whether a future explicit read endpoint for reconciliation summaries would reduce over-fetching
+- keep the recipe approval UX additive over the existing `POST /api/recipes/versions/:id/approve` contract unless a later requirement proves a persisted incomplete-draft state is needed
 
 ## 12. Container and deployment changes
 No container-specific changes are required for this feature refresh.
@@ -132,10 +146,13 @@ Follow-up security posture:
 - service tests for same-lot validation
 - service tests for replacement-recovery gate behavior
 - service tests for reconciliation outcomes and balance computation
+- recipe admin characterization tests for confirmation-dialog seams, action-local version feedback, incomplete-draft marker rendering, and repair/highlight hooks
+- user-reported targeted validation for `recipe-approval-ux`: `node --test tests/root-shell-recipes-admin-view-characterization.test.js tests/recipe-service-foundation.test.js tests/recipe-schema.test.js` pass (72/72), plus lint/typecheck pass
 
 ### Remaining recommended coverage
 - browser/E2E flow covering replacement recovery capture and reconciliation submission
 - integration test proving enriched QA inspection envelope and order read-model interaction together
+- executed manual/browser evidence for recipe approval cancel/confirm, scroll-to-feedback, `Reparar borrador`, and conservative repair highlighting behavior
 
 ## 15. Migration stages
 ### Stage 1 — Implemented
@@ -150,6 +167,7 @@ Follow-up security posture:
 
 ### Stage 2 — Proposed follow-up
 - add stronger end-to-end and manual evidence
+- record recipe approval UX browser-validation evidence
 - refresh operational docs/runbooks if warehouse workflow language changed
 
 ### Stage 3 — Proposed architecture hardening
@@ -162,6 +180,7 @@ Follow-up security posture:
 | Overstating feature completeness beyond available evidence | High | keep docs explicit about automated vs manual validation depth |
 | Root-shell recipe editor process-code catalog | ~~Medium~~ | **RESOLVED** — UI catalog aligned with backend `RECIPE_STAGE_PROCESS_CODES` (DEF-002) |
 | Regressions in full warehouse operator flow not covered by current service tests | Medium | add E2E/integration coverage and operator validation evidence |
+| Recipe approval dialog/focus behavior differs across real browsers despite characterization coverage | Medium | record manual browser evidence and keep the implementation on native `<dialog>` behavior already used elsewhere |
 | Further service-layer growth reducing maintainability | Medium | schedule policy extraction without rewriting public routes |
 
 ## 17. Rollback or recovery strategy
@@ -176,7 +195,11 @@ Still recommended despite implemented automated tests:
 3. Confirm replacement recovery with lot-level entries.
 4. Attempt to execute with a non-recovered lot and verify server rejection.
 5. Reconcile recovered balances with `USED`, `RETURNED`, and `DISCARDED` outcomes.
-6. ~~Verify root-shell recipe editor only offers backend-supported process codes~~ — **DONE**: `PROCESS_CODE_OPTIONS` now matches backend catalog exactly.
+6. Cancel the recipe approval confirmation dialog and verify no approval API call occurs.
+7. Confirm recipe approval failure scrolls/focuses the local version-card feedback region.
+8. Use `Reparar borrador` from approval feedback and verify the editor reopens on the same draft with highlight only when the backend message maps safely.
+9. Save a draft with incomplete `RECOLLECTION` rows and verify save is blocked.
+10. Save a draft with incomplete `PROCESSING` rows and verify save continues, warning appears, and the versions tab marks the draft as `Incompleta`.
 
 ## 19. Approval status
 **Status:** Documentation refresh completed for the implemented feature.

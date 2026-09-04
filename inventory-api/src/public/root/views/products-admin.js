@@ -35,7 +35,7 @@
 
           <div class="client-command-bar products-filter-grid">
             <label class="client-search-field products-search-field"><span>Buscar</span><input id="products-search-input" type="search" placeholder="Codigo, nombre o categoria" /></label>
-            <label><span>Categoria</span><select id="products-category-filter"><option value="">Todas</option></select></label>
+            <label><span>Subcategoria</span><select id="products-category-filter"><option value="">Todas</option></select></label>
             <button id="products-clear-filters-button" class="secondary-button" type="button">Limpiar filtros</button>
           </div>
 
@@ -73,7 +73,13 @@
             <div class="products-form-grid">
               <label class="products-field-wide"><span>Nombre *</span><input id="products-form-name" name="name" type="text" required minlength="2" maxlength="255" /></label>
               <label><span>Codigo</span><input name="code" type="text" maxlength="50" /></label>
-              <label><span>Subcategoria</span><select id="products-form-subcategory" name="subcategoryId"><option value="">Sin subcategoria</option></select></label>
+              <label class="products-field-subcategory-group">
+                <span>Subcategoria</span>
+                <div class="products-subcategory-input-row">
+                  <select id="products-form-subcategory" name="subcategoryId"><option value="">Sin subcategoria</option></select>
+                  <button id="products-form-add-subcategory-button" class="secondary-button" type="button" title="Crear una nueva subcategoria">+ Nueva</button>
+                </div>
+              </label>
               <label><span>Moneda</span><select name="currency"><option value="">— Seleccionar —</option><option value="CRC">CRC — Colón</option><option value="USD">USD — Dólar</option><option value="EUR">EUR — Euro</option></select></label>
               <label><span>Precio</span><input name="price" type="number" min="0" step="0.01" /></label>
               <label><span>Stock minimo</span><input name="minStock" type="number" min="0" step="0.01" /></label>
@@ -161,7 +167,7 @@
             <legend>Categorias registradas</legend>
             <div id="products-categories-list-region"></div>
           </fieldset>
-          <fieldset class="root-form__section">
+          <fieldset id="products-create-subcategory-fieldset" class="root-form__section">
             <legend>Nueva subcategoria</legend>
             <div class="root-form-grid">
               <label class="field-wide"><span>Nombre *</span><input id="products-category-name" name="name" type="text" required minlength="2" maxlength="255" /></label>
@@ -218,6 +224,8 @@
     const createCategoryButton = container.querySelector('#products-create-category-button');
     const closeCategoriesButton = container.querySelector('#products-close-categories-button');
     const cancelCategoriesButton = container.querySelector('#products-cancel-categories-button');
+    const createSubcategoryFieldset = container.querySelector('#products-create-subcategory-fieldset');
+    const addSubcategoryButton = container.querySelector('#products-form-add-subcategory-button');
 
     // --- TASK-006: refs de campos de tamaño/presentación ---
     const presentationTypeSelect = container.querySelector('#products-form-presentation-type');
@@ -250,7 +258,10 @@
     let selectedProductDetail = null;
     let detailState = 'idle';
     let editingProductId = null;
-    let lastDialogTrigger = null;
+    let lastFormDialogTrigger = null;
+    let lastCategoriesDialogTrigger = null;
+    let lastDeactivateDialogTrigger = null;
+    let lastCreatedSubcategoryId = null; // UX-001: persiste subcategoría creada para pre-selección
     let categoryWarning = '';
 
     // --- TASK-006: opciones de unidad por tipo de presentación ---
@@ -350,6 +361,15 @@
       if (!canListCategories) {
         openCategoriesButton.title = 'No tienes permisos para consultar categorias.';
       }
+      // UX-002: controlar visibilidad del botón "+ Nueva subcategoría" (D-005 confirmado)
+      // Visible para canListCategories; disabled para !canCreateCategories
+      if (addSubcategoryButton) {
+        addSubcategoryButton.hidden = !canListCategories;
+        addSubcategoryButton.disabled = !canCreateCategories;
+        addSubcategoryButton.title = canCreateCategories
+          ? 'Crear una nueva subcategoria'
+          : 'No tienes permiso para crear subcategorias.';
+      }
     }
 
     function getVisibleItems() {
@@ -384,13 +404,11 @@
       if (!canCreateCategories) {
         createCategoryButton.hidden = true;
         createCategoryButton.disabled = true;
-        categoryNameInput.disabled = true;
-        Array.from(categoriesForm.elements).forEach((element) => {
-          if (element instanceof globalScope.HTMLSelectElement && element.name === 'categoryId') {
-            element.disabled = true;
-          }
-        });
-        categoriesMessage.innerHTML = rootShellUi.renderInlineMessage('Solo puedes consultar subcategorias en esta cuenta.', 'warning');
+        if (createSubcategoryFieldset) createSubcategoryFieldset.hidden = true;
+      } else {
+        createCategoryButton.hidden = false;
+        createCategoryButton.disabled = false;
+        if (createSubcategoryFieldset) createSubcategoryFieldset.hidden = false;
       }
     }
 
@@ -493,8 +511,15 @@
         return;
       }
 
-      lastDialogTrigger = trigger;
+      lastFormDialogTrigger = trigger;
       resetFormDialog();
+
+      // UX-001: aplicar subcategoría pre-seleccionada si fue creada recientemente (consume-once)
+      if (mode === 'create' && lastCreatedSubcategoryId && formSubcategoryInput) {
+        formSubcategoryInput.value = String(lastCreatedSubcategoryId);
+        lastCreatedSubcategoryId = null;
+      }
+
       if (mode === 'edit' && product) {
         editingProductId = product.id;
         formTitle.textContent = 'Editar producto';
@@ -540,10 +565,10 @@
     function closeFormDialog() {
       formDialog.close();
       resetFormDialog();
-      if (lastDialogTrigger instanceof globalScope.HTMLElement) {
-        lastDialogTrigger.focus();
+      if (lastFormDialogTrigger instanceof globalScope.HTMLElement) {
+        lastFormDialogTrigger.focus();
       }
-      lastDialogTrigger = null;
+      lastFormDialogTrigger = null;
     }
 
     function openDeactivateDialog(trigger = null) {
@@ -551,7 +576,7 @@
       if (!canManageProducts || !product) {
         return;
       }
-      lastDialogTrigger = trigger;
+      lastDeactivateDialogTrigger = trigger;
       deactivateMessage.innerHTML = '';
       deactivateSummary.textContent = `${product.name || 'Producto'}${product.code ? ` · ${product.code}` : ''}`;
       deactivateDialog.showModal();
@@ -561,17 +586,17 @@
     function closeDeactivateDialog() {
       deactivateDialog.close();
       deactivateMessage.innerHTML = '';
-      if (lastDialogTrigger instanceof globalScope.HTMLElement) {
-        lastDialogTrigger.focus();
+      if (lastDeactivateDialogTrigger instanceof globalScope.HTMLElement) {
+        lastDeactivateDialogTrigger.focus();
       }
-      lastDialogTrigger = null;
+      lastDeactivateDialogTrigger = null;
     }
 
     function openCategoriesDialog(trigger = null) {
       if (!canListCategories) {
         return;
       }
-      lastDialogTrigger = trigger;
+      lastCategoriesDialogTrigger = trigger;
       categoriesMessage.innerHTML = canCreateCategories ? '' : rootShellUi.renderInlineMessage('Solo puedes consultar categorias en esta cuenta.', 'warning');
       renderCategoriesDialogState();
       categoriesDialog.showModal();
@@ -586,10 +611,10 @@
       categoriesDialog.close();
       categoriesForm.reset();
       categoriesMessage.innerHTML = '';
-      if (lastDialogTrigger instanceof globalScope.HTMLElement) {
-        lastDialogTrigger.focus();
+      if (lastCategoriesDialogTrigger instanceof globalScope.HTMLElement) {
+        lastCategoriesDialogTrigger.focus();
       }
-      lastDialogTrigger = null;
+      lastCategoriesDialogTrigger = null;
     }
 
     async function loadCategories() {
@@ -784,6 +809,13 @@
     closeCategoriesButton.addEventListener('click', closeCategoriesDialog);
     cancelCategoriesButton.addEventListener('click', closeCategoriesDialog);
 
+    // UX-002: abrir el dialog de categorías desde dentro del formulario de producto
+    if (addSubcategoryButton) {
+      addSubcategoryButton.addEventListener('click', (event) => {
+        openCategoriesDialog(event.currentTarget);
+      });
+    }
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       formMessage.innerHTML = '';
@@ -858,16 +890,30 @@
         return;
       }
 
+      const payload = productsHelpers.buildSubcategoryPayload(new globalScope.FormData(categoriesForm));
+
+      // UX-006: validación local de nombre duplicado antes de llamar al API
+      const duplicateMessage = productsHelpers.checkSubcategoryNameDuplicate(categories, payload.categoryId, payload.name);
+      if (duplicateMessage) {
+        categoriesMessage.innerHTML = rootShellUi.renderInlineMessage(duplicateMessage, 'warning');
+        return;
+      }
+
       createCategoryButton.disabled = true;
       createCategoryButton.textContent = 'Creando...';
-      setShellStatus('Creando categoria...');
+      setShellStatus('Creando subcategoria...');
 
       try {
-        const subcategory = await categoriesApi.createCategory(session, productsHelpers.buildSubcategoryPayload(new globalScope.FormData(categoriesForm)));
+        const subcategory = await categoriesApi.createCategory(session, payload);
         await loadCategories();
         categoriesForm.reset();
         renderCategoryOptions();
         categoriesMessage.innerHTML = rootShellUi.renderInlineMessage('Subcategoria creada correctamente.');
+        // UX-001: persistir para pre-selección en próxima apertura del formulario de producto
+        if (subcategory?.id) {
+          lastCreatedSubcategoryId = subcategory.id;
+        }
+        // Aplicar inmediatamente si el formulario de producto ya está abierto (UX-002)
         if (formSubcategoryInput && subcategory?.id) {
           formSubcategoryInput.value = String(subcategory.id);
         }
@@ -877,7 +923,7 @@
         setShellStatus('No se pudo crear la subcategoria.', 'error');
       } finally {
         createCategoryButton.disabled = false;
-        createCategoryButton.textContent = 'Crear categoria';
+        createCategoryButton.textContent = 'Crear subcategoria';
       }
     });
 

@@ -268,9 +268,34 @@
     }
   }
 
+  /**
+   * Checks if a subcategory name already exists within the given parent category.
+   * Case-insensitive and trim-normalized comparison.
+   * Returns a warning message string if duplicate found, null otherwise.
+   * Degrades gracefully: returns null if data is unavailable.
+   * @param {Array} categories - Array from GET /api/products/categories/company
+   * @param {string|number} categoryId - Parent category ID
+   * @param {string} name - Subcategory name to check
+   * @returns {string|null}
+   */
+  function checkSubcategoryNameDuplicate(categories, categoryId, name) {
+    if (!categories || !categoryId || !name) return null;
+    const parentCat = (categories || []).find((c) => String(c.id) === String(categoryId));
+    if (!parentCat) return null;
+    const normalizedName = String(name).trim().toLowerCase();
+    const existing = (parentCat.subcategories || []).find(
+      (s) => String(s.name || '').trim().toLowerCase() === normalizedName
+    );
+    if (existing) {
+      return `"${existing.name}" ya existe en ${parentCat.name}. Seleccionala en el formulario de producto.`;
+    }
+    return null;
+  }
+
   rootShell.register('views.productsAdminHelpers', {
     buildSubcategoryPayload,
     buildProductPayload,
+    checkSubcategoryNameDuplicate,
     buildProductsMetrics,
     buildVisibleSummary,
     canCreateCategories,

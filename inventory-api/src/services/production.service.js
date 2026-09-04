@@ -390,7 +390,8 @@ async function createProductionOrder(payload, auth, req = null) {
   const createProductionOrderResult = await inventoryRepository.transaction(async (tx) => {
     await inventoryRepository.acquireCompanyInventoryAdvisoryLock(scope.companyId, tx);
 
-    const requirements = buildMaterialRequirements(recipeVersion, scalingQuantity);
+    // FR-005: pass plannedUnits so per-input PER_FINISHED_UNIT overrides scale correctly
+    const requirements = buildMaterialRequirements(recipeVersion, scalingQuantity, Number(payload.quantity || 0));
     const stockCheckOverride = createStockCheckOverride(auth, payload.overrideJustification, override);
     const availabilityRows = await assertStockAvailability(
       tx,
@@ -506,7 +507,8 @@ async function approveProductionOrder(id, payload, auth, req = null) {
       const approveScaling = (/** @type {any} */ (order.recipeVersionSnapshot)?.recipeVersion?.quantityBasis ?? 'PER_OUTPUT_KG') === 'PER_OUTPUT_KG'
         ? Number(order.plannedOutputKg ?? order.quantity)
         : Number(order.quantity);
-      requirements = buildMaterialRequirements(recipeVersion, approveScaling);
+      // FR-005: pass plannedUnits (order.quantity) for per-input PER_FINISHED_UNIT overrides
+      requirements = buildMaterialRequirements(recipeVersion, approveScaling, Number(order.quantity || 0));
     }
 
     const stockCheckOverride = createStockCheckOverride(

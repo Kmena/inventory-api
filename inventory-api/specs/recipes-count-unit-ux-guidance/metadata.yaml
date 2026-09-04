@@ -1,0 +1,13 @@
+feature_name: recipes-count-unit-ux-guidance
+status: approved
+implementation_status: approved
+approved_by: product-owner
+approved_at: 2025-07
+created_by: sdd-planning-agent
+updated_by: sdd-planning-agent
+requester: sdd-implementation-agent-d75f97
+planner_id: sdd-planning-agent-854f35
+repository_path: inventory-api/
+source_request_language: es
+scope_type: incremental-ux-guidance
+last_updated_note: "Spec refinado con decisiones del solicitante: warnings no bloqueantes para UN, copy operativo para quantityBasis, guía extendida a PROCESSING/envasado, filtros cliente-side opcionales y recordatorio de follow-up para soporte híbrido por insumo."

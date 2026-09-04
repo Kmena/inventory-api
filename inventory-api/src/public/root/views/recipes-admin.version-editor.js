@@ -116,6 +116,7 @@
       const row = globalScope.document.createElement('div');
       row.className = 'products-form-grid stage-input-row';
       row.style.alignItems = 'end';
+      row.dataset.stageInputName = String(data.name || '').trim().toLowerCase();
 
       const existingUnit = data.unit || '';
       const productUnit = resolveProductUnit(data.productId);
@@ -146,9 +147,11 @@
         <button type="button" class="secondary-button remove-stage-input-btn" title="Quitar insumo">✕</button>
       `;
 
-      const productSelect = row.querySelector('.si-product');
-      const unitInput = row.querySelector('.si-unit');
-      const availHint = row.querySelector('.si-avail-hint');
+      const productSelect = /** @type {HTMLSelectElement} */ (row.querySelector('.si-product'));
+      const nameInput = /** @type {HTMLInputElement} */ (row.querySelector('.si-name'));
+      const quantityInput = /** @type {HTMLInputElement} */ (row.querySelector('.si-quantity'));
+      const unitInput = /** @type {HTMLInputElement} */ (row.querySelector('.si-unit'));
+      const availHint = /** @type {HTMLElement | null} */ (row.querySelector('.si-avail-hint'));
 
       // Recomputes the availability hint live from current form state so it stays
       // accurate even when the user modifies prior stage quantities after row creation.
@@ -163,6 +166,9 @@
       productSelect.addEventListener('change', () => {
         const selectedProduct = getProducts().find((product) => String(product.id) === String(productSelect.value));
         const unitPatch = recipesHelpers.buildStageInputPatchFromProduct(selectedProduct);
+        if (!nameInput.value.trim() && unitPatch.name) {
+          nameInput.value = unitPatch.name;
+        }
         unitInput.value = unitPatch.unit;
         unitInput.readOnly = Boolean(unitPatch.unitReadonly);
         if (unitPatch.unitReadonly) {
@@ -172,8 +178,15 @@
           unitInput.removeAttribute('aria-readonly');
           unitInput.title = '';
         }
+        row.dataset.stageInputName = nameInput.value.trim().toLowerCase();
         updateAvailHint();
       });
+
+      nameInput.addEventListener('input', () => {
+        row.dataset.stageInputName = nameInput.value.trim().toLowerCase();
+      });
+
+      quantityInput.addEventListener('input', updateAvailHint);
 
       // Initialize hint if product is already selected (e.g., editing an existing version)
       if (data.productId) updateAvailHint();
@@ -214,11 +227,11 @@
       });
 
       // Live range preview so user sees resulting bounds as they type
-      const expectedInput = row.querySelector('.qp-expected');
-      const minTolInput   = row.querySelector('.qp-min-tol');
-      const maxTolInput   = row.querySelector('.qp-max-tol');
-      const unitInput     = row.querySelector('.qp-unit');
-      const rangePreview  = row.querySelector('.qp-range-preview');
+      const expectedInput = /** @type {HTMLInputElement} */ (row.querySelector('.qp-expected'));
+      const minTolInput   = /** @type {HTMLInputElement} */ (row.querySelector('.qp-min-tol'));
+      const maxTolInput   = /** @type {HTMLInputElement} */ (row.querySelector('.qp-max-tol'));
+      const unitInput     = /** @type {HTMLInputElement} */ (row.querySelector('.qp-unit'));
+      const rangePreview  = /** @type {HTMLElement} */ (row.querySelector('.qp-range-preview'));
       function updateRangePreview() {
         const exp = Number(expectedInput.value);
         const min = Number(minTolInput.value || 0);
@@ -240,21 +253,93 @@
 
     // TASK-001 (qa-rejection-material-reconciliation-amendment): processCode catalog
     // Catalog must stay in sync with RECIPE_STAGE_PROCESS_CODES in src/schemas/recipe.schema.js.
+    // AUD-001: full catalog aligned with backend — do not add or remove values without
+    // updating RECIPE_STAGE_PROCESS_CODES in src/schemas/recipe.schema.js simultaneously.
     const PROCESS_CODE_OPTIONS = [
-      { value: 'MIXING',        label: 'Mezclado' },
-      { value: 'HEATING',       label: 'Calentamiento' },
-      { value: 'COOLING',       label: 'Enfriamiento' },
-      { value: 'CAPPING',       label: 'Tapado' },
-      { value: 'SEALING',       label: 'Sellado' },
-      { value: 'LABELING_PREP', label: 'Prep. etiquetado' },
-      { value: 'PACKING_PREP',  label: 'Prep. empaque' },
-      { value: 'OTHER',         label: 'Otro (describe abajo)' },
+      // Termicos
+      { value: 'HEATING',        label: 'Calentamiento' },
+      { value: 'COOLING',        label: 'Enfriamiento' },
+      { value: 'FREEZING',       label: 'Congelamiento' },
+      { value: 'DRYING',         label: 'Secado' },
+      { value: 'PASTEURIZATION', label: 'Pasteurizacion' },
+      { value: 'STERILIZATION',  label: 'Esterilizacion' },
+      // Mezcla / transformacion
+      { value: 'MIXING',         label: 'Mezclado' },
+      { value: 'BLENDING',       label: 'Mezcla fina' },
+      { value: 'DISSOLUTION',    label: 'Disolucion' },
+      { value: 'DILUTION',       label: 'Dilucion' },
+      { value: 'EMULSIFICATION', label: 'Emulsificacion' },
+      // Mecanicos
+      { value: 'MILLING',        label: 'Molienda' },
+      { value: 'GRINDING',       label: 'Triturado' },
+      { value: 'CUTTING',        label: 'Corte' },
+      { value: 'SIEVING',        label: 'Tamizado' },
+      { value: 'FILTERING',      label: 'Filtrado' },
+      // Reaccion / maduracion
+      { value: 'FERMENTATION',   label: 'Fermentacion' },
+      { value: 'CURING',         label: 'Curado' },
+      { value: 'RESTING',        label: 'Reposo' },
+      { value: 'HYDRATION',      label: 'Hidratacion' },
+      // Formado / produccion
+      { value: 'FORMING',        label: 'Formado' },
+      { value: 'COOKING',        label: 'Coccion' },
+      { value: 'BAKING',         label: 'Horneado' },
+      // Acabado / empaque
+      { value: 'PACKING_PREP',   label: 'Prep. empaque' },
+      { value: 'LABELING_PREP',  label: 'Prep. etiquetado' },
+      { value: 'CAPPING',        label: 'Tapado' },
+      { value: 'SEALING',        label: 'Sellado' },
+      // Escape
+      { value: 'OTHER',          label: 'Otro (describe abajo)' },
     ];
+
+    function clearStageValidationHighlight(element) {
+      if (!element) {
+        return;
+      }
+      element.style.boxShadow = '';
+      element.style.borderRadius = '';
+      element.style.background = '';
+    }
+
+    function applyStageValidationHighlight(element, tone = 'error') {
+      if (!element) {
+        return;
+      }
+      if (tone === 'warning') {
+        element.style.boxShadow = '0 0 0 2px rgba(217, 119, 6, 0.28)';
+        element.style.background = 'rgba(251, 191, 36, 0.12)';
+      } else {
+        element.style.boxShadow = '0 0 0 2px rgba(220, 38, 38, 0.28)';
+        element.style.background = 'rgba(254, 226, 226, 0.7)';
+      }
+      element.style.borderRadius = '8px';
+    }
+
+    function clearVersionValidationHighlights() {
+      Array.from(stagesList.querySelectorAll('.stage-section')).forEach((section) => {
+        clearStageValidationHighlight(section);
+        clearStageValidationHighlight(section.querySelector('.stage-process-code-block'));
+        clearStageValidationHighlight(section.querySelector('.stage-process-label-block'));
+        section.querySelectorAll('.stage-input-row').forEach((row) => clearStageValidationHighlight(row));
+      });
+    }
+
+    function focusValidationTarget(container, input, tone = 'error') {
+      applyStageValidationHighlight(container, tone);
+      if (container && typeof container.scrollIntoView === 'function') {
+        container.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+      if (input && typeof input.focus === 'function') {
+        input.focus();
+      }
+    }
 
     function addStageSection(data = {}) {
       const section = globalScope.document.createElement('div');
       section.className = 'stage-section';
       section.style.cssText = 'border:1px solid var(--border, #ddd); border-radius:8px; padding:1rem; margin-bottom:0.75rem;';
+      section.dataset.stageName = String(data.name || '').trim().toLowerCase();
       const qaMandatory = Boolean(data.qaMandatory);
       const stageType = data.stageType || 'PROCESSING';
       const processCode = data.processCode || '';
@@ -311,26 +396,32 @@
       `;
       stagesList.appendChild(section);
 
-      const qaCheckbox = section.querySelector('.stage-qa');
-      const qaParamsBlock = section.querySelector('.stage-qa-params');
+      const qaCheckbox = /** @type {HTMLInputElement} */ (section.querySelector('.stage-qa'));
+      const qaParamsBlock = /** @type {HTMLElement} */ (section.querySelector('.stage-qa-params'));
       const qaParamsList = section.querySelector('.qa-params-list');
-      const qaEmptyMessage = section.querySelector('.qa-params-empty-msg');
+      const qaEmptyMessage = /** @type {HTMLElement | null} */ (section.querySelector('.qa-params-empty-msg'));
       const addQaButton = section.querySelector('.add-qa-param-btn');
+      const stageNameInput = /** @type {HTMLInputElement} */ (section.querySelector('.stage-name'));
+
+      stageNameInput.addEventListener('input', () => {
+        section.dataset.stageName = stageNameInput.value.trim().toLowerCase();
+      });
 
       qaCheckbox.addEventListener('change', () => {
         qaParamsBlock.style.display = qaCheckbox.checked ? '' : 'none';
       });
 
       // TASK-001 (qa-rejection-material-reconciliation-amendment): stageType + processCode wiring
-      const stageTypeSelect = section.querySelector('.stage-type');
-      const processCodeBlock = section.querySelector('.stage-process-code-block');
-      const processCodeSelect = section.querySelector('.stage-process-code');
-      const processLabelBlock = section.querySelector('.stage-process-label-block');
+      const stageTypeSelect = /** @type {HTMLSelectElement | null} */ (section.querySelector('.stage-type'));
+      const processCodeBlock = /** @type {HTMLElement | null} */ (section.querySelector('.stage-process-code-block'));
+      const processCodeSelect = /** @type {HTMLSelectElement | null} */ (section.querySelector('.stage-process-code'));
+      const processLabelBlock = /** @type {HTMLElement | null} */ (section.querySelector('.stage-process-label-block'));
+      const processLabelInput = /** @type {HTMLInputElement | null} */ (section.querySelector('.stage-process-label'));
 
       // recipe-stage-lineage-validation: add-input button visibility for PROCESSING stages.
       // Computes prior recollected balance and conditionally shows the button and an
       // informative note when no materials are available.
-      const addInputBtn = section.querySelector('.add-stage-input-btn');
+      const addInputBtn = /** @type {HTMLElement} */ (section.querySelector('.add-stage-input-btn'));
 
       function applyStageTypeAccent() {
         const currentType = stageTypeSelect ? stageTypeSelect.value : 'PROCESSING';
@@ -374,8 +465,14 @@
       if (stageTypeSelect) {
         stageTypeSelect.addEventListener('change', () => {
           const isProcessing = stageTypeSelect.value === 'PROCESSING';
-          if (processCodeBlock) { processCodeBlock.style.display = isProcessing ? '' : 'none'; }
-          if (processLabelBlock) { processLabelBlock.style.display = 'none'; }
+          if (processCodeBlock) {
+            processCodeBlock.style.display = isProcessing ? '' : 'none';
+            clearStageValidationHighlight(processCodeBlock);
+          }
+          if (processLabelBlock) {
+            processLabelBlock.style.display = 'none';
+            clearStageValidationHighlight(processLabelBlock);
+          }
           applyStageTypeAccent();
           refreshInputsAreaVisibility();
         });
@@ -384,7 +481,17 @@
       if (processCodeSelect) {
         processCodeSelect.addEventListener('change', () => {
           const isOther = processCodeSelect.value === 'OTHER';
-          if (processLabelBlock) { processLabelBlock.style.display = isOther ? '' : 'none'; }
+          clearStageValidationHighlight(processCodeBlock);
+          if (processLabelBlock) {
+            processLabelBlock.style.display = isOther ? '' : 'none';
+            clearStageValidationHighlight(processLabelBlock);
+          }
+        });
+      }
+
+      if (processLabelInput) {
+        processLabelInput.addEventListener('input', () => {
+          clearStageValidationHighlight(processLabelBlock);
         });
       }
 
@@ -436,31 +543,168 @@
       return true;
     }
 
+    function validateStageStructureInline() {
+      const issues = [];
+
+      Array.from(stagesList.querySelectorAll('.stage-section')).forEach((section, sectionIndex) => {
+        const stageName = section.querySelector('.stage-name')?.value.trim() || `Etapa ${sectionIndex + 1}`;
+        const stageType = section.querySelector('.stage-type')?.value || 'PROCESSING';
+        const processCodeBlock = section.querySelector('.stage-process-code-block');
+        const processCodeSelect = section.querySelector('.stage-process-code');
+        const processLabelBlock = section.querySelector('.stage-process-label-block');
+        const processLabelInput = section.querySelector('.stage-process-label');
+        const processCode = processCodeSelect?.value.trim() || '';
+        const processLabel = processLabelInput?.value.trim() || '';
+
+        if (stageType !== 'PROCESSING') {
+          return;
+        }
+
+        if (!processCode) {
+          issues.push({
+            stageName,
+            message: `La etapa "${stageName}" requiere Codigo de proceso.`,
+            container: processCodeBlock,
+            input: processCodeSelect,
+          });
+          return;
+        }
+
+        if (processCode === 'OTHER' && !processLabel) {
+          issues.push({
+            stageName,
+            message: `La etapa "${stageName}" requiere Descripcion del proceso cuando el codigo es OTHER.`,
+            container: processLabelBlock,
+            input: processLabelInput,
+          });
+        }
+      });
+
+      return issues;
+    }
+
+    function inspectIncompleteStageInputs() {
+      const blockingIssues = [];
+      const warningIssues = [];
+
+      Array.from(stagesList.querySelectorAll('.stage-section')).forEach((section, sectionIndex) => {
+        const stageType = section.querySelector('.stage-type')?.value || 'PROCESSING';
+        const stageName = section.querySelector('.stage-name')?.value.trim() || `Etapa ${sectionIndex + 1}`;
+
+        Array.from(section.querySelectorAll('.stage-input-row')).forEach((row, rowIndex) => {
+          const productId = row.querySelector('.si-product')?.value || '';
+          const name = row.querySelector('.si-name')?.value.trim() || '';
+          const quantityValue = row.querySelector('.si-quantity')?.value || '';
+          const unit = row.querySelector('.si-unit')?.value.trim() || '';
+          const hasAnyValue = Boolean(productId || name || quantityValue || unit);
+          const hasQuantity = quantityValue !== '';
+          const isDescriptiveProcessingInput = stageType === 'PROCESSING' && !productId && Boolean(name);
+          const isIncomplete = hasAnyValue && !isDescriptiveProcessingInput && (
+            (!productId && (quantityValue || unit || !name))
+            || (Boolean(productId) && (!name || !hasQuantity || !unit))
+          );
+
+          if (!isIncomplete) {
+            return;
+          }
+
+          const issue = {
+            stageName,
+            stageType,
+            rowIndex,
+            row,
+          };
+
+          if (stageType === 'RECOLLECTION') {
+            blockingIssues.push(issue);
+            return;
+          }
+
+          warningIssues.push(issue);
+        });
+      });
+
+      return { blockingIssues, warningIssues };
+    }
+
+    function focusStageIssue(issue) {
+      if (!issue?.row) {
+        return;
+      }
+      focusValidationTarget(issue.row, issue.row.querySelector('.si-product') || issue.row.querySelector('.si-name'), 'warning');
+    }
+
+    function applyRepairHighlight(repairHighlight) {
+      clearVersionValidationHighlights();
+
+      if (!repairHighlight) {
+        return;
+      }
+
+      const stageMatch = Array.from(stagesList.querySelectorAll('.stage-section')).find((section) => section.dataset.stageName === String(repairHighlight.stageName || '').trim().toLowerCase());
+      if (!stageMatch) {
+        return;
+      }
+
+      applyStageValidationHighlight(stageMatch, 'warning');
+      if (typeof stageMatch.scrollIntoView === 'function') {
+        stageMatch.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+
+      if (!repairHighlight.inputName) {
+        const stageNameInput = stageMatch.querySelector('.stage-name');
+        if (stageNameInput && typeof stageNameInput.focus === 'function') {
+          stageNameInput.focus();
+        }
+        return;
+      }
+
+      const rowMatch = Array.from(stageMatch.querySelectorAll('.stage-input-row')).find((row) => row.dataset.stageInputName === String(repairHighlight.inputName || '').trim().toLowerCase());
+      if (!rowMatch) {
+        return;
+      }
+
+      applyStageValidationHighlight(rowMatch, 'warning');
+      const focusTarget = rowMatch.querySelector('.si-product') || rowMatch.querySelector('.si-name');
+      if (focusTarget && typeof focusTarget.focus === 'function') {
+        focusTarget.focus();
+      }
+    }
+
     function collectStages() {
       return Array.from(stagesList.querySelectorAll('.stage-section')).map((section) => {
         const inputRows = section.querySelectorAll('.stage-input-row');
-        const qaMandatory = section.querySelector('.stage-qa').checked;
-        const stageTypeEl = section.querySelector('.stage-type');
-        const processCodeEl = section.querySelector('.stage-process-code');
-        const processLabelEl = section.querySelector('.stage-process-label');
+        const qaEl = /** @type {HTMLInputElement} */ (section.querySelector('.stage-qa'));
+        const qaMandatory = qaEl.checked;
+        const stageTypeEl = /** @type {HTMLSelectElement | null} */ (section.querySelector('.stage-type'));
+        const processCodeEl = /** @type {HTMLSelectElement | null} */ (section.querySelector('.stage-process-code'));
+        const processLabelEl = /** @type {HTMLInputElement | null} */ (section.querySelector('.stage-process-label'));
         const stageType = stageTypeEl ? stageTypeEl.value : 'PROCESSING';
         const processCode = (stageType === 'PROCESSING' && processCodeEl) ? processCodeEl.value.trim() : null;
         const processLabel = (processCode === 'OTHER' && processLabelEl) ? processLabelEl.value.trim() : null;
+        const stageNameEl = /** @type {HTMLInputElement} */ (section.querySelector('.stage-name'));
+        const instructionsEl = /** @type {HTMLTextAreaElement} */ (section.querySelector('.stage-instructions'));
         return {
-          name: section.querySelector('.stage-name').value.trim(),
-          instructions: section.querySelector('.stage-instructions').value.trim() || undefined,
+          name: stageNameEl.value.trim(),
+          instructions: instructionsEl.value.trim() || undefined,
           qaMandatory,
           expectedParameters: qaMandatory ? collectQaParams(section) : [],
           // TASK-001: stage typing and processCode
           stageType: stageType || 'PROCESSING',
           processCode: processCode || undefined,
           processLabel: processLabel || undefined,
-          stageInputs: Array.from(inputRows).map((row) => ({
-            productId: Number(row.querySelector('.si-product').value) || undefined,
-            name: row.querySelector('.si-name').value.trim(),
-            quantity: Number(row.querySelector('.si-quantity').value) || undefined,
-            unit: row.querySelector('.si-unit').value.trim() || undefined,
-          })).filter((stageInput) => stageInput.name),
+          stageInputs: Array.from(inputRows).map((row) => {
+            const siProduct = /** @type {HTMLSelectElement} */ (row.querySelector('.si-product'));
+            const siName = /** @type {HTMLInputElement} */ (row.querySelector('.si-name'));
+            const siQuantity = /** @type {HTMLInputElement} */ (row.querySelector('.si-quantity'));
+            const siUnit = /** @type {HTMLInputElement} */ (row.querySelector('.si-unit'));
+            return {
+              productId: Number(siProduct.value) || undefined,
+              name: siName.value.trim(),
+              quantity: Number(siQuantity.value) || undefined,
+              unit: siUnit.value.trim() || undefined,
+            };
+          }).filter((stageInput) => stageInput.name),
         };
       }).filter((stage) => stage.name);
     }
@@ -482,7 +726,7 @@
       setDialogVisibility(versionDialog, true);
     }
 
-    function openEditVersionDialog(versionId) {
+    function openEditVersionDialog(versionId, repairHighlight = null) {
       const version = getSelectedRecipeVersions().find((entry) => String(entry?.id) === String(versionId));
       if (!version) {
         return;
@@ -526,9 +770,32 @@
       }
 
       setDialogVisibility(versionDialog, true);
+      applyRepairHighlight(repairHighlight);
+      if (repairHighlight?.message) {
+        versionMessage.innerHTML = rootShellUi.renderInlineMessage(repairHighlight.message, 'warning');
+      }
     }
 
     function buildVersionPayload(formData, parseOptionalDate, parseOptionalNumber) {
+      clearVersionValidationHighlights();
+
+      const stageStructureIssues = validateStageStructureInline();
+      if (stageStructureIssues.length) {
+        const firstIssue = stageStructureIssues[0];
+        focusValidationTarget(firstIssue.container, firstIssue.input);
+        throw new Error(firstIssue.message);
+      }
+
+      const incompleteInputs = inspectIncompleteStageInputs();
+      if (incompleteInputs.blockingIssues.length) {
+        focusStageIssue(incompleteInputs.blockingIssues[0]);
+        throw new Error('No se puede guardar el borrador. Completa las filas incompletas de RECOLLECTION antes de continuar.');
+      }
+
+      if (incompleteInputs.warningIssues.length) {
+        focusStageIssue(incompleteInputs.warningIssues[0]);
+      }
+
       const stages = collectStages();
       if (!stages.length) {
         throw new Error('Agrega al menos una etapa.');
@@ -559,7 +826,13 @@
         stages,
       };
 
-      return recipesState.serializeVersionPayloadFromForm(rawValues);
+      return {
+        payload: recipesState.serializeVersionPayloadFromForm(rawValues),
+        markVersionIncomplete: incompleteInputs.warningIssues.length > 0,
+        warningMessage: incompleteInputs.warningIssues.length > 0
+          ? 'Hay filas incompletas en PROCESSING. Guardaremos el borrador como incompleto y seguira bloqueado para aprobacion.'
+          : '',
+      };
     }
 
     return {
@@ -569,6 +842,7 @@
       openCreateVersionDialog,
       openEditVersionDialog,
       resetVersionForm,
+      applyRepairHighlight,
     };
   }
 

@@ -708,12 +708,14 @@ test('production-new.js includes ingredient preview helpers', () => {
 
 test('production-new.js renderIngredientsPreview uses correct quantity formula', () => {
   const source = readWarehouseFile('views/production-new.js');
-  // For PER_OUTPUT_KG recipes the scaling factor is plannedOutputKg (kgPerUnit × qty),
-  // not raw qty. The formula must multiply by scalingQty to match the backend.
+  // FR-007: each ingredient is scaled by its effective basis (ingScalingQty).
+  // When the ingredient has an inputQuantityBasis override of PER_FINISHED_UNIT,
+  // ingScalingQty = qty; otherwise it falls back to plannedOutputKg (kgPerUnit × qty)
+  // which correctly accounts for PER_OUTPUT_KG recipes.
   assert.match(
     source,
-    /Number\(ing\.quantity\)\s*\*\s*scalingQty/,
-    'required quantity must be Number(ing.quantity) * scalingQty (accounts for PER_OUTPUT_KG basis)',
+    /Number\(ing\.quantity\)\s*\*\s*ingScalingQty/,
+    'required quantity must be Number(ing.quantity) * ingScalingQty (per-ingredient basis, FR-007)',
   );
   assert.match(source, /clientKgPerUnit/, 'must define clientKgPerUnit for kg conversion');
   assert.match(source, /quantityBasis/, 'must read quantityBasis from recipe version');

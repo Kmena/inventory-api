@@ -795,3 +795,89 @@ test('serializeRecipeVersion defaults quantityBasis to PER_OUTPUT_KG for legacy 
 
   assert.equal(serialized.quantityBasis, 'PER_OUTPUT_KG');
 });
+
+// ── TASK-003 (recipe-input-per-unit-basis): inputQuantityBasis CRUD ──
+
+test('createRecipeVersion persists inputQuantityBasis PER_FINISHED_UNIT on stage input (TASK-003)', async () => {
+  const observed = { createPayload: null };
+
+  const stubbedVersion = {
+    id: 92n, companyId: 7n, recipeId: 33n, versionNumber: 4,
+    status: 'DRAFT', quantityBasis: 'PER_OUTPUT_KG',
+    effectiveFrom: null, effectiveTo: null,
+    expectedYield: null, expectedWaste: null,
+    yieldTolerancePercent: null, wasteTolerancePercent: null,
+    instructions: null, notes: null,
+    approvedAt: null, createdAt: new Date(), updatedAt: new Date(),
+    createdByUser: null, approvedByUser: null,
+    recipe: { id: 33n, name: 'Shampoo' },
+    stages: [{
+      id: 5n, stageOrder: 0, stageType: 'RECOLLECTION',
+      name: 'Insumos', instructions: null, responsibleRoleCode: null,
+      expectedParameters: [], parameterTolerances: [], requiredEvidence: [],
+      qaMandatory: false, processCode: null, processLabel: null,
+      stageInputs: [{
+        id: 6n, productId: 11n, name: 'Tapa',
+        quantity: 1, unit: 'UN', sortOrder: 0, notes: null,
+        inputQuantityBasis: 'PER_FINISHED_UNIT',
+        product: { id: 11n, code: 'TAP-001', name: 'Tapa', unit: 'UN', isActive: true },
+      }],
+    }],
+  };
+
+  await withModuleStubs([
+    [recipeRepository, {
+      findRecipeById: async (recipeId, companyId) => ({ id: recipeId, companyId, versions: [] }),
+      findLatestRecipeVersion: async () => ({ id: 91n, versionNumber: 3 }),
+      createRecipeVersion: async (payload) => { observed.createPayload = payload; return stubbedVersion; },
+    }],
+    [productRepository, {
+      findProductsByIds: async () => [{ id: 11n, name: 'Tapa', unit: 'UN' }],
+    }],
+  ], async () => {
+    const result = await recipeService.createRecipeVersion(33n, {
+      stages: [{
+        name: 'Insumos',
+        stageType: 'RECOLLECTION',
+        stageInputs: [{ productId: 11n, name: 'Tapa', quantity: 1, unit: 'UN', inputQuantityBasis: 'PER_FINISHED_UNIT' }],
+      }],
+    }, auth);
+
+    // The Prisma create payload must include inputQuantityBasis
+    assert.equal(
+      observed.createPayload.stages.create[0].stageInputs.create[0].inputQuantityBasis,
+      'PER_FINISHED_UNIT',
+    );
+
+    // The serialized response must expose inputQuantityBasis
+    assert.equal(result.stages[0].stageInputs[0].inputQuantityBasis, 'PER_FINISHED_UNIT');
+  });
+});
+
+test('serializeRecipeVersion exposes inputQuantityBasis null for inputs without override (TASK-003)', () => {
+  const version = {
+    id: 93n, companyId: 7n, recipeId: 33n, versionNumber: 5,
+    status: 'DRAFT', quantityBasis: 'PER_OUTPUT_KG',
+    effectiveFrom: null, effectiveTo: null,
+    expectedYield: null, expectedWaste: null,
+    yieldTolerancePercent: null, wasteTolerancePercent: null,
+    instructions: null, notes: null,
+    approvedAt: null, createdAt: new Date(), updatedAt: new Date(),
+    createdByUser: null, approvedByUser: null,
+    stages: [{
+      id: 7n, stageOrder: 0, stageType: 'RECOLLECTION',
+      name: 'Base', instructions: null, responsibleRoleCode: null,
+      expectedParameters: [], parameterTolerances: [], requiredEvidence: [],
+      qaMandatory: false, processCode: null, processLabel: null,
+      stageInputs: [{
+        id: 8n, productId: 12n, name: 'Agua',
+        quantity: 0.5, unit: 'KG', sortOrder: 0, notes: null,
+        inputQuantityBasis: null,
+        product: { id: 12n, code: 'AGU-001', name: 'Agua', unit: 'KG', isActive: true },
+      }],
+    }],
+  };
+
+  const serialized = recipeService.serializeRecipeVersion(version);
+  assert.equal(serialized.stages[0].stageInputs[0].inputQuantityBasis, null);
+});

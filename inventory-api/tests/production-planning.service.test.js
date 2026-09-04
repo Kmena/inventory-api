@@ -241,3 +241,84 @@ test('buildEnrichedSnapshot preserves the base recipe snapshot and appends mater
   ]);
   assert.equal(snapshot.override.permissionCode, 'production.override');
 });
+
+// ── TASK-004 (recipe-input-per-unit-basis): resolveInputScalingQuantity ──
+
+const { resolveInputScalingQuantity } = productionPlanningService.__private__;
+
+test('resolveInputScalingQuantity: null + PER_OUTPUT_KG uses plannedOutputKg (TASK-004)', () => {
+  assert.equal(resolveInputScalingQuantity(null, 'PER_OUTPUT_KG', 100, 10), 100);
+});
+
+test('resolveInputScalingQuantity: null + PER_FINISHED_UNIT uses plannedUnits (TASK-004)', () => {
+  assert.equal(resolveInputScalingQuantity(null, 'PER_FINISHED_UNIT', 100, 10), 10);
+});
+
+test('resolveInputScalingQuantity: PER_FINISHED_UNIT override on PER_OUTPUT_KG version uses plannedUnits (TASK-004)', () => {
+  assert.equal(resolveInputScalingQuantity('PER_FINISHED_UNIT', 'PER_OUTPUT_KG', 100, 10), 10);
+});
+
+test('resolveInputScalingQuantity: PER_OUTPUT_KG override on PER_FINISHED_UNIT version uses plannedOutputKg (TASK-004)', () => {
+  assert.equal(resolveInputScalingQuantity('PER_OUTPUT_KG', 'PER_FINISHED_UNIT', 100, 10), 100);
+});
+
+test('buildRecipeVersionSnapshot includes inputQuantityBasis per stageInput (TASK-004)', () => {
+  const version = buildRecipeVersion();
+  // Add inputQuantityBasis to the existing stageInput fixture
+  version.stages[0].stageInputs[0].inputQuantityBasis = 'PER_FINISHED_UNIT';
+
+  const snapshot = productionPlanningService.buildRecipeVersionSnapshot(version, null);
+  assert.equal(
+    snapshot.recipeVersion.stages[0].stageInputs[0].inputQuantityBasis,
+    'PER_FINISHED_UNIT',
+    'snapshot must freeze inputQuantityBasis per stageInput',
+  );
+});
+
+test('buildRecipeVersionSnapshot exposes null inputQuantityBasis when not set on stageInput (TASK-004)', () => {
+  const version = buildRecipeVersion();
+  // stageInput has no inputQuantityBasis in the default fixture
+  const snapshot = productionPlanningService.buildRecipeVersionSnapshot(version, null);
+  assert.equal(
+    snapshot.recipeVersion.stages[0].stageInputs[0].inputQuantityBasis,
+    null,
+    'absent inputQuantityBasis must be null in snapshot',
+  );
+});
+
+test('buildMaterialRequirements scales PER_FINISHED_UNIT input by plannedUnits in PER_OUTPUT_KG version (TASK-004)', () => {
+  // version PER_OUTPUT_KG, plannedOutputKg=5, plannedUnits=10
+  // Insumo A: 0.6 KG, inputQuantityBasis=null → 0.6 × 5 = 3
+  // Insumo B: 1 UN, inputQuantityBasis='PER_FINISHED_UNIT' → 1 × 10 = 10
+  const version = {
+    quantityBasis: 'PER_OUTPUT_KG',
+    stages: [{
+      stageType: 'RECOLLECTION',
+      stageInputs: [
+        { productId: 1n, name: 'Harina', quantity: 0.6, unit: 'KG', inputQuantityBasis: null },
+        { productId: 2n, name: 'Tapa', quantity: 1, unit: 'UN', inputQuantityBasis: 'PER_FINISHED_UNIT' },
+      ],
+    }],
+  };
+
+  const requirements = productionPlanningService.buildMaterialRequirements(version, 5, 10);
+  const byId = Object.fromEntries(requirements.map((r) => [String(r.productId), r]));
+  assert.equal(byId['1'].requiredQuantity, 3, 'gravimetric input must scale by plannedOutputKg');
+  assert.equal(byId['2'].requiredQuantity, 10, 'discrete input must scale by plannedUnits');
+});
+
+test('buildMaterialRequirements backward compat: no inputQuantityBasis scales by single quantity param (TASK-004)', () => {
+  // Simulates legacy recipe with no inputQuantityBasis — behavior must be identical to before
+  const version = {
+    quantityBasis: 'PER_OUTPUT_KG',
+    stages: [{
+      stageType: 'RECOLLECTION',
+      stageInputs: [
+        { productId: 3n, name: 'Agua', quantity: 0.4, unit: 'KG' },
+      ],
+    }],
+  };
+
+  const requirements = productionPlanningService.buildMaterialRequirements(version, 10);
+  assert.equal(requirements[0].requiredQuantity, 4, 'legacy input must scale by quantity param');
+});

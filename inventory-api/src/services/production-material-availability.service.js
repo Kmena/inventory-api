@@ -179,12 +179,12 @@ async function getAvailableLotsForStage(orderId, stageId, auth) {
       continue;
     }
 
-    // TASK-005 (production-size-conversion): for PER_OUTPUT_KG recipes the scaling
-    // quantity is plannedOutputKg (total kg of finished product), not order.quantity.
-    const snapshotBasis = /** @type {any} */ (order.recipeVersionSnapshot)?.recipeVersion?.quantityBasis ?? 'PER_OUTPUT_KG';
-    const lotScalingQuantity = snapshotBasis === 'PER_OUTPUT_KG'
-      ? number(order.plannedOutputKg ?? order.quantity)
-      : number(order.quantity);
+    // FR-005, BR-002: use per-input effective basis for lot scaling (recipe-input-per-unit-basis).
+    const versionBasis = /** @type {any} */ (order.recipeVersionSnapshot)?.recipeVersion?.quantityBasis ?? 'PER_OUTPUT_KG';
+    const plannedOutputKg = number(order.plannedOutputKg ?? order.quantity);
+    const plannedUnits = number(order.quantity);
+    const effectiveBasis = stageInput.inputQuantityBasis ?? versionBasis;
+    const lotScalingQuantity = effectiveBasis === 'PER_FINISHED_UNIT' ? plannedUnits : plannedOutputKg;
     const requiredQuantity = number(stageInput.quantity) * lotScalingQuantity;
     const reservableLotStocks = await inventoryRepository.findReservableLotStocks(
       order.originWarehouseId,
