@@ -1618,6 +1618,10 @@ model RecipeStageInput {
   unit          String?
   sortOrder     Int          @default(0) @map("sort_order")
   notes         String?
+  /// Base de cantidad individual. NULL = hereda RecipeVersion.quantityBasis.
+  /// PER_FINISHED_UNIT: este insumo se escala por unidades producidas aunque la versión sea PER_OUTPUT_KG.
+  /// PER_OUTPUT_KG: este insumo se escala por kg de salida aunque la versión sea PER_FINISHED_UNIT.
+  inputQuantityBasis RecipeQuantityBasis? @map("input_quantity_basis")
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
   recipeStage   RecipeStage  @relation(fields: [recipeStageId], references: [id], onDelete: Cascade)

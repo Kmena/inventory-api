@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   qaParameterSchema,
   recipeQuantityBasisSchema,
+  recipeStageInputSchema,
   recipeStageTypeSchema,
   recipeStageProcessCodeSchema,
   RECIPE_STAGE_PROCESS_CODES,
@@ -379,4 +380,35 @@ test('createRecipeVersionSchema defaults stageType to PROCESSING when omitted (T
 
   assert.equal(result.success, true);
   assert.equal(result.data.stages[0].stageType, 'PROCESSING');
+});
+
+// ── TASK-002 (recipe-input-per-unit-basis): inputQuantityBasis on stage inputs ──
+
+test('recipeStageInputSchema accepts inputQuantityBasis PER_FINISHED_UNIT (TASK-002-input)', () => {
+  const r = recipeStageInputSchema.safeParse({ name: 'Tapa', inputQuantityBasis: 'PER_FINISHED_UNIT' });
+  assert.equal(r.success, true, 'PER_FINISHED_UNIT debe ser aceptado');
+  assert.equal(r.data.inputQuantityBasis, 'PER_FINISHED_UNIT');
+});
+
+test('recipeStageInputSchema accepts inputQuantityBasis null (TASK-002-input)', () => {
+  const r = recipeStageInputSchema.safeParse({ name: 'Harina', inputQuantityBasis: null });
+  assert.equal(r.success, true, 'null debe ser aceptado');
+  assert.equal(r.data.inputQuantityBasis, null);
+});
+
+test('recipeStageInputSchema defaults inputQuantityBasis to null when absent (TASK-002-input)', () => {
+  const r = recipeStageInputSchema.safeParse({ name: 'Harina' });
+  assert.equal(r.success, true, 'campo ausente debe ser aceptado');
+  assert.equal(r.data.inputQuantityBasis, null, 'campo ausente debe defaultear a null');
+});
+
+test('recipeStageInputSchema rejects invalid inputQuantityBasis (TASK-002-input)', () => {
+  const r = recipeStageInputSchema.safeParse({ name: 'X', inputQuantityBasis: 'INVALID' });
+  assert.equal(r.success, false, 'valor inválido debe ser rechazado');
+});
+
+test('recipeStageInputSchema accepts inputQuantityBasis PER_OUTPUT_KG (TASK-002-input)', () => {
+  const r = recipeStageInputSchema.safeParse({ name: 'Agua', inputQuantityBasis: 'PER_OUTPUT_KG' });
+  assert.equal(r.success, true);
+  assert.equal(r.data.inputQuantityBasis, 'PER_OUTPUT_KG');
 });

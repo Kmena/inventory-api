@@ -265,6 +265,8 @@ function buildRecipeStageCreateData(stage, stageIndex) {
         unit: normalizeStageInputUnit(stageInput.unit),
         sortOrder: inputIndex,
         notes: stageInput.notes ?? null,
+        // FR-001, BR-001: null = inherit from version basis (recipe-input-per-unit-basis)
+        inputQuantityBasis: stageInput.inputQuantityBasis ?? null,
       })),
     },
   };
@@ -350,6 +352,8 @@ function serializeRecipeStageInput(stageInput) {
     unit: normalizeStageInputUnit(stageInput.unit),
     sortOrder: stageInput.sortOrder,
     notes: stageInput.notes,
+    // FR-001, BR-001: expose individual basis so UI and snapshot can use it
+    inputQuantityBasis: stageInput.inputQuantityBasis ?? null,
     product: stageInput.product ? {
       id: stageInput.product.id,
       code: stageInput.product.code,

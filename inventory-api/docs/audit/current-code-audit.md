@@ -1,34 +1,65 @@
-# Current Code Audit — Post-Implementation Review
-## Feature: `create-product-with-subcategory`
+# Current Code Audit — recipe-approval-ux (AUD-001 / AUD-002 / AUD-003 Resolution Cycle)
 
-**Audit Agent ID:** `baseline-audit-agent-6bfed3`
-**Implementation Agent:** `sdd-implementation-agent-d75f97`
-**Date:** Post-implementation audit
-**Scope:** Frontend-only UX feature — 8 tasks (UX-001 through UX-006 + TASK-007 + TASK-008)
-**Changed files:**
-- `src/public/root/views/products-admin.js`
-- `src/public/root/views/products-admin.helpers.js`
-- `tests/products-view-characterization.test.js`
-- `README.md`
-- `CHANGELOG.md`
+## Audit Metadata
+
+- **Audit Agent ID:** `baseline-audit-agent-c763e9`
+- **Repository:** `inventory-api`
+- **Feature slice reviewed:** `recipe-approval-ux` — three targeted findings (AUD-001, AUD-002, AUD-003) resolved by `sdd-implementation-agent-d75f97`
+- **Spec path:** `inventory-api/specs/recipe-approval-ux/` *(see AUD-REC-002: directory is present but empty)*
+- **Prior baseline score:** 9.2 / 10 — recorded by `baseline-audit-agent-1fab9c` (purchase-orders-workspace cycle)
+- **Inspection method:** Targeted repository traversal — changed files, schema alignment, typecheck config, test file, and all referenced dependencies
 
 ---
 
 ## Executive Summary
 
-The `create-product-with-subcategory` implementation delivers 8 frontend-only UX tasks that correct observable defects and add a missing user flow (creating a subcategory from within the product form). All 8 tasks are present and correctly implemented. The new `checkSubcategoryNameDuplicate` helper is well-structured, pure, and carries thorough test coverage (9 cases). The `lastDialogTrigger` refactoring into three dedicated variables is complete with no leftover references. No regressions were introduced in the existing characterization test suite (9 pass, 0 fail).
+This audit is the resolution-verification pass for three findings identified in the `recipe-approval-ux` implementation cycle. All three findings are confirmed **RESOLVED** based on direct code inspection. No regressions are detected against the prior baseline.
 
-Minor deficiencies exist: the CHANGELOG entry carries an inconsistent date (`2025-07` against a context of 2026-09-xx entries), the `specs/create-product-with-subcategory/` directory is empty (the spec was not preserved as a repository artifact in line with the established project pattern), and one render-assertion in the new tests is technically too broad to isolate the specific new button's `type` attribute.
+| Finding | Severity | Prior Status | Current Status |
+|---|---|---|---|
+| AUD-001: PROCESS_CODE_OPTIONS had only 8 of 28 backend process codes | High | Open | ✅ RESOLVED |
+| AUD-002: tsconfig.typecheck.json excluded all recipe-admin browser files | Medium | Open | ✅ RESOLVED |
+| AUD-003: No behavioral tests for `buildRepairHighlight` | Medium | Open | ✅ RESOLVED |
 
-These gaps are documentation and test-precision in nature; they do not affect functional correctness.
+Two new minor findings are raised in this pass:
+
+| Finding | Severity | Category |
+|---|---|---|
+| AUD-REC-001: Test file labels behavioral tests "AUD-009", not "AUD-003" | Low | Documentation — ID traceability gap |
+| AUD-REC-002: `specs/recipe-approval-ux/` directory is present but contains 0 files | Low | Documentation — Missing spec artifacts |
 
 ---
 
 ## Overall Score
 
-**Overall Score: 8.2 / 10**
+**Overall Score: 9.4 / 10**
 
-Justified by: correct full-spec implementation, solid helper-function test coverage, clean code style consistent with project conventions, and complete trigger-variable refactoring — offset by an incorrect CHANGELOG date, an empty spec-artifact directory, and one weak test assertion.
+### Score derivation from prior baseline of 9.2
+
+| Factor | Delta |
+|---|---|
+| AUD-001 resolved — PROCESS_CODE_OPTIONS expanded from 8 to all 28 backend codes | +0.10 |
+| AUD-002 resolved — 7 recipe-admin files added to typecheck scope with full JSDoc annotations | +0.05 |
+| AUD-003 resolved — 5 behavioral VM tests + 1 catalog alignment test for `buildRepairHighlight` | +0.03 |
+| AUD-REC-001 (new, Low): test labels say AUD-009, implementation agent said AUD-003 | −0.01 |
+| AUD-REC-002 (new, Low): `specs/recipe-approval-ux/` exists but is empty | −0.01 |
+| **Net improvement** | **+0.16** |
+
+### Persistent deductions (carried from prior baseline, unchanged)
+
+| Factor | Impact |
+|---|---|
+| AD-001: Two-mode access control coexistence (legacy `authorizePermission` + new `authorizeAccessPolicy`) | −0.15 |
+| AD-002: Two-step browser payment flow without server-side atomic op | −0.10 |
+| AD-003: `creditBalance` as mutable aggregate, not event-sourced | −0.10 |
+| AD-005: Billing trigger best-effort with no retry/alert | −0.10 |
+| AUD-017: Missing E2E tests for billing UI flows | −0.10 |
+| Partial OpenAPI coverage (intentional, bounded by exclusion manifest) | −0.10 |
+| `.env` committed with weak JWT secret | −0.05 |
+| AUD-018: `_activeTab` assigned but never read in `billing-admin.js` | −0.02 |
+| MAINT-001: `escapeHtml` duplicated across 5 warehouse files | −0.02 |
+| TEST-003: Leaked `tmp-prisma-lock-*` directories in `tests/` | −0.02 |
+| SEC-002: `resolveView` bypasses permission gate for `receive-from-po` (UI-layer only) | −0.02 |
 
 **Verdict: Acceptable**
 
@@ -38,393 +69,374 @@ Justified by: correct full-spec implementation, solid helper-function test cover
 
 | Attribute | Value |
 |---|---|
-| Runtime type | Node.js 24 + Express modular monolith |
-| Frontend delivery | Browser SPA served from same process (`src/public/`) |
-| UI pattern | IIFE modules registered on `window.RootShell` |
-| Feature area | Root-shell admin SPA — Products view |
-| Backend impact | None — feature is frontend-only |
-| Database impact | None |
-| API impact | None |
-| Test runner | `node --test` (Node.js built-in) |
-| Lint | ESLint 9 (flat config) |
+| Runtime | Node.js 24, Express 4.22, Prisma 5.22 |
+| Database | PostgreSQL 16 (via Prisma) |
+| Browser runtime | Vanilla JS SPA shells: `src/public/root/`, `src/public/warehouse/`, `src/public/agent/`, `src/public/supplier-quote/` |
+| Test runner | `node --test` (native Node.js) + Playwright E2E |
+| Total test files | ~176+ files in `tests/` |
+| Migrations | 63 directories, latest `20260926000000_add_recipe_stage_input_quantity_basis` |
+| Active runtime dependencies | 8 (`express`, `@prisma/client`, `zod`, `jsonwebtoken`, `bcrypt`, `morgan`, `cors`, `dotenv`) |
+| Open npm vulnerabilities | 0 (enforced by `audit-baseline.json` + CI) |
 
 ---
 
 ## Current Architecture
 
-The application is a layered Express monolith. The products-admin UX layer follows the project's established module pattern:
+**Style:** Layered modular monolith. Not hexagonal. Unchanged from previous baseline.
 
-```
-render()       → Returns static HTML string (DOM template)
-mount()        → Attaches DOM refs, state, event listeners, async loaders
-*.helpers.js   → Pure business-logic helpers (no DOM, no API calls)
-*.renderers.js → Pure rendering helpers (return HTML strings)
-*.state.js     → Pure state-resolution helpers
-*-api.js       → Thin fetch wrappers registered on RootShell
-```
+**Layers (bottom to top):**
+1. **Persistence** — Prisma ORM + PostgreSQL; repositories own all Prisma access
+2. **Repository layer** — tenant-scoped query wrappers; no business logic
+3. **Service layer** — business orchestration, `assertCompanyScope`, audit trail coordination
+4. **HTTP boundary** — Express routes + Zod validation + access policy middleware
+5. **Browser delivery** — `express.static(src/public/)` serving SPA shells
+6. **Root SPA shell** — actor-aware hash router + `window.RootShell` module registry
+7. **Warehouse SPA** — bounded `window.WarehouseShell` registry with permission-gated hash routing
+8. **Agent SPA** — standalone sales-agent workspace
+9. **Governance layer** — scripts, validators, characterization tests, GitHub Actions workflows
 
-All changed files conform to this pattern. No architectural deviations were introduced.
-
-### Dependency direction (unchanged)
-```
-products-admin.js (view)
-  └─ products-admin.helpers.js  (pure helpers)
-  └─ products-admin.renderers.js (pure renderers)
-  └─ products-admin.state.js    (pure state)
-  └─ products-api.js            (API client)
-  └─ categories-api.js          (API client)
-```
+No architectural changes were introduced in this cycle.
 
 ---
 
 ## Documentation Findings
 
-### AUD-001
+### AUD-REC-001 — Audit Finding ID Mismatch Between Implementation Report and Test File
+- **ID:** AUD-REC-001
 - **Severity:** Low
-- **Category:** Documentation — Incorrect date
-- **Location:** `CHANGELOG.md`, line 3
-- **Evidence:** Entry header reads `## 2025-07 — create-product-with-subcategory (UX-001..006)`. All surrounding entries are dated `2026-09-01`. The UX flow audit document (`docs/uiux_analisis/ux-flow-crear-producto-con-subcategoria.md`) is dated `2025-07`; that date appears to have been copied as the CHANGELOG entry date rather than the actual implementation date.
-- **Impact:** Misleading audit trail; CHANGELOG ordering places this entry at the top (most recent), while the date reads ~14 months prior to adjacent entries.
-- **Classification:** Incorrect current-state documentation — date does not reflect actual implementation date.
-- **Recommendation:** Update the CHANGELOG entry date to the actual implementation date (consistent with the surrounding 2026-09-xx entries).
+- **Category:** Documentation — ID traceability gap
+- **Location:** `tests/root-shell-recipes-admin-view-characterization.test.js` lines 259–310 (behavioral tests); implementation agent message (finding references)
+- **Evidence:** The implementation agent identifies the behavioral test finding as **AUD-003**. The test file labels all five behavioral VM tests for `buildRepairHighlight` as **AUD-009** in every test description string (e.g., `'buildRepairHighlight returns null when no version provided (AUD-009)'`). The catalog alignment test correctly references **AUD-001**.
+- **Impact:** A developer searching tests for AUD-003 would find nothing. A developer searching for AUD-009 in the audit file would find no matching entry. Traceability between audit findings and test coverage is partially broken.
+- **Recommendation:** Either update the test descriptions from `AUD-009` to `AUD-003`, or add an `AUD-003 → AUD-009` alias note in the audit document. Low effort to correct.
+- **Documentation separation assessment:** This is a current-state accuracy issue, not a mixed current/future-state issue.
 
----
-
-### AUD-002
+### AUD-REC-002 — Empty Specification Directory
+- **ID:** AUD-REC-002
 - **Severity:** Low
-- **Category:** Documentation — Missing spec artifact
-- **Location:** `inventory-api/specs/` (directory exists, 0 files, 0 subdirectories)
-- **Evidence:** The task brief specifies `Spec path: inventory-api/specs/create-product-with-subcategory/`. The `specs/` directory is empty. The UX analysis at `docs/uiux_analisis/ux-flow-crear-producto-con-subcategoria.md` served as the driving spec but is a UX audit document, not a formal implementation spec with task ledger, acceptance criteria, and traceability rows. The established project pattern (observable from `current-state.md` which references `specs/qa-rejection-material-reconciliation-amendment/`) preserves spec artifacts as repository references after implementation.
-- **Impact:** No post-implementation traceability to formal task acceptance criteria; deviation from established project spec-management pattern.
-- **Classification:** Missing spec artifact — directory was named in the brief but never populated, or was cleaned up post-implementation without a reference record.
-- **Recommendation:** Either restore the spec artifact or add a note to `current-state.md` that the driving spec for this feature lives at `docs/uiux_analisis/ux-flow-crear-producto-con-subcategoria.md`.
+- **Category:** Documentation — Missing spec artifacts
+- **Location:** `inventory-api/specs/` (directory exists; `inventory-api/specs/recipe-approval-ux/` referenced by implementation agent but no files present)
+- **Evidence:** `list_files(directory="inventory-api/specs", recursive=True)` returns `0 directories, 0 files`. The specs folder is entirely empty. The implementation agent states `inventory-api/specs/recipe-approval-ux/` as the specification path but no specification, task list, traceability matrix, or implementation report exists there.
+- **Impact:** Future agents cannot locate the feature specification. Traceability from requirements to implementation is severed. The `current-state.md` references `specs/qa-rejection-material-reconciliation-amendment/` for a prior feature, establishing a precedent that specs should live in this directory.
+- **Recommendation:** Either commit the recipe-approval-ux specification artifacts to `specs/recipe-approval-ux/`, or remove the specs directory if no spec management is intended going forward.
+- **Documentation separation assessment:** This is a missing-documentation finding, not a mixed current/future-state issue.
 
 ---
 
-### AUD-003
-- **Severity:** Low
-- **Category:** Documentation — `current-state.md` not updated
-- **Location:** `docs/current-state.md`
-- **Evidence:** The per-section update log in `current-state.md` shows no entry for the products-admin UX changes. Since this is a frontend-only UX fix, the omission is borderline acceptable; however, the established pattern (update log with section reference and change summary) was not followed.
-- **Impact:** Minor — the observable state document is slightly stale for this feature area.
-- **Classification:** Outdated documentation — not critical for a frontend-only UX change, but inconsistent with project conventions.
-- **Recommendation:** Add a row to the `current-state.md` update log acknowledging the products-admin UX changes (e.g., new `checkSubcategoryNameDuplicate` helper, consume-once subcategory pre-selection, `lastDialogTrigger` refactoring).
+## AUD-001 Resolution Verification — PROCESS_CODE_OPTIONS Catalog Alignment
+
+- **ID:** AUD-001
+- **Severity:** High (prior) → **RESOLVED**
+- **Category:** Known Defect — Frontend/backend catalog mismatch
+- **Location:** `src/public/root/views/recipes-admin.version-editor.js` lines 258–297 (`PROCESS_CODE_OPTIONS`)
+- **Prior state:** PROCESS_CODE_OPTIONS had only 8 entries. 20 of 28 backend `RECIPE_STAGE_PROCESS_CODES` values were missing from the UI dropdown. Users editing a PROCESSING stage could only select from a fraction of the approved catalog.
+- **Current state:** PROCESS_CODE_OPTIONS now contains **28 entries** exactly matching `RECIPE_STAGE_PROCESS_CODES` in `src/schemas/recipe.schema.js`.
+
+**Verified alignment (28/28 entries):**
+
+| Category | Backend codes | Present in UI |
+|---|---|---|
+| Thermal | HEATING, COOLING, FREEZING, DRYING, PASTEURIZATION, STERILIZATION | ✅ All 6 |
+| Mixing / transformation | MIXING, BLENDING, DISSOLUTION, DILUTION, EMULSIFICATION | ✅ All 5 |
+| Mechanical | MILLING, GRINDING, CUTTING, SIEVING, FILTERING | ✅ All 5 |
+| Reaction / maturation | FERMENTATION, CURING, RESTING, HYDRATION | ✅ All 4 |
+| Forming / production | FORMING, COOKING, BAKING | ✅ All 3 |
+| Finishing | PACKING_PREP, LABELING_PREP, CAPPING, SEALING | ✅ All 4 |
+| Escape hatch | OTHER | ✅ 1 |
+
+**Evidence:** Direct file inspection at lines 258–297. Each `{ value: 'CODE', label: '...' }` entry confirmed present. A synchronization comment was added at the catalog definition:
+
+```javascript
+// AUD-001: full catalog aligned with backend — do not add or remove values without
+// updating RECIPE_STAGE_PROCESS_CODES in src/schemas/recipe.schema.js simultaneously.
+```
+
+**Regression guard:** Test `recipes-admin.version-editor.js PROCESS_CODE_OPTIONS includes every backend RECIPE_STAGE_PROCESS_CODES value (AUD-001)` in `root-shell-recipes-admin-view-characterization.test.js` programmatically extracts all codes from `src/schemas/recipe.schema.js` via regex and asserts each one appears in the editor source as `value: 'CODE'`. This is a structural regression gate that will catch future drift automatically.
+
+**Status: RESOLVED.** Finding is closed.
 
 ---
 
-## Main Modules (Changed)
+## AUD-002 Resolution Verification — TypeScript Typecheck Coverage for Recipe Admin Files
 
-### `src/public/root/views/products-admin.helpers.js`
+- **ID:** AUD-002
+- **Severity:** Medium (prior) → **RESOLVED**
+- **Category:** Testing — Missing static-analysis coverage
+- **Location:** `inventory-api/tsconfig.typecheck.json`
+- **Prior state:** All recipe-admin browser files were absent from the `include` list in `tsconfig.typecheck.json`. Type errors in these files were not caught by CI.
+- **Current state:** Seven recipe-admin files are now included in the typecheck scope.
 
-| Item | Observation |
-|---|---|
-| New function: `checkSubcategoryNameDuplicate(categories, categoryId, name)` | Pure function, no side effects. Case-insensitive, trim-normalized. Scoped per parent category — cross-category isolation (BR-002) is correctly implemented. Graceful degradation for null/empty inputs. |
-| Export registry | `checkSubcategoryNameDuplicate` correctly added to the `rootShell.register` call alongside all existing exports. |
-| Code style | Consistent with existing helpers. Well-commented with JSDoc block. |
-| Responsibility boundary | Stays within helper scope — no DOM access, no API calls, no side effects. |
+**Verified additions to `tsconfig.typecheck.json`:**
 
-**Assessment:** The helper implementation is clean, testable, and correctly positioned.
+```json
+"src/public/root/recipes-api.js",
+"src/public/root/products-api.js",
+"src/public/root/views/recipes-admin.helpers.js",
+"src/public/root/views/recipes-admin.state.js",
+"src/public/root/views/recipes-admin.renderers.js",
+"src/public/root/views/recipes-admin.version-editor.js",
+"src/public/root/views/recipes-admin.js"
+```
 
----
+**JSDoc annotations added to `recipes-admin.version-editor.js`:** 30+ `@type` annotations were added to resolve TypeScript `checkJs` errors that emerged when the file entered typecheck scope. Representative examples verified:
 
-### `src/public/root/views/products-admin.js`
+```javascript
+const productSelect = /** @type {HTMLSelectElement} */ (row.querySelector('.si-product'));
+const nameInput    = /** @type {HTMLInputElement} */ (row.querySelector('.si-name'));
+const qaCheckbox   = /** @type {HTMLInputElement} */ (section.querySelector('.stage-qa'));
+const stageTypeEl  = /** @type {HTMLSelectElement | null} */ (section.querySelector('.stage-type'));
+```
 
-#### TASK-001 (UX-003) — `finally` block button text
-- **Before (defect):** `createCategoryButton.textContent = 'Crear categoria'`
-- **After (fix):** `createCategoryButton.textContent = 'Crear subcategoria'`
-- **Location:** `categoriesForm.addEventListener('submit', ...)` finally block
-- **Status:** ✅ Correctly fixed
+All seven files use `/** @type {any} */ (globalScope).RootShell` patterns that allow typecheck to pass in a browser-global context without a DOM harness.
 
-#### TASK-002 (UX-004) — Filter label
-- **Before (defect):** `<span>Categoria</span>` for a filter that operates on `subcategoryId`
-- **After (fix):** `<span>Subcategoria</span>`
-- **Location:** `render()` HTML template
-- **Status:** ✅ Correctly fixed — label now accurately describes the filter dimension
+**Gap noted (Suggestion):** `typecheck-ci-hardening-governance.test.js` does not yet assert that recipe-admin files are present in `tsconfig.typecheck.json`. If these entries were accidentally removed, the governance test would not detect the regression. The typecheck run itself would still pass (it only checks included files), but the coverage reduction would be silent. This is a governance gap, not a defect.
 
-#### TASK-003 (UX-005) — `createSubcategoryFieldset` ID and permission gate
-- **Added:** `id="products-create-subcategory-fieldset"` on the fieldset in `render()`
-- **Added:** `createSubcategoryFieldset` DOM reference in `mount()`
-- **Added:** `hidden = true/false` toggling in `renderCategoriesDialogState()` based on `canCreateCategories`
-- **Guard pattern:** `if (createSubcategoryFieldset)` used everywhere it is accessed — null-safe ✅
-- **Correctly absent from mandatory null guard:** New element is optional UI; null guard covers required structural elements only ✅
-- **Status:** ✅ Correctly implemented
-
-#### TASK-004 (UX-006) — Duplicate name validation
-- **Integration point:** `categoriesForm.addEventListener('submit', ...)` — validation runs before API call ✅
-- **Execution order:** `buildSubcategoryPayload` → `checkSubcategoryNameDuplicate` → early-return with warning message → API call ✅
-- **Message type:** `renderInlineMessage(duplicateMessage, 'warning')` — correctly uses warning (not error) per UX spec ✅
-- **Status:** ✅ Correctly integrated
-
-#### TASK-005 (UX-001) — `lastCreatedSubcategoryId` consume-once
-- **Declared:** `let lastCreatedSubcategoryId = null;` in `mount()` scope ✅
-- **Set:** In the `try` block of categories form submit handler, after successful API response ✅
-- **Consumed:** In `openFormDialog('create', ...)` — applied after `resetFormDialog()` then immediately nulled ✅
-- **Dual-path support (Path B):** When the product form is already open and the categories dialog is triggered from inside, `formSubcategoryInput.value` is also set immediately in the success handler ✅
-- **Status:** ✅ Correctly implemented with correct consume-once semantics
-
-#### TASK-006 (UX-002) — `#products-form-add-subcategory-button` and trigger refactoring
-- **Button in render():** Added adjacent to the subcategory select inside the product form ✅
-- **Type attribute:** `type="button"` — prevents accidental product-form submission ✅
-- **Permission model:** `hidden = !canListCategories` / `disabled = !canCreateCategories` — correct layered model (any user who can see categories can see the button; only users with create rights can activate it) ✅
-- **Event listener:** Calls `openCategoriesDialog(event.currentTarget)` ✅
-- **Guard pattern:** `if (addSubcategoryButton)` used for all DOM ref accesses ✅
-- **`lastDialogTrigger` refactoring:**
-  - Old variable `lastDialogTrigger`: **0 remaining references in production code** ✅ (only CHANGELOG mentions it)
-  - New: `lastFormDialogTrigger`, `lastCategoriesDialogTrigger`, `lastDeactivateDialogTrigger` — each independently wired to its corresponding dialog open/close functions ✅
-- **Status:** ✅ Correctly implemented
+**Status: RESOLVED.** Finding is closed.
 
 ---
 
-## Main Dependencies (Feature-level)
+## AUD-003 Resolution Verification — Behavioral Tests for `buildRepairHighlight`
 
-No new dependencies introduced. The feature uses only existing, registered modules:
-- `categoriesApi.createCategory()` — pre-existing
-- `productsHelpers.buildSubcategoryPayload()` — pre-existing
-- `rootShellUi.renderInlineMessage()` — pre-existing
-- `rootShell.register` / `rootShell.require` — project-standard module system
+- **ID:** AUD-003
+- **Severity:** Medium (prior) → **RESOLVED**
+- **Category:** Testing — Missing unit test coverage for key business function
+- **Location:** `src/public/root/views/recipes-admin.js` (function definition and export); `tests/root-shell-recipes-admin-view-characterization.test.js` (tests)
+- **Prior state:** `buildRepairHighlight` existed in `recipes-admin.js` but was not exposed for isolated testing. No behavioral tests existed. The function is responsible for parsing backend approval-failure messages and mapping them to specific stages or inputs to guide the user toward a repair action — a non-trivial parsing concern.
+- **Current state:** The function was moved to IIFE scope (inside `attachRootShellRecipesAdminView`) and explicitly exposed as `_buildRepairHighlight` on the registered module:
+
+```javascript
+rootShell.register('views.recipesAdmin', {
+  mount,
+  render,
+  // Exposed for isolated unit testing only — do not call from application code.
+  _buildRepairHighlight: buildRepairHighlight,
+});
+```
+
+**Five behavioral VM tests verified present** (labeled AUD-009 in test descriptions — see AUD-REC-001):
+
+| Test | Scenario | Key Assertion |
+|---|---|---|
+| `buildRepairHighlight returns null when no version provided (AUD-009)` | `null` version arg | Returns `null` |
+| `buildRepairHighlight returns null when message is empty (AUD-009)` | Empty/null message | Returns `null` for both `''` and `null` |
+| `buildRepairHighlight highlights RECOLLECTION input for under-allocation error (AUD-009)` | Backend message `El insumo "Tapa 3M" tiene 5 sin asignar` | Returns `{ stageName: 'Recoleccion', inputName: 'Tapa 3M', message: /etapa posterior|procesamiento/i }` |
+| `buildRepairHighlight returns null for under-allocation when RECOLLECTION stage not found (AUD-009)` | No RECOLLECTION stage matching the input name | Returns `null` |
+| `buildRepairHighlight matches stage name from generic backend message (AUD-009)` | Message contains stage name `"Mezclado"` | Returns `{ stageName: 'Mezclado' }` |
+
+**Test harness:** All five tests use `loadRecipesAdminWithMocks(browserWindow, context)` — a full VM-sandboxed execution of `recipes-admin.js` with all dependencies mocked. The tests access `admin._buildRepairHighlight(...)` directly. This is a genuine behavioral test, not a source-pattern assertion.
+
+**`findUnderAllocatedRepairHighlight` helper verified:** The internal helper that detects under-allocation messages (`/insumo\s+"([^"]+)".*sin asignar/i`) is also defined at IIFE scope. It correctly searches for a RECOLLECTION stage containing the named input before returning the repair hint.
+
+**Status: RESOLVED.** Finding is closed.
+
+---
+
+## Main Modules (Recipe Admin — Current State)
+
+| Module | Location | Typecheck | Behavioral Tests |
+|---|---|---|---|
+| `recipes-api.js` | `src/public/root/` | ✅ Included | Contract via `root-shell-recipes-api-characterization.test.js` |
+| `products-api.js` | `src/public/root/` | ✅ Included | Indirect via products view characterization |
+| `recipes-admin.helpers.js` | `src/public/root/views/` | ✅ Included | VM harness via characterization test |
+| `recipes-admin.state.js` | `src/public/root/views/` | ✅ Included | VM harness via characterization test |
+| `recipes-admin.renderers.js` | `src/public/root/views/` | ✅ Included | VM harness via characterization test |
+| `recipes-admin.version-editor.js` | `src/public/root/views/` | ✅ Included (30+ JSDoc annotations) | Source-pattern tests |
+| `recipes-admin.js` | `src/public/root/views/` | ✅ Included | VM harness, including `_buildRepairHighlight` behavioral tests |
+
+---
+
+## Main Dependencies
+
+No new runtime dependencies introduced. All 8 existing production dependencies unchanged. Zero npm audit vulnerabilities.
 
 ---
 
 ## Database Findings
 
-**Not applicable.** No database changes were made. No ORM, migration, or schema changes.
+No database changes in this cycle. All prior database findings carry unchanged.
+
+### DB-001 — Committed Development Credentials (Carried)
+- **ID:** DB-001
+- **Severity:** Low
+- **Location:** `inventory-api/.env`
+- **Evidence:** `JWT_SECRET=change_this_super_secret_key`, `DATABASE_URL=postgresql://tracksys:tracksys@localhost:5432/tracksys`. Pre-existing.
 
 ---
 
 ## API Findings
 
-**Not applicable.** No backend route, service, repository, or schema changes were made. The frontend continues to call the same existing endpoints:
-- `GET /api/products/categories/company`
-- `POST /api/products/categories/company`
-- `POST /api/products/`
-- `PUT /api/products/:id`
+No API contract changes in this cycle. All prior API findings carry unchanged.
 
 ---
 
 ## Container Findings
 
-**Not applicable.** `Dockerfile`, `docker-compose.dev.yml`, and `docker-compose.prod.yml` were not modified.
+No changes to `Dockerfile`, `docker-compose.yml`, `.dockerignore`. Container posture unchanged.
 
 ---
 
 ## Security Findings
 
-No new security concerns introduced.
+### SEC-001 — Committed Weak Credential (Carried)
+- **ID:** SEC-001
+- **Severity:** Low
+- **Location:** `inventory-api/.env:5`
+- **Evidence:** `JWT_SECRET=change_this_super_secret_key`. Pre-existing.
 
-| Check | Result |
-|---|---|
-| XSS via innerHTML | No new innerHTML assignments using unescaped user data. New button HTML is a static string literal. ✅ |
-| Form submission bypass | `type="button"` correctly prevents the new button from triggering the product form's `submit` event. ✅ |
-| Client-side duplicate check over-trust | `checkSubcategoryNameDuplicate` is a UX-only pre-validation. The API retains authoritative server-side uniqueness enforcement (409). Backend is not bypassed. ✅ |
-| Permission enforcement | Button visibility/state gated on `canListCategories`/`canCreateCategories`. Backend authorization is the authoritative enforcement layer per `docs/ui-guidelines.md` §4. ✅ |
-| Hardcoded secrets or tokens | None introduced. ✅ |
+### SEC-002 — Warehouse SPA `resolveView` Bypasses Permission Gate for `receive-from-po` (Carried)
+- **ID:** SEC-002
+- **Severity:** Low
+- **Location:** `src/public/warehouse/app.js` — `resolveView` function
+- **Evidence:** `receive-from-po` is in `VIEW_MODULE_KEYS` but not in `TAB_DEFINITIONS`, so `!tabDef` is always true and the permission check is skipped. All backend APIs remain individually protected by `authorizeAccessPolicy`. UI-layer only. Pre-existing.
 
 ---
 
 ## Testing Findings
 
-### Test file: `tests/products-view-characterization.test.js`
+### TEST-001 — AUD-003 Behavioral Coverage Now Present (Resolved)
+- **Status:** Resolved per inspection above.
 
-| Test | Type | Status | Notes |
-|---|---|---|---|
-| `products helpers normalize pagination, local filtering and payload shaping` | Pre-existing | ✅ Pass | Unmodified |
-| `products state/renderers expose summary, responsive markup and category list` | Pre-existing | ✅ Pass | Unmodified |
-| `buildProductPayload includes presentationType null for legacy products (TASK-006)` | Pre-existing | ✅ Pass | Unmodified |
-| `buildProductPayload includes all VOLUME size fields correctly (TASK-006)` | Pre-existing | ✅ Pass | Unmodified |
-| `buildProductPayload includes MASS size fields without density (TASK-006)` | Pre-existing | ✅ Pass | Unmodified |
-| `buildProductPayload includes LENGTH size fields with kgConversionFactor (TASK-006)` | Pre-existing | ✅ Pass | Unmodified |
-| `checkSubcategoryNameDuplicate detecta duplicados y degrada graciosamente` | **NEW** | ✅ Pass | 9 inline assertions — see table below |
-| `products-admin render() contiene las correcciones UX de labels, botón y fieldset` | **NEW** | ✅ Pass | 5 assertions — see table below |
-| `products-admin.js form HTML includes the presentation fieldset with all conditional elements (TASK-006)` | Pre-existing | ✅ Pass | Unmodified |
+### TEST-002 — Source-Pattern Test Limitation (Carried Observation)
+- **ID:** TEST-002
+- **Severity:** Suggestion
+- **Location:** Various source-pattern tests in `root-shell-recipes-admin-view-characterization.test.js`
+- **Evidence:** Source-pattern tests (`assert.match(source, /pattern/)`) cannot detect runtime field access errors, undefined references, or API contract violations. The AUD-001 catalog alignment test is a well-designed source-pattern test — it extracts real values from the backend schema rather than asserting fixed strings. This pattern should be used elsewhere for catalog-style assertions.
 
-**Total: 9 pass, 0 fail** — consistent with CHANGELOG claim.
-
----
-
-### `checkSubcategoryNameDuplicate` — Test case coverage
-
-| Case | Covered | Precision |
-|---|---|---|
-| Duplicate name (case-insensitive) in same parent category | ✅ | Exact — checks message includes parent category name |
-| Non-duplicate name in same parent category | ✅ | Exact — expects null |
-| Same name in **different** parent category (BR-002 cross-category isolation) | ✅ | Key boundary case — expects null |
-| Duplicate in a second parent category (MP) | ✅ | Exact — checks message includes `'Materia Prima'` |
-| Parent category not found (unknown ID) | ✅ | Expects null |
-| Empty categories array | ✅ | Expects null |
-| `null` categories | ✅ | Expects null |
-| `null` categoryId | ✅ | Expects null |
-| Empty name string | ✅ | Expects null |
-
-All 9 cases are correctly structured and assertions are appropriately precise.
-
----
-
-### `render()` — Assertion coverage
-
-| Assertion | Target | Precision |
-|---|---|---|
-| `html.includes('<span>Subcategoria</span>')` | Filter label text | Good — checks full span element |
-| `html.includes('Crear subcategoria')` | Submit button label | Adequate — text exists once in the template |
-| `html.includes('id="products-create-subcategory-fieldset"')` | Fieldset ID | Good |
-| `html.includes('id="products-form-add-subcategory-button"')` | New button ID | Good |
-| `html.includes('type="button"')` | Button type attribute | **Weak — see AUD-004** |
-
----
-
-### AUD-004
+### TEST-003 — Leaked Test Artifacts (Carried)
+- **ID:** TEST-003
 - **Severity:** Low
-- **Category:** Testing — Assertion too broad
-- **Location:** `tests/products-view-characterization.test.js` — `render()` test, last assertion
-- **Evidence:**
-  ```javascript
-  assert.ok(
-    html.includes('type="button"'),
-    'Debe haber al menos un elemento con type="button" en el render',
-  );
-  ```
-  The assertion message self-documents its weakness: "at least one element." The rendered HTML already contains multiple `type="button"` elements (refresh button, open-categories button, open-create button, close buttons). This assertion passes regardless of whether `#products-form-add-subcategory-button` specifically carries `type="button"`.
-- **Impact:** The assertion does not isolate the intended invariant. It would remain green even if the new button reverted to `type="submit"`, as long as any other button keeps `type="button"`.
-- **Recommendation:** Strengthen to a regex that tests the attribute in proximity to the button's ID:
-  ```javascript
-  assert.match(
-    html,
-    /id="products-form-add-subcategory-button"[^>]*type="button"|type="button"[^>]*id="products-form-add-subcategory-button"/,
-    'El botón #products-form-add-subcategory-button debe tener type="button"'
-  );
-  ```
+- **Location:** `tests/tmp-prisma-lock-*/` (169+ directories)
+- **Evidence:** `prisma-windows-build-stabilization.test.js` uses `fs.mkdtempSync` inside `tests/`. Directories accumulate. Pre-existing.
 
----
-
-### AUD-005
-- **Severity:** Low
-- **Category:** Testing — Mount behavior not directly tested
-- **Location:** `tests/products-view-characterization.test.js`
-- **Evidence:** New tests cover `render()` output (static HTML template) and `checkSubcategoryNameDuplicate` (pure helper), but do not exercise `mount()` behaviors: consume-once `lastCreatedSubcategoryId` state, `addSubcategoryButton` visibility toggling by permission, `renderCategoriesDialogState()` fieldset visibility, or the `openCategoriesDialog`-from-form-button event path. These require DOM simulation and async execution.
-- **Impact:** The most complex new logic (UX-001 consume-once and UX-002 permission-based button state) lacks direct test coverage. This matches the project's established characterization-test pattern — `mount()` behaviors are intentionally left to E2E suites — but the gap is worth recording.
-- **Recommendation:** Add a note to `docs/test-suite-catalog.md`. Consider a targeted mount-level test for the `lastCreatedSubcategoryId` consume-once logic using the existing `createHarnessWithView()` harness extended with a minimal DOM stub.
+### TEST-004 — Typecheck Governance Test Does Not Assert Recipe-Admin Files (New Suggestion)
+- **ID:** TEST-004
+- **Severity:** Suggestion
+- **Category:** Testing — Governance gap
+- **Location:** `tests/typecheck-ci-hardening-governance.test.js`
+- **Evidence:** The governance test verifies a fixed list of root-shell files in `tsconfig.typecheck.json` but does not include the 7 newly added recipe-admin files. If these entries were accidentally removed from `tsconfig.typecheck.json`, the governance test would not catch the regression. The `npm run typecheck` command would continue passing (it only checks what is included), silently losing coverage of the recipe-admin module group.
+- **Impact:** Low — the typecheck is also run as a standalone CI step, so type errors within these files would still surface. The missing governance assertion only affects regression detection for the *presence* of the files in scope.
+- **Recommendation:** Add recipe-admin file assertions to the existing `typecheck-ci-hardening-governance.test.js` loop.
 
 ---
 
 ## Maintainability Findings
 
-### AUD-006
-- **Severity:** Low (pre-existing — not introduced by this feature)
-- **Category:** Maintainability — `mount()` function size
-- **Location:** `src/public/root/views/products-admin.js` — `mount()` function
-- **Evidence:** The `mount()` function exceeds 250 lines including the new additions. `docs/coding_standard.md` §5.2 flags functions over 50 lines for justification review. The function was already large before this feature; the additions from this feature are ~25 incremental lines and are proportionate and targeted.
-- **Impact:** Continued growth makes the function harder to read and test in isolation; it does not affect current correctness.
-- **Recommendation:** No action required for this feature slice. Pre-existing debt; track separately for a future modularization pass.
+### MAINT-001 — `escapeHtml` Duplicated Across Warehouse Files (Carried)
+- **ID:** MAINT-001
+- **Severity:** Low
+- **Location:** `src/public/warehouse/app.js`, `views/production.js`, `views/receipts.js`, `views/recipe-consultation.js`, `views/receive-from-po.js`
+- **Evidence:** Five files each define an identical local `escapeHtml(str)` function. Pre-existing.
 
 ---
 
 ## Technical Debt
 
-### Pre-existing (not introduced by this feature)
-| Item | Severity | Notes |
-|---|---|---|
-| `mount()` function size in `products-admin.js` | Low | Exceeds coding-standard guideline; pre-dates this feature |
-| `render()` returns one large template string | Low | Consistent with project pattern; testable via VM harness |
-| No `mount()` characterization test coverage | Low | Project relies on E2E for mount behaviors |
+### Debt carried from prior baseline (unchanged)
 
-### Introduced by this feature
-| Item | Severity | Notes |
+| ID | Description | Severity |
 |---|---|---|
-| Overly broad `type="button"` assertion (AUD-004) | Low | Does not affect correctness; reduces future regression confidence |
-| CHANGELOG date `2025-07` inconsistent (AUD-001) | Low | Process artifact; does not affect code |
-| Empty spec directory (AUD-002) | Low | Deviation from project's spec-preservation pattern |
+| AD-001 | Two-mode access control coexistence | Medium |
+| AD-002 | Two-step browser payment flow without server-side atomic operation | Medium |
+| AD-003 | `creditBalance` as mutable aggregate, not derived from event log | Medium |
+| AD-005 | Billing trigger best-effort with no retry or alerting | Medium |
+| AUD-018 | `_activeTab` assigned but never read in `billing-admin.js` | Low |
+| MAINT-001 | `escapeHtml` duplicated in 5 warehouse view files | Low |
+| TEST-003 | 169+ `tmp-prisma-lock-*` directories leaked into `tests/` | Low |
+| SEC-002 | `resolveView` grants `receive-from-po` access without permission check (UI layer only) | Low |
 
 ---
 
 ## Behavior to Preserve
 
-| Behavior | Location | Evidence |
-|---|---|---|
-| `checkSubcategoryNameDuplicate` returns warning only for duplicates within the **same parent category** | `products-admin.helpers.js` | BR-002 cross-category isolation is implemented and verified by 3 related test cases |
-| `checkSubcategoryNameDuplicate` returns `null` for null/empty inputs | `products-admin.helpers.js` | 4 graceful-degradation cases verified |
-| `lastCreatedSubcategoryId` is cleared after first consumption | `products-admin.js` `openFormDialog()` | Consume-once semantics verified by code inspection |
-| `#products-form-add-subcategory-button` is `type="button"` | `render()` template | Prevents accidental product-form submission |
-| `addSubcategoryButton.hidden = !canListCategories` | `syncActionVisibility()` | Correct layered permission model |
-| `addSubcategoryButton.disabled = !canCreateCategories` | `syncActionVisibility()` | Only users with create rights can activate the button |
-| `createSubcategoryFieldset` hidden when `!canCreateCategories` | `renderCategoriesDialogState()` | Removes disabled-field noise for view-only users |
-| `<span>Subcategoria</span>` label on category filter | `render()` template | Accurately describes the `subcategoryId` filter dimension |
-| `createCategoryButton.textContent = 'Crear subcategoria'` in finally | `categoriesForm.submit` handler | Correct button-text restore on both success and error |
-| Three independent trigger variables for dialog focus management | `mount()` scope | `lastFormDialogTrigger`, `lastCategoriesDialogTrigger`, `lastDeactivateDialogTrigger` each independently managed — zero leftover `lastDialogTrigger` references |
+The following recipe-approval-ux behaviors are confirmed correct and must be preserved:
+
+1. **`buildRepairHighlight`** — Parses backend approval-failure messages to produce targeted stage/input repair hints. Under-allocation messages matching `/insumo\s+"([^"]+)".*sin asignar/i` are routed to the RECOLLECTION stage containing the named input. Generic messages containing a stage name route to that stage. Returns `null` when no safe mapping exists — conservative behavior that avoids misleading hints.
+
+2. **`_buildRepairHighlight` export** — Exposed on the `views.recipesAdmin` module exclusively for testing. The comment `// Exposed for isolated unit testing only — do not call from application code.` must be preserved.
+
+3. **PROCESS_CODE_OPTIONS catalog** — All 28 entries must remain synchronized with `RECIPE_STAGE_PROCESS_CODES` in `src/schemas/recipe.schema.js`. The synchronization comment at the catalog definition must be preserved.
+
+4. **JSDoc type annotations** — All `/** @type {HTMLInputElement} */`, `/** @type {HTMLSelectElement} */`, and `/** @type {HTMLElement} */` annotations in `recipes-admin.version-editor.js` must be preserved or replaced with equivalent type-safe alternatives when the file is modified.
+
+5. **All previously preserved behaviors** from prior baselines remain intact per test suite evidence.
 
 ---
 
 ## Known Defects
 
-None identified in the new code.
+**None outstanding.**
 
-The following pre-existing defects were corrected by this feature:
-
-| Former defect | Resolution |
-|---|---|
-| UX-003: Button text reset to `'Crear categoria'` in finally block | Fixed: resets to `'Crear subcategoria'` |
-| UX-004: Filter label read `'Categoria'` but operated on `subcategoryId` | Fixed: label now reads `'Subcategoria'` |
-| UX-005: Create-subcategory fieldset had no ID; disabled-field noise shown to view-only users | Fixed: ID added; fieldset hidden for `!canCreateCategories` |
-| UX-006: No client-side duplicate check — users discovered duplicates only via server 409 | Fixed: `checkSubcategoryNameDuplicate` runs before API call |
-| UX-001: Auto-selection of newly created subcategory was silently lost on `resetFormDialog()` | Fixed: consume-once `lastCreatedSubcategoryId` variable |
-| UX-002: No way to create a subcategory from within the product form (Path B caused full data loss) | Fixed: `#products-form-add-subcategory-button` with correct type and event listener |
+All three findings identified for the recipe-approval-ux cycle are resolved:
+- **AUD-001** (High): PROCESS_CODE_OPTIONS fully aligned — 28/28 codes present.
+- **AUD-002** (Medium): tsconfig.typecheck.json now covers all 7 recipe-admin files.
+- **AUD-003** (Medium): 5 behavioral VM tests present for `buildRepairHighlight` via `_buildRepairHighlight`.
 
 ---
 
 ## Architectural Debt
 
-| Item | Severity | Category | Notes |
-|---|---|---|---|
-| `mount()` function in `products-admin.js` exceeds maintainable size | Low | Function size | Pre-existing. All logic within is view-layer concerns; no cross-layer violations were introduced. |
-| Products admin view orchestrates DOM, state, events, and API calls in one closure | Low | Mixed responsibilities | Pre-existing pattern across the entire root-shell SPA. Acceptable in project context; not worsened by this feature. |
+All architectural debt carries unchanged from the prior baseline. No new architectural issues introduced in this cycle.
 
-No new architectural debt was introduced.
+| ID | Description | Severity |
+|---|---|---|
+| AD-001 | Two-mode access control coexistence | Medium |
+| AD-002 | Two-step browser payment flow without server-side atomic operation | Medium |
+| AD-003 | `creditBalance` as mutable aggregate | Medium |
+| AD-005 | Best-effort billing trigger | Medium |
 
 ---
 
 ## Unknown Behavior
 
-| Item | Notes |
-|---|---|
-| Browser `<dialog>` stacking behavior | README (per TASK-008) documents Chrome 37+/Firefox 98+/Safari 15.4+/Edge 79+ requirement. Not exercisable via `node:test` harness. Fallback via header "Categorías" button is documented. |
-| Race: new subcategory created between client page load and `checkSubcategoryNameDuplicate` execution | If another session creates a same-named subcategory after the category list was loaded but before the user submits, the client-side check will not detect it. The server still enforces the constraint and returns 409. The error surface is correct; the warning surface may be stale. |
-| `formSubcategoryInput.value` pre-selection when `loadCategories()` fails silently | If categories fail to reload after subcategory creation, the pre-selected ID in `formSubcategoryInput` may not match any `<option>`. The select silently falls back to its first option. This is graceful but produces no visible warning to the user. |
+### UNK-001 — `creditBalance` Drift on Silent Billing Trigger Failure (Carried)
+- **Severity:** Medium
+
+### UNK-002 — Dead Payment Status Values (Carried)
+- **Severity:** Low
+
+### UNK-003 — No Service-Layer Guard on `createPurchaseReceipt` for PO Status (Carried)
+- **Severity:** Low
 
 ---
 
 ## Critical Risks
 
-No critical risks identified.
+**No critical risks identified in the current state.**
 
-The nearest item to a risk is AUD-004 (weak `type="button"` assertion): a future edit that accidentally changes the new button's type to `type="submit"` would not be caught by the current test. This is Low severity.
+All three High/Medium findings from the recipe-approval-ux cycle are resolved. The remaining open findings are all Low severity or Suggestions.
 
 ---
 
 ## Recommended Priorities
 
-| Priority | Finding | Action |
-|---|---|---|
-| P1 | AUD-004 — `type="button"` assertion too broad | Strengthen assertion to validate the specific button's attribute in proximity to its ID |
-| P2 | AUD-001 — CHANGELOG date `2025-07` inconsistent | Correct to actual implementation date |
-| P3 | AUD-002 — Empty `specs/` directory | Restore spec artifact or add reference to `current-state.md` |
-| P4 | AUD-005 — Mount behavioral changes not tested | Add targeted consume-once test using existing `createHarnessWithView()` harness |
-| P5 | AUD-003 — `current-state.md` not updated | Add update-log row for the products-admin UX changes |
+### Immediate (from this cycle)
+
+1. **AUD-REC-001** — Correct test descriptions from `AUD-009` to `AUD-003` (or document the alias in the audit). One-line change per test, five tests total.
+2. **AUD-REC-002** — Commit recipe-approval-ux specification artifacts to `specs/recipe-approval-ux/`, or remove the empty directory.
+3. **TEST-004** — Add recipe-admin file assertions to `typecheck-ci-hardening-governance.test.js` to prevent silent regression of AUD-002.
+
+### Near-term (carried from prior cycle)
+
+4. **MAINT-001** — Remove duplicated `escapeHtml` from four warehouse view files; consume from `WarehouseShell.require('app').escapeHtml`.
+5. **TEST-003** — Add `tests/tmp-prisma-lock-*/` to `.gitignore`; use `os.tmpdir()` in the Prisma test harness.
+6. **SEC-002** — Add `receive-from-po` to `TAB_DEFINITIONS` in `warehouse/app.js` with `permission: (p) => p.includes('receipts.inspect')`.
+
+### Background (carried, not introduced by this feature)
+
+7. **DB-001 / SEC-001** — Remove `.env` from version control.
+8. **AD-001** — Migrate remaining legacy `authorizePermission` routes to `authorizeAccessPolicy`.
+9. **AD-005** — Add retry/alerting to `billing-trigger.service.js`.
 
 ---
 
-## Summary Table
+## Final Verdict
 
-| ID | Severity | Category | Status | Title |
-|---|---|---|---|---|
-| AUD-001 | Low | Documentation | Open | CHANGELOG date `2025-07` inconsistent with surrounding 2026-09-xx entries |
-| AUD-002 | Low | Documentation | Open | `specs/create-product-with-subcategory/` directory is empty |
-| AUD-003 | Low | Documentation | Open | `current-state.md` not updated for products-admin UX changes |
-| AUD-004 | Low | Testing | Open | `type="button"` assertion too broad — does not isolate new button attribute |
-| AUD-005 | Low | Testing | Open | `mount()` behavioral changes (consume-once, permission visibility) not directly tested |
-| AUD-006 | Low | Maintainability | Pre-existing | `mount()` function exceeds maintainable size guideline |
-
----
-
-**Overall Score: 8.2 / 10**
+**Overall Score: 9.4 / 10**
 
 **Verdict: Acceptable**
 
-The implementation correctly resolves all 6 UX defects (UX-001 through UX-006) and fulfils all 8 assigned tasks. Code quality is consistent with project standards. The new `checkSubcategoryNameDuplicate` function is well-structured, correctly positioned in the helpers module, and thoroughly tested with 9 targeted cases. All pre-existing tests continue to pass. The `lastDialogTrigger` refactoring is complete and clean. Identified deficiencies are documentation and test-precision in nature, with no functional correctness or security concerns.
+### Score justification summary
+
+The prior baseline of 9.2/10 reflected a repository in good operational health with well-governed persistence, security, and test coverage, offset by carried architectural debt (dual access control modes, mutable credit aggregate, best-effort billing trigger) and three open recipe-approval-ux findings. This cycle resolves all three findings — including one High-severity functional defect (20 of 28 process codes missing from the UI catalog) — and closes a medium-severity type-safety gap and a medium-severity behavioral test gap. Two new Low-severity documentation findings are raised. The net improvement is +0.16 points. All prior deductions carry unchanged.
+
+The repository remains in the **Acceptable** band. The persistent architectural debt items (AD-001 through AD-005) are the primary barrier to the Healthy band, as they represent real operational risks (silent billing failures, non-atomic payment flow, mutable balance aggregate) rather than cosmetic concerns.

@@ -103,28 +103,32 @@
 - `tests/production-service-foundation.test.js` cubre el escalamiento distinto entre `PER_OUTPUT_KG` y `PER_FINISHED_UNIT`.
 - `tests/root-shell-recipes-admin-view-characterization.test.js` cubre la presencia del select de `quantityBasis`, su hint y el editor desacoplado.
 - `tests/production-execution.service.test.js` cubre prerrequisitos de recolección para ejecución.
-- No se encontraron pruebas específicas para labels enriquecidos de insumos, warnings COUNT/UN o badges de revisión en recetas.
+- Tras esta implementación, `tests/root-shell-recipes-admin-view-characterization.test.js` cubre labels enriquecidos de insumos, warnings COUNT/UN, guía de recolección y badges de revisión en recetas.
 
 ## 9. Current limitations
 - `quantityBasis` es global por versión; no hay soporte híbrido por etapa o por insumo.
-- El copy visible actual no explica bien la decisión entre kg y unidad.
-- El selector de insumos no expone `presentationType`, `unit` ni señales discretas.
-- La UI no diferencia el comportamiento de cantidades `UN`; usa step decimal genérico.
-- La explicación de la dependencia `PROCESSING` → `RECOLLECTION` es insuficiente en edición/revisión, incluyendo casos como `CAPPING` y envasado/empaque.
-- El detalle de versión no resalta los atributos que gobiernan la interpretación operativa de la receta.
-- El descubrimiento de insumos puede volverse difícil porque el editor hoy carga productos con `pageSize: 100` y no ofrece filtros cliente-side por categoría, subcategoría, nombre o código.
+- El soporte sigue siendo version-level; no existe soporte híbrido por insumo o por etapa.
+- El descubrimiento cliente-side sigue limitado al dataset visible cargado actualmente (`pageSize: 100`), por lo que catálogos mayores requieren un follow-up estructural.
 
 ## 10. Technical debt related to the change
 - Comentario/documentación desalineada en `prisma/schema.prisma:1616` sobre `RecipeStageInput.quantity` como base unitaria fija.
-- `recipes-admin.version-editor.js` concentra bastante lógica de UX; nuevas reglas deberían introducirse con helpers limitados para evitar crecimiento descontrolado.
-- El editor de recetas carga productos con `pageSize: 100` (`src/public/root/views/recipes-admin.js:269`), lo que podría ser un límite funcional en catálogos grandes; este spec permite filtros cliente-side sobre el dataset actual, pero no resuelve aún una estrategia estructural de carga mayor.
+- `recipes-admin.version-editor.js` sigue concentrando bastante lógica de UX; esta implementación movió parte del copy y clasificación a helpers, pero aún conviene seguir extrayendo reglas incrementales con cuidado.
+- El editor de recetas carga productos con `pageSize: 100` (`src/public/root/views/recipes-admin.js:269`), lo que sigue siendo un límite funcional en catálogos grandes; este spec solo añadió filtros cliente-side sobre el dataset actual.
 
 ## 11. Risks
 - Cambios de copy o warnings pueden inducir a pensar erróneamente que COUNT/UN está prohibido en recetas por kg si no se redactan con cuidado.
 - Endurecer demasiado la validación de `UN` podría romper usos válidos o datos heredados.
 - Añadir lógica UX ad hoc dentro del editor puede aumentar complejidad si no se encapsula mínimamente.
 
-## 12. Relevant files
+## 12. Post-implementation update
+- `recipes-admin.helpers.js` ahora centraliza labels/hints operativos de `quantityBasis`, clasificación `COUNT/UN`, labels enriquecidos y filtros cliente-side por etapa.
+- `recipes-admin.version-editor.js` ahora ofrece búsqueda/filtros de insumos por etapa, warnings no bloqueantes de compatibilidad `COUNT/UN`, hint para `UN`, y guía inline de `PROCESSING`/`CAPPING` dependiente de `RECOLLECTION`.
+- `recipes-admin.renderers.js` ahora expone `quantityBasis`, `stageType`, `processCode` y badges de revisión en superficies de detalle.
+- `production-new.js` y `recipe-consultation.js` recibieron paridad incremental de copy y semántica visible para `quantityBasis`, `COUNT/UN` y dependencia de recolección.
+- No hubo cambios de backend, rutas, contratos API, Prisma ni migraciones.
+- Follow-up explícito recomendado: `recipes-hybrid-input-scaling` para soporte híbrido por insumo fuera de alcance.
+
+## 13. Relevant files
 - `src/public/root/views/recipes-admin.js`
 - `src/public/root/views/recipes-admin.renderers.js`
 - `src/public/root/views/recipes-admin.version-editor.js`

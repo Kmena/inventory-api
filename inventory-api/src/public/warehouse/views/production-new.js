@@ -46,6 +46,19 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function describeQuantityBasis(quantityBasis) {
+  if (quantityBasis === 'PER_FINISHED_UNIT') {
+    return 'Por unidad terminada';
+  }
+  return 'Por kg de producto terminado';
+}
+
+function isCountOrUnitProduct(product, fallbackUnit = '') {
+  return String(product?.presentationType || '').toUpperCase() === 'COUNT'
+    || String(product?.unit || fallbackUnit).toUpperCase() === 'UN'
+    || String(product?.netContentUnit || '').toUpperCase() === 'UN';
+}
+
 // Round to 3 decimal places, strip trailing zeros
 function formatQty(num) {
   if (!Number.isFinite(num) || num === 0) { return '0'; }
@@ -120,30 +133,64 @@ function renderIngredientsPreview(recipe, qty, selectedVersionId, selectedProduc
   // PER_OUTPUT_KG: scale by total kg of finished product, not by unit count.
   const quantityBasis = approvedVersion.quantityBasis ?? 'PER_OUTPUT_KG';
   const kgPerUnit     = quantityBasis === 'PER_OUTPUT_KG' ? clientKgPerUnit(selectedProduct) : 1;
-  const scalingQty    = quantityBasis === 'PER_OUTPUT_KG' ? kgPerUnit * qty : qty;
+  const plannedOutputKg = kgPerUnit * qty;
+  const scalingQty    = quantityBasis === 'PER_OUTPUT_KG' ? plannedOutputKg : qty;
   const plannedKgNote = quantityBasis === 'PER_OUTPUT_KG'
     ? ` (≈ <strong>${escapeHtml(formatQty(scalingQty))}</strong> kg de producto terminado)`
     : '';
+
+  // FR-007: build per-product inputQuantityBasis map from stage inputs
+  // so each ingredient can be scaled by its effective basis.
+  const inputBasisByProductId = new Map();
+  for (const stage of approvedVersion.stages || []) {
+    for (const si of stage.stageInputs || []) {
+      if (si.productId && si.inputQuantityBasis) {
+        inputBasisByProductId.set(String(si.productId), si.inputQuantityBasis);
+      }
+    }
+  }
+
+  const hasCountOrUnitInputs = ingredients.some((ing) => isCountOrUnitProduct(ing.product, ing.unit));
 
   const rows = ingredients.map((ing) => {
     const p = ing.product;
     const name   = p ? p.name : `Insumo #${ing.productId}`;
     const code   = p?.code ? ` (${escapeHtml(p.code)})` : '';
     const unit   = p?.unit ? ` <span style="color:#666;font-size:.85em">${escapeHtml(p.unit)}</span>` : '';
-    const needed = formatQty(Number(ing.quantity) * scalingQty);
+    // FR-007, BR-002: use effective basis per ingredient
+    const inputBasis = inputBasisByProductId.get(String(ing.productId)) ?? null;
+    const effectiveBasis = inputBasis ?? quantityBasis;
+    const ingScalingQty = effectiveBasis === 'PER_FINISHED_UNIT' ? qty : plannedOutputKg;
+    const needed = formatQty(Number(ing.quantity) * ingScalingQty);
+    const perUnitTag = (inputBasis === 'PER_FINISHED_UNIT' && quantityBasis !== 'PER_FINISHED_UNIT')
+      ? ' <span style="font-size:.78em;color:#0a6c3b;font-weight:600">(por unidad)</span>'
+      : '';
     return `<tr>
       <td style="padding:4px 0">${escapeHtml(name)}${code}</td>
       <td style="text-align:right;padding:4px 0;font-variant-numeric:tabular-nums">
-        <strong>${escapeHtml(needed)}</strong>${unit}
+        <strong>${escapeHtml(needed)}</strong>${unit}${perUnitTag}
       </td>
     </tr>`;
   }).join('');
+
+  const quantityBasisLabel = describeQuantityBasis(quantityBasis);
+  const countHint = hasCountOrUnitInputs
+    ? `<p style="margin:0 0 8px;font-size:.82rem;color:#7a4b00">${escapeHtml(quantityBasis === 'PER_OUTPUT_KG'
+      ? 'COUNT/UN detectado. Por kg de producto terminado revisa la operabilidad de cantidades discretas.'
+      : 'COUNT/UN detectado. Por unidad terminada suele ser consistente para tapas y otros insumos discretos.')}</p>`
+    : '';
+  const unitHint = hasCountOrUnitInputs
+    ? '<p style="margin:0 0 8px;font-size:.82rem;color:#555">La unidad UN normalmente se opera sin decimales.</p>'
+    : '';
 
   return `
     <div style="background:#f0f7ff;border:1px solid #bcd;border-radius:8px;padding:12px 14px">
       <p style="margin:0 0 8px;font-weight:600;font-size:.9em">
         📦 Materias primas para <strong>${escapeHtml(String(qty))}</strong> unidades${plannedKgNote}
       </p>
+      <p style="margin:0 0 8px;font-size:.82rem;color:#555">Base visible de la receta: <strong>${escapeHtml(quantityBasisLabel)}</strong>.</p>
+      ${countHint}
+      ${unitHint}
       <table style="width:100%;border-collapse:collapse;font-size:.9em">
         <thead>
           <tr style="border-bottom:1px solid #bcd">
@@ -238,6 +285,7 @@ function renderForm(container, data) {
           <select id="pn-recipe-version-id" required aria-required="true">
             <option value="">Seleccione version...</option>
           </select>
+          <small id="pn-version-basis-hint" style="display:block;margin-top:4px;color:#555"></small>
         </div>
 
         <div class="field">
@@ -310,7 +358,16 @@ function wireRecipeVersionAutoFill(container, recipes) {
   const recipeSelect  = /** @type {HTMLSelectElement} */ (container.querySelector('#pn-recipe'));
   const versionSelect = /** @type {HTMLSelectElement} */ (container.querySelector('#pn-recipe-version-id'));
   const versionField  = /** @type {HTMLElement}       */ (container.querySelector('#pn-version-field'));
+  const versionBasisHint = /** @type {HTMLElement|null} */ (container.querySelector('#pn-version-basis-hint'));
   if (!recipeSelect || !versionSelect || !versionField) { return; }
+
+  function updateVersionBasisHint(recipe) {
+    if (!versionBasisHint) return;
+    const selectedVersion = (recipe?.versions || []).find((version) => String(version.id) === String(versionSelect.value));
+    versionBasisHint.textContent = selectedVersion
+      ? `Base visible de la receta: ${describeQuantityBasis(selectedVersion.quantityBasis || 'PER_OUTPUT_KG')}.`
+      : '';
+  }
 
   function populateVersions() {
     const recipe   = recipes.find((r) => String(r.id) === recipeSelect.value);
@@ -319,21 +376,27 @@ function wireRecipeVersionAutoFill(container, recipes) {
       versionField.style.display = 'none';
       versionSelect.innerHTML    = '<option value="">Sin versiones aprobadas</option>';
       versionSelect.required     = false;
+      if (versionBasisHint) versionBasisHint.textContent = '';
       return;
     }
     const opts = approved.map((v) => {
       const isLatest   = String(v.id) === String(recipe.latestApprovedVersionId);
       const stageCount = Array.isArray(v.stages) ? v.stages.length : '?';
-      const label = `v${v.versionNumber} — ${stageCount} etapa(s)${isLatest ? ' · activa ✓' : ''}`;
+      const label = `v${v.versionNumber} — ${describeQuantityBasis(v.quantityBasis || 'PER_OUTPUT_KG')} — ${stageCount} etapa(s)${isLatest ? ' · activa ✓' : ''}`;
       return `<option value="${escapeHtml(String(v.id))}">${escapeHtml(label)}</option>`;
     });
     versionSelect.innerHTML = opts.join('');
     versionSelect.value     = String(recipe.latestApprovedVersionId); // pre-selecciona la activa
     versionSelect.required  = true;
     versionField.style.display = '';
+    updateVersionBasisHint(recipe);
   }
 
   recipeSelect.addEventListener('change', populateVersions);
+  versionSelect.addEventListener('change', () => {
+    const recipe = recipes.find((entry) => String(entry.id) === recipeSelect.value);
+    updateVersionBasisHint(recipe);
+  });
 }
 
 function collectPayload(container) {

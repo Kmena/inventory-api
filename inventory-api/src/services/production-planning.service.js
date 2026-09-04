@@ -111,6 +111,8 @@ function buildRecipeVersionSnapshot(recipeVersion, override) {
           unit: stageInput.unit,
           sortOrder: stageInput.sortOrder,
           notes: stageInput.notes,
+          // FR-006, NFR-003: freeze individual basis so execution never re-reads recipe
+          inputQuantityBasis: stageInput.inputQuantityBasis ?? null,
           product: stageInput.product ? {
             id: stageInput.product.id,
             code: stageInput.product.code,
@@ -129,9 +131,26 @@ function buildRecipeVersionSnapshot(recipeVersion, override) {
   });
 }
 
-function buildMaterialRequirements(recipeVersion, quantity) {
+/**
+ * Returns the correct scaling quantity for a single stage input.
+ * FR-005, BR-002, BR-005, BR-006, D-003.
+ * @param {string|null|undefined} inputQuantityBasis - per-input override (null = inherit version)
+ * @param {string} versionQuantityBasis - version-level basis
+ * @param {number} plannedOutputKg - kg planned
+ * @param {number} plannedUnits - units planned (order.quantity)
+ * @returns {number}
+ */
+function resolveInputScalingQuantity(inputQuantityBasis, versionQuantityBasis, plannedOutputKg, plannedUnits) {
+  const effectiveBasis = inputQuantityBasis ?? versionQuantityBasis ?? 'PER_OUTPUT_KG';
+  return effectiveBasis === 'PER_FINISHED_UNIT'
+    ? Number(plannedUnits || 0)
+    : Number(plannedOutputKg || 0);
+}
+
+function buildMaterialRequirements(recipeVersion, quantity, plannedUnits) {
   const requirementsByProductId = new Map();
   const allStages = recipeVersion?.stages || [];
+  const versionBasis = recipeVersion?.quantityBasis ?? 'PER_OUTPUT_KG';
 
   // Mirror the same deduplication logic as aggregateIngredientsFromStages:
   // PROCESSING stages consume already-collected material — counting them again
@@ -146,6 +165,10 @@ function buildMaterialRequirements(recipeVersion, quantity) {
     ? allStages.filter((s) => s.stageType === 'RECOLLECTION')
     : allStages;
 
+  // plannedUnits defaults to quantity when not provided (backward compat for callers
+  // that only pass the single scaling quantity and have a non-mixed recipe).
+  const resolvedPlannedUnits = plannedUnits !== undefined ? plannedUnits : quantity;
+
   for (const stage of sourcingStages) {
     for (const stageInput of stage?.stageInputs || []) {
       if (!stageInput?.productId) {
@@ -153,7 +176,14 @@ function buildMaterialRequirements(recipeVersion, quantity) {
       }
 
       const productIdKey = String(stageInput.productId);
-      const requiredQuantity = Number(stageInput.quantity || 0) * Number(quantity || 0);
+      // FR-005, BR-002: use per-input effective basis for scaling
+      const scalingQty = resolveInputScalingQuantity(
+        stageInput.inputQuantityBasis,
+        versionBasis,
+        Number(quantity || 0),
+        Number(resolvedPlannedUnits || 0),
+      );
+      const requiredQuantity = Number(stageInput.quantity || 0) * scalingQty;
       const current = requirementsByProductId.get(productIdKey);
 
       if (current) {
@@ -237,5 +267,6 @@ module.exports = {
     toSnapshotValue,
     isPrismaDecimal,
     normalizeSnapshotQaParameterDefinition,
+    resolveInputScalingQuantity,
   },
 };

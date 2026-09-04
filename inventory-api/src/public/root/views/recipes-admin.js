@@ -13,6 +13,75 @@
     return recipesRenderers.renderWorkspace();
   }
 
+  // Pure helpers — defined at IIFE scope so they are accessible for testing
+  // via the registered module's _buildRepairHighlight export.
+
+  function findUnderAllocatedRepairHighlight(version, message) {
+    const underAllocatedMatch = String(message || '').match(/insumo\s+"([^"]+)".*sin asignar/i);
+    if (!underAllocatedMatch) {
+      return null;
+    }
+
+    const inputName = String(underAllocatedMatch[1] || '').trim().toLowerCase();
+    const inputLabel = String(underAllocatedMatch[1] || '').trim();
+    const stages = Array.isArray(version?.stages) ? version.stages : [];
+    const recollectionStage = stages.find((stage) => (
+      stage?.stageType === 'RECOLLECTION'
+      && Array.isArray(stage.stageInputs)
+      && stage.stageInputs.some((stageInput) => String(stageInput?.name || '').trim().toLowerCase() === inputName)
+    ));
+
+    if (!recollectionStage) {
+      return null;
+    }
+
+    return {
+      stageName: recollectionStage.name,
+      inputName: inputLabel,
+      message: `El insumo "${inputLabel}" fue recolectado pero no se usa completamente en una etapa posterior. Revisa las etapas de procesamiento posteriores.`,
+    };
+  }
+
+  function buildRepairHighlight(version, message) {
+    const normalizedMessage = String(message || '').trim().toLowerCase();
+    if (!version || !normalizedMessage) {
+      return null;
+    }
+
+    const underAllocatedHighlight = findUnderAllocatedRepairHighlight(version, message);
+    if (underAllocatedHighlight) {
+      return underAllocatedHighlight;
+    }
+
+    const matchingStages = (version.stages || []).filter((stage) => normalizedMessage.includes(String(stage?.name || '').trim().toLowerCase()));
+    if (matchingStages.length === 1) {
+      return {
+        stageName: matchingStages[0].name,
+        message: `Revisa la etapa "${matchingStages[0].name}".`,
+      };
+    }
+
+    const matchedRows = [];
+    (version.stages || []).forEach((stage) => {
+      (stage.stageInputs || []).forEach((stageInput) => {
+        const inputName = String(stageInput?.name || '').trim().toLowerCase();
+        if (inputName && normalizedMessage.includes(inputName)) {
+          matchedRows.push({ stageName: stage.name, inputName: stageInput.name });
+        }
+      });
+    });
+
+    if (matchedRows.length === 1) {
+      return {
+        stageName: matchedRows[0].stageName,
+        inputName: matchedRows[0].inputName,
+        message: `Revisa la etapa "${matchedRows[0].stageName}" y el insumo "${matchedRows[0].inputName}".`,
+      };
+    }
+
+    return null;
+  }
+
   async function mount(container, session, helpers = {}) {
     const setShellStatus = typeof helpers.setShellStatus === 'function' ? helpers.setShellStatus : () => {};
     const metricsRegion = container.querySelector('#recipes-metrics');
@@ -50,6 +119,14 @@
     const assignmentProductSelect = container.querySelector('#recipes-assignment-product');
     const closeAssignmentButton = container.querySelector('#recipes-close-assignment-button');
     const cancelAssignmentButton = container.querySelector('#recipes-cancel-assignment-button');
+    const approvalDialog = container.querySelector('#recipes-approval-dialog');
+    const approvalTitle = container.querySelector('#recipes-approval-title');
+    const approvalSubtitle = container.querySelector('#recipes-approval-subtitle');
+    const approvalCopy = container.querySelector('#recipes-approval-copy');
+    const approvalVersionContext = container.querySelector('#recipes-approval-version-context');
+    const closeApprovalButton = container.querySelector('#recipes-close-approval-button');
+    const cancelApprovalButton = container.querySelector('#recipes-cancel-approval-button');
+    const confirmApprovalButton = container.querySelector('#recipes-confirm-approval-button');
     const stagesModal = container.querySelector('#recipes-stages-modal');
     const stagesModalTitle = container.querySelector('#recipes-stages-modal-title');
     const stagesModalSubtitle = container.querySelector('#recipes-stages-modal-subtitle');
@@ -57,7 +134,7 @@
     const stagesModalEditBtn = container.querySelector('#recipes-stages-edit-btn');
     const closeStagesModal = container.querySelector('#recipes-close-stages-modal');
 
-    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !detailSubtitle || !detailMessage || !detailRegion || !searchInput || !statusFilter || !typeFilter || !sharedFilter || !clearFiltersButton || !refreshButton || !openCreateButton || !recipeFormDialog || !recipeForm || !recipeFormMessage || !recipeFormTitle || !recipeFormNameInput || !closeRecipeFormButton || !cancelRecipeFormButton || !versionDialog || !versionForm || !versionMessage || !versionTitle || !stagesList || !addStageButton || !closeVersionButton || !cancelVersionButton || !assignmentDialog || !assignmentForm || !assignmentMessage || !assignmentProductSelect || !closeAssignmentButton || !cancelAssignmentButton || !stagesModal || !stagesModalBody || !closeStagesModal) {
+    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !detailSubtitle || !detailMessage || !detailRegion || !searchInput || !statusFilter || !typeFilter || !sharedFilter || !clearFiltersButton || !refreshButton || !openCreateButton || !recipeFormDialog || !recipeForm || !recipeFormMessage || !recipeFormTitle || !recipeFormNameInput || !closeRecipeFormButton || !cancelRecipeFormButton || !versionDialog || !versionForm || !versionMessage || !versionTitle || !stagesList || !addStageButton || !closeVersionButton || !cancelVersionButton || !assignmentDialog || !assignmentForm || !assignmentMessage || !assignmentProductSelect || !closeAssignmentButton || !cancelAssignmentButton || !approvalDialog || !approvalTitle || !approvalSubtitle || !approvalCopy || !approvalVersionContext || !closeApprovalButton || !cancelApprovalButton || !confirmApprovalButton || !stagesModal || !stagesModalBody || !closeStagesModal) {
       return;
     }
 
@@ -80,6 +157,11 @@
     let activeTab = 'summary';
     let editingVersionId = null;
     let recipeBeingAssigned = null;
+    let pendingApprovalVersionId = null;
+    let pendingApprovalTrigger = null;
+    let pendingRepairHighlight = null;
+    let versionFeedbackById = {};
+    let incompleteVersionIds = {};
 
     const recipesVersionEditor = recipesVersionEditorModule.createVersionEditor({
       getProducts: () => products,
@@ -197,6 +279,8 @@
         versions: getSelectedRecipeVersions(),
         associatedProducts: getAssociatedProductsForSelectedRecipe(),
         permissions,
+        versionFeedbackById,
+        incompleteVersionIds,
       });
       const selectedRecipe = getSelectedRecipe();
       detailSubtitle.textContent = selectedRecipe
@@ -244,7 +328,12 @@
         ]);
         selectedRecipeDetail = {
           ...recipeDetail,
-          versions: Array.isArray(versions) ? versions : [],
+          versions: Array.isArray(versions)
+            ? versions.map((version) => ({
+              ...version,
+              isIncompleteDraft: Boolean(incompleteVersionIds[String(version?.id)]),
+            }))
+            : [],
         };
         detailState = 'ready';
       } catch (error) {
@@ -324,6 +413,87 @@
       };
     }
 
+    function setVersionFeedback(versionId, feedback) {
+      if (!versionId) {
+        return;
+      }
+      versionFeedbackById = {
+        ...versionFeedbackById,
+        [String(versionId)]: {
+          ...feedback,
+          versionId,
+        },
+      };
+      activeTab = 'versions';
+      renderDetail();
+    }
+
+    function scrollVersionCardFeedbackIntoView(versionId) {
+      const versionCard = detailRegion.querySelector(`[data-version-card-id="${String(versionId)}"]`);
+      const feedbackRegion = detailRegion.querySelector(`[data-version-feedback="${String(versionId)}"]`);
+      if (versionCard && typeof versionCard.scrollIntoView === 'function') {
+        versionCard.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+      if (feedbackRegion instanceof globalScope.HTMLElement) {
+        if (typeof feedbackRegion.focus === 'function') {
+          feedbackRegion.focus();
+        }
+      }
+    }
+
+    function markVersionIncomplete(versionId, shouldMark) {
+      const key = String(versionId || '');
+      if (!key) {
+        return;
+      }
+      const nextState = { ...incompleteVersionIds };
+      if (shouldMark) {
+        nextState[key] = true;
+      } else {
+        delete nextState[key];
+      }
+      incompleteVersionIds = nextState;
+    }
+
+    function openApprovalDialog(versionId, versionLabel, triggerButton) {
+      pendingApprovalVersionId = versionId;
+      pendingApprovalTrigger = triggerButton || null;
+      approvalTitle.textContent = 'Aprobar version';
+      approvalSubtitle.textContent = 'Esta accion es irreversible.';
+      approvalCopy.textContent = 'Despues de aprobarla, esta version no podra editarse. Si necesitas cambios mas adelante, tendras que crear un nuevo borrador.';
+      approvalVersionContext.textContent = `Vas a aprobar ${versionLabel || 'esta version borrador'}.`;
+      setDialogVisibility(approvalDialog, true);
+      cancelApprovalButton.focus();
+    }
+
+    function closeApprovalDialog() {
+      setDialogVisibility(approvalDialog, false);
+      if (pendingApprovalTrigger && typeof pendingApprovalTrigger.focus === 'function') {
+        pendingApprovalTrigger.focus();
+      }
+      pendingApprovalVersionId = null;
+      pendingApprovalTrigger = null;
+    }
+
+    function shouldMarkDraftIncompleteFromApprovalError(message) {
+      const normalizedMessage = String(message || '').trim().toLowerCase();
+      if (!normalizedMessage) {
+        return false;
+      }
+
+      return [
+        'product',
+        'producto',
+        'insumo',
+        'recole',
+        'allocation',
+        'asign',
+        'etapa',
+        'lineage',
+        'cantidad',
+      ].some((fragment) => normalizedMessage.includes(fragment));
+    }
+
     syncActionVisibility();
 
     if (!permissions.canViewRecipes) {
@@ -375,6 +545,12 @@
     cancelRecipeFormButton.addEventListener('click', () => setDialogVisibility(recipeFormDialog, false));
     closeVersionButton.addEventListener('click', () => setDialogVisibility(versionDialog, false));
     cancelVersionButton.addEventListener('click', () => setDialogVisibility(versionDialog, false));
+    closeApprovalButton.addEventListener('click', closeApprovalDialog);
+    cancelApprovalButton.addEventListener('click', closeApprovalDialog);
+    approvalDialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      closeApprovalDialog();
+    });
 
     addStageButton.addEventListener('click', () => recipesVersionEditor.addStageSection({ name: '', stageInputs: [] }));
 
@@ -401,6 +577,41 @@
     closeAssignmentButton.addEventListener('click', () => setDialogVisibility(assignmentDialog, false));
     cancelAssignmentButton.addEventListener('click', () => setDialogVisibility(assignmentDialog, false));
 
+    confirmApprovalButton.addEventListener('click', async () => {
+      const versionId = pendingApprovalVersionId;
+      if (!versionId) {
+        closeApprovalDialog();
+        return;
+      }
+
+      const version = getSelectedRecipeVersions().find((entry) => String(entry?.id) === String(versionId));
+      closeApprovalDialog();
+
+      try {
+        await recipesApi.approveRecipeVersion(session, versionId, {});
+        markVersionIncomplete(versionId, false);
+        setVersionFeedback(versionId, {
+          tone: 'success',
+          summary: 'Version aprobada correctamente.',
+        });
+        await loadRecipeDetail(selectedRecipeId);
+        await loadData();
+        scrollVersionCardFeedbackIntoView(versionId);
+      } catch (error) {
+        const message = error?.message || 'No se pudo aprobar la version.';
+        setVersionFeedback(versionId, {
+          tone: 'error',
+          summary: 'No se pudo aprobar esta version.',
+          detail: message,
+          showRepairAction: true,
+        });
+        if (version?.status !== 'APPROVED' && shouldMarkDraftIncompleteFromApprovalError(message)) {
+          markVersionIncomplete(versionId, true);
+        }
+        scrollVersionCardFeedbackIntoView(versionId);
+      }
+    });
+
     recipeForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const payload = buildRecipePayload(new globalScope.FormData(recipeForm));
@@ -422,9 +633,9 @@
         return;
       }
 
-      let payload;
+      let buildResult;
       try {
-        payload = recipesVersionEditor.buildVersionPayload(
+        buildResult = recipesVersionEditor.buildVersionPayload(
           new globalScope.FormData(versionForm),
           parseOptionalDate,
           parseOptionalNumber,
@@ -434,15 +645,27 @@
         return;
       }
 
+      const payload = buildResult.payload;
+      if (buildResult.warningMessage) {
+        versionMessage.innerHTML = rootShellUi.renderInlineMessage(buildResult.warningMessage, 'warning');
+      }
+
       try {
-        if (editingVersionId) {
-          await recipesApi.updateRecipeVersion(session, editingVersionId, payload);
-        } else {
-          await recipesApi.createRecipeVersion(session, selectedRecipeId, payload);
+        const savedVersion = editingVersionId
+          ? await recipesApi.updateRecipeVersion(session, editingVersionId, payload)
+          : await recipesApi.createRecipeVersion(session, selectedRecipeId, payload);
+        const savedVersionId = savedVersion?.id || editingVersionId;
+        if (savedVersionId) {
+          markVersionIncomplete(savedVersionId, buildResult.markVersionIncomplete === true);
         }
         versionMessage.innerHTML = rootShellUi.renderInlineMessage(editingVersionId ? 'Version borrador actualizada.' : 'Version borrador guardada.', 'success');
         setDialogVisibility(versionDialog, false);
         await loadRecipeDetail(selectedRecipeId);
+        activeTab = 'versions';
+        renderDetail();
+        if (savedVersionId) {
+          scrollVersionCardFeedbackIntoView(savedVersionId);
+        }
       } catch (error) {
         versionMessage.innerHTML = rootShellUi.renderInlineMessage(error?.message || 'No se pudo guardar la version.', 'error');
       }
@@ -516,16 +739,21 @@
       const approveVersionButton = target instanceof HTMLElement ? target.closest('[data-approve-recipe-version]') : null;
       if (approveVersionButton instanceof globalScope.HTMLButtonElement) {
         const versionId = approveVersionButton.getAttribute('data-approve-recipe-version');
+        const versionLabel = approveVersionButton.getAttribute('data-version-label') || 'esta version';
         if (!versionId) { return; }
+        openApprovalDialog(versionId, versionLabel, approveVersionButton);
+        return;
+      }
 
-        try {
-          await recipesApi.approveRecipeVersion(session, versionId, {});
-          detailMessage.innerHTML = rootShellUi.renderInlineMessage('Version aprobada correctamente.', 'success');
-          await loadRecipeDetail(selectedRecipeId);
-          await loadData();
-        } catch (error) {
-          detailMessage.innerHTML = rootShellUi.renderInlineMessage(error?.message || 'No se pudo aprobar la version.', 'error');
+      const repairVersionButton = target instanceof HTMLElement ? target.closest('[data-repair-recipe-version]') : null;
+      if (repairVersionButton instanceof globalScope.HTMLButtonElement) {
+        const versionId = repairVersionButton.getAttribute('data-repair-recipe-version');
+        if (!versionId) {
+          return;
         }
+        const version = getSelectedRecipeVersions().find((entry) => String(entry?.id) === String(versionId));
+        pendingRepairHighlight = buildRepairHighlight(version, versionFeedbackById[String(versionId)]?.detail);
+        recipesVersionEditor.openEditVersionDialog(versionId, pendingRepairHighlight);
         return;
       }
 
@@ -564,5 +792,7 @@
   rootShell.register('views.recipesAdmin', {
     mount,
     render,
+    // Exposed for isolated unit testing only — do not call from application code.
+    _buildRepairHighlight: buildRepairHighlight,
   });
 }(window));

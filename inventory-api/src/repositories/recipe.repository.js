@@ -116,16 +116,25 @@ function createRecipeVersion(data, db = prisma) {
 }
 
 async function updateRecipeVersion(id, companyId, data, db = prisma) {
-  const result = await /** @type {any} */ (db).recipeVersion.updateMany({
+  // updateMany does not support nested relation writes (stages: { deleteMany, create }).
+  // Use a findFirst ownership check + update (single record) instead so nested writes work.
+  const existing = await /** @type {any} */ (db).recipeVersion.findFirst({
     where: { id, companyId },
-    data,
+    select: { id: true },
   });
 
-  if (result.count === 0) {
+  if (!existing) {
     return null;
   }
 
-  return findRecipeVersionById(id, companyId, db);
+  return /** @type {any} */ (db).recipeVersion.update({
+    where: { id },
+    data,
+    include: {
+      ...recipeVersionInclude,
+      recipe: true,
+    },
+  });
 }
 
 module.exports = {

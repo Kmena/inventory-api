@@ -1,6 +1,11 @@
 # Implementation Tasks
 ## TASK-001: Establecer cobertura de caracterización para la mejora UX
-**Status:** Pending
+**Status:** Completed
+**Completed at:** 2025-07
+**Implemented files:**
+- `tests/root-shell-recipes-admin-view-characterization.test.js`
+**Validation evidence:**
+- `node --test tests/root-shell-recipes-admin-view-characterization.test.js` (fallo esperado previo a implementación)
 **Objective:** Definir pruebas que describan el comportamiento UX esperado antes de modificar la UI.
 **Affected areas:**
 - `tests/root-shell-recipes-admin-view-characterization.test.js`
@@ -21,7 +26,17 @@
 - [ ] No se modifica código productivo en esta tarea.
 
 ## TASK-002: Clarificar el copy y hints de quantityBasis
-**Status:** Pending
+**Status:** Completed
+**Completed at:** 2025-07
+**Implemented files:**
+- `src/public/root/views/recipes-admin.helpers.js`
+- `src/public/root/views/recipes-admin.renderers.js`
+- `src/public/root/views/recipes-admin.version-editor.js`
+- `tests/root-shell-recipes-admin-view-characterization.test.js`
+**Validation evidence:**
+- `node --test --test-name-pattern "^recipes admin quantityBasis copy uses operational language and removes visible legacy wording$|^recipes-admin.renderers.js and version-editor.js implement quantityBasis select and hint together \(TASK-006\)$|^recipes-admin.version-editor.js buildVersionPayload includes quantityBasis \(TASK-006\)$|^recipes-admin.version-editor.js restores quantityBasis when opening existing version for edit \(TASK-006\)$" tests/root-shell-recipes-admin-view-characterization.test.js`
+- `npm run lint`
+- `npm run typecheck`
 **Objective:** Hacer explícito cuándo usar `PER_OUTPUT_KG` y cuándo usar `PER_FINISHED_UNIT` en el editor de versión.
 **Affected areas:**
 - `src/public/root/views/recipes-admin.renderers.js`
@@ -43,7 +58,15 @@
 - [ ] El cambio no altera el payload enviado al backend.
 
 ## TASK-003: Enriquecer labels, metadata y descubrimiento del selector de insumos
-**Status:** Pending
+**Status:** Completed
+**Completed at:** 2025-07
+**Implemented files:**
+- `src/public/root/views/recipes-admin.helpers.js`
+- `src/public/root/views/recipes-admin.version-editor.js`
+**Validation evidence:**
+- `node --test --test-name-pattern "^recipes admin source defines enriched COUNT/UN product labels and client-side discovery controls$" tests/root-shell-recipes-admin-view-characterization.test.js`
+- `npm run lint`
+- `npm run typecheck`
 **Objective:** Mostrar metadata útil del producto para distinguir insumos discretos COUNT/UN en el flujo de recetas y mejorar el descubrimiento en catálogos grandes con filtros o búsqueda cliente-side cuando el dataset actual lo permita.
 **Affected areas:**
 - `src/public/root/views/recipes-admin.version-editor.js`
@@ -69,7 +92,14 @@
 - [ ] Los productos legacy siguen mostrando labels válidos.
 
 ## TASK-004: Mostrar compatibilidad COUNT/UN vs quantityBasis
-**Status:** Pending
+**Status:** Completed
+**Completed at:** 2025-07
+**Implemented files:**
+- `src/public/root/views/recipes-admin.version-editor.js`
+**Validation evidence:**
+- `node --test --test-name-pattern "^recipes admin source defines contextual warnings for COUNT/UN basis compatibility and decimal UN quantities$" tests/root-shell-recipes-admin-view-characterization.test.js`
+- `npm run lint`
+- `npm run typecheck`
 **Objective:** Añadir warnings y hints contextuales según la combinación entre base de receta e insumos discretos.
 **Affected areas:**
 - `src/public/root/views/recipes-admin.version-editor.js`
@@ -92,7 +122,15 @@
 - [ ] No se introducen nuevas validaciones backend en esta tarea.
 
 ## TASK-005: Guiar etapas PROCESSING/CAPPING/envasado y dependencia de RECOLLECTION
-**Status:** Pending
+**Status:** Completed
+**Completed at:** 2025-07
+**Implemented files:**
+- `src/public/root/views/recipes-admin.version-editor.js`
+- `src/public/root/views/recipes-admin.renderers.js`
+**Validation evidence:**
+- `node --test --test-name-pattern "^recipes admin source explains PROCESSING recollection dependency and highlights review badges$" tests/root-shell-recipes-admin-view-characterization.test.js`
+- `npm run lint`
+- `npm run typecheck`
 **Objective:** Explicar explícitamente la relación entre etapas de procesamiento como tapado o envasado/empaque y los materiales recolectados previamente.
 **Affected areas:**
 - `src/public/root/views/recipes-admin.version-editor.js`
@@ -114,7 +152,14 @@
 - [ ] La lógica operativa existente no cambia de semántica.
 
 ## TASK-006: Mejorar interacción de cantidades discretas UN con warning no bloqueante
-**Status:** Pending
+**Status:** Completed
+**Completed at:** 2025-07
+**Implemented files:**
+- `src/public/root/views/recipes-admin.version-editor.js`
+**Validation evidence:**
+- `node --test --test-name-pattern "^recipes admin source defines contextual warnings for COUNT/UN basis compatibility and decimal UN quantities$" tests/root-shell-recipes-admin-view-characterization.test.js`
+- `npm run lint`
+- `npm run typecheck`
 **Objective:** Priorizar cantidades discretas para `UN` con feedback UX incremental y seguro.
 **Affected areas:**
 - `src/public/root/views/recipes-admin.version-editor.js`
@@ -136,7 +181,18 @@
 - [ ] Otras unidades siguen funcionando como antes.
 
 ## TASK-007: Resaltar basis, etapas y compatibilidad en la revisión, con paridad incremental en bodega cuando aplique
-**Status:** Pending
+**Status:** Completed
+**Completed at:** 2025-07
+**Implemented files:**
+- `src/public/root/views/recipes-admin.renderers.js`
+- `src/public/warehouse/views/production-new.js`
+- `src/public/warehouse/views/recipe-consultation.js`
+- `tests/root-shell-recipes-admin-view-characterization.test.js`
+**Validation evidence:**
+- `node --test --test-name-pattern "^warehouse recipe surfaces keep incremental parity for quantityBasis and COUNT/UN visibility when implemented$" tests/root-shell-recipes-admin-view-characterization.test.js`
+- `node --test tests/root-shell-recipes-admin-view-characterization.test.js`
+- `npm run lint`
+- `npm run typecheck`
 **Objective:** Hacer revisable la interpretación de la receta desde las superficies de detalle sin abrir el editor.
 **Affected areas:**
 - `src/public/root/views/recipes-admin.renderers.js`
@@ -158,7 +214,20 @@
 - [ ] Las unidades relevantes son visibles en la revisión.
 
 ## TASK-008: Validar no-regresión, documentar cierre técnico y registrar follow-up híbrido
-**Status:** Pending
+**Status:** Completed
+**Completed at:** 2025-07
+**Implemented files:**
+- `tests/root-shell-recipes-admin-view-characterization.test.js`
+- `specs/recipes-count-unit-ux-guidance/implementation-report.md`
+- `specs/recipes-count-unit-ux-guidance/tasks.md`
+- `specs/recipes-count-unit-ux-guidance/traceability.md`
+- `specs/recipes-count-unit-ux-guidance/changelog.md`
+- `specs/recipes-count-unit-ux-guidance/current-state.md`
+- `docs/architecture.md`
+**Validation evidence:**
+- `node --test tests/root-shell-recipes-admin-view-characterization.test.js`
+- `npm run lint`
+- `npm run typecheck`
 **Objective:** Confirmar que la mejora es incremental, compatible y lista para despliegue.
 **Affected areas:**
 - `tests/root-shell-recipes-admin-view-characterization.test.js`

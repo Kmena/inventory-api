@@ -159,27 +159,24 @@
 **Risk:** Low
 
 ## TASK-209: Align root-shell recipe editor process-code catalog with backend validation
-**Status:** Proposed
+**Status:** Completed
 **Priority:** High
 **Domain:** Recipes / Root UI
 **Requirement:** FR-007, FR-008, FR-009, FR-017
-**Reason:** Current documentation refresh identified drift between backend-approved process codes and the root-shell editor option list.
-**Current problem:** `src/public/root/views/recipes-admin.version-editor.js` includes UI options such as `FILLING`, `LABELING`, `PACKAGING`, and `QUALITY_CHECK`, while backend validation in `src/schemas/recipe.schema.js` expects the approved catalog including `PACKING_PREP` and `LABELING_PREP`.
-**Proposed change:** Converge UI options to the backend-supported catalog and add characterization coverage for catalog parity.
+**Reason:** The recipe editor had to stop offering process-code values that backend validation would reject.
+**Current problem:** The previous UI catalog could drift from `RECIPE_STAGE_PROCESS_CODES` in `src/schemas/recipe.schema.js` and create avoidable submission failures.
+**Proposed change:** Converge UI options to the backend-supported catalog and keep characterization coverage for catalog parity.
 **Affected files:** `src/public/root/views/recipes-admin.version-editor.js`, `src/schemas/recipe.schema.js`, root-shell recipe tests, docs
 **Dependencies:** TASK-201
 **Database impact:** None
 **API impact:** Prevents avoidable client-side submission of invalid process codes
 **Container impact:** None
 **Security impact:** Low
-**Acceptance criteria:**
-- UI only offers backend-supported process codes.
-- `OTHER` still requires free-text description in the UI.
-- Catalog parity is covered by automated tests.
+**Acceptance criteria:** Implemented; `PROCESS_CODE_OPTIONS` now matches the backend-supported catalog and `OTHER` still requires free-text description.
 **Required tests:** root-shell recipe editor characterization tests; recipe schema parity tests
-**Migration considerations:** Keep additive; do not change persisted codes already valid in DB
-**Rollback or mitigation:** If parity cannot be completed immediately, block unsupported UI options instead of broadening backend catalog silently
-**Risk:** Medium
+**Migration considerations:** Additive UI alignment only; no persisted-code rewrite required
+**Rollback or mitigation:** Keep the backend catalog authoritative if future UI options are revisited
+**Risk:** Low
 
 ## TASK-210: Add stronger end-to-end coverage for QA rejection to reconciliation workflow
 **Status:** Proposed
@@ -246,5 +243,49 @@
 - Operational users have a current runbook/reference for the amended workflow.
 **Required tests:** documentation governance tests if impacted
 **Migration considerations:** Documentation-only
+**Rollback or mitigation:** None needed
+**Risk:** Low
+
+## TASK-213: Implement recipe approval UX confirmation, local feedback, incomplete draft marker, and repair highlighting
+**Status:** Completed
+**Priority:** High
+**Domain:** Recipes / Root UI
+**Requirement:** `recipe-approval-ux` FR-001 to FR-011
+**Reason:** Draft recipe approval was too easy to trigger accidentally, feedback was distant from the action context, and incomplete stage-input rows could be lost without clear user awareness.
+**Current problem:** Approval had no explicit confirmation modal, approval errors were not localized to the triggering version card, incomplete `PROCESSING` rows could disappear during save, and repair navigation lacked direct editor guidance.
+**Proposed change:** Add a custom irreversible-action confirmation dialog, action-local version-card feedback, frontend-managed incomplete draft markers, stage-type-aware incomplete-row handling, and conservative repair highlighting in the existing recipe admin modules.
+**Affected files:** `src/public/root/views/recipes-admin.js`, `src/public/root/views/recipes-admin.renderers.js`, `src/public/root/views/recipes-admin.version-editor.js`, `tests/root-shell-recipes-admin-view-characterization.test.js`
+**Dependencies:** Existing recipe route/service/schema contracts; TASK-209 alignment for process-code parity
+**Database impact:** None
+**API impact:** Reuses the existing `POST /api/recipes/versions/:id/approve` contract without payload changes
+**Container impact:** None
+**Security impact:** Low positive impact through an explicit irreversible-action UX safeguard while preserving backend permission and validation authority
+**Acceptance criteria:** Implemented with `#recipes-approval-dialog`, local version-card feedback, `Reparar borrador` CTA, `Incompleta` draft state, blocking save for incomplete `RECOLLECTION`, warning-only save for incomplete `PROCESSING`, and conservative exact-match repair highlighting.
+**Required tests:** `tests/root-shell-recipes-admin-view-characterization.test.js`, `tests/recipe-service-foundation.test.js`, `tests/recipe-schema.test.js`, `npm run lint`, `npm run typecheck`
+**Migration considerations:** Frontend-only behavior; no migrations or route-contract changes
+**Rollback or mitigation:** The implementation is additive over the existing recipe admin modules and can be reverted without database rollback if necessary
+**Risk:** Medium
+
+## TASK-214: Record manual browser evidence for recipe approval UX behavior across supported dialogs
+**Status:** Proposed
+**Priority:** Medium
+**Domain:** Recipes / Documentation / QA
+**Requirement:** `recipe-approval-ux` NFR-005, AC-001, AC-003, AC-009, AC-010, AC-011
+**Reason:** Automated characterization covers source and markup seams, but the repository still lacks executed browser evidence for dialog focus, cancellation, scroll-to-feedback, and repair navigation behavior.
+**Current problem:** Current implementation reports targeted tests, lint, and typecheck as passing, yet manual browser validation for the new approval dialog and repair affordances is not recorded in repository docs.
+**Proposed change:** Execute and document browser-level validation steps for confirm/cancel, local feedback focus, `Reparar borrador`, and conservative highlight behavior in supported browsers.
+**Affected files:** `docs/action-plan.md`, feature implementation report(s), optional runbook or QA evidence docs, and possibly future browser/E2E tests under `tests/`
+**Dependencies:** TASK-213
+**Database impact:** None
+**API impact:** None
+**Container impact:** None
+**Security impact:** Low
+**Acceptance criteria:**
+- Manual evidence confirms cancel does not call approval.
+- Approval failure visibly focuses or scrolls to the local version-card feedback.
+- `Reparar borrador` reopens the same draft and only highlights when mapping is safe.
+- Evidence is checked into repository docs with conservative wording.
+**Required tests:** manual browser checks; optional future E2E characterization
+**Migration considerations:** Documentation/test evidence only
 **Rollback or mitigation:** None needed
 **Risk:** Low

@@ -15,8 +15,31 @@ function escapeHtml(str) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function renderStageAccordion(stage, index) {
-  const ingredients = stage.ingredients || stage.items || [];
+function isCountOrUnitIngredient(ingredient) {
+  return String(ingredient?.product?.presentationType || '').toUpperCase() === 'COUNT'
+    || String(ingredient?.unit || '').toUpperCase() === 'UN'
+    || String(ingredient?.product?.unit || '').toUpperCase() === 'UN';
+}
+
+function buildStageBadges(stage) {
+  // AUD-005: frozen snapshot stores inputs under stageInputs (not ingredients/items)
+  const ingredients = stage.stageInputs || stage.ingredients || stage.items || [];
+  const badges = [];
+  if (ingredients.some((ingredient) => isCountOrUnitIngredient(ingredient))) {
+    badges.push('COUNT/UN');
+  }
+  if (stage.stageType === 'RECOLLECTION') {
+    badges.push('RECOLLECTION');
+  }
+  if (stage.stageType === 'PROCESSING' && ['CAPPING', 'PACKING_PREP', 'LABELING_PREP'].includes(String(stage.processCode || ''))) {
+    badges.push('Depende de recoleccion');
+  }
+  return badges;
+}
+
+function renderStageAccordion(stage, index, versionQuantityBasis) {
+  // AUD-005: frozen snapshot stores inputs under stageInputs (not ingredients/items)
+  const ingredients = stage.stageInputs || stage.ingredients || stage.items || [];
   const qaRequired = stage.requiresQualityCheck === true;
   const stageId = `recipe-stage-${index}`;
 
@@ -26,15 +49,21 @@ function renderStageAccordion(stage, index) {
       <div class="recipe-ingredients">
         <h4 class="recipe-ingredients__title">Ingredientes</h4>
         <ul class="recipe-ingredients__list">
-          ${ingredients.map((/** @type {any} */ ing) => `
+          ${ingredients.map((/** @type {any} */ ing) => {
+            // FR-007: show effective basis tag when stageInput overrides the version basis
+            const ingBasis = ing.inputQuantityBasis ?? null;
+            const perUnitTag = (ingBasis === 'PER_FINISHED_UNIT' && versionQuantityBasis !== 'PER_FINISHED_UNIT')
+              ? ' <span style="font-size:.78em;color:#0a6c3b;font-weight:600">(por unidad)</span>'
+              : '';
+            return `
             <li class="recipe-ingredients__item">
               <span class="recipe-ingredients__name">${escapeHtml(ing.product?.name || (ing.productId ? `Producto #${ing.productId}` : '—'))}</span>
               <span class="recipe-ingredients__qty">
-                ${escapeHtml(String(ing.quantity || '—'))} ${escapeHtml(ing.unit || '')}
+                ${escapeHtml(String(ing.quantity || '—'))} ${escapeHtml(ing.unit || '')}${perUnitTag}
                 ${ing.tolerance ? ` <em>(±${escapeHtml(String(ing.tolerance))}%)</em>` : ''}
               </span>
-            </li>
-          `).join('')}
+            </li>`;
+          }).join('')}
         </ul>
       </div>
     `;
@@ -60,6 +89,9 @@ function renderStageAccordion(stage, index) {
     `;
   }
 
+  const badges = buildStageBadges(stage);
+  const quantityBasisLabel = versionQuantityBasis === 'PER_FINISHED_UNIT' ? 'Por unidad terminada' : 'Por kg de producto terminado';
+
   return `
     <li class="recipe-stage">
       <button type="button"
@@ -70,6 +102,8 @@ function renderStageAccordion(stage, index) {
         <span class="recipe-stage__chevron" aria-hidden="true">▶</span>
       </button>
       <div id="${escapeHtml(stageId)}" class="recipe-stage__content" hidden>
+        ${badges.length ? `<p class="recipe-stage__instructions">${badges.map((badge) => `• ${escapeHtml(badge)}`).join(' ')}</p>` : ''}
+        <p class="recipe-stage__instructions">Base visible: ${escapeHtml(quantityBasisLabel)}</p>
         ${stage.instructions ? `<p class="recipe-stage__instructions">${escapeHtml(stage.instructions)}</p>` : ''}
         ${ingredientsHtml}
         ${qaHtml}
@@ -139,10 +173,13 @@ function render(container, session, params) {
     .then((/** @type {any} */ order) => {
       if (statusEl) { statusEl.hidden = true; }
 
-      const snapshot = order.frozenRecipeSnapshot || order.recipe || null;
-      const stages = order.stages || snapshot?.stages || [];
-      const recipeName = snapshot?.name || order.recipe?.name || order.product?.name || '—';
-      const recipeVersion = snapshot?.versionLabel || snapshot?.version || '—';
+      const snapshot = order.recipeVersionSnapshot || null;
+      const snapshotRecipeVersion = snapshot?.recipeVersion || null;
+      const snapshotRecipe = snapshot?.recipe || null;
+      const stages = order.stages || snapshotRecipeVersion?.stages || [];
+      const recipeName = snapshotRecipe?.name || order.recipe?.name || order.product?.name || '—';
+      const recipeVersion = snapshotRecipeVersion?.versionNumber || snapshotRecipeVersion?.versionLabel || '—';
+      const versionQuantityBasis = snapshotRecipeVersion?.quantityBasis || 'PER_OUTPUT_KG';
       const frozenAt = order.createdAt ? new Date(order.createdAt).toLocaleDateString('es') : '—';
 
       if (!contentEl) { return; }
@@ -158,7 +195,7 @@ function render(container, session, params) {
       if (stages.length > 0) {
         const stagesList = document.createElement('ul');
         stagesList.className = 'recipe-stages-list';
-        stagesList.innerHTML = stages.map((/** @type {any} */ stage, idx) => renderStageAccordion(stage, idx)).join('');
+        stagesList.innerHTML = stages.map((/** @type {any} */ stage, idx) => renderStageAccordion(stage, idx, versionQuantityBasis)).join('');
         contentEl.append(stagesList);
         attachAccordionBehavior(contentEl);
       } else {
