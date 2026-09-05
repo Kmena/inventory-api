@@ -8,6 +8,64 @@
     IN_PRODUCTION: { emoji: '🏭', label: 'En producción',           color: '#065f46', bg: '#d1fae5', border: '#6ee7b7' },
   });
 
+  const CURRENCY_SYMBOLS = Object.freeze({ CRC: '₡', USD: '$', EUR: '€' });
+
+  function resolveStoreCurrencyCode(storeCurrency) {
+    return CURRENCY_SYMBOLS[storeCurrency] ? storeCurrency : null;
+  }
+
+  function formatStoreCurrencyAmount(amount, currencyCode) {
+    const numericAmount = Number(amount || 0);
+    const currencySymbol = currencyCode ? CURRENCY_SYMBOLS[currencyCode] : '';
+    return `${currencySymbol}${numericAmount.toFixed(2)}`;
+  }
+
+  function renderStoreCreditSummary(store) {
+    const currencyCode = resolveStoreCurrencyCode(store?.currency);
+    const creditLimit = Number(store?.creditLimit ?? 0);
+    const creditBalance = Number(store?.creditBalance ?? 0);
+    const usedAmount = formatStoreCurrencyAmount(creditBalance, currencyCode);
+
+    if (creditLimit <= 0) {
+      return `Usado: ${rootShellUi.escapeHtml(usedAmount)} · Disponible: Sin límite configurado`;
+    }
+
+    const availableAmount = formatStoreCurrencyAmount(Math.max(0, creditLimit - creditBalance), currencyCode);
+    return `Usado: ${rootShellUi.escapeHtml(usedAmount)} · Disponible: ${rootShellUi.escapeHtml(availableAmount)}`;
+  }
+
+  function storeUsesFiscalOverrides(store) {
+    return [
+      store?.legalName,
+      store?.commercialName,
+      store?.legalId,
+      store?.documentType,
+      store?.emailBilling,
+      store?.economicActivityCode,
+      store?.economicActivityName,
+    ].some((value) => String(value || '').trim().length > 0);
+  }
+
+  function renderStoreFiscalSummary(store) {
+    if (!storeUsesFiscalOverrides(store)) {
+      return 'Facturación: hereda datos fiscales del cliente';
+    }
+
+    const legalName = String(store?.legalName || '').trim();
+    const legalId = String(store?.legalId || '').trim();
+    const documentType = String(store?.documentType || '').trim();
+    const summaryParts = ['Facturación: datos fiscales propios de la tienda'];
+
+    if (legalName) {
+      summaryParts.push(`Razón social: ${rootShellUi.escapeHtml(legalName)}`);
+    }
+    if (documentType || legalId) {
+      summaryParts.push(`Identificación: ${rootShellUi.escapeHtml(documentType || 'No registrada')} · ${rootShellUi.escapeHtml(legalId || 'No registrada')}`);
+    }
+
+    return summaryParts.join(' · ');
+  }
+
   /** @param {{ id: string|number, status: string }[]} orders */
   function renderStoreActiveOrdersBadges(orders) {
     if (!orders.length) return '';
@@ -45,7 +103,7 @@
     `).join('');
   }
 
-  function renderClientDetail(client, classifications, documentTypes, zoneOptions, canDeactivate) {
+  function renderClientDetail(client, classifications, documentTypes, zoneOptions, canDeactivate, economicActivities) {
     if (!client) {
       return '<p class="empty-state">Selecciona un cliente del listado para abrir el detalle contextual.</p>';
     }
@@ -73,12 +131,42 @@
             <label><span>Codigo</span><input name="code" type="text" maxlength="50" value="${rootShellUi.escapeHtml(client.code || '')}" /></label>
             <label><span>Clasificacion</span><select name="clientClassificationId"><option value="">Sin clasificacion</option>${(classifications || []).map((classification) => `<option value="${rootShellUi.escapeHtml(classification.id)}" ${String(classification.id) === String(client.clientClassificationId || client.classification?.id || '') ? 'selected' : ''}>${rootShellUi.escapeHtml(classification.name)}</option>`).join('')}</select></label>
             <label><span>Identificacion</span><input name="legalId" type="text" maxlength="100" value="${rootShellUi.escapeHtml(client.legalId || '')}" /></label>
-            <label><span>Tipo de documento</span><input name="documentType" type="text" maxlength="50" value="${rootShellUi.escapeHtml(client.documentType || '')}" list="clients-document-types-list" /></label>
+            <label>
+              <span>Tipo de identificación</span>
+              <select name="documentType">
+                <option value="">Selecciona</option>
+                <option value="01" ${client.documentType === '01' ? 'selected' : ''}>01 — Cédula Física</option>
+                <option value="02" ${client.documentType === '02' ? 'selected' : ''}>02 — Cédula Jurídica</option>
+                <option value="03" ${client.documentType === '03' ? 'selected' : ''}>03 — DIMEX</option>
+                <option value="04" ${client.documentType === '04' ? 'selected' : ''}>04 — NITE</option>
+              </select>
+            </label>
+            <label><span>Razon social</span><input name="legalName" type="text" maxlength="255" value="${rootShellUi.escapeHtml(client.legalName || '')}" /></label>
+            <label><span>Nombre comercial</span><input name="commercialName" type="text" maxlength="255" value="${rootShellUi.escapeHtml(client.commercialName || '')}" /></label>
             <label><span>Telefono</span><input name="phone" type="text" maxlength="50" value="${rootShellUi.escapeHtml(client.phone || '')}" /></label>
-            <label><span>Correo facturacion</span><input name="emailBilling" type="email" maxlength="255" value="${rootShellUi.escapeHtml(client.emailBilling || '')}" /></label>
+            <label><span>Correo electrónico para facturas (PDF y XML)</span><input name="emailBilling" type="email" maxlength="255" value="${rootShellUi.escapeHtml(client.emailBilling || '')}" /></label>
             <label><span>Tipo de pago</span><select name="paymentType"><option value="">Selecciona</option><option value="CASH" ${client.paymentType === 'CASH' ? 'selected' : ''}>Contado</option><option value="CREDIT" ${client.paymentType === 'CREDIT' ? 'selected' : ''}>Credito</option><option value="TRANSFER" ${client.paymentType === 'TRANSFER' ? 'selected' : ''}>Transferencia</option><option value="CARD" ${client.paymentType === 'CARD' ? 'selected' : ''}>Tarjeta</option></select></label>
             <label><span>Dias de pago</span><input name="paymentDays" type="number" min="0" value="${rootShellUi.escapeHtml(client.paymentDays || '')}" /></label>
+            <label class="root-form-grid__full">
+              <span>Actividad económica</span>
+              <select id="clients-edit-economic-activity" name="economicActivityCode">
+                <option value="">Selecciona actividad económica</option>
+                ${(Array.isArray(economicActivities) ? economicActivities : []).map((a) => {
+                  const code = a.code || a.value || '';
+                  const label = a.name || a.label || '';
+                  const selected = code === (client.economicActivityCode || '') ? 'selected' : '';
+                  return `<option value="${rootShellUi.escapeHtml(code)}" ${selected}>${rootShellUi.escapeHtml(code)} — ${rootShellUi.escapeHtml(label)}</option>`;
+                }).join('')}
+                ${(client.economicActivityCode && !(Array.isArray(economicActivities) ? economicActivities : []).some((a) => (a.code || a.value) === client.economicActivityCode))
+                  ? `<option value="${rootShellUi.escapeHtml(client.economicActivityCode)}" selected>${rootShellUi.escapeHtml(client.economicActivityCode)}${client.economicActivityName ? ` — ${rootShellUi.escapeHtml(client.economicActivityName)}` : ''}</option>`
+                  : ''}
+              </select>
+              <input type="hidden" id="clients-edit-economic-activity-name" name="economicActivityName" value="${rootShellUi.escapeHtml(client.economicActivityName || '')}" />
+            </label>
 
+            <label><span>Provincia</span><input name="province" type="text" maxlength="100" value="${rootShellUi.escapeHtml(client.province || '')}" /></label>
+            <label><span>Canton</span><input name="canton" type="text" maxlength="100" value="${rootShellUi.escapeHtml(client.canton || '')}" /></label>
+            <label><span>Distrito</span><input name="district" type="text" maxlength="100" value="${rootShellUi.escapeHtml(client.district || '')}" /></label>
             <label class="root-form-grid__full"><span>Direccion</span><textarea name="address" rows="3" maxlength="1000">${rootShellUi.escapeHtml(client.address || '')}</textarea></label>
           </div>
           <div class="action-row compact-action-row">
@@ -107,14 +195,16 @@
               <p class="muted">${rootShellUi.escapeHtml(store.code || 'Sin codigo')} · ${rootShellUi.escapeHtml(store.subregion?.name || store.subregionName || 'Sin subzona')}</p>
               ${store.latitude && store.longitude ? `<p class="muted" style="font-size:0.78rem;">📍 ${rootShellUi.escapeHtml(String(store.latitude))}, ${rootShellUi.escapeHtml(String(store.longitude))}</p>` : '<p class="muted" style="font-size:0.78rem;">Sin coordenadas</p>'}
               ${renderStoreActiveOrdersBadges(store.orders || [])}
+              <p class="muted" style="font-size:0.78rem;">${renderStoreFiscalSummary(store)}</p>
               <form class="clients-store-credit-form" data-client-id="${rootShellUi.escapeHtml(client.id)}" data-store-id="${rootShellUi.escapeHtml(store.id)}" style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <label style="font-size:0.8rem;display:flex;align-items:center;gap:4px;">
                   <span style="white-space:nowrap;">Límite crédito</span>
                   <input name="creditLimit" type="number" min="0" step="0.01" value="${rootShellUi.escapeHtml(String(store.creditLimit ?? 0))}" style="width:100px;" />
                 </label>
-                <span class="muted" style="font-size:0.78rem;">Saldo: ${rootShellUi.escapeHtml(String(Number(store.creditBalance ?? 0).toFixed(2)))}</span>
+                <span class="muted" style="font-size:0.78rem;">Moneda: ${rootShellUi.escapeHtml(resolveStoreCurrencyCode(store.currency) || 'Sin definir')}</span>
+                <span class="muted" style="font-size:0.78rem;">${renderStoreCreditSummary(store)}</span>
                 <button type="submit" class="secondary-button" style="font-size:0.78rem;padding:4px 10px;">Guardar</button>
-                <span class="clients-store-credit-msg" style="font-size:0.78rem;"></span>
+                <div class="clients-store-credit-msg" aria-live="polite"></div>
               </form>
             </article>
           `)}
@@ -137,12 +227,18 @@
           <div class="root-form-grid">
             <label><span>Tipo de documento *</span><select name="documentType" required><option value="">Selecciona</option>${(documentTypes || []).map((item) => `<option value="${rootShellUi.escapeHtml(item.value || item.code || item.name || '')}">${rootShellUi.escapeHtml(item.label || item.name || item.value || item.code || 'Documento')}</option>`).join('')}</select></label>
             <label><span>Numero</span><input name="documentNumber" type="text" maxlength="120" /></label>
-            <label><span>Nombre de archivo *</span><input name="fileName" type="text" required maxlength="255" /></label>
-            <label><span>Tipo MIME</span><input name="mimeType" type="text" maxlength="120" placeholder="application/pdf" /></label>
-            <label class="root-form-grid__full"><span>Contenido Base64 *</span><textarea name="fileContentBase64" rows="4" required></textarea></label>
+            <label class="root-form-grid__full">
+              <span>Archivo *</span>
+              <input name="documentFile" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" aria-describedby="clients-document-file-help clients-document-file-feedback" />
+              <small id="clients-document-file-help" class="muted">Formatos permitidos: PDF, JPG, PNG, WebP, DOC, DOCX. Máximo 5 MB.</small>
+              <input name="fileName" type="hidden" />
+              <input name="mimeType" type="hidden" />
+              <input name="fileContentBase64" type="hidden" />
+              <div id="clients-document-file-feedback" aria-live="polite"></div>
+            </label>
             <label class="root-form-grid__full"><span>Notas</span><textarea name="notes" rows="2"></textarea></label>
           </div>
-          <div class="action-row compact-action-row"><button type="submit">Agregar documento</button></div>
+          <div class="action-row compact-action-row"><button id="clients-document-submit-button" type="submit">Agregar documento</button></div>
         </form>
       </section>
 

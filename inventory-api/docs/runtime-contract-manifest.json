@@ -578,6 +578,15 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "agent-payment-registration-outside-current-openapi-baseline",
       "reason": "Registro de pagos por el agente comercial desde la vista de tienda. Ruta activa en runtime pero excluida del contrato OpenAPI parcial hasta formalización del módulo de cobranza."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/clients",
+      "expressPath": "/:clientId/stores/:storeId/documents",
+      "routeFile": "src/routes/client.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "client-store-document-upload-outside-current-openapi-baseline",
+      "reason": "Subida de documentos asociados a una tienda de cliente (client-store-documents-credit-ux, TASK-009). Ruta activa en runtime y protegida por tenant scope, pero excluida del contrato OpenAPI parcial hasta formalización del módulo de documentos de tienda."
     }
   ]
 }

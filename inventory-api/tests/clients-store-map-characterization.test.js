@@ -163,6 +163,76 @@ test('clients-admin-store-dialog.js exists and registers views.clientsAdminStore
   assert.ok(src.includes('function open('), 'must expose an open() function');
 });
 
+test('clients-admin-store-dialog.js adds creditLimit field and delegates payload shaping to shared helpers (TASK-005)', () => {
+  const src = readFile(path.join(rootViewsDir, 'clients-admin-store-dialog.js'));
+  assert.ok(src.includes('name="creditLimit" type="number"'), 'store dialog must render a creditLimit number input');
+  assert.ok(src.includes('min="0"'), 'creditLimit must prevent negative values in the dialog');
+  assert.ok(src.includes('step="0.01"'), 'creditLimit must support decimal values');
+  assert.ok(src.includes('views.clientsAdminHelpers'), 'store dialog must require the shared clients admin helpers');
+  assert.ok(src.includes('clientsAdminHelpers.buildStorePayload'), 'store dialog must delegate store payload shaping to shared helpers');
+});
+
+test('clients-admin-store-dialog.js adds required currency select with CRC/USD/EUR options (TASK-006)', () => {
+  const src = readFile(path.join(rootViewsDir, 'clients-admin-store-dialog.js'));
+  assert.ok(src.includes('name="currency" required'), 'store dialog must require a currency selection');
+  assert.ok(src.includes('Selecciona moneda'), 'store dialog must guide the user to explicitly choose a currency');
+  assert.ok(src.includes('value="CRC">CRC — Colón'), 'store dialog must include the CRC option');
+  assert.ok(src.includes('value="USD">USD — Dólar'), 'store dialog must include the USD option');
+  assert.ok(src.includes('value="EUR">EUR — Euro'), 'store dialog must include the EUR option');
+});
+
+test('clients-admin-store-dialog.js adds inherit vs override fiscal controls and summary block (TASK-007)', () => {
+  const src = readFile(path.join(rootViewsDir, 'clients-admin-store-dialog.js'));
+  assert.ok(src.includes('name="billingMode" value="inherit" checked'), 'store dialog must default to inherit billing mode');
+  assert.ok(src.includes('name="billingMode" value="override"'), 'store dialog must expose override billing mode');
+  assert.ok(src.includes('Facturación heredada del cliente'), 'store dialog must show inherited fiscal summary copy');
+  assert.ok(src.includes('Usar datos fiscales del cliente'), 'store dialog must label the inherit option');
+  assert.ok(src.includes('Usar datos fiscales propios de esta tienda'), 'store dialog must label the override option');
+  assert.ok(src.includes('store-dialog-billing-override-fields'), 'store dialog must render a dedicated override fields container');
+  assert.ok(src.includes('toggleBillingMode('), 'store dialog must toggle the billing mode UI');
+});
+
+test('clients-admin-store-dialog.js renders zone guidance state and refresh affordances (TASK-003/TASK-004)', () => {
+  const src = readFile(path.join(rootViewsDir, 'clients-admin-store-dialog.js'));
+  assert.ok(
+    src.includes('Necesitas configurar zonas antes de crear una tienda'),
+    'store dialog must explain the missing-zones dependency',
+  );
+  assert.ok(src.includes('Ir a Zonas'), 'store dialog must expose the Ir a Zonas action');
+  assert.ok(src.includes('Refrescar zonas'), 'store dialog must expose the Refrescar zonas action');
+  assert.ok(src.includes("data-action=\"refresh-zones\""), 'store dialog must expose refresh action hooks');
+  assert.ok(src.includes('store-dialog-zone-guidance'), 'store dialog must include a dedicated guidance state container');
+  assert.ok(src.includes('mainFieldset.hidden'), 'store dialog must toggle the form when no zones are available');
+});
+
+test('clients-admin-store-dialog.js accepts refreshZones callback and repopulates subregion options (TASK-004)', () => {
+  const src = readFile(path.join(rootViewsDir, 'clients-admin-store-dialog.js'));
+  assert.ok(src.includes('function open(clientId, clientName, session, zoneOptions, onSuccess, refreshZones, clientFiscalProfile, documentTypeOptions, canLookupTaxpayer)'), 'open() must accept refreshZones callback, client fiscal profile, documentTypeOptions and canLookupTaxpayer');
+  assert.ok(src.includes('zoneOptions = await refreshZones()'), 'refresh action must await refreshZones()');
+  assert.ok(src.includes('subregionSelect.innerHTML'), 'refresh action must update the subregion select in place');
+  assert.ok(src.includes('updateZoneAvailability(zoneOptions)'), 'refresh action must re-evaluate the guidance/form state');
+});
+
+test('clients-admin-store-dialog.js enters Phase 2 after store creation for optional document upload (TASK-009)', () => {
+  const src = readFile(path.join(rootViewsDir, 'clients-admin-store-dialog.js'));
+  assert.ok(src.includes('function enterPhase2('), 'store dialog must define enterPhase2 for optional document upload');
+  assert.ok(src.includes('function buildPhase2Html('), 'store dialog must define buildPhase2Html');
+  assert.ok(src.includes('Documentos de la tienda'), 'Phase 2 must show a document upload heading');
+  assert.ok(src.includes('Adjuntar documento'), 'Phase 2 must have an upload submit button');
+  assert.ok(src.includes('Finalizar'), 'Phase 2 must have a Finalizar button to close without more uploads');
+  assert.ok(src.includes('uploadStoreDocument'), 'Phase 2 must call clientsApi.uploadStoreDocument');
+  assert.ok(src.includes('5 * 1024 * 1024'), 'Phase 2 must enforce the 5 MB guard (AC-016, BR-001)');
+  assert.ok(src.includes('FileReader'), 'Phase 2 must use FileReader to convert the file to Base64');
+  assert.ok(src.includes('enterPhase2(dialog,'), 'submit handler must transition to Phase 2 after Phase 1 success');
+});
+
+test('clients-api.js exposes uploadStoreDocument registered in clientsApi (TASK-009)', () => {
+  const src = readFile(path.join(publicRoot, 'root', 'clients-api.js'));
+  assert.ok(src.includes('async function uploadStoreDocument('), 'clients-api.js must define uploadStoreDocument');
+  assert.ok(src.includes('/stores/'), 'uploadStoreDocument must use the store-scoped document endpoint');
+  assert.ok(src.includes('uploadStoreDocument,'), 'uploadStoreDocument must be registered in clientsApi object');
+});
+
 test('clients-admin-store-dialog.js creates dialog dynamically — not pre-rendered (ADR-004, TASK-P0-008)', () => {
   const src = readFile(path.join(rootViewsDir, 'clients-admin-store-dialog.js'));
   assert.ok(
@@ -255,6 +325,14 @@ test('clients-admin.js registers views.clientsAdminStoreDialog and connects add-
   assert.ok(
     src.includes('clientsAdminStoreDialog.open('),
     'clients-admin.js must call clientsAdminStoreDialog.open()',
+  );
+  assert.ok(
+    src.includes('zoneOptions = clientsState.flattenZoneOptions(zonesResponse);'),
+    'clients-admin.js must refresh and normalize zone options before returning them to the dialog',
+  );
+  assert.ok(
+    src.includes('getSelectedClient(),'),
+    'clients-admin.js must pass the selected client fiscal profile into the store dialog',
   );
 });
 

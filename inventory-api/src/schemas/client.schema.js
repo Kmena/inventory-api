@@ -73,6 +73,15 @@ const createClientStoreSchema = z.object({
   province: z.string().trim().max(120).optional(),
   canton: z.string().trim().max(120).optional(),
   district: z.string().trim().max(120).optional(),
+  currency: z.enum(['CRC', 'USD', 'EUR']).optional(),
+  legalName: z.string().trim().min(2).max(255).optional(),
+  commercialName: z.string().trim().max(255).optional(),
+  legalId: z.string().trim().max(100).optional(),
+  documentType: z.string().trim().max(50).optional(),
+  emailBilling: z.string().trim().email().optional(),
+  economicActivityCode: z.string().trim().max(20).optional(),
+  economicActivityName: z.string().trim().max(255).optional(),
+  creditLimit: z.coerce.number().min(0).optional(),
   representatives: z.array(createClientStoreRepresentativeSchema).max(20).optional(),
 });
 
@@ -126,12 +135,16 @@ const createClientReferenceSchema = z.object({
   approvedBy: z.string().trim().max(255).optional(),
 });
 
+// Store-scoped document upload — same validation as client-level; storeId comes from route param
+const uploadClientStoreDocumentSchema = uploadClientDocumentSchema;
+
 module.exports = {
   createClientSchema,
   updateClientSchema,
   createCompanyClientSchema,
   createClientStoreSchema,
   uploadClientDocumentSchema,
+  uploadClientStoreDocumentSchema,
   createClientReferenceSchema,
   updateClientStoreCreditLimitSchema,
 };

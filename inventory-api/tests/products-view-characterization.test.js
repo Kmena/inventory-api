@@ -301,8 +301,17 @@ test('products-admin render() contiene las correcciones UX de labels, botón y f
   const productsAdmin = rootShell.require('views.productsAdmin');
   const html = productsAdmin.render();
 
-  // TASK-002: label del filtro debe decir 'Subcategoria'
-  assert.ok(html.includes('<span>Subcategoria</span>'), 'El label del filtro debe decir Subcategoria');
+  // TASK-002: label del filtro debe decir 'Subcategoria' — verificar en el contexto del filtro,
+  // no solo que el string existe en el HTML (AC-005: el label del SELECTOR del filtro en la barra de filtros)
+  // Buscar '#products-category-filter' y verificar que el label adyacente dice 'Subcategoria'
+  const filterSelectIdx = html.indexOf('id="products-category-filter"');
+  assert.ok(filterSelectIdx !== -1, 'El select del filtro de subcategoría debe existir');
+  // El label con <span>Subcategoria</span> debe aparecer en las 200 posiciones previas al select
+  const filterContext = html.slice(Math.max(0, filterSelectIdx - 200), filterSelectIdx + 20);
+  assert.ok(
+    filterContext.includes('<span>Subcategoria</span>'),
+    'El label del filtro adyacente a #products-category-filter debe decir Subcategoria (no Categoria)',
+  );
 
   // TASK-001: el botón de submit del form de categorías debe decir 'Crear subcategoria'
   assert.ok(html.includes('Crear subcategoria'), 'El botón de submit debe decir Crear subcategoria');

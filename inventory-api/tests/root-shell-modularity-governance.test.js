@@ -126,7 +126,7 @@ test('sensitive root-shell modules keep isolated characterization coverage and e
   assert.match(clientsAdminSource, /views\.clientsAdminState/);
   assert.match(clientsAdminSource, /clientsRenderers\.renderClientList\(/);
   assert.match(clientsAdminSource, /clientsState\.buildClientsListSummary\(/);
-  assert.match(clientsRenderersSource, /function renderClientDetail\(client, classifications, documentTypes, zoneOptions, canDeactivate\)/);
+  assert.match(clientsRenderersSource, /function renderClientDetail\(client, classifications, documentTypes, zoneOptions, canDeactivate, economicActivities\)/);
   assert.match(clientsStateSource, /function flattenZoneOptions\(regions\)/);
   assert.match(clientsStateSource, /function getSelectedClient\(clients, clientDetailsById, selectedClientId\)/);
 

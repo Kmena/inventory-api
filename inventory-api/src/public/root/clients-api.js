@@ -120,6 +120,18 @@
     });
   }
 
+  async function uploadStoreDocument(session, clientId, storeId, payload) {
+    return sendJson(
+      session,
+      `/api/clients/${encodeURIComponent(clientId)}/stores/${encodeURIComponent(storeId)}/documents`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        fallbackMessage: 'No se pudo cargar el documento de la tienda.',
+      },
+    );
+  }
+
   async function listZones(session) {
     return inventoryAuth.fetchJson(session, '/api/regions/company', {
       fallbackMessage: 'No se pudieron cargar las zonas y subzonas.',
@@ -198,5 +210,6 @@
     updateClient,
     updateStoreCreditLimit,
     uploadDocument,
+    uploadStoreDocument,
   });
 }(window));

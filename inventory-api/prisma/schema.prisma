@@ -629,6 +629,14 @@ model ClientStore {
   province  String?
   canton    String?
   district  String?
+  currency  String?
+  legalName String? @map("legal_name")
+  commercialName String? @map("commercial_name")
+  legalId String? @map("legal_id")
+  documentType String? @map("document_type")
+  emailBilling String? @map("email_billing")
+  economicActivityCode String? @map("economic_activity_code")
+  economicActivityName String? @map("economic_activity_name")
   creditLimit   Decimal @default(0) @db.Decimal(14, 2) @map("credit_limit")
   creditBalance Decimal @default(0) @db.Decimal(14, 2) @map("credit_balance")
   createdAt DateTime @default(now()) @map("created_at")
@@ -639,6 +647,7 @@ model ClientStore {
   representatives ClientStoreRepresentative[]
   orders          Order[]
   routeVisitLogs  RouteVisitLog[]
+  documents       ClientDocument[]
 
   @@unique([clientId, code])
   @@index([legalEntityId])
@@ -705,20 +714,23 @@ model ClientReference {
 }
 
 model ClientDocument {
-  id             BigInt   @id @default(autoincrement())
-  clientId       BigInt   @map("client_id")
-  documentType   String   @map("document_type")
-  documentNumber String?  @map("document_number")
-  fileName       String   @map("file_name")
-  mimeType       String?  @map("mime_type")
-  fileUrl        String   @map("file_url")
-  status         String   @default("ACTIVE")
+  id             BigInt       @id @default(autoincrement())
+  clientId       BigInt       @map("client_id")
+  storeId        BigInt?      @map("store_id")
+  documentType   String       @map("document_type")
+  documentNumber String?      @map("document_number")
+  fileName       String       @map("file_name")
+  mimeType       String?      @map("mime_type")
+  fileUrl        String       @map("file_url")
+  status         String       @default("ACTIVE")
   notes          String?
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  client         Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  store          ClientStore? @relation(fields: [storeId], references: [id], onDelete: SetNull)
 
   @@index([clientId])
+  @@index([storeId])
   @@map("client_documents")
 }
 
