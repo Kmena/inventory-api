@@ -417,6 +417,8 @@ button:disabled { opacity: 0.7; cursor: progress; }
 .message.error:not(:empty) { background: #fef2f2; border-color: #f3c7c7; }
 .message.warning { color: #92400e; }
 .message.warning:not(:empty) { background: #fef3c7; border-color: #d97706; }
+.message.success { color: #166534; }
+.message.success:not(:empty) { background: #f0fdf4; border-color: #86efac; }
 .message.warning.approval-banner { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .auth-help { margin: 0; font-size: 0.9rem; color: var(--muted); line-height: 1.4; }
 #import-progress { font-size: 0.95rem; }
