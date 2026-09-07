@@ -171,13 +171,43 @@ async function createCompanyClientStore(clientId, payload, auth) {
 
   try {
     const existingStores = await clientRepository.countClientStores(clientId);
-    return await clientRepository.createClientStore({
+    const storeData = {
       ...payload,
       clientId,
       legalEntityId: client.legalEntityId,
       isPrimary: existingStores === 0,
       isActive: true,
-    });
+    };
+
+    if (payload.currency) {
+      storeData.currency = payload.currency;
+    }
+    if (payload.legalName) {
+      storeData.legalName = payload.legalName;
+    }
+    if (payload.commercialName) {
+      storeData.commercialName = payload.commercialName;
+    }
+    if (payload.legalId) {
+      storeData.legalId = payload.legalId;
+    }
+    if (payload.documentType) {
+      storeData.documentType = payload.documentType;
+    }
+    if (payload.emailBilling) {
+      storeData.emailBilling = payload.emailBilling;
+    }
+    if (payload.economicActivityCode) {
+      storeData.economicActivityCode = payload.economicActivityCode;
+    }
+    if (payload.economicActivityName) {
+      storeData.economicActivityName = payload.economicActivityName;
+    }
+    if (payload.creditLimit != null) {
+      storeData.creditLimit = Number(payload.creditLimit);
+    }
+
+    return await clientRepository.createClientStore(storeData);
   } catch (error) {
     if (error.code === 'P2002') {
       throw createHttpError(409, 'Ya existe una tienda con ese codigo para este cliente', 'conflict');
@@ -229,6 +259,69 @@ async function createCompanyClientDocument(clientId, payload, auth) {
     }
 
     throw createHttpError(500, 'No se pudo guardar el documento del cliente', 'internal_server_error');
+  }
+
+  return serializeClientDocument(createdDocument);
+}
+
+async function createCompanyClientStoreDocument(clientId, storeId, payload, auth) {
+  assertCompanyUser(auth);
+
+  const companyId = BigInt(auth.companyId);
+
+  const client = await clientRepository.findCompanyClientById(clientId, companyId);
+  if (!client) {
+    throw createHttpError(404, 'Cliente no encontrado', 'not_found');
+  }
+
+  // Validate that storeId belongs to clientId and is active
+  const store = await prisma.clientStore.findFirst({
+    where: {
+      id: BigInt(storeId),
+      clientId: BigInt(clientId),
+      client: { companyId },
+      isActive: true,
+    },
+  });
+  if (!store) {
+    throw createHttpError(404, 'Tienda no encontrada', 'not_found');
+  }
+
+  const file = validateClientDocumentPayload(payload);
+  const documentId = await clientRepository.reserveClientDocumentId();
+  const createdDocument = await clientRepository.createClientDocument({
+    id: documentId,
+    clientId,
+    storeId: store.id,
+    documentType: payload.documentType,
+    documentNumber: payload.documentNumber,
+    fileName: file.fileName,
+    mimeType: file.mimeType,
+    fileUrl: buildProtectedClientDocumentUrl(clientId, documentId),
+    status: 'ACTIVE',
+    notes: payload.notes,
+  });
+
+  try {
+    await persistPrivateClientDocumentFile({
+      companyId,
+      clientId,
+      documentId,
+      fileName: file.fileName,
+      buffer: file.buffer,
+    });
+  } catch {
+    try {
+      await clientRepository.deleteClientDocument(documentId, clientId, companyId);
+    } catch (_cleanupError) {
+      throw createHttpError(
+        500,
+        'No se pudo guardar el documento de la tienda ni revertir su registro',
+        'internal_server_error',
+      );
+    }
+
+    throw createHttpError(500, 'No se pudo guardar el documento de la tienda', 'internal_server_error');
   }
 
   return serializeClientDocument(createdDocument);
@@ -369,6 +462,7 @@ module.exports = {
   createCompanyClient,
   createCompanyClientStore,
   createCompanyClientDocument,
+  createCompanyClientStoreDocument,
   createCompanyClientReference,
   getCompanyClientDocumentDownload,
   updateClient,

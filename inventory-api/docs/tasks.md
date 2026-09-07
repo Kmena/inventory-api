@@ -289,3 +289,143 @@
 **Migration considerations:** Documentation/test evidence only
 **Rollback or mitigation:** None needed
 **Risk:** Low
+
+## TASK-301: Introduce store currency semantics and credit display alignment
+**Status:** Completed
+**Priority:** High
+**Domain:** Customers / Stores / Root-shell clients administration
+**Requirement:** `client-store-documents-credit-ux` FR-010, FR-011, BR-007
+**Reason:** Create-time store `creditLimit` was implemented first, but store onboarding still needed store currency and clearer card-level credit semantics.
+**Current problem:** The pre-TASK-006 repository lacked a `ClientStore.currency` field and store cards communicated credit usage ambiguously.
+**Proposed change:** Add additive store `currency` persistence and validation, and update store-card credit rendering to show used/available values with a store-specific currency symbol while remaining safe for legacy `NULL` currency rows.
+**Affected files:** `src/public/root/views/clients-admin-store-dialog.js`, `src/public/root/views/clients-admin.helpers.js`, `src/public/root/views/clients-admin.renderers.js`, `src/schemas/client.schema.js`, `src/services/client.service.js`, `prisma/schema.prisma`, `prisma/migrations/20261002000000_add_store_currency/migration.sql`, related tests/docs
+**Dependencies:** Existing TASK-001 through TASK-005 characterization baseline
+**Database impact:** Added additive nullable `ClientStore.currency` column through `20261002000000_add_store_currency`; no rewrite of prior migrations
+**API impact:** Existing store-create contract now accepts `currency`; existing credit-limit patch route remains compatible
+**Container impact:** None
+**Security impact:** Low
+**Acceptance criteria:** Implemented — `currency` is limited to `CRC | USD | EUR`; store cards render `Usado` / `Disponible` values in the configured currency; legacy `NULL` currency rows render `Moneda: Sin definir` and symbol-free amounts instead of defaulting to `CRC`; existing create-time `creditLimit` behavior remains compatible.
+**Required tests:** `tests/client-store-credit-limit.test.js`, `tests/clients-store-map-characterization.test.js`, `tests/clients-view-characterization.test.js`; user-reported `npx prisma validate`, `npx prisma migrate deploy`, `npx prisma migrate status`, `npm run lint`, `npm run typecheck`, and `npm run build`
+**Migration considerations:** Additive nullable rollout preserved backward compatibility for existing stores; any future backfill must use a new migration or data-fix strategy rather than editing applied history
+**Rollback or mitigation:** Keep the existing credit-limit patch route operational as a fallback path during rollout; renderer compatibility protects legacy rows with `NULL` currency
+**Risk:** Medium
+
+## TASK-302: Complete remaining client fiscal catalog wiring and creation-form alignment
+**Status:** Proposed
+**Priority:** High
+**Domain:** Customers / Root-shell clients administration
+**Requirement:** `client-store-documents-credit-ux` FR-012, FR-028, FR-029, FR-030, FR-031, FR-032, BR-013, BR-014, BR-015
+**Reason:** TASK-008 exposed the missing editable legal/geographic fields and removed dead client credit shaping, but the approved Hacienda-aligned client fiscal contract is still incomplete.
+**Current problem:** The client edit form now exposes `legalName`, `commercialName`, `province`, `canton`, and `district`, and `buildClientPayload()` no longer sends dead client credit fields, but client create/edit still use free-text `documentType`, the create dialog still lacks the full approved fiscal/geographic field set, and economic activities are not yet loaded/catalog-backed in the clients workspace.
+**Proposed change:** Finish the remaining client-side fiscal form alignment by constraining `documentType`, loading economic activities at mount time, wiring economic-activity selection/auto-fill, and bringing the create dialog into parity with the approved client fiscal/geographic contract without regressing current client update flows.
+**Affected files:** `src/public/root/views/clients-admin.js`, `src/public/root/views/clients-admin.renderers.js`, `src/public/root/views/clients-admin.helpers.js`, `src/schemas/client.schema.js`, `src/services/client.service.js`, related tests/docs
+**Dependencies:** TASK-307, TASK-306
+**Database impact:** None required for this remaining slice
+**API impact:** Existing client create/update payloads keep the same route shape while tightening browser-side fiscal field choices
+**Container impact:** None
+**Security impact:** Medium positive impact through clearer server-side validation and less free-text fiscal input
+**Acceptance criteria:** Client create/edit forms expose the remaining approved fiscal/catalog fields; `documentType` is constrained to the approved identification types; economic activities are loaded and selectable from the approved catalog; current client create/update contracts remain compatible.
+**Required tests:** schema validation tests, client-view characterization, payload-shaping regression tests, economic-activity loading assertions
+**Migration considerations:** Preserve current client legal-entity linkage semantics and avoid widening the route surface
+**Rollback or mitigation:** Keep existing client route contracts stable and stage UI changes behind characterization coverage
+**Risk:** High
+
+## TASK-306: Implement store fiscal inheritance/override foundation
+**Status:** Completed
+**Priority:** High
+**Domain:** Customers / Stores / Root-shell clients administration
+**Requirement:** `client-store-documents-credit-ux` FR-013, FR-014, FR-015, partial FR-016, BR-008, BR-009, BR-010, AC-010, AC-011
+**Reason:** Store onboarding needed an explicit way to inherit client fiscal data or capture store-specific billing data without replacing the existing create-store contract.
+**Current problem:** Before TASK-007, store creation had no explicit inherit-vs-override mode and no additive persistence for store-specific fiscal values.
+**Proposed change:** Add seven nullable store fiscal override columns, extend the create-store schema/service path, expose inherit-vs-override controls with an inherited summary in the store dialog, and render compact store-card fiscal summaries.
+**Affected files:** `prisma/schema.prisma`, `prisma/migrations/20261002001000_add_store_billing_fields/migration.sql`, `src/schemas/client.schema.js`, `src/services/client.service.js`, `src/public/root/views/clients-admin.js`, `src/public/root/views/clients-admin.helpers.js`, `src/public/root/views/clients-admin-store-dialog.js`, `src/public/root/views/clients-admin.renderers.js`, `tests/client-store-fiscal-overrides.test.js`, `tests/clients-store-map-characterization.test.js`, `tests/clients-view-characterization.test.js`
+**Dependencies:** TASK-301
+**Database impact:** Added seven nullable `ClientStore` override columns through additive migration `20261002001000_add_store_billing_fields`
+**API impact:** Existing `POST /api/clients/company/:clientId/stores` contract now accepts additive nullable override fields; no new route introduced
+**Container impact:** None
+**Security impact:** Low positive impact through clearer validation of store billing payload shape
+**Acceptance criteria:** Implemented — inherited mode shows a read-only client fiscal summary, override mode persists the current 7 store fiscal fields, omit/null continues to mean inherit, and store cards indicate inherited vs store-specific fiscal data.
+**Required tests:** `tests/client-store-fiscal-overrides.test.js`, `tests/clients-store-map-characterization.test.js`, `tests/clients-view-characterization.test.js`; user-reported `npm run lint`, `npm run typecheck`, `npx prisma validate`, `npx prisma migrate deploy`, `npx prisma migrate status`, and `npm run build`
+**Migration considerations:** Additive nullable rollout preserved backward compatibility and avoided introducing a persisted billing-mode flag
+**Rollback or mitigation:** Keep inheritance as the default when override values are absent; no historical migration edits
+**Risk:** Medium
+
+## TASK-307: Expose client edit legal/geographic fields, remove dead client credit shaping, and align inline store-credit feedback
+**Status:** Completed
+**Priority:** High
+**Domain:** Customers / Root-shell clients administration
+**Requirement:** `client-store-documents-credit-ux` FR-017, FR-018, FR-019, FR-020, BR-002, BR-003, AC-012, AC-013, AC-014, AC-015
+**Reason:** The backend update path already supported additional client fiscal/geographic fields, but the browser edit form and helper layer still lagged behind the active store-level credit model and the shared inline-message pattern.
+**Current problem:** Before TASK-008, the client edit form omitted `legalName`, `commercialName`, `province`, `canton`, and `district`; `buildClientPayload()` still shaped dead client-level `creditLimit` / `creditBalance` values; and the store-credit mini-form used ad-hoc text feedback in a container not suited for block-level inline messages.
+**Proposed change:** Expose the backend-supported client legal/geographic fields in the edit form, remove dead client-level credit shaping from `buildClientPayload()`, and standardize store-credit save feedback on `rootShellUi.renderInlineMessage(...)` inside a valid `aria-live` block container.
+**Affected files:** `src/public/root/views/clients-admin.renderers.js`, `src/public/root/views/clients-admin.helpers.js`, `src/public/root/views/clients-admin.js`, `tests/clients-view-characterization.test.js`, related canonical/spec docs
+**Dependencies:** TASK-301, TASK-306
+**Database impact:** None
+**API impact:** No route or payload-contract expansion beyond exposing already-supported client update fields and removing dead client-level credit fields from browser submissions
+**Container impact:** None
+**Security impact:** Low positive impact through reduced payload drift and continued use of `renderInlineMessage(...)` escaping semantics
+**Acceptance criteria:** Implemented — the client edit form exposes `legalName`, `commercialName`, `province`, `canton`, and `district`; `buildClientPayload()` excludes `creditLimit` / `creditBalance`; and inline store-credit success/error feedback uses `renderInlineMessage(...)` in a valid `aria-live` block container.
+**Required tests:** `tests/clients-view-characterization.test.js`; user-reported `node --test tests/client-store-credit-limit.test.js tests/client-store-fiscal-overrides.test.js tests/clients-store-map-characterization.test.js tests/clients-view-characterization.test.js` (`43/43`), `npm run lint`, and `npm run typecheck`
+**Migration considerations:** Adapter-only/browser-only change; no database or historical migration change required
+**Rollback or mitigation:** Existing client/store routes remain unchanged; characterization coverage protects the helper and renderer seams
+**Risk:** Low
+
+## TASK-303: Add store-scoped client documents and optional phase-2 store upload flow
+**Status:** Proposed
+**Priority:** High
+**Domain:** Customers / Stores / Documents
+**Requirement:** `client-store-documents-credit-ux` FR-021 through FR-025, BR-001, BR-012, NFR-002, NFR-007
+**Reason:** The client document UX is now usable, but the domain still cannot represent store-owned credit-analysis documents without overloading client-owned documents.
+**Current problem:** `ClientDocument` is currently client-scoped only, there is no `storeId` linkage, and the store dialog cannot continue into an optional document-upload phase after store creation.
+**Proposed change:** Add nullable `storeId` support to `ClientDocument`, introduce an additive store-document upload route/use case, and extend the store dialog with an optional phase-2 upload section after successful store creation.
+**Affected files:** `prisma/schema.prisma`, new additive migration, `src/routes/client.routes.js`, `src/schemas/client.schema.js`, `src/services/client.service.js`, `src/repositories/client.repository.js`, `src/public/root/clients-api.js`, `src/public/root/views/clients-admin-store-dialog.js`, related tests/docs
+**Dependencies:** TASK-002 file-picker contract should be reused; TASK-005 create-store payload seam should be preserved; TASK-301 completed and should remain compatible
+**Database impact:** Additive nullable `ClientDocument.storeId` foreign key plus related index/constraint work
+**API impact:** New additive `POST /api/clients/:clientId/stores/:storeId/documents` route while preserving existing client-document routes
+**Container impact:** None
+**Security impact:** Medium positive impact if store/client ownership validation is tested explicitly
+**Acceptance criteria:** Existing client-document flow remains backward-compatible; store documents can be uploaded for a valid client/store pair; invalid cross-linkage is rejected; phase-2 upload remains optional.
+**Required tests:** route/service integration tests for store-document ownership; characterization for phase-2 dialog flow; regression tests for existing client document route
+**Migration considerations:** Use new migration only; do not retrofit existing document rows destructively
+**Rollback or mitigation:** Keep client-owned document flow untouched and gate phase-2 UI behind successful store creation only
+**Risk:** High
+
+## TASK-304: Wire Hacienda lookup, economic-activity catalog, and trade-type catalog into client/store onboarding
+**Status:** Proposed
+**Priority:** Medium
+**Domain:** Customers / Fiscal data / Integrations
+**Requirement:** `client-store-documents-credit-ux` FR-026 through FR-036, BR-011, BR-014, BR-016, BR-017
+**Reason:** The repository already has taxpayer lookup and economic-activity adapters, but the client/store onboarding UI does not expose them where onboarding users need them.
+**Current problem:** Client creation lacks taxpayer lookup, economic activities are not loaded at mount time in the clients workspace, and `tradeTypeCode` / `tradeTypeLabel` are not modeled in current client/store forms or persistence. TASK-008 removed the obsolete client-level `creditLimit` / `creditBalance` shaping, so the remaining gap is catalog/lookup wiring rather than dead client credit fields.
+**Proposed change:** Reuse the existing taxpayer and economic-activity adapters in the client/store UI, constrain `documentType` and economic-activity selection to catalog-backed choices, and introduce a reusable trade-type catalog artifact plus persistence of `tradeTypeCode` and `tradeTypeLabel`.
+**Affected files:** `src/public/root/clients-api.js`, `src/public/root/views/clients-admin.js`, `src/public/root/views/clients-admin.renderers.js`, `src/public/root/views/clients-admin-store-dialog.js`, `src/public/root/views/clients-admin.helpers.js`, `src/schemas/client.schema.js`, `src/services/client.service.js`, `src/lib/` catalog artifact, `prisma/schema.prisma`, new additive migration, docs/tests
+**Dependencies:** TASK-302, TASK-306; TASK-301 completed and must remain compatible with legacy-null currency rendering semantics
+**Database impact:** Additive client/store fiscal catalog fields as approved
+**API impact:** Existing lookup/catalog routes reused; client/store create-update payloads gain additive validated fields
+**Container impact:** None
+**Security impact:** Medium positive impact through reduction of free-text fiscal data and clearer permission-gated lookup use
+**Acceptance criteria:** Client/store forms surface the approved lookup/catalog flows; economic activities are loaded at mount time; trade type persists as code + label; browser behavior remains additive over existing routes.
+**Required tests:** characterization for lookup wiring and dropdown rendering; integration tests for persisted trade-type/economic-activity fields; permission-gating tests for taxpayer lookup affordances
+**Migration considerations:** Keep current routes stable and introduce only additive persistence/validation changes
+**Rollback or mitigation:** Maintain manual entry fallback where business rules still allow it during rollout
+**Risk:** Medium
+
+## TASK-305: Record canonical validation evidence and reduce clients-admin adapter drift
+**Status:** Proposed
+**Priority:** Medium
+**Domain:** Documentation / Root UI governance
+**Requirement:** `client-store-documents-credit-ux` NFR-001, NFR-004, NFR-005, NFR-006
+**Reason:** The feature now has user-reported targeted validation and improved browser seams; canonical docs are refreshed through TASK-008, but manual evidence and adapter hardening still lag behind the implemented state.
+**Current problem:** Canonical docs now reflect TASK-008, but manual browser evidence for the new client/store UX is still not captured, the governed upload pattern is duplicated across browser modules, the additive store-currency rollout still relies on renderer compatibility for legacy `NULL` rows, and the new store override flow plus TASK-008 client-edit/inline-feedback behavior are covered structurally rather than by checked-in manual browser evidence.
+**Proposed change:** Add executed manual validation evidence for the implemented client/store seams, refresh canonical runtime/governance docs after each approved increment, verify the legacy null-currency display path in a browser if such data exists, and evaluate extraction of a shared browser helper for governed file uploads.
+**Affected files:** `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, `docs/tasks.md`, feature implementation reports/evidence docs, possible new browser helper under `src/public/**`, related characterization tests
+**Dependencies:** TASK-302 through TASK-304 as applicable; canonical doc refresh now covers TASK-001 through TASK-008
+**Database impact:** None
+**API impact:** None directly
+**Container impact:** None
+**Security impact:** Low positive impact through stronger validation evidence and reduced UX drift
+**Acceptance criteria:** Canonical docs clearly distinguish implemented vs proposed client/store work; manual browser evidence exists for native download, file picker, client edit/save with the newly exposed legal/geographic fields, inline store-credit feedback, zone refresh, create-store `currency` + `creditLimit`, inherited vs override store billing behavior, and legacy null-currency-safe rendering when applicable; any helper extraction preserves existing contracts.
+**Required tests:** documentation governance tests; existing client workspace characterization tests; optional new helper-level tests if extraction is approved
+**Migration considerations:** Documentation-first; helper extraction should be sequenced only after characterization safety nets exist
+**Rollback or mitigation:** If helper extraction is deferred, keep docs explicit about the duplication as active architectural debt
+**Risk:** Low

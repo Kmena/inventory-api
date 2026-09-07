@@ -199,6 +199,28 @@ async function validateRequestProducts(companyId, items) {
   }
 }
 
+/**
+ * Validates that all items are associated with the given supplier through ProductSupplier.
+ * Throws 400 if any item's product is not linked to the supplier in the company catalog.
+ */
+async function validateSupplierProductEligibility(companyId, supplierId, items) {
+  const links = await procurementRepository.listEligibleProductSupplierLinks(
+    companyId,
+    supplierId,
+    items.map((item) => item.productId),
+  );
+  const eligibleSet = new Set(links.map((link) => BigInt(link.productId).toString()));
+  for (const item of items) {
+    if (!eligibleSet.has(BigInt(item.productId).toString())) {
+      throw createHttpError(
+        400,
+        'El proveedor no está asociado a uno o más productos cotizados',
+        'validation_error',
+      );
+    }
+  }
+}
+
 async function createPurchaseRequest(payload, auth) {
   const scope = assertCompanyScope(auth);
   await validateRequestProducts(scope.companyId, payload.items);
@@ -408,6 +430,7 @@ async function createSupplierQuotation(purchaseRequestId, payload, auth) {
       throw createHttpError(400, 'La cotización contiene productos que no pertenecen a la solicitud de compra', 'validation_error');
     }
   }
+  await validateSupplierProductEligibility(scope.companyId, supplier.id, payload.items);
 
   // Tag the evidence JSON with _source so tracking logic can distinguish
   // direct-entry quotations from catalog-assisted ones (which have evidence: null).
@@ -729,18 +752,35 @@ async function createPurchaseOrderFromSelection(purchaseRequestId, payload, auth
     },
   });
 
-  await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, {
-    status: 'CLOSED',
-  });
+  // Only close the request when every product in the request is now covered
+  // by at least one purchase order item. A partial selection (e.g. 1 of 3
+  // products) must leave the request OPEN so the remaining products can
+  // be quoted and ordered independently.
+  const coveredProductIds = new Set(
+    (request.purchaseOrders || [])
+      .flatMap((po) => (po.items || []).map((item) => String(item.productId)))
+      .concat((purchaseOrder.items || []).map((item) => String(item.productId))),
+  );
+  const requestedProductIds = new Set((request.items || []).map((item) => String(item.productId)));
+  const allProductsCovered = [...requestedProductIds].every((id) => coveredProductIds.has(id));
 
-  return serializePurchaseOrder(purchaseOrder);
+  if (allProductsCovered) {
+    await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'CLOSED' });
+  }
+
+  // Include requestStatus so the frontend can distinguish a partial order
+  // (request still OPEN, more products to cover) from a complete order (CLOSED).
+  return {
+    ...serializePurchaseOrder(purchaseOrder),
+    requestStatus: allProductsCovered ? 'CLOSED' : 'OPEN',
+  };
 }
 
 /**
  * Crea todas las órdenes de compra de una selección mixta en una sola llamada.
  * Evita el 409 que ocurre cuando el loop del frontend intenta crear la segunda PO
  * sobre una solicitud que el primer call ya cerró.
- * @returns {Promise<{ orders: object[] }>}
+ * @returns {Promise<{ orders: object[], requestStatus: string }>}
  */
 async function createPurchaseOrdersFromMixedSelections(purchaseRequestId, payload, auth) {
   const scope = assertCompanyScope(auth);
@@ -790,13 +830,29 @@ async function createPurchaseOrdersFromMixedSelections(purchaseRequestId, payloa
     createdOrders.push(serializePurchaseOrder(po));
   }
 
-  // Close the request once — only if it is still OPEN (idempotent: a partial
-  // previous attempt may have already closed it).
+  // Only close the request when every product in the request is now covered
+  // by at least one purchase order item (same rule as single-PO creation).
+  // A batch that covers only some products must leave the request OPEN.
   if (request.status === 'OPEN') {
-    await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'CLOSED' });
+    const coveredInBatch = new Set(
+      createdOrders.flatMap((o) => (o.items || []).map((item) => String(item.productId))),
+    );
+    const coveredByPrior = new Set(
+      (request.purchaseOrders || [])
+        .flatMap((po) => (po.items || []).map((item) => String(item.productId))),
+    );
+    const allCoveredIds = new Set([...coveredByPrior, ...coveredInBatch]);
+    const requestedProductIds = new Set((request.items || []).map((item) => String(item.productId)));
+    const allProductsCovered = [...requestedProductIds].every((id) => allCoveredIds.has(id));
+
+    if (allProductsCovered) {
+      await procurementRepository.updatePurchaseRequest(request.id, scope.companyId, { status: 'CLOSED' });
+    }
+
+    return { orders: createdOrders, requestStatus: allProductsCovered ? 'CLOSED' : 'OPEN' };
   }
 
-  return { orders: createdOrders };
+  return { orders: createdOrders, requestStatus: 'OPEN' };
 }
 
 /**

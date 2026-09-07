@@ -9,6 +9,7 @@ process.env.BROWSER_SESSION_STORE_MODE = 'memory';
 const { chromium } = require('playwright');
 const app = require('../src/app');
 const { enableDbFreeAuditSeams } = require('./helpers/db-free-audit');
+const { enableDbFreeAuthSeams } = require('./helpers/db-free-auth');
 const browserSessionService = require('../src/services/browser-session.service');
 const {
   BROWSER_SESSION_COOKIE_NAME,
@@ -18,6 +19,8 @@ const {
 
 const restoreDbFreeAuditSeams = enableDbFreeAuditSeams();
 process.on('exit', restoreDbFreeAuditSeams);
+const restoreDbFreeAuthSeams = enableDbFreeAuthSeams();
+process.on('exit', restoreDbFreeAuthSeams);
 
 function createBrowserSessionUser({
   id = '77',
@@ -182,7 +185,7 @@ async function stubBillingRuntime(page, baseUrl, user) {
       { id: 302, name: 'Cliente Sur' },
     ],
     ledger: {
-      client: { id: 301, name: 'Cliente Norte', creditLimit: 50000, creditBalance: 15000 },
+      client: { id: 301, name: 'Cliente Norte', stores: [{ creditLimit: 50000, creditBalance: 15000 }] },
       invoices: [
         {
           id: 1001,
@@ -311,7 +314,7 @@ test('billing views E2E: renders receivables tab with invoices and supports tab 
   await page.waitForFunction(() => globalThis.location.hash === '#admin_home');
 
   // Navigate to billing view
-  await page.getByRole('link', { name: 'Facturación', exact: true }).click();
+  await page.getByRole('link', { name: 'Facturación y Cobros', exact: true }).click();
   await page.waitForFunction(() => globalThis.location.hash === '#billing');
   await page.waitForFunction(() =>
     globalThis.document.getElementById('billing-view-title')?.textContent === 'Facturación y cobros',
@@ -384,7 +387,7 @@ test('billing views E2E: payment dialog opens from receivables and submits creat
   await page.waitForFunction(() => globalThis.location.hash === '#admin_home');
 
   // Navigate to billing
-  await page.getByRole('link', { name: 'Facturación', exact: true }).click();
+  await page.getByRole('link', { name: 'Facturación y Cobros', exact: true }).click();
   await page.waitForFunction(() => globalThis.location.hash === '#billing');
 
   // Wait for receivables to load
@@ -438,7 +441,7 @@ test('billing views E2E: pending payments tab supports reject flow with reason m
   await page.waitForFunction(() => globalThis.location.hash === '#admin_home');
 
   // Navigate to billing
-  await page.getByRole('link', { name: 'Facturación', exact: true }).click();
+  await page.getByRole('link', { name: 'Facturación y Cobros', exact: true }).click();
   await page.waitForFunction(() => globalThis.location.hash === '#billing');
 
   // Switch to pending tab

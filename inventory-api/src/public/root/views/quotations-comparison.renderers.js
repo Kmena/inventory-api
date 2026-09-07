@@ -47,23 +47,31 @@
     return '<span class="badge badge-warning" style="font-size:0.75rem;">⏳ Sin respuesta del proveedor</span>';
   }
 
-  function renderQuotationRow(q, showAction) {
+  function renderQuotationRow(q, showAction, lockedProductIds = new Set()) {
     const supplierName = q.supplier?.name || q.supplierName || '—';
     const leadTime = q.averageLeadTimeDays != null
       ? `${Math.round(q.averageLeadTimeDays)} días`
       : '—';
     const itemsHtml = renderItemsList(q.items, q.currency);
-    const actionCell = showAction
-      ? `<button
-           type="button"
-           class="quotations-select-supplier-button"
-           data-quotation-id="${rootShellUi.escapeHtml(String(q.id))}"
-           data-supplier-name="${rootShellUi.escapeHtml(supplierName)}"
-           data-total-amount="${rootShellUi.escapeHtml(String(q.totalAmount || 0))}"
-           data-currency="${rootShellUi.escapeHtml(q.currency || '')}"
-           aria-label="Seleccionar a ${rootShellUi.escapeHtml(supplierName)} como proveedor"
-         >Seleccionar este proveedor</button>`
-      : '<span class="muted" style="font-size:0.8rem;">Registrá una cotización para seleccionar</span>';
+
+    // Si TODOS los productos de esta cotización ya tienen OC activa → bloquear.
+    const quotationItems = q.items || [];
+    const isFullyLocked = showAction && quotationItems.length > 0
+      && quotationItems.every((item) => lockedProductIds.has(String(item.productId)));
+
+    const actionCell = isFullyLocked
+      ? `<span class="badge badge-success" style="font-size:0.8rem;">✓ OC generada</span>`
+      : showAction
+        ? `<button
+             type="button"
+             class="quotations-select-supplier-button"
+             data-quotation-id="${rootShellUi.escapeHtml(String(q.id))}"
+             data-supplier-name="${rootShellUi.escapeHtml(supplierName)}"
+             data-total-amount="${rootShellUi.escapeHtml(String(q.totalAmount || 0))}"
+             data-currency="${rootShellUi.escapeHtml(q.currency || '')}"
+             aria-label="Seleccionar a ${rootShellUi.escapeHtml(supplierName)} como proveedor"
+           >Seleccionar este proveedor</button>`
+        : '<span class="muted" style="font-size:0.8rem;">Registrá una cotización para seleccionar</span>';
 
     return `
       <tr>
@@ -103,7 +111,7 @@
     `;
   }
 
-  function renderComparisonTable(quotations) {
+  function renderComparisonTable(quotations, lockedProductIds = new Set()) {
     if (!quotations || !quotations.length) {
       return '<p class="empty-state">No hay cotizaciones con respuesta para comparar.</p>';
     }
@@ -118,7 +126,7 @@
         <div class="stack-section">
           <h4 style="margin:0 0 0.5rem;">Respuestas recibidas</h4>
           <p class="muted" style="margin:0 0 0.75rem;font-size:0.85rem;">Precios confirmados por el proveedor · ordenados por precio total ascendente</p>
-          ${renderTable(responded.map((q) => renderQuotationRow(q, true)).join(''), 'Respuestas de proveedores')}
+          ${renderTable(responded.map((q) => renderQuotationRow(q, true, lockedProductIds)).join(''), 'Respuestas de proveedores')}
         </div>
       `);
     }
@@ -128,7 +136,7 @@
         <div class="stack-section">
           <h4 style="margin:0 0 0.5rem;">Precio histórico de catálogo</h4>
           <p class="muted" style="margin:0 0 0.75rem;font-size:0.85rem;">Estos proveedores aún no han enviado una cotización para esta solicitud. Los precios mostrados son los últimos registrados en el sistema y no están confirmados.</p>
-          ${renderTable(catalogOnly.map((q) => renderQuotationRow(q, false)).join(''), 'Precios de catálogo sin respuesta')}
+          ${renderTable(catalogOnly.map((q) => renderQuotationRow(q, false, lockedProductIds)).join(''), 'Precios de catálogo sin respuesta')}
         </div>
       `);
     }
@@ -262,7 +270,14 @@
         const defaultChecked = !isLocked && cheapestByProduct.get(pid) === qid ? 'checked' : '';
         const isCheapest = cheapestByProduct.get(pid) === qid;
         const priceLabel = rootShellUi.escapeHtml(formatCurrency(item.unitPrice, q.currency));
+        const subtotal = Number(item.unitPrice || 0) * Number(item.quantity || 0);
+        const subtotalLabel = rootShellUi.escapeHtml(formatCurrency(subtotal, q.currency));
         const leadLabel = item.leadTimeDays != null ? `${item.leadTimeDays}d` : '—';
+        const currencyLabel = rootShellUi.escapeHtml(q.currency || 'CRC');
+        const notesText = item.notes || item.availabilityNotes || '';
+        const notesHtml = notesText
+          ? `<span title="${rootShellUi.escapeHtml(notesText)}" style="font-size:0.7rem;color:#6b7280;cursor:help;">📝</span>`
+          : '';
         return `
           <td style="text-align:center;">
             <label style="display:flex;flex-direction:column;align-items:center;gap:0.2rem;${isLocked ? '' : 'cursor:pointer;'}">
@@ -280,7 +295,9 @@
                 ${isLocked ? 'disabled aria-disabled="true"' : ''}
               />
               <strong style="font-size:0.8rem;${isCheapest && !isLocked ? 'color:var(--success-color,#16a34a);' : ''}">${priceLabel}</strong>
+              <span style="font-size:0.72rem;color:#6b7280;">${subtotalLabel} ${currencyLabel}</span>
               <span class="badge" style="font-size:0.65rem;">${rootShellUi.escapeHtml(leadLabel)}</span>
+              ${notesHtml}
             </label>
           </td>
         `;

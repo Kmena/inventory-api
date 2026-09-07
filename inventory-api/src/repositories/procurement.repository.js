@@ -167,6 +167,24 @@ function createSupplierQuotation(data, db = prisma) {
   });
 }
 
+/**
+ * Returns ProductSupplier links for the given supplier and product IDs scoped to the company.
+ * Used to determine which request items a supplier is eligible to quote.
+ * @param {bigint} companyId
+ * @param {bigint} supplierId
+ * @param {bigint[]} productIds
+ * @param {object} [db]
+ */
+function listEligibleProductSupplierLinks(companyId, supplierId, productIds, db = prisma) {
+  const uniqueIds = [...new Set((productIds || []).map((id) => BigInt(id).toString()))]
+    .map((id) => BigInt(id));
+  if (!uniqueIds.length) return Promise.resolve([]);
+  return db.productSupplier.findMany({
+    where: { supplierId, productId: { in: uniqueIds }, product: { companyId } },
+    select: { productId: true },
+  });
+}
+
 function findSupplierQuotationByIdForCompany(id, companyId, db = prisma) {
   return db.supplierQuotation.findFirst({
     where: { id, companyId },
@@ -326,6 +344,7 @@ module.exports = {
   findPurchaseRequestByIdForCompany,
   updatePurchaseRequest,
   createSupplierQuotation,
+  listEligibleProductSupplierLinks,
   findSupplierQuotationByIdForCompany,
   updateSupplierQuotation,
   createSupplierSelection,

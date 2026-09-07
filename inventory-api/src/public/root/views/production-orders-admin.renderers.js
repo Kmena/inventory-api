@@ -370,6 +370,16 @@
                   role="alert" aria-live="assertive"></p>
              </div>`
           : ''}
+        ${['DRAFT','PENDING_APPROVAL','APPROVED','IN_PROGRESS','QA_HOLD'].includes(order?.status) && options.canCancelProduction
+          ? `<div class="action-row compact-action-row" style="margin-bottom:1rem">
+               <button type="button" class="secondary-button production-cancel-btn"
+                       data-order-id="${rootShellUi.escapeHtml(String(order?.id || ''))}"
+                       data-order-status="${rootShellUi.escapeHtml(order?.status || '')}"
+                       style="color:var(--color-danger,#c00);border-color:var(--color-danger,#c00)">✕ Cancelar orden</button>
+               <p class="production-cancel-error" style="color:var(--color-danger,#c00);font-size:0.85rem" hidden
+                  role="alert" aria-live="assertive"></p>
+             </div>`
+          : ''}
         ${order?.status !== 'DRAFT' && order?.status !== 'PENDING_APPROVAL'
           ? '<article class="detail-item"><span>Contexto</span><strong>Vista read-only de supervision. La operacion diaria ocurre en /warehouse/.</strong></article>'
           : ''}
@@ -397,7 +407,34 @@
     `;
   }
 
+  /**
+   * Rellena el dialog de confirmación de cancelación antes de mostrarlo.
+   * @param {HTMLElement} dialog
+   * @param {{ id: any, orderId: string, status: string, product?: {name:string} }} order
+   */
+  function populateCancelDialog(dialog, order) {
+    const infoEl = dialog.querySelector('#production-cancel-confirm-info');
+    const msgEl  = dialog.querySelector('#production-cancel-confirm-message');
+    if (!infoEl || !msgEl) { return; }
+
+    const earlyState = order.status === 'DRAFT' || order.status === 'PENDING_APPROVAL';
+    msgEl.innerHTML = earlyState
+      ? ''
+      : `<p class="message message-warning" style="margin-bottom:0.75rem">
+           ⚠️ Esta orden ya fue aprobada o está en ejecución. Los materiales asignados
+           pueden necesitar ajuste manual. Para un flujo con devolución de lotes,
+           usá /warehouse/.
+         </p>`;
+
+    infoEl.innerHTML = `
+      <article class="detail-item"><span>Orden</span><strong>${rootShellUi.escapeHtml(order.orderId || `#${order.id}`)}</strong></article>
+      <article class="detail-item"><span>Producto</span><strong>${rootShellUi.escapeHtml(order.product?.name || '—')}</strong></article>
+      <article class="detail-item"><span>Estado actual</span><strong>${rootShellUi.escapeHtml(order.status)}</strong></article>
+    `;
+  }
+
   rootShell.register('views.productionOrdersAdminRenderers', {
+    populateCancelDialog,
     renderMetrics,
     renderOptionList,
     renderOrderDetail,

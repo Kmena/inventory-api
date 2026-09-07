@@ -1,6 +1,6 @@
 # Architecture
 ## 1. Purpose and scope
-This document describes the architecture currently implemented in the repository, with emphasis on the active production, QA, recipe, warehouse-browser, and root-shell product-catalog browser flows after the `qa-rejection-material-reconciliation-amendment`, `recipe-input-per-unit-basis`, `recipe-approval-ux`, and `create-product-with-subcategory` implementations.
+This document describes the architecture currently implemented in the repository, with emphasis on the active production, QA, recipe, customer/client, warehouse-browser, and root-shell browser flows after the `qa-rejection-material-reconciliation-amendment`, `recipe-input-per-unit-basis`, `recipe-approval-ux`, `create-product-with-subcategory`, and the currently partial `client-store-documents-credit-ux` implementation through TASK-008.
 
 It documents current reality only: active runtime components, current boundaries, dependency rules in effect, and architectural limitations still present.
 
@@ -24,6 +24,9 @@ The recent amendments did not introduce a full hexagonal module split. They exte
 - root-shell product-admin support for stacked native dialogs during inline subcategory creation
 - browser helper export of `checkSubcategoryNameDuplicate(...)` for local UX validation ahead of the unchanged backend category API
 - root-shell recipe-admin UX guidance for operational `quantityBasis`, COUNT/UN discovery, per-unit override controls, review badges, explicit approval confirmation, action-local version feedback, frontend-managed incomplete draft markers, and conservative repair highlighting
+- root-shell clients-admin browser changes that keep the backend client-document API unchanged while moving document download and upload usability concerns into the browser adapter layer
+- shared browser payload shaping for store creation, with the dialog delegating store payload normalization to `views.clientsAdminHelpers.buildStorePayload(...)` and the backend create-store contract now accepting store `currency`, optional create-time `creditLimit`, and additive nullable store fiscal override fields
+- client payload shaping in the same browser helper now excludes dead client-level credit fields and includes the backend-supported legal/geographic fields exposed in the client edit form
 
 ## 3. Active architectural style and module boundaries
 ### Runtime style
@@ -58,6 +61,7 @@ These are separate files and services, but still part of one tightly-coupled app
 | Domain | Current responsibility | Main code locations |
 |---|---|---|
 | Identity & Access | authentication, actor reload, permission enforcement | `src/services/auth.service.js`, `src/middlewares/`, `src/security/` |
+| Customers / Client Admin | company-scoped clients, stores, client-owned documents, create-time store currency + creditLimit support, create-time store fiscal inherit/override mode, editable client legal/geographic fields, shared client/store browser payload shaping, store credit updates, root-shell client workspace, Leaflet-backed store dialog | `src/routes/client.routes.js`, `src/services/client.service.js`, `src/repositories/client.repository.js`, `src/public/root/clients-api.js`, `src/public/root/views/clients-admin*.js` |
 | Recipes | recipe versions, version-level quantity basis, per-stage-input basis override, stage typing, process-code validation | `src/services/recipe.service.js`, `src/schemas/recipe.schema.js`, root-shell recipe editor |
 | Inventory | lots, warehouse balances, stock mutation, movement audit | `src/services/inventory*.js`, `src/repositories/inventory.repository.js` |
 | Production | orders, planned-output scaling, material requirements, stage executions, losses, returns, completion | `src/services/production*.js`, `src/routes/production.routes.js` |
@@ -68,6 +72,34 @@ These are separate files and services, but still part of one tightly-coupled app
 | Root-shell Recipe Admin UI | recipe listing/detail, version editor, operational quantity-basis guidance, COUNT/UN discovery filters, review badges, approval confirmation, local version-card feedback, incomplete draft markers, repair highlighting | `src/public/root/views/recipes-admin*.js` |
 
 ## 5. Current runtime components and responsibilities
+### `client.routes.js`
+Responsibilities:
+- mounts company-scoped client CRUD, store creation, store credit-limit update, client reference creation, and protected client-document download/upload endpoints
+- enforces authentication, access policy, and payload validation before delegating to `client.service.js`
+- keeps the existing client-document upload and download route contracts stable while frontend UX evolves independently
+
+### `client.service.js`
+Responsibilities:
+- coordinates company-scoped client and store operations
+- validates company ownership for client/store/document access
+- persists client-owned documents and writes protected files to private storage
+- keeps store creation tied to the client legal entity while now accepting store `currency`, optional create-time `creditLimit`, and additive nullable fiscal override fields; separate credit-limit updates remain available as a follow-up use case for existing stores
+- preserves current inherit semantics by omitting store override columns when the dialog remains in inherited billing mode instead of persisting a separate inheritance flag
+- continues accepting client legal/geographic fields already supported by the backend update path; TASK-008 changed only the browser adapters and helper payload shaping, not the service contract itself
+
+### Root-shell clients admin SPA components
+Relevant files:
+- `src/public/root/clients-api.js`
+- `src/public/root/views/clients-admin.js`
+- `src/public/root/views/clients-admin.renderers.js`
+- `src/public/root/views/clients-admin-store-dialog.js`
+
+Responsibilities:
+- render the client workspace list/detail shell, client document form, and store cards
+- translate the protected document download response into a native browser download using `blob` + `ObjectURL` + temporary `<a download>` dispatch
+- derive `fileName`, `mimeType`, and `fileContentBase64` from a user-selected file before calling the unchanged client-document upload route
+- create the store dialog dynamically, hide the unusable form when no zones exist, support in-place zone refresh via an injected browser callback, delegate store payload shaping to the shared clients-admin helper registry entry, expose inherit-vs-override fiscal mode with an inherited summary panel, render editable client legal/geographic fields in the detail pane, and render legacy-null-safe store credit summaries plus compact inherited/override fiscal summaries and inline store-credit feedback in store cards
+
 ### `production.routes.js`
 Responsibilities:
 - mounts production order lifecycle endpoints
@@ -191,6 +223,10 @@ Current rules actually followed in the amended area:
 - services derive company scope from authenticated actor, not from client payload
 - repositories own Prisma include graphs and row creation for production aggregates
 - browser renderers/controllers remain presentation adapters and do not access Prisma directly
+- the current client-document UX change is adapter-local: `clientsApi.downloadDocument(...)` still exposes backend response metadata and `clients-admin.js` owns native browser download dispatch plus file-picker-to-Base64 conversion
+- TASK-008 remained adapter-local as well: the shared client payload helper dropped dead client-credit fields, the renderer exposed backend-supported client legal/geographic inputs, and the store-credit mini-form aligned with the shared `renderInlineMessage(...)` UI contract without changing backend routes or schemas
+- create-store payload normalization is now intentionally centralized in `views.clientsAdminHelpers.buildStorePayload(...)`; `clients-admin-store-dialog.js` consumes that shared helper instead of maintaining a second payload builder
+- the shared helper forwards the selected store `currency`, omits blank/zero browser `creditLimit` values, includes override fiscal fields only when `billingMode = 'override'`, and leaves `createClientStoreSchema` as the server-side authority for allowed `currency` values, numeric coercion, override-email validation, and non-negative validation
 - recipe payload validation treats `inputQuantityBasis` as an adapter-boundary concern and normalizes omission to `null`
 - production planning and material availability both apply the same effective-basis rule: `inputQuantityBasis ?? version.quantityBasis ?? 'PER_OUTPUT_KG'`
 - root-shell product helpers are exported through the browser registry and reused from the product-admin view instead of duplicating that helper logic inline in submit handlers
@@ -223,9 +259,27 @@ Current violations still present:
 - `recipe_stage_inputs.input_quantity_basis` belongs to the recipe persistence model and is authored through recipe version create/update flows
 - frozen `recipeVersionSnapshot.recipeVersion.stages[].stageInputs[].inputQuantityBasis` belongs to the production-order snapshot read model once an order is created
 - `production_recolection_entries` and `production_recolection_reconciliations` are currently part of the production persistence model and loaded with the production order aggregate read model
+- `client_stores.currency` belongs to the customers/stores persistence model; current create-store writes validate `CRC | USD | EUR`, while existing legacy rows may remain `NULL` and are normalized only at the renderer boundary today
+- the nullable `client_stores.legal_name`, `commercial_name`, `legal_id`, `document_type`, `email_billing`, `economic_activity_code`, and `economic_activity_name` fields also belong to the customers/stores persistence model; omission/null currently represents inherit-from-client semantics during store creation
 
 ## 8. Current API and integration contracts
 ### Current API contracts in effect
+- `POST /api/clients/:clientId/documents`
+  - remains the current high-payload JSON upload contract for client-owned documents
+  - browser code now fills `fileName`, `mimeType`, and `fileContentBase64` from a native file picker instead of visible text fields
+- `GET /api/clients/:clientId/documents/:documentId/download`
+  - remains the current protected document download contract
+  - returns the file stream and `Content-Disposition`; browser code now consumes it through `clientsApi.downloadDocument(...)` and native download dispatch
+- `POST /api/clients/company/:clientId/stores`
+  - remains the current store-create contract and now accepts store `currency`, optional `creditLimit`, and additive nullable store fiscal override fields
+  - browser payload shaping is shared through `views.clientsAdminHelpers.buildStorePayload(...)`, which forwards `currency`, omits blank/zero credit values, omits fiscal override fields in inherit mode, and reaches Zod validation before persistence
+- `GET /api/regions/company`
+  - remains the zone/subzone catalog contract used by the store dialog
+  - the root-shell adapter now supports in-place re-fetch for the already-open dialog
+- `GET /api/taxpayers/lookup?identification=...`
+  - is already registered in `clientsApi` and remains an authenticated integration adapter used only in limited client-edit flows today
+- `GET /api/economic-activities`
+  - is already registered in `clientsApi` but is not yet loaded by the clients workspace at mount time
 - `POST /api/production/orders/:id/stages/:stageId/inspections`
   - accepts QA inspection payloads, including rejection metadata, optional `requiresReplacementStage`, and `replacementItems`
   - may return a plain inspection object or an enriched envelope depending on rejection/disposition scope
@@ -288,7 +342,9 @@ Feature-specific coverage currently present:
 - replacement-recovery gate tests
 - reconciliation balance and validation tests
 - root-shell recipe admin characterization for approval confirmation seams, local version-card feedback, incomplete-draft marker rendering, approval gating hooks, and repair-highlight hooks
+- root-shell clients characterization for protected-document browser download dispatch, file-picker upload contract, 5 MB guard, missing-zones guidance state, in-place zone refresh, shared store payload builder delegation, create-time store `currency` + `creditLimit` validation, store fiscal inherit/override rendering, and null-currency-safe credit rendering (`tests/clients-view-characterization.test.js`, `tests/clients-store-map-characterization.test.js`, `tests/client-store-credit-limit.test.js`, `tests/client-store-fiscal-overrides.test.js`)
 - targeted `recipe-approval-ux` validation is user-reported as pass for `tests/root-shell-recipes-admin-view-characterization.test.js`, `tests/recipe-service-foundation.test.js`, `tests/recipe-schema.test.js`, plus lint and typecheck
+- targeted `client-store-documents-credit-ux` validation for TASK-001 through TASK-008 is user-reported as pass for `node --test tests/client-store-credit-limit.test.js tests/client-store-fiscal-overrides.test.js tests/clients-store-map-characterization.test.js tests/clients-view-characterization.test.js` (`43/43`), plus `npm run lint` and `npm run typecheck`; TASK-008 introduced no production schema change, so earlier TASK-006/TASK-007 Prisma/build validation remains the latest reported persistence evidence
 
 Current limitation:
 - manual end-to-end evidence for the warehouse operator flow and manual browser validation for the recipe approval dialog/focus behavior are still weaker than the automated service-level evidence
@@ -312,6 +368,13 @@ Current limitation:
 - Action-local recipe approval feedback is an active UI decision: success/error state is stored per version id and rendered inside the corresponding version card.
 - The `Incompleta` draft marker for recipe versions is currently an adapter-level state concern maintained in the root-shell view, not a persisted backend field.
 - Repair highlighting for recipe approval failures is intentionally conservative: exact stage-name matches or uniquely matched input names are highlighted, otherwise the UI falls back to generic repair guidance.
+- Client-document backend contracts remain unchanged while the root-shell adapter owns native browser download dispatch and FileReader-derived upload metadata.
+- Store creation remains a one-phase backend use case, but it now accepts store `currency`, optional create-time `creditLimit`, and nullable fiscal override fields; inherit-vs-override is currently represented by null/omitted override values rather than a persisted mode flag, and store-scoped document upload is still absent.
+- Shared store payload shaping through `views.clientsAdminHelpers.buildStorePayload(...)` is now an active browser-layer decision used by the store dialog to reduce payload drift.
+- `views.clientsAdminHelpers.buildClientPayload(...)` is also an active browser-layer contract: it now forwards the backend-supported client legal/geographic fields and intentionally excludes client-level `creditLimit` / `creditBalance` because active credit ownership is store-level.
+- The inline store-credit feedback region is now standardized on `rootShellUi.renderInlineMessage(...)` and rendered inside a block-level `aria-live` container.
+- Legacy stores may still persist `NULL` currency because the migration was additive and nullable; the current clients renderer intentionally treats that as `Moneda: Sin definir` and avoids defaulting the symbol to `CRC`.
+- Empty zone catalogs are treated as a first-class browser state in the store dialog; guidance + refresh are active UX decisions rather than backend errors.
 
 ## 13. Known architectural limitations
 - no explicit domain layer for Production, Quality, Inventory, Recipes, or Product Catalog UI workflows
@@ -323,6 +386,11 @@ Current limitation:
 - recipe approval incomplete-state visibility currently depends on frontend-managed per-version state instead of a backend-persisted recipe-version attribute
 - recipe repair highlighting relies on parsing backend-authored error text, which is intentionally narrow but still couples the UI affordance to message wording stability
 - products-admin dialog orchestration, local state, helper invocation, and API calling remain concentrated in one browser module instead of smaller focused UI components
+- clients-admin and clients-admin-store-dialog similarly remain coarse browser modules where DOM orchestration, adapter logic, and UI policy are mixed together
+- store currency remains browser-required but persistence-nullable for backward compatibility, so legacy normalization is still handled in the renderer instead of at a stricter domain boundary
+- store fiscal override semantics are split across browser helper payload shaping, dialog-mode toggling, renderer summary logic, and service-level selective persistence rather than one backend-owned policy seam
+- the governed file-upload pattern is duplicated across browser surfaces instead of being exposed through one shared helper module
+- `buildClientPayload()` no longer contains obsolete client-level `creditLimit` shaping or a stale `creditBalance` numeric-field entry, but the shared clients helper still aggregates multiple concerns (client payload shaping, store payload shaping, filtering, summaries) in one browser module
 
 ## 14. Open decisions requiring clarification
 - Should relevant-input scope remain computed on demand, or be stored as a persisted audit snapshot per rejection event?
@@ -331,6 +399,11 @@ Current limitation:
 - Is stronger end-to-end evidence required before the amended warehouse flow is treated as operationally complete?
 - Should legacy `recolection` path names remain indefinitely, or should a versioned rename strategy be planned later?
 - If the root-shell product admin keeps growing, should its dialog orchestration and helper usage be split into smaller browser modules in a future UI-maintenance cycle?
+- Should the root-shell clients workspace extract shared governed file-upload helpers instead of keeping separate FileReader logic in payment and client-document adapters?
+- Should the shared clients helper be split so store payload shaping, client payload shaping, and filtering concerns do not continue accreting inside one browser helper module even after TASK-008 reduced one instance of payload drift?
+- When the remaining client-store onboarding requirements are implemented, should the current store fiscal override mode and future store-scoped documents remain inside the current `client.service.js` boundary or be split into more explicit submodules?
+- Should legacy `NULL` store currencies be backfilled or constrained more strictly at persistence level after the additive rollout, or is renderer-level compatibility sufficient for now?
+- Does the current `window.open('#zones', '_blank', 'noopener')` guidance affordance remain acceptable after manual browser validation, or should navigation be redesigned?
 
 ## 15. Documentation governance
 The canonical reviewed artifacts under `docs/**` represent implemented reality and are the authoritative reference for runtime contracts. The workflow-baseline validators and characterization tests intentionally read hosted workflow truth from that parent-root workflow tree.

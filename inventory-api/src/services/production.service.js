@@ -309,9 +309,8 @@ async function getValidatedProductionContext(payload, auth) {
   await assertCompanyWarehouses(scope.companyId, [payload.originWarehouseId, payload.destinationWarehouseId]);
   await assertResponsibleUser(scope.companyId, payload.responsibleUserId);
 
-  if (product.requiresExpiration && !payload.expirationDate) {
-    throw createHttpError(400, 'El producto requiere fecha de vencimiento para producción', 'validation_error');
-  }
+  // FR-011 / BR-008: expiration date is captured at completion/receipt, not at planning time.
+  // Do NOT reject creation solely because product.requiresExpiration && !payload.expirationDate.
 
   const violations = buildGuardrailViolations(product, recipeVersion);
   const override = assertOverrideAllowed(auth, payload.overrideJustification, violations);

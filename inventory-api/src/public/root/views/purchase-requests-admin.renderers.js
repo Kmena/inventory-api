@@ -239,6 +239,232 @@
     `;
   }
 
+  /**
+   * Misma lógica que compareSupplierQuotations del backend:
+   * el responseSource se deriva de evidence._source o rfqInvitations,
+   * NO del campo responseSource crudo del quotation (que puede ser null).
+   */
+  function deriveResponseSource(q) {
+    if (Array.isArray(q.rfqInvitations) && q.rfqInvitations.length > 0) {
+      return q.rfqInvitations[0].responseSource || 'MANUAL_OFFICE_EMAIL';
+    }
+    const evidence = q.evidence && typeof q.evidence === 'object' && !Array.isArray(q.evidence)
+      ? q.evidence : null;
+    if (evidence && evidence._source === 'DIRECT_ENTRY') return 'DIRECT_ENTRY';
+    return null;
+  }
+
+  function computeQuotationTotal(q) {
+    return (q.items || []).reduce((s, i) => s + Number(i.quantity || 0) * Number(i.unitPrice || 0), 0);
+  }
+
+  function renderQuotationsSection(quotations) {
+    if (!quotations || !quotations.length) {
+      return '<p class="muted" style="font-size:0.85rem;">Sin cotizaciones registradas aún.</p>';
+    }
+
+    // Agrupar por proveedor (mismo algoritmo que el backend) para eliminar duplicados
+    // y resolver responseSource correctamente desde evidence._source o rfqInvitations.
+    const bySupplier = new Map();
+    for (const q of quotations) {
+      const key = String(q.supplierId || q.supplier?.id || '');
+      const responseSource = deriveResponseSource(q);
+      const actual = responseSource !== null;
+      if (!bySupplier.has(key)) {
+        bySupplier.set(key, { name: q.supplier?.name || '—', currency: q.currency || 'CRC', quotations: [], hasActual: false });
+      }
+      const bucket = bySupplier.get(key);
+      bucket.quotations.push({ q, responseSource, actual });
+      if (actual) bucket.hasActual = true;
+    }
+
+    // Colapsar a una entrada por proveedor: si tiene respuesta real, descartar las de catálogo.
+    const merged = [];
+    for (const [, bucket] of bySupplier) {
+      const keep = bucket.hasActual ? bucket.quotations.filter((e) => e.actual) : bucket.quotations;
+      const entry = keep.reduce((acc, { q, responseSource }) => {
+        const itemTotal = computeQuotationTotal(q);
+        if (!acc) {
+          return {
+            name: bucket.name,
+            currency: q.currency || bucket.currency,
+            responseSource,
+            items: [...(q.items || [])],
+            total: itemTotal,
+          };
+        }
+        acc.items = [...acc.items, ...(q.items || [])];
+        acc.total += itemTotal;
+        if (!acc.responseSource && responseSource) acc.responseSource = responseSource;
+        return acc;
+      }, null);
+      if (entry) merged.push(entry);
+    }
+
+    const sourceLabel = (src) => {
+      if (src === 'DIRECT_ENTRY') return { text: 'Ingresada directamente', cls: 'badge-success' };
+      if (src === 'MANUAL_OFFICE_EMAIL') return { text: 'Respuesta manual', cls: 'badge-success' };
+      if (src === 'PUBLIC_TOKEN') return { text: 'Respuesta pública (RFQ)', cls: 'badge-success' };
+      return { text: '⏳ Sin respuesta', cls: '' };
+    };
+
+    const formatTotal = (total, currency) => {
+      try {
+        return Number(total).toLocaleString('es-CR', { style: 'currency', currency: currency || 'CRC', minimumFractionDigits: 2 });
+      } catch (_e) {
+        return `${currency} ${Number(total).toFixed(2)}`;
+      }
+    };
+
+    const responded = merged.filter((e) => e.responseSource);
+    const catalogOnly = merged.filter((e) => !e.responseSource);
+
+    const buildRow = (entry) => {
+      const src = sourceLabel(entry.responseSource);
+      const name = rootShellUi.escapeHtml(entry.name);
+      const totalStr = rootShellUi.escapeHtml(formatTotal(entry.total, entry.currency));
+      const currency = rootShellUi.escapeHtml(entry.currency || 'CRC');
+      const productList = entry.items.map((i) => {
+        const pname = rootShellUi.escapeHtml(i.product?.name || i.productName || `#${i.productId}`);
+        const qty = rootShellUi.escapeHtml(String(i.quantity || 0));
+        const up = rootShellUi.escapeHtml(formatTotal(i.unitPrice || 0, entry.currency));
+        return `<span style="font-size:0.78rem;display:block;">${pname}: ${qty} u · ${up}</span>`;
+      }).join('');
+      return `<tr>
+        <td data-label="Proveedor"><strong>${name}</strong><div style="margin-top:0.25rem;">${productList}</div></td>
+        <td data-label="Origen"><span class="badge ${rootShellUi.escapeHtml(src.cls)}">${rootShellUi.escapeHtml(src.text)}</span></td>
+        <td data-label="Total"><strong>${totalStr}</strong></td>
+        <td data-label="Moneda">${currency}</td>
+      </tr>`;
+    };
+
+    const tableHead = `<thead><tr>
+      <th scope="col">Proveedor · Productos</th>
+      <th scope="col">Origen</th>
+      <th scope="col">Total</th>
+      <th scope="col">Moneda</th>
+    </tr></thead>`;
+
+    const sections = [];
+    if (responded.length) {
+      sections.push(`
+        <p class="muted" style="font-size:0.8rem;margin:0 0 0.4rem;">Respuestas confirmadas</p>
+        <div class="table-wrapper" style="margin-bottom:0.75rem;">
+          <table aria-label="Cotizaciones recibidas">${tableHead}<tbody>${responded.map(buildRow).join('')}</tbody></table>
+        </div>`);
+    }
+    if (catalogOnly.length) {
+      sections.push(`
+        <p class="muted" style="font-size:0.8rem;margin:0 0 0.4rem;">Solo precio histórico (sin respuesta confirmada)</p>
+        <div class="table-wrapper">
+          <table aria-label="Proveedores sin respuesta">${tableHead}<tbody>${catalogOnly.map(buildRow).join('')}</tbody></table>
+        </div>`);
+    }
+    return sections.join('');
+  }
+
+  function renderSelectionsSection(selections) {
+    if (!selections || !selections.length) {
+      return '<p class="muted" style="font-size:0.85rem;">Sin selección de proveedor registrada.</p>';
+    }
+
+    // Deduplicar por quotationId — pueden existir duplicados si se seleccionó más de una vez.
+    const seen = new Set();
+    const unique = selections.filter((sel) => {
+      const key = String(sel.quotationId || sel.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const formatTotal = (total, currency) => {
+      try {
+        return Number(total || 0).toLocaleString('es-CR', { style: 'currency', currency: currency || 'CRC', minimumFractionDigits: 2 });
+      } catch (_e) { return `${currency} ${Number(total || 0).toFixed(2)}`; }
+    };
+
+    const rows = unique.map((sel) => {
+      const name = rootShellUi.escapeHtml(sel.quotation?.supplier?.name || '—');
+      const approvalBadge = sel.approvalRequired
+        ? (sel.approvalStatus === 'APPROVED'
+          ? '<span class="badge badge-success">Aprobada</span>'
+          : '<span class="badge badge-warning">Pendiente aprobación</span>')
+        : '<span class="badge badge-info">Directa</span>';
+      const products = (sel.quotation?.items || []).map((i) =>
+        rootShellUi.escapeHtml(i.product?.name || i.productName || `#${i.productId}`)).join(', ');
+      const totalStr = rootShellUi.escapeHtml(formatTotal(sel.totalAmount, sel.currency));
+      return `<tr>
+        <td data-label="Proveedor"><strong>${name}</strong></td>
+        <td data-label="Aprobación">${approvalBadge}</td>
+        <td data-label="Total">${totalStr}</td>
+        <td data-label="Productos">${products || '—'}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="table-wrapper">
+      <table aria-label="Selección de proveedores">
+        <thead><tr>
+          <th scope="col">Proveedor</th>
+          <th scope="col">Aprobación</th>
+          <th scope="col">Total</th>
+          <th scope="col">Productos</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }
+
+  function renderPurchaseOrdersSection(purchaseOrders) {
+    if (!purchaseOrders || !purchaseOrders.length) {
+      return '<p class="muted" style="font-size:0.85rem;">Sin órdenes de compra generadas.</p>';
+    }
+
+    const formatTotal = (total, currency) => {
+      try {
+        return Number(total || 0).toLocaleString('es-CR', { style: 'currency', currency: currency || 'CRC', minimumFractionDigits: 2 });
+      } catch (_e) { return `${currency} ${Number(total || 0).toFixed(2)}`; }
+    };
+
+    const rows = purchaseOrders.map((po) => {
+      const name = rootShellUi.escapeHtml(po.supplier?.name || '—');
+      // Siempre calcular desde ítems — el campo totalAmount almacenado puede ser 0.
+      const computedTotal = (po.items || []).reduce(
+        (s, i) => s + Number(i.quantity || 0) * Number(i.unitPrice || 0), 0,
+      );
+      const currency = po.currency || po.items?.[0]?.currency || 'CRC';
+      const total = rootShellUi.escapeHtml(formatTotal(computedTotal, currency));
+      const products = (po.items || []).map((i) =>
+        rootShellUi.escapeHtml(i.product?.name || i.productName || `#${i.productId}`)).join(', ');
+      const PO_STATUS = {
+        PENDING:   '<span class="badge badge-info">Pendiente</span>',
+        ISSUED:    '<span class="badge badge-success">Emitida</span>',
+        RECEIVED:  '<span class="badge badge-success">Recibida</span>',
+        CANCELLED: '<span class="badge badge-danger">Cancelada</span>',
+      };
+      const statusBadge = PO_STATUS[po.status] || `<span class="badge">${rootShellUi.escapeHtml(po.status || '—')}</span>`;
+      return `<tr>
+        <td data-label="OC #"><strong>#${rootShellUi.escapeHtml(String(po.id))}</strong></td>
+        <td data-label="Proveedor">${name}</td>
+        <td data-label="Total">${total}</td>
+        <td data-label="Estado">${statusBadge}</td>
+        <td data-label="Productos">${products || '—'}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="table-wrapper">
+      <table aria-label="Órdenes de compra">
+        <thead><tr>
+          <th scope="col">OC #</th>
+          <th scope="col">Proveedor</th>
+          <th scope="col">Total</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Productos</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }
+
   function renderRequestDetail(request) {
     if (!request) {
       return '<p class="empty-state">Selecciona una solicitud para ver el detalle.</p>';
@@ -248,7 +474,12 @@
     const date = rootShellUi.escapeHtml(rootShellUi.formatDate(request.createdAt));
     const statusBadge = getStatusBadge(request.status);
     const items = request.items || [];
-    const respondedCount = Number(request.respondedInvitationCount || 0);
+    const quotations = request.quotations || [];
+    const selections = request.selections || [];
+    const purchaseOrders = request.purchaseOrders || [];
+
+    // Contar respuestas reales: cotizaciones con responseSource (directas o RFQ)
+    const respondedCount = quotations.filter((q) => q.responseSource).length;
 
     const itemRows = items.map((item) => {
       const productName = item.product?.name || item.productName || '—';
@@ -299,6 +530,7 @@
             <span> · Creada el ${date}</span>
             <span> · ${rootShellUi.escapeHtml(String(items.length))} producto(s)</span>
             <span> · ${rootShellUi.escapeHtml(String(respondedCount))} cotización(es) recibida(s)</span>
+            ${purchaseOrders.length ? `<span> · <strong>${rootShellUi.escapeHtml(String(purchaseOrders.length))} OC generada(s)</strong></span>` : ''}
           </p>
         </div>
         <div class="action-row compact-action-row">
@@ -318,6 +550,23 @@
         ${itemsTable}
       </div>
 
+      <div class="stack-section">
+        <h4>Cotizaciones (${rootShellUi.escapeHtml(String(quotations.length))} proveedor(es))</h4>
+        ${renderQuotationsSection(quotations)}
+      </div>
+
+      ${selections.length ? `
+      <div class="stack-section">
+        <h4>Selección de proveedor</h4>
+        ${renderSelectionsSection(selections)}
+      </div>` : ''}
+
+      ${purchaseOrders.length ? `
+      <div class="stack-section">
+        <h4>Órdenes de compra</h4>
+        ${renderPurchaseOrdersSection(purchaseOrders)}
+      </div>` : ''}
+
       <div
         id="purchase-requests-email-drafts-section"
         class="stack-section"
@@ -334,5 +583,8 @@
     renderRequestList,
     renderRequestDetail,
     renderEmailDrafts,
+    renderQuotationsSection,
+    renderSelectionsSection,
+    renderPurchaseOrdersSection,
   });
 }(window));

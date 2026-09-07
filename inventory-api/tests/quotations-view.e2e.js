@@ -9,6 +9,7 @@ process.env.BROWSER_SESSION_STORE_MODE = 'memory';
 const { chromium } = require('playwright');
 const app = require('../src/app');
 const { enableDbFreeAuditSeams } = require('./helpers/db-free-audit');
+const { enableDbFreeAuthSeams } = require('./helpers/db-free-auth');
 const browserSessionService = require('../src/services/browser-session.service');
 const {
   BROWSER_SESSION_COOKIE_NAME,
@@ -18,6 +19,8 @@ const {
 
 const restoreDbFreeAuditSeams = enableDbFreeAuditSeams();
 process.on('exit', restoreDbFreeAuditSeams);
+const restoreDbFreeAuthSeams = enableDbFreeAuthSeams();
+process.on('exit', restoreDbFreeAuthSeams);
 
 function createBrowserSessionUser({ permissions }) {
   return {
@@ -266,7 +269,7 @@ async function stubQuotationsRoutes(page, state) {
     ];
     state.rfqTracking = [
       {
-        id: state.purchaseRequest.id,
+        purchaseRequestId: state.purchaseRequest.id,
         title: 'Cotización agrupada (1 producto)',
         items: cloneJson(state.purchaseRequest.items),
         rfqInvitations: cloneJson(state.rfqInvitations),
@@ -322,6 +325,9 @@ test('quotations workspace creates RFQ invitations after grouped quotation confi
   await stubQuotationsRoutes(page, state);
   await openQuotationsView(page, baseUrl);
 
+  // The products list lives inside #quotations-create-panel which starts hidden;
+  // click "Crear cotización agrupada" to reveal it first.
+  await page.getByRole('button', { name: 'Crear cotización agrupada' }).click();
   await page.waitForSelector('#quotations-list-region .quotations-open-detail-button');
   await page.getByRole('button', { name: 'Ver proveedores', exact: true }).click();
   await page.waitForSelector('#quotations-detail-quantity');
@@ -335,9 +341,10 @@ test('quotations workspace creates RFQ invitations after grouped quotation confi
   await page.getByRole('button', { name: 'Confirmar generación', exact: true }).click();
 
   await page.waitForSelector('#rfq-section:not([hidden])');
+  // Wait until the generate-RFQ button is ready (context is set and has at least one supplier).
   await page.waitForFunction(() => {
-    const summary = globalThis.document.querySelector('#rfq-section-summary');
-    return summary && summary.textContent.includes('0 invitación(es) generadas.');
+    const btn = globalThis.document.querySelector('#rfq-generate-button');
+    return btn && !btn.disabled;
   });
 
   const createRfqResponsePromise = page.waitForResponse((response) => {
@@ -359,10 +366,12 @@ test('quotations workspace creates RFQ invitations after grouped quotation confi
     const sectionSummary = globalThis.document.querySelector('#rfq-section-summary');
     const tableRegion = globalThis.document.querySelector('#rfq-invitations-region');
     const trackingSummary = globalThis.document.querySelector('#rfq-tracking-summary');
-    return sectionSummary?.textContent.includes('1 invitación(es) generadas.')
+    // After loadRfqTracking completes it overwrites the summary to the stable
+    // "active request" message. The invitation table should still have the data.
+    return sectionSummary?.textContent.includes('Solicitud activa')
       && tableRegion?.textContent.includes('Proveedor Norte')
       && tableRegion?.textContent.includes('Preparada')
-      && trackingSummary?.textContent.includes('1 solicitud(es) con invitaciones.');
+      && trackingSummary?.textContent.includes('1 solicitud(es) abiertas');
   }, { timeout: 10000 });
 
   assert.equal(state.counters.requestGroupedQuotations, 1);

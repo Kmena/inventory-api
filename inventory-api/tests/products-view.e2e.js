@@ -9,6 +9,7 @@ process.env.BROWSER_SESSION_STORE_MODE = 'memory';
 const { chromium } = require('playwright');
 const app = require('../src/app');
 const { enableDbFreeAuditSeams } = require('./helpers/db-free-audit');
+const { enableDbFreeAuthSeams } = require('./helpers/db-free-auth');
 const browserSessionService = require('../src/services/browser-session.service');
 const {
   BROWSER_SESSION_COOKIE_NAME,
@@ -18,6 +19,8 @@ const {
 
 const restoreDbFreeAuditSeams = enableDbFreeAuditSeams();
 process.on('exit', restoreDbFreeAuditSeams);
+const restoreDbFreeAuthSeams = enableDbFreeAuthSeams();
+process.on('exit', restoreDbFreeAuthSeams);
 
 function createBrowserSessionUser({ permissions }) {
   return {
@@ -153,11 +156,11 @@ test('products view supports read-only paginated listing, local filtering and de
 
   const productPages = {
     1: createProductsResponse([
-      { id: 11, categoryId: 7, code: 'PT-11', name: 'Cafe molido', description: 'Bebida', category: { name: 'Bebidas' }, price: 1200, currency: 'CRC', isActive: true, quantity: 9, reservedQuantity: 1, minStock: 4, maxStock: 20, unit: 'UN' },
-      { id: 12, categoryId: 8, code: 'PT-12', name: 'Caja kraft', description: 'Empaque', category: { name: 'Empaques' }, price: 900, currency: 'CRC', isActive: true, quantity: 40, reservedQuantity: 0, minStock: 10, maxStock: 80, unit: 'UN' },
+      { id: 11, categoryId: 7, subcategoryId: 7, code: 'PT-11', name: 'Cafe molido', description: 'Bebida', category: { name: 'Bebidas' }, price: 1200, currency: 'CRC', isActive: true, quantity: 9, reservedQuantity: 1, minStock: 4, maxStock: 20, unit: 'UN' },
+      { id: 12, categoryId: 8, subcategoryId: 8, code: 'PT-12', name: 'Caja kraft', description: 'Empaque', category: { name: 'Empaques' }, price: 900, currency: 'CRC', isActive: true, quantity: 40, reservedQuantity: 0, minStock: 10, maxStock: 80, unit: 'UN' },
     ], 1, 11, 2),
     2: createProductsResponse([
-      { id: 21, categoryId: 7, code: 'PT-21', name: 'Te frio', description: 'Bebida fria', category: { name: 'Bebidas' }, price: 1400, currency: 'CRC', isActive: true, quantity: 6, reservedQuantity: 0, minStock: 2, maxStock: 15, unit: 'UN' },
+      { id: 21, categoryId: 7, subcategoryId: 7, code: 'PT-21', name: 'Te frio', description: 'Bebida fria', category: { name: 'Bebidas' }, price: 1400, currency: 'CRC', isActive: true, quantity: 6, reservedQuantity: 0, minStock: 2, maxStock: 15, unit: 'UN' },
     ], 2, 11, 2),
   };
 
@@ -171,8 +174,8 @@ test('products view supports read-only paginated listing, local filtering and de
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify([
-        { id: 7, name: 'Bebidas', categoryType: 'PT' },
-        { id: 8, name: 'Empaques', categoryType: 'EM' },
+        { id: 7, name: 'Bebidas', categoryType: 'PT', subcategories: [{ id: 7, name: 'Bebidas' }] },
+        { id: 8, name: 'Empaques', categoryType: 'EM', subcategories: [{ id: 8, name: 'Empaques' }] },
       ]),
     });
   });
@@ -238,9 +241,10 @@ test('products view creates categories, creates products, edits and deactivates 
   await stubAuthMe(page, baseUrl, user);
 
   const state = {
-    categories: [{ id: 7, name: 'Bebidas', categoryType: 'PT' }],
-    items: [{ id: 11, categoryId: 7, code: 'PT-11', name: 'Cafe molido', description: 'Bebida', category: { name: 'Bebidas' }, price: 1200, currency: 'CRC', isActive: true, quantity: 9, reservedQuantity: 1, minStock: 4, maxStock: 20, unit: 'UN' }],
-    nextCategoryId: 8,
+    // Categories use the nested structure: each category has a subcategories array.
+    categories: [{ id: 7, name: 'Bebidas', categoryType: 'PT', subcategories: [] }],
+    items: [{ id: 11, subcategoryId: 7, code: 'PT-11', name: 'Cafe molido', description: 'Bebida', category: { name: 'Bebidas' }, price: 1200, currency: 'CRC', isActive: true, quantity: 9, reservedQuantity: 1, minStock: 4, maxStock: 20, unit: 'UN' }],
+    nextSubcategoryId: 8,
     nextProductId: 12,
   };
 
@@ -257,17 +261,15 @@ test('products view creates categories, creates products, edits and deactivates 
 
     if (method === 'POST') {
       const payload = JSON.parse(route.request().postData() || '{}');
-      const createdCategory = {
-        id: state.nextCategoryId,
-        name: payload.name,
-        categoryType: payload.categoryType,
-      };
-      state.nextCategoryId += 1;
-      state.categories.push(createdCategory);
+      // Subcategory is nested under the parent category.
+      const newSub = { id: state.nextSubcategoryId, name: payload.name };
+      state.nextSubcategoryId += 1;
+      const parent = state.categories.find((c) => c.id === payload.categoryId);
+      if (parent) parent.subcategories.push(newSub);
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
-        body: JSON.stringify(createdCategory),
+        body: JSON.stringify({ id: newSub.id, categoryId: payload.categoryId, name: newSub.name }),
       });
       return;
     }
@@ -296,13 +298,15 @@ test('products view creates categories, creates products, edits and deactivates 
 
     if (method === 'PUT') {
       const payload = JSON.parse(route.request().postData() || '{}');
-      const category = state.categories.find((item) => item.id === payload.categoryId) || state.categories.find((item) => item.id === state.items[productIndex].categoryId) || null;
+      // Payload now uses subcategoryId; find the sub for display name.
+      const allSubs = state.categories.flatMap((c) => c.subcategories || []);
+      const sub = allSubs.find((s) => s.id === (payload.subcategoryId ?? state.items[productIndex].subcategoryId));
       state.items[productIndex] = {
         ...state.items[productIndex],
         ...payload,
         id: productId,
-        categoryId: payload.categoryId ?? state.items[productIndex].categoryId,
-        category: category ? { name: category.name } : null,
+        subcategoryId: payload.subcategoryId ?? state.items[productIndex].subcategoryId,
+        category: sub ? { name: sub.name } : null,
       };
       await route.fulfill({
         status: 200,
@@ -336,14 +340,16 @@ test('products view creates categories, creates products, edits and deactivates 
     }
 
     const payload = JSON.parse(route.request().postData() || '{}');
-    const category = state.categories.find((item) => item.id === payload.categoryId) || null;
+    // Payload uses subcategoryId; find sub for display name.
+    const allSubs = state.categories.flatMap((c) => c.subcategories || []);
+    const sub = allSubs.find((s) => s.id === payload.subcategoryId) || null;
     const createdProduct = {
       id: state.nextProductId,
       ...payload,
       isActive: true,
       quantity: 0,
       reservedQuantity: 0,
-      category: category ? { name: category.name } : null,
+      category: sub ? { name: sub.name } : null,
     };
     state.nextProductId += 1;
     state.items.push(createdProduct);
@@ -361,14 +367,19 @@ test('products view creates categories, creates products, edits and deactivates 
 
   await page.getByRole('button', { name: 'Categorias' }).click();
   await page.locator('#products-category-name').fill('Snacks');
-  await page.getByRole('button', { name: 'Crear categoria' }).click();
-  await expectText(page, '#products-categories-message', 'Categoria creada correctamente.');
+  // Parent category is required; select the existing one before submitting.
+  await page.locator('#products-subcategory-parent-category').selectOption('7');
+  await page.getByRole('button', { name: 'Crear subcategoria' }).click();
+  await expectText(page, '#products-categories-message', 'Subcategoria creada correctamente.');
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
 
   await page.getByRole('button', { name: 'Nuevo producto' }).click();
   await page.locator('#products-form-name').fill('Producto nuevo');
   await page.locator('input[name="code"]').fill('PT-12');
-  await page.locator('#products-form-category').selectOption('8');
+  // The subcategory select is #products-form-subcategory (pre-selected to 8 by lastCreatedSubcategoryId).
+  await page.locator('#products-form-subcategory').selectOption('8');
+  // netContentUnit is always required in the form.
+  await page.locator('#products-form-net-content-unit').selectOption('UN');
   await page.locator('select[name="currency"]').selectOption('CRC');
   await page.locator('input[name="price"]').fill('1550');
   await page.getByRole('button', { name: 'Guardar producto' }).click();

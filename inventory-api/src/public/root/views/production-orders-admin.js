@@ -62,6 +62,45 @@
           </div>
         </article>
       </section>
+
+      <dialog id="production-approve-confirm-dialog" class="modal-card" aria-labelledby="production-approve-confirm-title">
+        <div class="page-header">
+          <div>
+            <h3 id="production-approve-confirm-title">Confirmar aprobación de orden</h3>
+            <p class="muted">Revisá el contexto antes de aprobar.</p>
+          </div>
+          <button id="production-approve-confirm-close" class="secondary-button" type="button" aria-label="Cerrar">Cancelar</button>
+        </div>
+        <div id="production-approve-confirm-message" role="status" aria-live="polite"></div>
+        <div class="stack-section">
+          <div class="detail-grid" id="production-approve-confirm-info"></div>
+          <div id="production-approve-confirm-actions" style="display:flex;gap:0.75rem;margin-top:1rem;">
+            <button id="production-approve-confirm-submit" type="button" style="background:var(--color-success,#16A34A)">Confirmar aprobación</button>
+            <button id="production-approve-confirm-cancel" class="secondary-button" type="button">Cancelar</button>
+          </div>
+        </div>
+      </dialog>
+
+      <dialog id="production-cancel-confirm-dialog" class="modal-card" aria-labelledby="production-cancel-confirm-title">
+        <div class="page-header">
+          <div>
+            <h3 id="production-cancel-confirm-title">Cancelar orden de producción</h3>
+            <p class="muted">Esta acción no se puede deshacer.</p>
+          </div>
+          <button id="production-cancel-confirm-close" class="secondary-button" type="button" aria-label="Cerrar">✕</button>
+        </div>
+        <div id="production-cancel-confirm-message" role="status" aria-live="polite"></div>
+        <div class="stack-section">
+          <div class="detail-grid" id="production-cancel-confirm-info"></div>
+          <div style="display:flex;gap:0.75rem;margin-top:1rem;">
+            <button id="production-cancel-confirm-submit" type="button"
+                    style="background:var(--color-danger,#c00);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer">
+              Confirmar cancelación
+            </button>
+            <button id="production-cancel-confirm-back" class="secondary-button" type="button">Volver</button>
+          </div>
+        </div>
+      </dialog>
     `;
   }
 
@@ -94,8 +133,9 @@
     }
 
     const canViewProductionOrders = productionOrdersHelpers.canViewProductionOrders(session, sessionAdapter);
-    const canSubmitProduction = productionOrdersHelpers.canSubmitProductionOrders(session, sessionAdapter);
+    const canSubmitProduction  = productionOrdersHelpers.canSubmitProductionOrders(session, sessionAdapter);
     const canApproveProduction = productionOrdersHelpers.canApproveProductionOrders(session, sessionAdapter);
+    const canCancelProduction  = productionOrdersHelpers.canCancelProductionOrders(session, sessionAdapter);
 
     let ordersDataset = {
       items: [],
@@ -158,7 +198,7 @@
 
     function renderDetail() {
       detailRegion.innerHTML = productionOrdersRenderers.renderOrderDetail(
-        getSelectedOrder(), { detailState, canSubmitProduction, canApproveProduction },
+        getSelectedOrder(), { detailState, canSubmitProduction, canApproveProduction, canCancelProduction },
       );
       const selectedOrder = getSelectedOrder();
       detailSubtitle.textContent = selectedOrder
@@ -309,36 +349,166 @@
       await loadOrders(ordersDataset.pagination.page || 1);
     });
 
+    // TASK-009 (FR-020, FR-021, BR-010): Approval confirmation dialog
+    const approveDialog = container.querySelector('#production-approve-confirm-dialog');
+    const approveDialogInfo = container.querySelector('#production-approve-confirm-info');
+    const approveDialogMessage = container.querySelector('#production-approve-confirm-message');
+    const approveDialogSubmitBtn = container.querySelector('#production-approve-confirm-submit');
+    const approveDialogCancelBtn = container.querySelector('#production-approve-confirm-cancel');
+    const approveDialogCloseBtn = container.querySelector('#production-approve-confirm-close');
+    let pendingApproveOrderId = null;
+    let pendingApproveOrderSnapshot = null;
+
+    function openApproveConfirmDialog(order) {
+      if (!approveDialog) { return; }
+      pendingApproveOrderId = order?.id ? String(order.id) : null;
+      pendingApproveOrderSnapshot = order ?? null;
+      approveDialogMessage.innerHTML = '';
+
+      const esc = rootShellUi.escapeHtml;
+      approveDialogInfo.innerHTML = `
+        <article class="detail-item"><span>Producto</span><strong>${esc(order?.product?.name || 'Sin producto')}</strong></article>
+        <article class="detail-item"><span>Cantidad</span><strong>${esc(String(order?.quantity ?? '—'))}</strong></article>
+        <article class="detail-item"><span>Bodega origen</span><strong>${esc(order?.originWarehouse?.name || '—')}</strong></article>
+        <article class="detail-item"><span>Bodega destino</span><strong>${esc(order?.destinationWarehouse?.name || '—')}</strong></article>
+        <article class="detail-item"><span>Responsable</span><strong>${esc(productionOrdersState.resolveResponsibleLabel(order))}</strong></article>
+        <article class="detail-item"><span>Lote</span><strong>${esc(order?.productionLotCode || '—')}</strong></article>
+        ${order?.overrideJustification ? `<article class="detail-item"><span>Override</span><strong>${esc(order.overrideJustification)}</strong></article>` : ''}
+      `;
+
+      approveDialogSubmitBtn.disabled = false;
+      approveDialogSubmitBtn.textContent = 'Confirmar aprobación';
+      approveDialog.showModal();
+    }
+
+    function closeApproveConfirmDialog() {
+      pendingApproveOrderId = null;
+      pendingApproveOrderSnapshot = null;
+      if (approveDialog) { approveDialog.close(); }
+    }
+
+    if (approveDialogCloseBtn) {
+      approveDialogCloseBtn.addEventListener('click', closeApproveConfirmDialog);
+    }
+    if (approveDialogCancelBtn) {
+      approveDialogCancelBtn.addEventListener('click', closeApproveConfirmDialog);
+    }
+    if (approveDialogSubmitBtn) {
+      approveDialogSubmitBtn.addEventListener('click', async () => {
+        if (!pendingApproveOrderId) { return; }
+        approveDialogSubmitBtn.disabled = true;
+        approveDialogSubmitBtn.textContent = 'Aprobando...';
+        approveDialogMessage.innerHTML = '';
+
+        try {
+          const approvedOrderCode = pendingApproveOrderSnapshot?.orderId || `#${pendingApproveOrderId}`;
+          const approvedProductName = pendingApproveOrderSnapshot?.product?.name || 'Sin producto';
+          await productionAdminApi.approveProductionOrder(session, pendingApproveOrderId, {});
+          closeApproveConfirmDialog();
+          await loadOrders(ordersDataset.pagination.page || 1);
+          pageMessage.innerHTML = rootShellUi.renderInlineMessage(`✓ Orden ${approvedOrderCode} aprobada — ${approvedProductName}. Lista para iniciar en /warehouse/.`, 'success');
+        } catch (error) {
+          approveDialogMessage.innerHTML = rootShellUi.renderInlineMessage(
+            error?.message || 'No se pudo aprobar la orden.', 'error',
+          );
+          approveDialogSubmitBtn.disabled = false;
+          approveDialogSubmitBtn.textContent = 'Confirmar aprobación';
+        }
+      });
+    }
+
+    // --- Cancel confirmation dialog ---
+    const cancelDialog          = container.querySelector('#production-cancel-confirm-dialog');
+    const cancelDialogCloseBtn  = container.querySelector('#production-cancel-confirm-close');
+    const cancelDialogBackBtn   = container.querySelector('#production-cancel-confirm-back');
+    const cancelDialogSubmitBtn = container.querySelector('#production-cancel-confirm-submit');
+    let pendingCancelOrderId    = null;
+    let pendingCancelOrderSnapshot = null;
+
+    function openCancelConfirmDialog(order) {
+      if (!cancelDialog) { return; }
+      pendingCancelOrderId = order?.id ? String(order.id) : null;
+      pendingCancelOrderSnapshot = order ?? null;
+      cancelDialogSubmitBtn.disabled = false;
+      cancelDialogSubmitBtn.textContent = 'Confirmar cancelación';
+      cancelDialog.querySelector('#production-cancel-confirm-message').innerHTML = '';
+      productionOrdersRenderers.populateCancelDialog(cancelDialog, order);
+      cancelDialog.showModal();
+    }
+    function closeCancelConfirmDialog() {
+      pendingCancelOrderId = null;
+      pendingCancelOrderSnapshot = null;
+      if (cancelDialog?.open) { cancelDialog.close(); }
+    }
+    cancelDialogCloseBtn?.addEventListener('click', closeCancelConfirmDialog);
+    cancelDialogBackBtn?.addEventListener('click', closeCancelConfirmDialog);
+    cancelDialog?.addEventListener('cancel', (e) => { e.preventDefault(); closeCancelConfirmDialog(); });
+
+    cancelDialogSubmitBtn?.addEventListener('click', async () => {
+      if (!pendingCancelOrderId) { return; }
+      cancelDialogSubmitBtn.disabled = true;
+      cancelDialogSubmitBtn.textContent = 'Cancelando...';
+      const msgEl = cancelDialog.querySelector('#production-cancel-confirm-message');
+      try {
+        const cancelledOrderCode = pendingCancelOrderSnapshot?.orderId || `#${pendingCancelOrderId}`;
+        const cancelledProductName = pendingCancelOrderSnapshot?.product?.name || 'Sin producto';
+        await productionAdminApi.cancelProductionOrder(session, pendingCancelOrderId, {});
+        closeCancelConfirmDialog();
+        await loadOrders(ordersDataset.pagination.page || 1);
+        pageMessage.innerHTML = rootShellUi.renderInlineMessage(`Orden ${cancelledOrderCode} cancelada — ${cancelledProductName}.`, 'success');
+      } catch (error) {
+        msgEl.innerHTML = rootShellUi.renderInlineMessage(
+          error?.message || 'No se pudo cancelar la orden.', 'error',
+        );
+        cancelDialogSubmitBtn.disabled = false;
+        cancelDialogSubmitBtn.textContent = 'Confirmar cancelación';
+      }
+    });
+
     detailRegion.addEventListener('click', async (event) => {
       const target = event.target;
       if (!(target instanceof globalScope.HTMLElement)) { return; }
 
-      const btn = target.closest('.production-submit-btn, .production-approve-btn');
+      const btn = target.closest('.production-submit-btn, .production-approve-btn, .production-cancel-btn');
       if (!(btn instanceof globalScope.HTMLButtonElement)) { return; }
 
       const orderId = btn.getAttribute('data-order-id');
       if (!orderId) { return; }
 
       const isSubmit = btn.classList.contains('production-submit-btn');
+      const isCancel = btn.classList.contains('production-cancel-btn');
+
+      if (isCancel) {
+        openCancelConfirmDialog(getSelectedOrder());
+        return;
+      }
+
+      if (!isSubmit) {
+        // FR-021: approval requires confirmation dialog
+        const orderToApprove = getSelectedOrder();
+        openApproveConfirmDialog(orderToApprove);
+        return;
+      }
+
+      // Submit to approval (no dialog required per DEC-008)
+      const submitOrder = getSelectedOrder();
+      const submitOrderCode = submitOrder?.orderId || `#${orderId}`;
+      const submitProductName = submitOrder?.product?.name || 'Sin producto';
       const errEl = btn.nextElementSibling;
       const originalText = btn.textContent;
-
       btn.disabled = true;
-      btn.textContent = isSubmit ? 'Enviando...' : 'Aprobando...';
+      btn.textContent = 'Enviando...';
       if (errEl) { errEl.hidden = true; }
 
       try {
-        if (isSubmit) {
-          await productionAdminApi.submitProductionOrder(session, orderId);
-        } else {
-          await productionAdminApi.approveProductionOrder(session, orderId, {});
-        }
+        await productionAdminApi.submitProductionOrder(session, orderId);
         await loadOrders(ordersDataset.pagination.page || 1);
+        pageMessage.innerHTML = rootShellUi.renderInlineMessage(`✓ Orden ${submitOrderCode} enviada para aprobación — ${submitProductName}.`, 'success');
       } catch (error) {
         btn.disabled = false;
         btn.textContent = originalText;
         if (errEl) {
-          errEl.textContent = error?.message || (isSubmit ? 'No se pudo enviar la orden.' : 'No se pudo aprobar la orden.');
+          errEl.textContent = error?.message || 'No se pudo enviar la orden.';
           errEl.hidden = false;
         }
       }

@@ -49,7 +49,7 @@
   }
 
   function buildClientPayload(formData) {
-    const numericFields = new Set(['clientClassificationId', 'paymentDays', 'creditLimit', 'creditBalance']);
+    const numericFields = new Set(['clientClassificationId', 'paymentDays']);
     const allowedFields = [
       'clientClassificationId',
       'code',
@@ -69,7 +69,6 @@
       'district',
       'paymentType',
       'paymentDays',
-      'creditLimit',
     ];
 
     return allowedFields.reduce((payload, fieldName) => {
@@ -92,11 +91,29 @@
       subregionId: Number(formData.get('subregionId') || 0),
     };
 
-    const optionalFields = ['code', 'storeType', 'locationReference', 'attentionSchedule', 'phone', 'address', 'province', 'canton', 'district'];
+    const optionalFields = ['code', 'storeType', 'locationReference', 'attentionSchedule', 'phone', 'address', 'province', 'canton', 'district', 'currency'];
     for (const fieldName of optionalFields) {
       const value = String(formData.get(fieldName) || '').trim();
       if (value) {
         payload[fieldName] = value;
+      }
+    }
+
+    const billingMode = String(formData.get('billingMode') || 'inherit').trim();
+    if (billingMode === 'override') {
+      for (const fieldName of ['legalName', 'commercialName', 'legalId', 'documentType', 'emailBilling', 'economicActivityCode', 'economicActivityName']) {
+        const value = String(formData.get(fieldName) || '').trim();
+        if (value) {
+          payload[fieldName] = value;
+        }
+      }
+    }
+
+    const creditLimitValue = String(formData.get('creditLimit') || '').trim();
+    if (creditLimitValue) {
+      const creditLimit = Number(creditLimitValue);
+      if (creditLimit > 0) {
+        payload.creditLimit = creditLimit;
       }
     }
 

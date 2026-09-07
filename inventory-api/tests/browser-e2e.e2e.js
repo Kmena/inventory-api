@@ -9,10 +9,13 @@ process.env.BROWSER_SESSION_STORE_MODE = 'memory';
 const { chromium } = require('playwright');
 const app = require('../src/app');
 const { enableDbFreeAuditSeams } = require('./helpers/db-free-audit');
+const { enableDbFreeAuthSeams } = require('./helpers/db-free-auth');
 const browserSessionService = require('../src/services/browser-session.service');
 
 const restoreDbFreeAuditSeams = enableDbFreeAuditSeams();
 process.on('exit', restoreDbFreeAuditSeams);
+const restoreDbFreeAuthSeams = enableDbFreeAuthSeams();
+process.on('exit', restoreDbFreeAuthSeams);
 const {
   BROWSER_SESSION_COOKIE_NAME,
   BROWSER_SESSION_STATE_COOKIE_NAME,

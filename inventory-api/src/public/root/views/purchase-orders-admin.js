@@ -32,6 +32,26 @@
       <section class="routes-page" id="purchase-orders-page">
         <div id="purchase-orders-page-message"></div>
 
+        <article
+          class="card root-card"
+          id="po-creation-cta"
+          style="background:#eff6ff;border:1px solid #bfdbfe;margin-bottom:1rem;"
+          aria-label="Guía para crear órdenes de compra"
+        >
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <p style="margin:0 0 0.3rem;font-weight:600;font-size:0.95rem;">¿Necesitás crear una orden de compra?</p>
+              <p class="muted" style="margin:0;font-size:0.85rem;">
+                Las órdenes de compra se generan a partir de solicitudes de compra y cotizaciones aprobadas.
+                Iniciá el proceso desde el módulo de Cotizaciones.
+              </p>
+            </div>
+            <button id="po-cta-navigate-button" type="button" style="white-space:nowrap;">
+              Ir a Cotizaciones
+            </button>
+          </div>
+        </article>
+
         <div class="commercial-layout commercial-layout--rfq-tracking" id="purchase-orders-layout">
 
           <article class="card root-card commercial-list-card" id="purchase-orders-sidebar">
@@ -262,6 +282,13 @@
     }
 
     refreshButton.addEventListener('click', loadOrders);
+
+    const ctaButton = container.querySelector('#po-cta-navigate-button');
+    if (ctaButton) {
+      ctaButton.addEventListener('click', () => {
+        window.location.hash = '#cotizaciones';
+      });
+    }
 
     await loadOrders();
   }

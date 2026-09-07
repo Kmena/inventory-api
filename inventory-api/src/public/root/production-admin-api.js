@@ -66,9 +66,27 @@
     );
   }
 
+  /**
+   * Cancela una orden de producción. Para órdenes DRAFT/PENDING_APPROVAL no se
+   * requieren devoluciones. Para estados posteriores el payload puede incluir
+   * returns[], aunque el flujo completo de devolución vive en /warehouse/.
+   */
+  async function cancelProductionOrder(session, productionOrderId, payload = {}) {
+    return inventoryAuth.fetchJson(
+      session,
+      `/api/production/orders/${encodeURIComponent(productionOrderId)}/cancel`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        fallbackMessage: 'No se pudo cancelar la orden de produccion.',
+      },
+    );
+  }
+
   rootShell.register('productionAdminApi', {
     approveProductionOrder,
     buildServerListQuery,
+    cancelProductionOrder,
     createProductionOrder,
     getProductionOrder,
     listProductionOrders,

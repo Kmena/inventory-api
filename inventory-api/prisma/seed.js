@@ -63,12 +63,14 @@ const permissionDefinitions = [
   ['inventory.intake.override', 'inventory', 'intake_override', 'Sobrescribir validaciones de entrada'],
   ['billing.handoff.view', 'billing', 'view_handoff', 'Ver referencias y estado de handoff fiscal'],
   ['billing.handoff.create', 'billing', 'create_handoff', 'Crear referencias de handoff fiscal'],
+  ['integration.taxpayer.lookup', 'integration', 'taxpayer_lookup', 'Consultar datos fiscales de contribuyentes en Hacienda'],
+  ['integration.economic-activities.list', 'integration', 'economic_activities_list', 'Listar actividades economicas del catalogo de Hacienda'],
 ];
 
 const rolePermissionMap = {
   root: permissionDefinitions.map(([code]) => code),
   admin: permissionDefinitions.map(([code]) => code),
-  sales: ['clients.view', 'clients.manage', 'sales.manage'],
+  sales: ['clients.view', 'clients.manage', 'sales.manage', 'integration.taxpayer.lookup', 'integration.economic-activities.list'],
   sales_agent: [
     'clients.view',
     'sales.orders.create',

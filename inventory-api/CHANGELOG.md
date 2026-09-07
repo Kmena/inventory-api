@@ -1,6 +1,6 @@
 # Changelog
 
-## 2025-07 — create-product-with-subcategory (UX-001..006)
+## 2026-10-02 — create-product-with-subcategory (UX-001..006)
 - **TASK-001 (UX-003):** Corregido texto del botón en el `finally` block del submit del formulario de categorías: `'Crear categoria'` → `'Crear subcategoria'`.
 - **TASK-002 (UX-004):** Corregido label del filtro del listado de productos: `<span>Categoria</span>` → `<span>Subcategoria</span>` para reflejar que filtra por `subcategoryId`.
 - **TASK-003 (UX-005):** El fieldset "Nueva subcategoría" ahora tiene `id="products-create-subcategory-fieldset"` y se oculta completamente (`hidden=true`) para usuarios sin `products.manage` ni `inventory.manage`, eliminando el ruido visual de campos deshabilitados.

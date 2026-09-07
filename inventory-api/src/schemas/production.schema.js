@@ -182,6 +182,14 @@ const recordReconciliationOutcomesSchema = z.object({
   outcomes: z.array(reconciliationOutcomeItemSchema).min(1),
 }).strict();
 
+// TASK-006 (purchase-production-order-ux): Pre-order material availability preview
+const materialAvailabilityPreviewSchema = z.object({
+  productId: z.coerce.bigint(),
+  recipeVersionId: z.coerce.bigint(),
+  quantity: z.coerce.number().positive(),
+  originWarehouseId: z.coerce.bigint(),
+}).strict();
+
 module.exports = {
   createProductionOrderSchema,
   productionApprovalSchema,
@@ -195,4 +203,5 @@ module.exports = {
   recolectionConfirmSchema,
   reconciliationOutcomeItemSchema,
   recordReconciliationOutcomesSchema,
+  materialAvailabilityPreviewSchema,
 };

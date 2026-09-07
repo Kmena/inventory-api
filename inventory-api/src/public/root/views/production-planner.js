@@ -25,6 +25,7 @@
       usersApi: rootShell.require('usersApi'),
       recipesApi: rootShell.require('recipesApi'),
       rootShellUi: rootShell.require('ui'),
+      sessionAdapter: rootShell.require('sessionAdapter'),
     };
   }
 
@@ -196,9 +197,26 @@
   // Data loading
   // -------------------------------------------------------------------
 
+  // Estados que indican que ya hay una orden activa para ese producto.
+  const ACTIVE_ORDER_STATUSES = new Set(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'IN_PROGRESS', 'QA_HOLD']);
+
   async function loadPlannerData(session, deps) {
-    const products = await deps.productsApi.listProducts(session);
+    // Fetch products y órdenes activas en paralelo — una sola vuelta de red.
+    const [products, ordersResponse] = await Promise.all([
+      deps.productsApi.listProducts(session),
+      deps.productionAdminApi.listProductionOrders(session).catch(() => []),
+    ]);
     const list = Array.isArray(products) ? products : (products?.items || []);
+    const orderList = Array.isArray(ordersResponse) ? ordersResponse : (ordersResponse?.items || []);
+
+    // productId → cantidad de órdenes activas para mostrar el badge.
+    const activeOrdersByProductId = new Map();
+    for (const o of orderList) {
+      if (o?.productId && ACTIVE_ORDER_STATUSES.has(o.status)) {
+        const key = String(o.productId);
+        activeOrdersByProductId.set(key, (activeOrdersByProductId.get(key) || 0) + 1);
+      }
+    }
 
     // Build stock map for ALL products so the dialog can check ingredient availability.
     const productStockMap = new Map();
@@ -209,7 +227,6 @@
           name: p.name || `Producto #${p.id}`,
           unit: p.unit || '',
           code: p.code || '',
-          // TASK-006: campos de conversión para el preview de kg planeados.
           presentationType: p.presentationType || null,
           netContent: toNum(p.netContent),
           netContentUnit: p.netContentUnit || null,
@@ -235,6 +252,7 @@
         maxStock: max,
         status: classifyStock(qty, min, max),
         suggested: suggestedBatch(qty, min, max),
+        activeOrders: activeOrdersByProductId.get(String(p.id)) || 0,
       };
     }).sort((a, b) => {
       const sa = STATUS_ORDER[a.status];
@@ -299,10 +317,13 @@
                style="display:none;margin:-6px 0 12px 0;font-size:0.875rem">
               Kg planeados: <strong id="planner-kg-preview-value">—</strong>
             </p>
-            <label style="display:block;margin-bottom:12px">
+            <label style="display:block;margin-bottom:4px">
               <span>Codigo de lote de produccion *</span>
-              <input type="text" id="planner-field-lot-code" maxlength="100" required placeholder="Ej. LOT-2025-001" />
+              <input type="text" id="planner-field-lot-code" maxlength="100" required placeholder="Ej. PROD-20250515-CAFE-001" />
             </label>
+            <p class="muted" style="font-size:0.8rem;margin:0 0 12px">
+              Auto-sugerido como <code>PROD-YYYYMMDD-{CODIGO}-001</code>. El numero de orden se asigna despues de crear.
+            </p>
             <label style="display:block;margin-bottom:12px">
               <span>Bodega origen (materias primas) *</span>
               <select id="planner-field-origin-wh" required></select>
@@ -344,6 +365,9 @@
 
     const rowsHtml = rows.map((row) => {
       const badge = `<span class="${STATUS_CLASS[row.status]}">${escapeHtml(STATUS_LABELS[row.status])}</span>`;
+      const activeBadge = row.activeOrders > 0
+        ? `<br/><span class="badge" style="background:#d1fae5;color:#065f46;margin-top:4px;display:inline-block">🔄 En producción (${row.activeOrders})</span>`
+        : '';
       const suggested = row.suggested != null
         ? `<small class="muted">Sugerido: ${escapeHtml(formatQty(row.suggested))}</small>`
         : '';
@@ -352,6 +376,7 @@
           <td>
             <strong>${escapeHtml(row.name)}</strong><br />
             <small class="muted">${escapeHtml(row.code)}${row.unit ? ` · ${escapeHtml(row.unit)}` : ''}</small>
+            ${activeBadge}
           </td>
           <td style="text-align:right">${escapeHtml(formatQty(row.quantity))}</td>
           <td style="text-align:right">${escapeHtml(formatQty(row.minStock))}</td>
@@ -459,7 +484,10 @@
         ]);
         const whList = (Array.isArray(warehouses) ? warehouses : warehouses?.items || [])
           .map((w) => ({ id: w.id, label: w.name || `Bodega #${w.id}` }));
+        // Solo usuarios cuyo rol incluya production.execute — el repo ya devuelve
+        // role.rolePermissions[].permission.code, sin costo extra de red.
         const userList = (Array.isArray(users) ? users : users?.items || [])
+          .filter((u) => (u.role?.rolePermissions || []).some((rp) => rp.permission?.code === 'production.execute'))
           .map((u) => ({ id: u.id, label: u.fullName || u.username || `Usuario #${u.id}` }));
         fillSelect(dialog.querySelector('#planner-field-origin-wh'), whList, 'Seleccione bodega origen');
         fillSelect(dialog.querySelector('#planner-field-destination-wh'), whList, 'Seleccione bodega destino');
@@ -516,6 +544,24 @@
     const kgPreviewEl = dialog.querySelector('#planner-kg-preview');
     const kgPreviewValueEl = dialog.querySelector('#planner-kg-preview-value');
     const plannerProduct = productStockMap.get(String(dialogCtx.productId));
+
+    // Auto-sugerir código de lote usando fecha + código de producto + consecutivo.
+    // El número de orden no está disponible hasta después de la creación en el backend,
+    // por eso se usa el código del producto como identificador trazable.
+    // El consecutivo evita colisiones cuando se crean varias órdenes del mismo producto
+    // el mismo día durante la misma sesión. Formato: PROD-YYYYMMDD-{CODIGO}-001.
+    const lotCodeInput = /** @type {HTMLInputElement} */ (dialog.querySelector('#planner-field-lot-code'));
+    if (lotCodeInput && !lotCodeInput.value) {
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const productCode = (plannerProduct?.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const counterKey = `${dateStr}-${productCode}`;
+      const seq = (dialogState.lotCodeCounters.get(counterKey) || 0) + 1;
+      dialogState.lotCodeCounters.set(counterKey, seq);
+      const seqStr = String(seq).padStart(3, '0');
+      lotCodeInput.value = productCode
+        ? `PROD-${dateStr}-${productCode}-${seqStr}`
+        : `PROD-${dateStr}-${seqStr}`;
+    }
 
     /**
      * Actualiza el indicador de kg planeados debajo del input de cantidad.
@@ -596,9 +642,9 @@
       submitBtn.textContent = 'Creando...';
       setDialogError(dialog, '');
       try {
-        await deps.productionAdminApi.createProductionOrder(session, payload);
+        const createdOrder = await deps.productionAdminApi.createProductionOrder(session, payload);
         closeDialog();
-        if (typeof onSuccess === 'function') { onSuccess(); }
+        if (typeof onSuccess === 'function') { onSuccess(createdOrder); }
       } catch (err) {
         setDialogError(dialog, err?.message || 'No se pudo crear la orden.');
       } finally {
@@ -624,6 +670,9 @@
       dropdownsLoaded: false,
       recipeVersionCache: new Map(),
       currentQtyListener: null,
+      // Contador por clave "YYYYMMDD-CODE" para evitar colisiones de lot code
+      // cuando se crean varias ordenes del mismo producto el mismo dia.
+      lotCodeCounters: new Map(),
     };
     const refs = { currentCtx: null };
     let productStockMap = new Map();
@@ -667,11 +716,61 @@
       openDialog(container, session, dialogCtx, refs, dialogState, deps, productStockMap);
     });
 
-    wireDialog(container, session, refs, dialogState, deps, () => {
-      if (pageMessage) {
-        pageMessage.innerHTML = deps.rootShellUi.renderInlineMessage('Orden de produccion creada correctamente.', 'success');
-      }
-      refresh();
+    const canSubmit  = deps.sessionAdapter.hasPermission(session, 'production.create');
+    const canApprove = deps.sessionAdapter.hasPermission(session, 'production.approve');
+
+    wireDialog(container, session, refs, dialogState, deps, async (createdOrder) => {
+      // Primero refrescar la tabla (refresh() limpia pageMessage como primera línea),
+      // luego poner el mensaje de éxito para que no lo pise el refresh.
+      await refresh();
+      if (!pageMessage) { return; }
+
+      const orderId = createdOrder?.id;
+      const orderCode = createdOrder?.orderId || (orderId ? `#${orderId}` : '—');
+      const productName = createdOrder?.product?.name || refs.currentCtx?.productName || 'Producto desconocido';
+      const qty = createdOrder?.quantity ?? '—';
+      const lotCode = createdOrder?.productionLotCode || '—';
+
+      const quickActions = orderId && (canSubmit || canApprove) ? `
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          ${canSubmit ? `<button type="button" class="secondary-button planner-quick-submit" data-order-id="${escapeHtml(String(orderId))}">Enviar para aprobación →</button>` : ''}
+          ${canApprove ? `<button type="button" class="primary-button planner-quick-approve" data-order-id="${escapeHtml(String(orderId))}">Aprobar ahora ✓</button>` : ''}
+        </div>` : '';
+
+      pageMessage.innerHTML = `
+        <div class="message success" role="status">
+          ✓ Orden <strong>${escapeHtml(orderCode)}</strong> creada —
+          <strong>${escapeHtml(productName)}</strong> · ${escapeHtml(String(qty))} unidades · lote ${escapeHtml(lotCode)}.
+          ${quickActions}
+        </div>`;
+      pageMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      // Botón: solo enviar a aprobación
+      pageMessage.querySelector('.planner-quick-submit')?.addEventListener('click', async (evt) => {
+        const btn = /** @type {HTMLButtonElement} */ (evt.currentTarget);
+        btn.disabled = true; btn.textContent = 'Enviando...';
+        try {
+          await deps.productionAdminApi.submitProductionOrder(session, orderId);
+          await refresh();
+          pageMessage.innerHTML = deps.rootShellUi.renderInlineMessage('Orden enviada para aprobación.', 'success');
+        } catch (err) {
+          pageMessage.innerHTML = deps.rootShellUi.renderInlineMessage(err?.message || 'Error al enviar.', 'error');
+        }
+      });
+
+      // Botón: enviar + aprobar en un paso
+      pageMessage.querySelector('.planner-quick-approve')?.addEventListener('click', async (evt) => {
+        const btn = /** @type {HTMLButtonElement} */ (evt.currentTarget);
+        btn.disabled = true; btn.textContent = 'Aprobando...';
+        try {
+          await deps.productionAdminApi.submitProductionOrder(session, orderId);
+          await deps.productionAdminApi.approveProductionOrder(session, orderId, {});
+          await refresh();
+          pageMessage.innerHTML = deps.rootShellUi.renderInlineMessage('Orden aprobada. Lista para iniciar en /warehouse/.', 'success');
+        } catch (err) {
+          pageMessage.innerHTML = deps.rootShellUi.renderInlineMessage(err?.message || 'Error al aprobar.', 'error');
+        }
+      });
     });
 
     await refresh();

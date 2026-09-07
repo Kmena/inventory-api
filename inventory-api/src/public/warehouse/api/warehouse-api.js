@@ -250,6 +250,14 @@ function reconcileRecolection(session, orderId, recolectionId, outcomes) {
   );
 }
 
+// TASK-006 (purchase-production-order-ux): pre-order material availability preview
+function previewMaterialAvailability(session, payload) {
+  return safeFetch(session, '/api/production/orders/material-availability-preview', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 WarehouseShell.register('warehouseApi', {
   listPendingReceipts,
   getReceipt,
@@ -283,5 +291,7 @@ WarehouseShell.register('warehouseApi', {
   confirmRecolection,
   // TASK-007 (qa-rejection-material-reconciliation-amendment): reconciliation outcomes
   reconcileRecolection,
+  // TASK-006 (purchase-production-order-ux): pre-order material availability
+  previewMaterialAvailability,
 });
 })();

@@ -302,6 +302,10 @@ function renderForm(container, data) {
 
         <div id="pn-ingredients-preview" class="field" style="display:none" aria-live="polite"></div>
 
+        <div id="pn-recipe-product-warning" class="field" style="display:none" aria-live="polite"></div>
+
+        <div id="pn-material-availability-preview" class="field" style="display:none" aria-live="polite"></div>
+
         <div class="field">
           <label for="pn-lot-code">Codigo de lote de produccion *</label>
           <input type="text" id="pn-lot-code" required aria-required="true" maxlength="100" placeholder="Ej. LOT-2025-001" />
@@ -425,10 +429,20 @@ function collectPayload(container) {
   return payload;
 }
 
+// FR-022, FR-023: Human-readable field label map for validation messages
+const FIELD_LABELS = {
+  productId: 'Producto a producir',
+  recipeVersionId: 'Versión aprobada',
+  productionLotCode: 'Código de lote',
+  originWarehouseId: 'Bodega origen',
+  destinationWarehouseId: 'Bodega destino',
+  responsibleUserId: 'Responsable',
+};
+
 function validatePayload(payload) {
   const missing = [];
   for (const key of ['productId', 'recipeVersionId', 'productionLotCode', 'originWarehouseId', 'destinationWarehouseId', 'responsibleUserId']) {
-    if (!payload[key]) { missing.push(key); }
+    if (!payload[key]) { missing.push(FIELD_LABELS[key] || key); }
   }
   if (missing.length > 0) { return `Complete los campos obligatorios: ${missing.join(', ')}.`; }
   if (!Number.isFinite(payload.quantity) || payload.quantity <= 0) {
@@ -438,6 +452,196 @@ function validatePayload(payload) {
     return 'La bodega destino debe ser distinta a la bodega origen.';
   }
   return null;
+}
+
+// FR-013, FR-014, FR-015: Recipe/product applicability guidance
+function wireRecipeProductGuidance(container, recipes, products) {
+  const recipeSelect = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-recipe'));
+  const productSelect = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-product'));
+  const warningRegion = /** @type {HTMLElement|null} */ (container.querySelector('#pn-recipe-product-warning'));
+  if (!recipeSelect || !productSelect || !warningRegion) { return; }
+
+  function checkApplicability() {
+    warningRegion.style.display = 'none';
+    warningRegion.innerHTML = '';
+
+    const recipe = (recipes || []).find((r) => String(r.id) === recipeSelect.value);
+    const product = (products || []).find((p) => String(p.id) === productSelect.value);
+    if (!recipe || !product) { return; }
+
+    // Check if product.recipeId matches the selected recipe
+    if (product.recipeId && String(product.recipeId) === String(recipe.id)) {
+      warningRegion.style.display = '';
+      warningRegion.innerHTML = `
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;">
+          <p style="margin:0;font-size:.88em;color:#166534;">✓ La receta <strong>${escapeHtml(recipe.name)}</strong> está asociada al producto <strong>${escapeHtml(product.name)}</strong>.</p>
+        </div>`;
+      return;
+    }
+
+    // Mismatch — show warning
+    warningRegion.style.display = '';
+    const productRecipe = product.recipeId
+      ? (recipes || []).find((r) => String(r.id) === String(product.recipeId))
+      : null;
+    const expectedLabel = productRecipe
+      ? `La receta asociada al producto es "${escapeHtml(productRecipe.name)}".`
+      : 'El producto no tiene una receta directa asociada.';
+
+    warningRegion.innerHTML = `
+      <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:10px 14px;">
+        <p style="margin:0 0 4px;font-weight:600;font-size:.88em;color:#854d0e;">⚠️ Receta y producto no coinciden directamente</p>
+        <p style="margin:0;font-size:.84em;color:#713f12;">
+          ${expectedLabel}
+          La receta seleccionada es "${escapeHtml(recipe.name)}".
+          Si esto es intencional, puede continuar. El backend validará la combinación.
+        </p>
+      </div>`;
+  }
+
+  recipeSelect.addEventListener('change', checkApplicability);
+  productSelect.addEventListener('change', checkApplicability);
+}
+
+// FR-016, FR-018, FR-019: Pre-submit material availability preview
+function wireMaterialAvailabilityPreview(container, api, session) {
+  const productSelect = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-product'));
+  const recipeSelect = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-recipe'));
+  const versionSelect = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-recipe-version-id'));
+  const qtyInput = /** @type {HTMLInputElement|null} */ (container.querySelector('#pn-quantity'));
+  const originSelect = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-origin-wh'));
+  const previewRegion = /** @type {HTMLElement|null} */ (container.querySelector('#pn-material-availability-preview'));
+  if (!productSelect || !recipeSelect || !qtyInput || !originSelect || !previewRegion) { return; }
+
+  let debounceTimer = null;
+
+  function canPreview() {
+    const versionId = versionSelect?.value || '';
+    return productSelect.value && versionId && originSelect.value &&
+      Number(qtyInput.value) > 0;
+  }
+
+  async function fetchPreview() {
+    if (!canPreview()) {
+      previewRegion.style.display = 'none';
+      previewRegion.innerHTML = '';
+      return;
+    }
+
+    previewRegion.style.display = '';
+    previewRegion.innerHTML = `
+      <div style="background:#f0f7ff;border:1px solid #bcd;border-radius:8px;padding:12px 14px">
+        <p style="margin:0;font-size:.88em;color:#555">⏳ Consultando disponibilidad de materiales...</p>
+      </div>`;
+
+    try {
+      const result = await api.previewMaterialAvailability(session, {
+        productId: productSelect.value,
+        recipeVersionId: versionSelect?.value || '',
+        quantity: Number(qtyInput.value),
+        originWarehouseId: originSelect.value,
+      });
+
+      if (!result || !Array.isArray(result.items) || result.items.length === 0) {
+        previewRegion.innerHTML = `
+          <div style="background:#f0f7ff;border:1px solid #bcd;border-radius:8px;padding:12px 14px">
+            <p style="margin:0;font-size:.88em;color:#555">Sin requerimientos de material para esta combinación.</p>
+          </div>`;
+        return;
+      }
+
+      const rows = result.items.map((item) => {
+        const isMissing = item.missing > 0.000001;
+        const rowStyle = isMissing ? 'color:#991b1b;font-weight:600' : '';
+        return `<tr style="${rowStyle}">
+          <td style="padding:4px 0">${escapeHtml(item.productName || `#${item.productId}`)}</td>
+          <td style="text-align:right;padding:4px 0">${escapeHtml(formatQty(item.required))}</td>
+          <td style="text-align:right;padding:4px 0">${escapeHtml(formatQty(item.available))}</td>
+          <td style="text-align:right;padding:4px 0">${isMissing ? escapeHtml(formatQty(item.missing)) : '—'}</td>
+        </tr>`;
+      }).join('');
+
+      const shortageNote = result.hasShortage
+        ? `<p style="margin:8px 0 0;font-size:.84em;color:#991b1b;font-weight:600">
+            ⚠️ Hay faltantes. Considere cambiar la bodega origen, ajustar cantidad o solicitar un override.
+          </p>`
+        : `<p style="margin:8px 0 0;font-size:.84em;color:#166534">
+            ✓ Stock suficiente en la bodega seleccionada.
+          </p>`;
+
+      const bgColor = result.hasShortage ? '#fef2f2' : '#f0fdf4';
+      const borderColor = result.hasShortage ? '#fca5a5' : '#86efac';
+
+      previewRegion.innerHTML = `
+        <div style="background:${bgColor};border:1px solid ${borderColor};border-radius:8px;padding:12px 14px">
+          <p style="margin:0 0 8px;font-weight:600;font-size:.9em">📦 Disponibilidad de materiales (vista previa)</p>
+          <table style="width:100%;border-collapse:collapse;font-size:.88em">
+            <thead>
+              <tr style="border-bottom:1px solid #bcd">
+                <th style="text-align:left;padding:3px 0;color:#555">Insumo</th>
+                <th style="text-align:right;padding:3px 0;color:#555">Requerido</th>
+                <th style="text-align:right;padding:3px 0;color:#555">Disponible</th>
+                <th style="text-align:right;padding:3px 0;color:#555">Faltante</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          ${shortageNote}
+          <p style="margin:4px 0 0;font-size:.78em;color:#888">Vista previa. La validación final ocurre al crear la orden.</p>
+        </div>`;
+    } catch (err) {
+      previewRegion.innerHTML = `
+        <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 14px">
+          <p style="margin:0;font-size:.88em;color:#991b1b">
+            No se pudo consultar disponibilidad: ${escapeHtml(err?.message || 'Error de red')}.
+          </p>
+        </div>`;
+    }
+  }
+
+  function schedulePreview() {
+    if (debounceTimer) { clearTimeout(debounceTimer); }
+    debounceTimer = setTimeout(fetchPreview, 600);
+  }
+
+  productSelect.addEventListener('change', schedulePreview);
+  recipeSelect.addEventListener('change', schedulePreview);
+  if (versionSelect) { versionSelect.addEventListener('change', schedulePreview); }
+  qtyInput.addEventListener('input', schedulePreview);
+  originSelect.addEventListener('change', schedulePreview);
+}
+
+// FR-024, FR-025: Editable lot-code suggestion using PROD-YYYYMMDD-<PRODUCTCODE>-001
+function wireLotCodeSuggestion(container, products) {
+  const productSelect = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-product'));
+  const lotInput = /** @type {HTMLInputElement|null} */ (container.querySelector('#pn-lot-code'));
+  if (!productSelect || !lotInput) { return; }
+
+  let userHasEdited = false;
+  lotInput.addEventListener('input', () => { userHasEdited = lotInput.value.trim() !== ''; });
+
+  function suggestLotCode() {
+    if (userHasEdited && lotInput.value.trim() !== '') { return; }
+    const product = (products || []).find((p) => String(p.id) === productSelect.value);
+    if (!product) { return; }
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const code = product.code || product.name?.substring(0, 8)?.toUpperCase().replace(/\s+/g, '') || 'PROD';
+    lotInput.value = `PROD-${dateStr}-${code}-001`;
+  }
+
+  productSelect.addEventListener('change', suggestLotCode);
+}
+
+// FR-026: Preselect current user as responsible when in company user list
+function preselectResponsible(container, session, users) {
+  const responsibleSelect = /** @type {HTMLSelectElement|null} */ (container.querySelector('#pn-responsible'));
+  if (!responsibleSelect || !session?.user?.id) { return; }
+
+  const currentUserId = String(session.user.id);
+  const match = (users || []).find((u) => String(u.id) === currentUserId);
+  if (match) {
+    responsibleSelect.value = currentUserId;
+  }
 }
 
 function wireSubmit(container, api, session) {
@@ -542,6 +746,10 @@ async function render(container, session, _params) {
   renderForm(container, data);
   wireRecipeVersionAutoFill(container, data.recipes);
   wireIngredientsPreview(container, data.recipes, data.products);
+  wireRecipeProductGuidance(container, data.recipes, data.products);
+  wireMaterialAvailabilityPreview(container, api, session);
+  wireLotCodeSuggestion(container, data.products);
+  preselectResponsible(container, session, data.users);
   wireSubmit(container, api, session);
 }
 

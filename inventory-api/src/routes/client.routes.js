@@ -10,6 +10,7 @@ const {
   createCompanyClientSchema,
   createClientStoreSchema,
   uploadClientDocumentSchema,
+  uploadClientStoreDocumentSchema,
   createClientReferenceSchema,
   updateClientStoreCreditLimitSchema,
 } = require('../schemas/client.schema');
@@ -51,6 +52,19 @@ router.patch('/company/:clientId/stores/:storeId/credit-limit', authorizeAccessP
   try {
     return res.json(
       await clientService.updateCompanyClientStoreCreditLimit(
+        parseBigIntId(req.params.clientId, 'clientId'),
+        parseBigIntId(req.params.storeId, 'storeId'),
+        req.body,
+        req.auth,
+      ),
+    );
+  } catch (error) { return next(error); }
+});
+
+router.post('/:clientId/stores/:storeId/documents', ...highPayloadParsers, authorizeAccessPolicy('client.document.upload'), validate(uploadClientStoreDocumentSchema), async (req, res, next) => {
+  try {
+    return res.status(201).json(
+      await clientService.createCompanyClientStoreDocument(
         parseBigIntId(req.params.clientId, 'clientId'),
         parseBigIntId(req.params.storeId, 'storeId'),
         req.body,

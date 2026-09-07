@@ -532,10 +532,12 @@
     let rfqInvitations = [];
     let currentMachoteData = null;
     let currentManualInvitation = null;
+    let currentManualEligibleItems = [];
     let currentCancelInvitationId = null;
     let currentPurchaseRequestItems = [];
     let currentRfqSupplierIds = [];
     let cachedSuppliers = null;
+    let cachedQuotableProducts = null;
 
     function syncActiveRequestFromTracking() {
       const activeRequest = helpers.findTrackingRequestById(currentTrackingRequests, currentPurchaseRequestId);
@@ -706,6 +708,8 @@
         rfqInvitationsMessage.innerHTML = rootShellUi.renderInlineMessage(`Se generaron ${(results || []).length} invitación(es) correctamente.`, 'success');
         await loadRfqInvitations();
         await loadRfqTracking();
+        // Mostrar la comparación con precios de catálogo desde el momento en que se generan los RFQ.
+        await comparison.refreshForRequest(currentPurchaseRequestId);
         if (currentMachoteData) openMachoteDialogWithData(currentMachoteData);
       } catch (error) {
         rfqInvitationsMessage.innerHTML = rootShellUi.renderInlineMessage(error.message || 'Error al generar invitaciones.', 'error');
@@ -803,23 +807,98 @@
 
     // ── Cotizacion directa (sin invitacion RFQ) ───────────────────────────
 
+    /**
+     * Returns the set of product IDs from currentPurchaseRequestItems that are
+     * associated with the given supplier through the ProductSupplier catalog.
+     * Falls back to ALL product IDs when quotable-product data is unavailable.
+     */
+    function getEligibleProductIdsForSupplier(supplierIdNum) {
+      if (!supplierIdNum || !cachedQuotableProducts?.length) {
+        // No filter data available — degrade gracefully (show all, backend validates)
+        return new Set(currentPurchaseRequestItems.map((item) => Number(item.productId)));
+      }
+      return new Set(
+        cachedQuotableProducts
+          .filter((p) => (p.supplierIds || []).some((sid) => Number(sid) === supplierIdNum))
+          .map((p) => Number(p.id)),
+      );
+    }
+
+    /**
+     * Applies supplier eligibility filter to the direct quotation items table.
+     * Hides ineligible rows, disables submit when no eligible rows remain.
+     */
+    function applyDirectQuotationEligibilityFilter(supplierId) {
+      const tbody = directQuotationContent?.querySelector('#direct-q-items-body');
+      if (!tbody) return;
+
+      const supplierIdNum = supplierId ? Number(supplierId) : null;
+
+      if (!supplierIdNum) {
+        // No supplier selected — show all rows
+        Array.from(tbody.querySelectorAll('tr')).forEach((row) => { row.hidden = false; });
+        if (directQuotationSubmitButton) directQuotationSubmitButton.disabled = true;
+        return;
+      }
+
+      const eligibleProductIds = getEligibleProductIdsForSupplier(supplierIdNum);
+
+      let visibleCount = 0;
+      Array.from(tbody.querySelectorAll('tr')).forEach((row) => {
+        const productId = Number(row.getAttribute('data-product-id'));
+        const eligible = eligibleProductIds.has(productId);
+        row.hidden = !eligible;
+        if (eligible) visibleCount += 1;
+      });
+
+      if (visibleCount === 0) {
+        if (directQuotationMessage) {
+          directQuotationMessage.innerHTML = rootShellUi.renderInlineMessage(
+            'Este proveedor no tiene productos asociados en el catálogo para esta solicitud. No se puede registrar la cotización.',
+            'warning',
+          );
+        }
+        if (directQuotationSubmitButton) directQuotationSubmitButton.disabled = true;
+      } else {
+        if (directQuotationMessage) directQuotationMessage.innerHTML = '';
+        if (directQuotationSubmitButton) directQuotationSubmitButton.disabled = false;
+      }
+    }
+
     async function openDirectQuotationDialog() {
       if (!directQuotationDialog) return;
       if (directQuotationMessage) directQuotationMessage.innerHTML = '';
       if (directQuotationContent) directQuotationContent.innerHTML = '<p class="muted">Cargando proveedores...</p>';
+      if (directQuotationSubmitButton) directQuotationSubmitButton.disabled = true;
       directQuotationDialog.showModal();
 
       try {
+        // Load suppliers and quotable-product eligibility data in parallel
+        const [suppliersResult, productsResult] = await Promise.all([
+          cachedSuppliers ? Promise.resolve(cachedSuppliers) : quotationsApi.listSuppliers(session),
+          cachedQuotableProducts ? Promise.resolve(cachedQuotableProducts) : quotationsApi.listQuotableProducts(session),
+        ]);
         if (!cachedSuppliers) {
-          const result = await quotationsApi.listSuppliers(session);
-          cachedSuppliers = Array.isArray(result?.items) ? result.items
-            : Array.isArray(result) ? result : [];
+          cachedSuppliers = Array.isArray(suppliersResult?.items) ? suppliersResult.items
+            : Array.isArray(suppliersResult) ? suppliersResult : [];
+        }
+        if (!cachedQuotableProducts) {
+          cachedQuotableProducts = Array.isArray(productsResult) ? productsResult : [];
         }
         if (directQuotationContent) {
           directQuotationContent.innerHTML = renderers.renderDirectQuotationForm(
             cachedSuppliers,
             currentPurchaseRequestItems,
           );
+          // Wire supplier select → real-time eligibility filter
+          const supplierSelect = directQuotationContent.querySelector('#direct-q-supplier');
+          if (supplierSelect) {
+            supplierSelect.addEventListener('change', () => {
+              applyDirectQuotationEligibilityFilter(supplierSelect.value);
+            });
+            // Apply immediately in case a supplier is already pre-selected
+            applyDirectQuotationEligibilityFilter(supplierSelect.value);
+          }
         }
       } catch (err) {
         if (directQuotationMessage) {
@@ -837,6 +916,7 @@
 
     async function submitDirectQuotation() {
       if (!currentPurchaseRequestId) return;
+      if (directQuotationSubmitButton?.disabled) return;
       if (directQuotationMessage) directQuotationMessage.innerHTML = '';
 
       const supplierId = directQuotationContent?.querySelector('#direct-q-supplier')?.value?.trim();
@@ -892,7 +972,12 @@
           );
         }
       } finally {
-        if (directQuotationSubmitButton) { directQuotationSubmitButton.disabled = false; directQuotationSubmitButton.textContent = 'Registrar cotización'; }
+        if (directQuotationSubmitButton) {
+          directQuotationSubmitButton.textContent = 'Registrar cotización';
+          // Re-apply eligibility filter instead of blindly enabling
+          const supplierSelect = directQuotationContent?.querySelector('#direct-q-supplier');
+          applyDirectQuotationEligibilityFilter(supplierSelect?.value || '');
+        }
       }
     }
 
@@ -900,10 +985,31 @@
 
     function openManualResponseDialog(invitationId, supplierName) {
       currentManualInvitation = rfqInvitations.find((i) => String(i.id) === String(invitationId)) || { id: invitationId, supplierName };
+
+      // Prioridad 1: eligibleItems desde el tracking (getRfqTrackingSummary los incluye por invitación).
+      const trackingRequest = helpers.findTrackingRequestById(currentTrackingRequests, currentPurchaseRequestId);
+      const trackingInvitation = (trackingRequest?.invitations || []).find(
+        (inv) => String(inv.id) === String(invitationId),
+      );
+
+      if (Array.isArray(trackingInvitation?.eligibleItems) && trackingInvitation.eligibleItems.length > 0) {
+        // El backend ya calculó qué productos puede cotizar este proveedor.
+        currentManualEligibleItems = trackingInvitation.eligibleItems;
+      } else {
+        // Fallback: filtrar con cachedQuotableProducts (requiere que la cache esté cargada).
+        const supplierId = Number(
+          currentManualInvitation.supplierId || currentManualInvitation.supplier?.id || 0,
+        );
+        const eligibleProductIds = getEligibleProductIdsForSupplier(supplierId);
+        currentManualEligibleItems = currentPurchaseRequestItems.filter(
+          (item) => eligibleProductIds.has(Number(item.productId)),
+        );
+      }
+
       manualTitle.textContent = `Registrar respuesta — ${supplierName || 'Proveedor'}`;
       manualSubtitle.textContent = 'Captura la cotización recibida por correo.';
       manualMessage.innerHTML = '';
-      manualContent.innerHTML = renderers.renderManualResponseFormContent(currentManualInvitation, currentPurchaseRequestItems);
+      manualContent.innerHTML = renderers.renderManualResponseFormContent(currentManualInvitation, currentManualEligibleItems);
       manualDialog.showModal();
     }
 
@@ -939,7 +1045,8 @@
         return;
       }
 
-      const payload = helpers.buildManualResponsePayload(formData, currentPurchaseRequestItems);
+      // Usar solo los ítems elegibles que se mostraron en el form.
+      const payload = helpers.buildManualResponsePayload(formData, currentManualEligibleItems);
       manualSubmitButton.disabled = true;
       manualSubmitButton.textContent = 'Registrando...';
 
@@ -949,12 +1056,15 @@
         rfqInvitationsMessage.innerHTML = rootShellUi.renderInlineMessage('Respuesta manual registrada exitosamente.', 'success');
         await loadRfqInvitations();
         await loadRfqTracking();
+        // Refrescar comparación igual que lo hace el submit de cotización directa.
+        await comparison.refreshForRequest(currentPurchaseRequestId);
       } catch (error) {
         manualMessage.innerHTML = rootShellUi.renderInlineMessage(error.message || 'Error al registrar respuesta.', 'error');
       } finally {
         manualSubmitButton.disabled = false;
         manualSubmitButton.textContent = 'Registrar respuesta';
         currentManualInvitation = null;
+        currentManualEligibleItems = [];
       }
     }
 
@@ -1007,6 +1117,13 @@
         null, // loaded on-demand via refreshForRequest when a request is selected
         helpersBag,
       );
+
+      // Auto-cargar la comparación con la solicitud más reciente si existe.
+      // Si hay varias, muestra la primera (más reciente por orden del servidor).
+      const firstRequest = currentTrackingRequests[0];
+      if (firstRequest?.purchaseRequestId) {
+        await comparison.refreshForRequest(firstRequest.purchaseRequestId);
+      }
     }
   }
 
