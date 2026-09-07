@@ -30,6 +30,7 @@ const originals = {
   findPurchaseRequestByIdForCompany: procurementRepository.findPurchaseRequestByIdForCompany,
   updatePurchaseRequest: procurementRepository.updatePurchaseRequest,
   createSupplierQuotation: procurementRepository.createSupplierQuotation,
+  listEligibleProductSupplierLinks: procurementRepository.listEligibleProductSupplierLinks,
   findSupplierQuotationByIdForCompany: procurementRepository.findSupplierQuotationByIdForCompany,
   updateSupplierQuotation: procurementRepository.updateSupplierQuotation,
   createSupplierSelection: procurementRepository.createSupplierSelection,
@@ -54,6 +55,7 @@ function patch(overrides) {
     findPurchaseRequestByIdForCompany: overrides.findPurchaseRequestByIdForCompany || originals.findPurchaseRequestByIdForCompany,
     updatePurchaseRequest: overrides.updatePurchaseRequest || originals.updatePurchaseRequest,
     createSupplierQuotation: overrides.createSupplierQuotation || originals.createSupplierQuotation,
+    listEligibleProductSupplierLinks: overrides.listEligibleProductSupplierLinks || originals.listEligibleProductSupplierLinks,
     findSupplierQuotationByIdForCompany: overrides.findSupplierQuotationByIdForCompany || originals.findSupplierQuotationByIdForCompany,
     updateSupplierQuotation: overrides.updateSupplierQuotation || originals.updateSupplierQuotation,
     createSupplierSelection: overrides.createSupplierSelection || originals.createSupplierSelection,
@@ -419,6 +421,50 @@ test('createSupplierQuotation rejects products not present in request', async ()
   });
 });
 
+test('createSupplierQuotation rejects items from a supplier not associated through ProductSupplier', async () => {
+  let quotationCreated = false;
+  await withPatched({
+    findPurchaseRequestByIdForCompany: async () => buildRequest(),
+    findSupplierByIdForCompany: async () => ({ id: 3001n, companyId: 7n }),
+    findProductByIdForCompany: async () => ({ id: 11n, companyId: 7n, isActive: true }),
+    listEligibleProductSupplierLinks: async () => [],
+    createSupplierQuotation: async () => { quotationCreated = true; throw new Error('must not reach'); },
+  }, async () => {
+    await assert.rejects(
+      () => procurementService.createSupplierQuotation(1001n, {
+        supplierId: 3001n,
+        items: [{ productId: 11n, quantity: 5, unitPrice: 4 }],
+      }, auth),
+      (error) => error?.statusCode === 400 && error?.code === 'validation_error',
+    );
+  });
+
+  assert.equal(quotationCreated, false, 'quotation must not be persisted');
+});
+
+test('createSupplierQuotation succeeds when supplier is associated to all quoted products', async () => {
+  await withPatched({
+    findPurchaseRequestByIdForCompany: async () => buildRequest(),
+    findSupplierByIdForCompany: async () => ({ id: 3001n, companyId: 7n }),
+    findProductByIdForCompany: async () => ({ id: 11n, companyId: 7n, isActive: true }),
+    listEligibleProductSupplierLinks: async () => [{ productId: 11n }],
+    createSupplierQuotation: async (data) => buildQuotation({
+      supplierId: data.supplierId,
+      items: data.items.create.map((item, idx) => ({
+        id: BigInt(idx + 1), ...item, product: { id: item.productId, name: 'Ácido cítrico' },
+      })),
+    }),
+  }, async () => {
+    const result = await procurementService.createSupplierQuotation(1001n, {
+      supplierId: 3001n,
+      items: [{ productId: 11n, quantity: 5, unitPrice: 4 }],
+    }, auth);
+
+    assert.equal(result.supplierId, 3001n);
+    assert.equal(result.items.length, 1);
+  });
+});
+
 test('compareSupplierQuotations sorts quotations by total amount', async () => {
   // Two quotations from DIFFERENT suppliers so they are not merged.
   // supplierId must differ; buildQuotation defaults to supplierId 3001n.
@@ -501,7 +547,9 @@ test('createPurchaseOrderFromSelection requires approved selection when approval
   });
 });
 
-test('createPurchaseOrderFromSelection creates PO and closes request when selection is approved', async () => {
+test('createPurchaseOrderFromSelection creates PO and closes request when all products are covered', async () => {
+  // Request has 1 product (11n). PO covers that product → request must close.
+  let requestClosed = false;
   await withPatched({
     findPurchaseRequestByIdForCompany: async () => buildRequest(),
     findSupplierSelectionByIdForCompany: async () => buildSelection({ approvalRequired: true, approvalStatus: 'APPROVED' }),
@@ -520,13 +568,51 @@ test('createPurchaseOrderFromSelection creates PO and closes request when select
       supplier: { id: data.supplierId, name: 'Proveedor Uno' },
       items: data.items.create.map((item, index) => ({ id: BigInt(index + 1), ...item, product: { id: item.productId } })),
     }),
-    updatePurchaseRequest: async () => buildRequest({ status: 'CLOSED' }),
+    updatePurchaseRequest: async () => { requestClosed = true; return buildRequest({ status: 'CLOSED' }); },
   }, async () => {
     const result = await procurementService.createPurchaseOrderFromSelection(1001n, { selectionId: 4001n }, auth);
     assert.equal(result.status, 'DRAFT');
     assert.equal(result.items.length, 1);
     assert.equal(result.supplierId, 3001n);
   });
+  assert.equal(requestClosed, true, 'request must be closed when all products are covered');
+});
+
+test('createPurchaseOrderFromSelection leaves request OPEN when only some products are covered', async () => {
+  // Request has 2 products (11n and 12n). PO only covers product 11n → request must stay OPEN.
+  const requestWithTwoProducts = buildRequest({
+    items: [
+      { id: 1n, productId: 11n, quantity: 10, notes: null, product: { id: 11n, companyId: 7n, name: 'Ácido cítrico' } },
+      { id: 2n, productId: 12n, quantity: 5, notes: null, product: { id: 12n, companyId: 7n, name: 'Sal' } },
+    ],
+    purchaseOrders: [],
+  });
+  let requestClosed = false;
+  await withPatched({
+    findPurchaseRequestByIdForCompany: async () => requestWithTwoProducts,
+    findSupplierSelectionByIdForCompany: async () => buildSelection({ approvalRequired: false }),
+    createPurchaseOrder: async (data) => ({
+      id: 5002n,
+      companyId: data.companyId,
+      purchaseRequestId: data.purchaseRequestId,
+      quotationId: data.quotationId,
+      selectionId: data.selectionId,
+      supplierId: data.supplierId,
+      createdByUserId: data.createdByUserId,
+      status: 'DRAFT',
+      notes: data.notes,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      supplier: { id: data.supplierId, name: 'Proveedor Uno' },
+      // PO only covers product 11n — 12n is not included
+      items: [{ id: 1n, productId: 11n, quantity: 10, unitPrice: 5, notes: null, product: { id: 11n, name: 'Ácido cítrico' } }],
+    }),
+    updatePurchaseRequest: async () => { requestClosed = true; return requestWithTwoProducts; },
+  }, async () => {
+    const result = await procurementService.createPurchaseOrderFromSelection(1001n, { selectionId: 4001n }, auth);
+    assert.equal(result.status, 'DRAFT');
+  });
+  assert.equal(requestClosed, false, 'request must NOT be closed when not all products have a purchase order');
 });
 
 test('listPurchaseOrders returns tenant-scoped orders serialized by serializePurchaseOrder', async (t) => {

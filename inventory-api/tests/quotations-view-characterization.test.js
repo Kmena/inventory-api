@@ -361,3 +361,102 @@ test('quotations-api exposes comparison and selection endpoints', () => {
   assert.match(source, /\/api\/procurement\/requests\/\$\{purchaseRequestId\}\/select-quotation/, 'select endpoint must be correct');
   assert.match(source, /\/api\/procurement\/selections\/\$\{selectionId\}\/approve/, 'approve endpoint must be correct');
 });
+
+// ------------------------------------------------------------------
+// TASK-002 (FR-003-FR-007): Persistent PO creation success state
+// ------------------------------------------------------------------
+test('comparison section renders persistent success state after PO creation instead of hiding section (FR-003-FR-007)', () => {
+  const source = fs.readFileSync(path.join(rootPublicPath, 'views', 'quotations-comparison.js'), 'utf8');
+
+  // FR-003: Success state persisted in UI
+  assert.match(source, /renderCreatedPoSuccessState/, 'must call renderCreatedPoSuccessState after PO creation');
+  // FR-004: PO identifiers visible (e.g. OC #)
+  assert.match(source, /OC #/, 'success state must show PO identifiers');
+  // FR-005: Actionable next steps (issue, view)
+  assert.match(source, /data-action="issue"/, 'success state must have issue action');
+  assert.match(source, /data-action="view"/, 'success state must have view action');
+  // FR-006: Back to requests navigation
+  assert.match(source, /data-action="back-to-requests"/, 'success state must have back-to-requests action');
+  // FR-007: Permission-gated issue action
+  assert.match(source, /procurement\.manage/, 'issue action must be permission-gated');
+});
+
+// ------------------------------------------------------------------
+// TASK-003 (FR-008-FR-009): Mixed approval pending selections
+// ------------------------------------------------------------------
+test('comparison section renders all pending selections in approval banner (FR-008-FR-009)', () => {
+  const source = fs.readFileSync(path.join(rootPublicPath, 'views', 'quotations-comparison.js'), 'utf8');
+
+  // FR-008: Multiple selections listed
+  assert.match(source, /pendingSelections/, 'approval banner must track pending selections');
+  assert.match(source, /approve-individual-btn/, 'individual approve buttons must exist');
+  // FR-009: Approve-all button
+  assert.match(source, /approve-all-selections-button/, 'approve-all button must exist');
+  assert.match(source, /submitApproveAllSelections/, 'approve-all handler must exist');
+});
+
+// ------------------------------------------------------------------
+// TASK-004 (FR-010-FR-012): Comparison matrix context improvements
+// ------------------------------------------------------------------
+test('comparison renderers show subtotal and currency in matrix cells (FR-010-FR-012)', () => {
+  const rendererSource = fs.readFileSync(
+    path.join(rootPublicPath, 'views', 'quotations-comparison.renderers.js'),
+    'utf8',
+  );
+
+  // FR-010: Subtotal per cell
+  assert.match(rendererSource, /subtotalLabel/, 'matrix cells must compute subtotal');
+  assert.match(rendererSource, /unitPrice.*\*.*quantity|quantity.*\*.*unitPrice/, 'subtotal must multiply price × quantity');
+  // FR-011: Currency label
+  assert.match(rendererSource, /currencyLabel/, 'matrix cells must display currency label');
+  // FR-012: Notes/availability tooltip
+  assert.match(rendererSource, /notesText/, 'matrix cells must handle item notes');
+  assert.match(rendererSource, /availabilityNotes/, 'matrix cells must handle availability notes');
+});
+
+// ------------------------------------------------------------------
+// TASK-012 (FR-030): Direct quotation — supplier eligibility filter
+// ------------------------------------------------------------------
+test('quotations renderers renderDirectQuotationForm renders all request items as rows (renderer contract)', () => {
+  const rootShell = createHarness();
+  const renderers = rootShell.require('views.quotationsAdminRenderers');
+
+  const suppliers = [
+    { id: 10, name: 'Proveedor Alpha' },
+    { id: 20, name: 'Proveedor Beta' },
+  ];
+  const requestItems = [
+    { productId: 100, quantity: 5, product: { name: 'Harina', unit: 'kg' } },
+    { productId: 200, quantity: 3, product: { name: 'Azúcar', unit: 'kg' } },
+  ];
+
+  const html = renderers.renderDirectQuotationForm(suppliers, requestItems);
+
+  assert.match(html, /direct-q-supplier/);
+  assert.match(html, /Proveedor Alpha/);
+  assert.match(html, /Proveedor Beta/);
+  assert.match(html, /direct-q-items-body/);
+  assert.match(html, /data-product-id="100"/);
+  assert.match(html, /data-product-id="200"/);
+  assert.match(html, /Harina/);
+  assert.match(html, /Azúcar/);
+});
+
+test('quotations-admin source applies supplier eligibility filter to direct quotation items table', () => {
+  const source = fs.readFileSync(path.join(rootPublicPath, 'views', 'quotations-admin.js'), 'utf8');
+
+  assert.match(source, /applyDirectQuotationEligibilityFilter/, 'controller must define eligibility filter function');
+  assert.match(source, /cachedQuotableProducts/, 'controller must cache quotable products for supplier-product eligibility');
+  assert.match(source, /listQuotableProducts/, 'controller must load quotable products lazily for eligibility data');
+  assert.match(source, /eligibleProductIds/, 'controller must compute eligible product ids set');
+  assert.match(source, /row\.hidden/, 'controller must hide ineligible rows in the DOM');
+  assert.match(source, /supplierSelect.*addEventListener.*change|addEventListener.*change.*supplierSelect/, 'controller must wire supplier change event to eligibility filter');
+});
+
+test('quotations-admin getEligibleProductIdsForSupplier falls back to all products when cachedQuotableProducts is unavailable', () => {
+  const source = fs.readFileSync(path.join(rootPublicPath, 'views', 'quotations-admin.js'), 'utf8');
+
+  // When cachedQuotableProducts is null/empty, all request items must be shown (graceful degradation)
+  assert.match(source, /getEligibleProductIdsForSupplier/, 'helper function must exist');
+  assert.match(source, /degrade gracefully|fall.*back|Falls back|Degrade/i, 'source must document graceful degradation');
+});

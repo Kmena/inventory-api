@@ -270,27 +270,16 @@
   }
 
   function renderManualResponseDialog(invitation, request) {
-    const items = request?.items || [];
-    return `
-      <fieldset class="root-form__section">
-        <legend>Datos generales</legend>
-        <div class="root-form-grid">
-          <label>
-            <span>Moneda *</span>
-            <select id="rfq-tracking-manual-currency" name="currency" required>
-              <option value="CRC">CRC — Colón</option>
-              <option value="USD">USD — Dólar</option>
-              <option value="EUR">EUR — Euro</option>
-            </select>
-          </label>
-          <label>
-            <span>Notas</span>
-            <textarea id="rfq-tracking-manual-notes" name="notes" maxlength="2000" rows="2"></textarea>
-          </label>
-        </div>
-      </fieldset>
-      <fieldset class="root-form__section">
-        <legend>Productos de la solicitud</legend>
+    // Prefer supplier-eligible items provided by backend; fall back to all request items.
+    const items = Array.isArray(invitation?.eligibleItems)
+      ? invitation.eligibleItems
+      : (request?.items || []);
+
+    const hasItems = items.length > 0;
+
+    const itemsContent = hasItems
+      ? `
+        <p class="muted">Solo se muestran los productos asociados al proveedor según el catálogo vigente.</p>
         <div class="table-wrapper">
           <table>
             <thead>
@@ -313,6 +302,35 @@
             </tbody>
           </table>
         </div>
+      `
+      : `
+        <div class="empty-state">
+          <h4>No hay productos cotizables</h4>
+          <p class="muted">Este proveedor no tiene productos de esta solicitud asociados en el catálogo vigente. No se puede registrar una respuesta manual para esta invitación.</p>
+        </div>
+      `;
+
+    return `
+      <fieldset class="root-form__section">
+        <legend>Datos generales</legend>
+        <div class="root-form-grid">
+          <label>
+            <span>Moneda *</span>
+            <select id="rfq-tracking-manual-currency" name="currency" required>
+              <option value="CRC">CRC — Colón</option>
+              <option value="USD">USD — Dólar</option>
+              <option value="EUR">EUR — Euro</option>
+            </select>
+          </label>
+          <label>
+            <span>Notas</span>
+            <textarea id="rfq-tracking-manual-notes" name="notes" maxlength="2000" rows="2"></textarea>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset class="root-form__section" data-has-eligible-items="${hasItems ? 'true' : 'false'}">
+        <legend>Productos cotizables para este proveedor</legend>
+        ${itemsContent}
       </fieldset>
     `;
   }

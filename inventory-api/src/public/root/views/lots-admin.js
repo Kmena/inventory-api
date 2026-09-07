@@ -337,9 +337,10 @@
         try {
           await inventoryApi.updateLotQa(session, lot.lotId, payload);
           qaRegion.innerHTML = '';
-          pageMessage.innerHTML = rootShellUi.renderInlineMessage('QA del lote actualizado correctamente.');
           setShellStatus('QA registrado correctamente.');
           await loadData();
+          // Set success message after loadData() so it is not cleared by the data reload.
+          pageMessage.innerHTML = rootShellUi.renderInlineMessage('QA del lote actualizado correctamente.');
         } catch (error) {
           qaFormMessage.innerHTML = rootShellUi.renderInlineMessage(
             error.message || 'No pudimos actualizar el QA del lote. Revisa los datos e intenta nuevamente.',

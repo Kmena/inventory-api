@@ -389,8 +389,11 @@ test('rfq tracking renderers renderManualResponseDialog generates form fields wi
       { productId: 11, productName: 'Sal', quantity: 10 },
     ],
   };
-  const context = { invitationId: 1, purchaseRequestId: 5, supplierName: 'Proveedor Test', request };
-  const html = renderers.renderManualResponseDialog(context, request);
+  // Invitation provides eligibleItems: only product 10 is eligible for this supplier
+  const invitation = {
+    eligibleItems: [{ productId: 10, productName: 'Azúcar', quantity: 5 }],
+  };
+  const html = renderers.renderManualResponseDialog(invitation, request);
 
   assert.match(html, /id="rfq-tracking-manual-currency"/);
   assert.match(html, /<select/);
@@ -398,12 +401,44 @@ test('rfq tracking renderers renderManualResponseDialog generates form fields wi
   assert.match(html, /value="USD"/);
   assert.match(html, /id="rfq-tracking-manual-notes"/);
   assert.match(html, /<textarea/);
+  assert.match(html, /Productos cotizables para este proveedor/);
+  assert.match(html, /catálogo vigente/);
   assert.match(html, /id="rfq-tracking-manual-items-body"/);
   assert.match(html, /data-product-id="10"/);
-  assert.match(html, /data-product-id="11"/);
+  assert.doesNotMatch(html, /data-product-id="11"/, 'Ineligible product must not appear');
   assert.match(html, /name="quantity"/);
   assert.match(html, /name="unitPrice"/);
   assert.match(html, /name="leadTimeDays"/);
   assert.match(html, /Azúcar/);
-  assert.match(html, /Sal/);
+  assert.doesNotMatch(html, /Sal/, 'Ineligible product name must not appear');
+});
+
+test('rfq tracking renderers renderManualResponseDialog shows empty state when supplier has no eligible products', () => {
+  const rootShell = createHarness();
+  const renderers = rootShell.require('views.rfqTrackingAdminRenderers');
+  const request = {
+    purchaseRequestId: 5,
+    items: [{ productId: 10, productName: 'Azúcar', quantity: 5 }],
+  };
+  const invitation = { eligibleItems: [] };
+  const html = renderers.renderManualResponseDialog(invitation, request);
+
+  assert.match(html, /data-has-eligible-items="false"/);
+  assert.match(html, /No hay productos cotizables/);
+  assert.match(html, /No se puede registrar una respuesta manual/);
+  assert.doesNotMatch(html, /id="rfq-tracking-manual-items-body"/);
+});
+
+test('rfq tracking renderers renderManualResponseDialog falls back to request items when invitation has no eligibleItems', () => {
+  const rootShell = createHarness();
+  const renderers = rootShell.require('views.rfqTrackingAdminRenderers');
+  const request = {
+    purchaseRequestId: 5,
+    items: [{ productId: 10, productName: 'Azúcar', quantity: 5 }],
+  };
+  // Passing null/undefined invitation simulates legacy path without eligibleItems
+  const html = renderers.renderManualResponseDialog(null, request);
+
+  assert.match(html, /data-product-id="10"/);
+  assert.match(html, /Azúcar/);
 });

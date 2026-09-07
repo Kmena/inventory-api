@@ -32,7 +32,13 @@ function buildSecureLink(rawToken) {
   return `${base}/supplier-quote/?token=${encodeURIComponent(rawToken)}`;
 }
 
-function buildEmailMachote(invitation, rawToken, request) {
+/**
+ * @param {object} invitation
+ * @param {string} rawToken
+ * @param {object} request
+ * @param {Array|null} [eligibleItems]  When provided, only these items appear in the email body.
+ */
+function buildEmailMachote(invitation, rawToken, request, eligibleItems = null) {
   const supplierName = invitation.supplier?.name || 'Proveedor';
   const companyName = invitation.purchaseRequest?.company?.name || '';
   const requestTitle = request?.title || invitation.purchaseRequest?.title || 'Solicitud de cotización';
@@ -41,7 +47,10 @@ function buildEmailMachote(invitation, rawToken, request) {
     : String(invitation.expiresAt);
   const secureLink = buildSecureLink(rawToken);
 
-  const productLines = (request?.items || invitation.purchaseRequest?.items || [])
+  const itemsForEmail = Array.isArray(eligibleItems)
+    ? eligibleItems
+    : (request?.items || invitation.purchaseRequest?.items || []);
+  const productLines = itemsForEmail
     .map((item) => `- ${item.product?.name || `Producto #${item.productId}`}: ${item.quantity} unidades`)
     .join('\n');
 
@@ -156,6 +165,78 @@ async function persistExpiredInvitationsIfNeeded(invitations, db = null) {
   return Promise.all((invitations || []).map((invitation) => persistExpiredInvitationIfNeeded(invitation, db)));
 }
 
+// ─── Supplier-product eligibility helpers ────────────────────────────────────
+
+function getRequestItems(request) {
+  return request?.items || [];
+}
+
+function getRequestProductIds(request) {
+  return getRequestItems(request).map((item) => item.productId);
+}
+
+/**
+ * Filters request items to those whose product is associated with the supplier.
+ * @param {object} request
+ * @param {bigint[]} eligibleProductIds
+ */
+function filterRequestItemsByEligibility(request, eligibleProductIds) {
+  const eligibleSet = new Set((eligibleProductIds || []).map((id) => BigInt(id).toString()));
+  return getRequestItems(request).filter((item) => eligibleSet.has(BigInt(item.productId).toString()));
+}
+
+/**
+ * Queries the DB for product IDs in the request that the supplier is associated with.
+ * @param {bigint} companyId
+ * @param {bigint} supplierId
+ * @param {object} request
+ * @param {object|null} [db]
+ */
+async function getEligibleProductIdsForSupplier(companyId, supplierId, request, db = null) {
+  const links = await rfqRepository.listEligibleProductSupplierLinks(
+    companyId,
+    supplierId,
+    getRequestProductIds(request),
+    db || undefined,
+  );
+  return links.map((link) => link.productId);
+}
+
+/**
+ * Returns only the request items the supplier is eligible to quote.
+ * @param {bigint} companyId
+ * @param {bigint} supplierId
+ * @param {object} request
+ * @param {object|null} [db]
+ */
+async function getEligibleRequestItemsForSupplier(companyId, supplierId, request, db = null) {
+  const eligibleProductIds = await getEligibleProductIdsForSupplier(companyId, supplierId, request, db);
+  return filterRequestItemsByEligibility(request, eligibleProductIds);
+}
+
+/**
+ * Validates that all response items belong to the request AND are associated with the supplier.
+ * Throws 400 atomically if any item fails either check.
+ * @param {Array} responseItems
+ * @param {object} request
+ * @param {Array} eligibleItems  Result of getEligibleRequestItemsForSupplier
+ */
+function validateResponseItemsEligibility(responseItems, request, eligibleItems) {
+  const requestProductIds = new Set(getRequestProductIds(request).map((id) => BigInt(id).toString()));
+  const eligibleProductIds = new Set((eligibleItems || []).map((item) => BigInt(item.productId).toString()));
+  for (const item of responseItems) {
+    const productId = BigInt(item.productId).toString();
+    if (!requestProductIds.has(productId)) {
+      throw createHttpError(400, `Producto ${item.productId} no pertenece a esta solicitud`, 'invalid_product');
+    }
+    if (!eligibleProductIds.has(productId)) {
+      throw createHttpError(400, 'El proveedor no está asociado a uno o más productos cotizados', 'validation_error');
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function assertInvitationAvailableForInternalMutation(invitation) {
   if (invitation.status === 'RESPONDED') {
     throw createHttpError(409, 'La invitación ya fue respondida', 'already_responded');
@@ -234,15 +315,25 @@ async function createRfqInvitations(purchaseRequestId, { supplierIds }, auth, re
     if (existing) {
       throw createHttpError(409, `Ya existe una invitación activa para el proveedor ${supplier.name}`, 'duplicate_invitation');
     }
-    supplierEntries.push({ sid, supplier });
+
+    const eligibleItems = await getEligibleRequestItemsForSupplier(companyId, sid, request);
+    if (!eligibleItems.length) {
+      throw createHttpError(
+        400,
+        `El proveedor ${supplier.name || sid} no tiene productos cotizables en esta solicitud`,
+        'supplier_not_eligible',
+      );
+    }
+
+    supplierEntries.push({ sid, supplier, eligibleItems });
   }
 
   // Create all invitations atomically
   const results = await rfqRepository.transaction(async (tx) => {
     const transactionResults = [];
-    for (const { sid, supplier } of supplierEntries) {
+    for (const { sid, supplier, eligibleItems } of supplierEntries) {
       const { rawToken, tokenHash } = generateTokenPair();
-      const machote = buildEmailMachote({ supplier, purchaseRequest: request, expiresAt }, rawToken, request);
+      const machote = buildEmailMachote({ supplier, purchaseRequest: request, expiresAt }, rawToken, request, eligibleItems);
 
       const invitation = await rfqRepository.createInvitation({
         companyId,
@@ -325,7 +416,13 @@ async function refreshInvitationTemplate(invitationId, auth, req = null) {
   const { rawToken, tokenHash } = generateTokenPair();
   const ttlDays = getTokenTtlDays();
   const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
-  const machote = buildEmailMachote(invitation, rawToken, invitation.purchaseRequest);
+  const eligibleItems = await getEligibleRequestItemsForSupplier(
+    companyId, invitation.supplierId, invitation.purchaseRequest,
+  );
+  if (!eligibleItems.length) {
+    throw createHttpError(400, 'El proveedor no tiene productos cotizables en esta solicitud', 'supplier_not_eligible');
+  }
+  const machote = buildEmailMachote(invitation, rawToken, invitation.purchaseRequest, eligibleItems);
 
   const updated = await rfqRepository.updateInvitation(invitationId, {
     tokenHash,
@@ -420,11 +517,14 @@ async function getPublicInvitation(rawToken, req = null) {
   }
 
   const request = invitation.purchaseRequest;
+  const eligibleItems = await getEligibleRequestItemsForSupplier(
+    invitation.companyId, invitation.supplierId, request,
+  );
   return {
     supplierName: invitation.supplier?.name || 'Proveedor',
     requestTitle: request?.title || 'Solicitud de cotización',
     expiresAt: invitation.expiresAt,
-    items: (request?.items || []).map((item) => ({
+    items: eligibleItems.map((item) => ({
       productId: item.productId,
       productName: item.product?.name || `Producto #${item.productId}`,
       quantity: item.quantity,
@@ -459,14 +559,10 @@ async function submitPublicResponse(rawToken, responseBody, req = null) {
       await rejectPublicInvitationAccess(req, invitation, 410, 'Este enlace ha expirado', 'expired');
     }
 
-    const requestItemIds = new Set(
-      (invitation.purchaseRequest?.items || []).map((i) => i.productId.toString())
+    const eligibleItems = await getEligibleRequestItemsForSupplier(
+      invitation.companyId, invitation.supplierId, invitation.purchaseRequest, tx,
     );
-    for (const item of responseBody.items) {
-      if (!requestItemIds.has(BigInt(item.productId).toString())) {
-        throw createHttpError(400, `Producto ${item.productId} no pertenece a esta solicitud`, 'invalid_product');
-      }
-    }
+    validateResponseItemsEligibility(responseBody.items, invitation.purchaseRequest, eligibleItems);
 
     const quotation = await rfqRepository.createSupplierQuotation({
       companyId: invitation.companyId,
@@ -531,14 +627,10 @@ async function submitManualResponse(invitationId, responseBody, auth, req = null
     invitation = await persistExpiredInvitationIfNeeded(invitation, tx);
     assertInvitationAvailableForInternalMutation(invitation);
 
-    const requestItemIds = new Set(
-      (invitation.purchaseRequest?.items || []).map((i) => i.productId.toString())
+    const eligibleItems = await getEligibleRequestItemsForSupplier(
+      companyId, invitation.supplierId, invitation.purchaseRequest, tx,
     );
-    for (const item of responseBody.items) {
-      if (!requestItemIds.has(BigInt(item.productId).toString())) {
-        throw createHttpError(400, `Producto ${item.productId} no pertenece a esta solicitud`, 'invalid_product');
-      }
-    }
+    validateResponseItemsEligibility(responseBody.items, invitation.purchaseRequest, eligibleItems);
 
     const quotation = await rfqRepository.createSupplierQuotation({
       companyId,
@@ -597,12 +689,24 @@ async function submitManualResponse(invitationId, responseBody, auth, req = null
 async function getRfqTrackingSummary(auth) {
   const { companyId } = assertCompanyScope(auth);
   const requests = await rfqRepository.listRfqTrackingSummary(companyId);
-  const normalizedRequests = await Promise.all((requests || []).map(async (request) => ({
-    request,
-    invitations: await persistExpiredInvitationsIfNeeded(request.rfqInvitations || []),
-  })));
+  const normalizedRequests = await Promise.all((requests || []).map(async (request) => {
+    const invitations = await persistExpiredInvitationsIfNeeded(request.rfqInvitations || []);
+    const eligibleItemsByInvitationId = new Map();
+    for (const inv of invitations) {
+      const eligible = await getEligibleRequestItemsForSupplier(companyId, inv.supplierId, request);
+      eligibleItemsByInvitationId.set(String(inv.id), eligible.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        notes: item.notes,
+        productName: item.product?.name || `Producto #${item.productId}`,
+        unit: item.product?.unit || null,
+      })));
+    }
+    return { request, invitations, eligibleItemsByInvitationId };
+  }));
 
-  return normalizedRequests.map(({ request: req, invitations }) => {
+  return normalizedRequests.map(({ request: req, invitations, eligibleItemsByInvitationId }) => {
     const serializedInvitations = invitations.map((inv) => ({
       id: inv.id,
       purchaseRequestId: inv.purchaseRequestId,
@@ -615,6 +719,7 @@ async function getRfqTrackingSummary(auth) {
       respondedAt: inv.respondedAt,
       createdAt: inv.createdAt,
       quotationId: inv.quotationId,
+      eligibleItems: eligibleItemsByInvitationId.get(String(inv.id)) || [],
       quotation: serializeQuotationResponseSummary(inv.quotation, inv.responseSource || null),
     }));
 

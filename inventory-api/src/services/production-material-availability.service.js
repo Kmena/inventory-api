@@ -221,9 +221,108 @@ async function getAvailableLotsForStage(orderId, stageId, auth) {
   };
 }
 
+const recipeRepository = require('../repositories/recipe.repository');
+const { buildMaterialRequirements } = require('./production-planning.service');
+const { derivePlannedOutputKg } = require('./product-size-conversion.helper');
+
+/**
+ * TASK-006 (purchase-production-order-ux): Pre-order material availability preview.
+ * Computes material requirements and stock availability WITHOUT creating an order.
+ * FR-016, FR-017, FR-018, BR-007.
+ */
+async function previewMaterialAvailability(payload, auth) {
+  const scope = assertCompanyScope(auth);
+
+  const product = await productRepository.findProductById(payload.productId, scope.companyId);
+  if (!product) {
+    throw createHttpError(404, 'Producto no encontrado para la empresa autenticada', 'not_found');
+  }
+
+  const recipeVersion = await recipeRepository.findRecipeVersionById(payload.recipeVersionId, scope.companyId);
+  if (!recipeVersion) {
+    throw createHttpError(404, 'Versión de receta no encontrada para la empresa autenticada', 'not_found');
+  }
+
+  // Validate warehouse belongs to company
+  const warehouses = await productRepository.findCompanyWarehousesByIds(
+    scope.companyId,
+    [BigInt(payload.originWarehouseId)],
+  );
+  if (warehouses.length === 0) {
+    throw createHttpError(400, 'La bodega origen debe pertenecer a la empresa autenticada', 'validation_error');
+  }
+
+  // Compute scaling quantity using same logic as createProductionOrder
+  const quantityBasis = recipeVersion.quantityBasis ?? 'PER_OUTPUT_KG';
+  let scalingQuantity = Number(payload.quantity);
+  let plannedOutputKg = null;
+
+  if (quantityBasis === 'PER_OUTPUT_KG') {
+    const derived = derivePlannedOutputKg(product, Number(payload.quantity));
+    plannedOutputKg = derived.plannedOutputKg;
+    scalingQuantity = plannedOutputKg;
+  }
+
+  const requirements = buildMaterialRequirements(recipeVersion, scalingQuantity, Number(payload.quantity));
+
+  // Fetch stock for each required product in the origin warehouse
+  const productIds = [...new Set(requirements.map((r) => r.productId).filter(Boolean))];
+  const warehouseStocks = productIds.length > 0
+    ? await inventoryRepository.findWarehouseStocksByProductIds(
+        scope.companyId,
+        payload.originWarehouseId,
+        productIds,
+      )
+    : [];
+
+  const stockByProductId = new Map(
+    warehouseStocks.map((stock) => [
+      String(stock.productId),
+      Math.max(0, number(stock.quantity) - number(stock.reservedQuantity)),
+    ]),
+  );
+
+  const items = requirements.map((requirement) => {
+    const required = number(requirement.requiredQuantity);
+    const available = stockByProductId.get(String(requirement.productId)) ?? 0;
+    const missing = Math.max(0, required - available);
+    return {
+      productId: requirement.productId,
+      productName: null, // enriched below if product data is available
+      unit: requirement.unit,
+      required,
+      available,
+      missing,
+    };
+  });
+
+  // Enrich with product names
+  if (productIds.length > 0) {
+    const products = await productRepository.findProductsByIds(
+      productIds.map((pid) => BigInt(pid)),
+      scope.companyId,
+    );
+    const nameMap = new Map(products.map((p) => [String(p.id), p.name]));
+    for (const item of items) {
+      item.productName = nameMap.get(String(item.productId)) ?? null;
+    }
+  }
+
+  return {
+    recipeVersionId: payload.recipeVersionId,
+    productId: payload.productId,
+    originWarehouseId: payload.originWarehouseId,
+    quantity: Number(payload.quantity),
+    plannedOutputKg,
+    items,
+    hasShortage: items.some((item) => item.missing > 0.000001),
+  };
+}
+
 module.exports = {
   getMaterialRequirementsWithAvailability,
   getAvailableLotsForStage,
+  previewMaterialAvailability,
   __private__: {
     DEFAULT_TOLERANCE_PERCENT,
     sortLotsForAvailability,

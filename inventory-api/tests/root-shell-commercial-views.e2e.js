@@ -612,6 +612,7 @@ test('commercial views E2E: clients supports local filtering and update plus sto
   await page.waitForFunction(() => globalThis.document.querySelector('#store-dialog-form') !== null);
   await page.locator('#store-dialog-form input[name="name"]').fill('Sucursal Norte 2');
   await page.locator('#store-dialog-form select[name="subregionId"]').selectOption('102');
+  await page.locator('#store-dialog-form select[name="currency"]').selectOption('CRC');
   await page.locator('#store-dialog-form input[name="code"]').fill('SN-02');
   await page.getByRole('button', { name: 'Crear tienda' }).click();
   await page.waitForFunction(() => globalThis.document.getElementById('clients-detail-message')?.textContent?.includes('Tienda creada correctamente.'));

@@ -25,6 +25,7 @@ prisma/dev.db
 
 # Keep the audit directory ignored in public mode.
 docs/audit/**
+docs/uiux_analisis/**
 
 # Internal auxiliary technical artifacts kept out of the reviewed contract baseline.
 internal-docs/generated/**
@@ -39,3 +40,5 @@ commit-plan-*.md
 docs-cleanup-report.md
 
 specs/*
+
+CREDENCIALES-PRIVADAS.md

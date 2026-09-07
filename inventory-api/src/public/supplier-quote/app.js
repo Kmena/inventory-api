@@ -47,35 +47,8 @@
       year: 'numeric', month: 'long', day: 'numeric',
     }) : '';
 
-    contentEl.innerHTML = `
-      <article class="card root-card">
-        <div class="page-header">
-          <div>
-            <h3>${escapeHtml(data.requestTitle || 'Solicitud de cotización')}</h3>
-            <p class="muted">Proveedor: <strong>${escapeHtml(data.supplierName || '')}</strong></p>
-            ${expiresAt ? `<p class="muted">Vence: ${escapeHtml(expiresAt)}</p>` : ''}
-          </div>
-        </div>
-
-        <form id="supplier-quote-form" class="root-form">
-          <fieldset class="root-form__section">
-            <legend>Datos generales</legend>
-            <div class="root-form-grid">
-              <label>
-                <span>Moneda *</span>
-                <select id="sq-currency" name="currency" required>
-                  <option value="CRC">CRC — Colón</option>
-                  <option value="USD">USD — Dólar</option>
-                  <option value="EUR">EUR — Euro</option>
-                </select>
-              </label>
-              <label>
-                <span>Notas (opcional)</span>
-                <textarea id="sq-notes" name="notes" maxlength="2000" rows="2" placeholder="Observaciones, condiciones de pago, etc."></textarea>
-              </label>
-            </div>
-          </fieldset>
-
+    const itemsSection = items.length
+      ? `
           <fieldset class="root-form__section">
             <legend>Productos solicitados</legend>
             <div class="table-wrapper supplier-quote-items-table">
@@ -123,15 +96,60 @@
             </div>
             <p class="muted">Complete el precio unitario para cada producto que desee cotizar.</p>
           </fieldset>
+        `
+      : `
+          <fieldset class="root-form__section">
+            <legend>Productos solicitados</legend>
+            <div class="empty-state">
+              <p class="muted">Esta solicitud no tiene productos disponibles para cotizar.</p>
+            </div>
+          </fieldset>
+        `;
+
+    const submitAction = items.length
+      ? `<div class="action-row"><button id="sq-submit-button" type="button">Enviar cotización</button></div>`
+      : '';
+
+    contentEl.innerHTML = `
+      <article class="card root-card">
+        <div class="page-header">
+          <div>
+            <h3>${escapeHtml(data.requestTitle || 'Solicitud de cotización')}</h3>
+            <p class="muted">Proveedor: <strong>${escapeHtml(data.supplierName || '')}</strong></p>
+            ${expiresAt ? `<p class="muted">Vence: ${escapeHtml(expiresAt)}</p>` : ''}
+          </div>
+        </div>
+
+        <form id="supplier-quote-form" class="root-form">
+          <fieldset class="root-form__section">
+            <legend>Datos generales</legend>
+            <div class="root-form-grid">
+              <label>
+                <span>Moneda *</span>
+                <select id="sq-currency" name="currency" required>
+                  <option value="CRC">CRC — Colón</option>
+                  <option value="USD">USD — Dólar</option>
+                  <option value="EUR">EUR — Euro</option>
+                </select>
+              </label>
+              <label>
+                <span>Notas (opcional)</span>
+                <textarea id="sq-notes" name="notes" maxlength="2000" rows="2" placeholder="Observaciones, condiciones de pago, etc."></textarea>
+              </label>
+            </div>
+          </fieldset>
+
+          ${itemsSection}
         </form>
 
-        <div class="action-row">
-          <button id="sq-submit-button" type="button">Enviar cotización</button>
-        </div>
+        ${submitAction}
       </article>
     `;
 
-    document.getElementById('sq-submit-button').addEventListener('click', handleSubmit);
+    const submitButton = document.getElementById('sq-submit-button');
+    if (submitButton) {
+      submitButton.addEventListener('click', handleSubmit);
+    }
   }
 
   async function loadInvitation(token) {

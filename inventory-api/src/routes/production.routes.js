@@ -15,6 +15,7 @@ const {
   cancelWithReturnsSchema,
   recolectionConfirmSchema,
   recordReconciliationOutcomesSchema,
+  materialAvailabilityPreviewSchema,
 } = require('../schemas/production.schema');
 const { qualityInspectionSchema } = require('../schemas/quality.schema');
 const productionService = require('../services/production.service');
@@ -39,6 +40,16 @@ router.get('/orders', authorizeAccessPolicy('production.view'), async (req, res,
 router.post('/orders', authorizeAccessPolicy('production.create'), validate(createProductionOrderSchema), async (req, res, next) => {
   try {
     return res.status(201).json(await productionService.createProductionOrder(req.body, req.auth, req));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// TASK-006 (purchase-production-order-ux): Pre-order material availability preview.
+// FR-016, FR-017. Does NOT create an order — advisory preview only.
+router.post('/orders/material-availability-preview', authorizeAccessPolicy('production.create'), validate(materialAvailabilityPreviewSchema), async (req, res, next) => {
+  try {
+    return res.json(await productionMaterialAvailabilityService.previewMaterialAvailability(req.body, req.auth));
   } catch (error) {
     return next(error);
   }

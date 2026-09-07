@@ -740,6 +740,58 @@ test('production-new.js wireIngredientsPreview reacts to version select changes'
   assert.match(source, /selectedVersionId/, 'must pass selectedVersionId to renderIngredientsPreview');
 });
 
+// ------------------------------------------------------------------
+// TASK-005 (FR-024-FR-025): Lot code suggestion
+// ------------------------------------------------------------------
+test('production-new.js auto-suggests lot code with PROD-YYYYMMDD-<CODE>-001 format (FR-024, FR-025)', () => {
+  const source = readWarehouseFile('views/production-new.js');
+  assert.match(source, /wireLotCodeSuggestion/, 'must define wireLotCodeSuggestion helper');
+  assert.match(source, /PROD-/, 'lot code must use PROD- prefix');
+  assert.match(source, /pn-lot-code/, 'must reference the lot-code input element');
+  // The suggestion must be editable — user can override
+  assert.match(source, /lotInput/, 'must have reference to the lot code input');
+});
+
+// ------------------------------------------------------------------
+// TASK-005 (FR-026-FR-027): Responsible user preselection
+// ------------------------------------------------------------------
+test('production-new.js preselects the logged-in user as responsible (FR-026, FR-027)', () => {
+  const source = readWarehouseFile('views/production-new.js');
+  assert.match(source, /preselectResponsible/, 'must define preselectResponsible helper');
+  assert.match(source, /session\.user\.id/, 'must use session user id for preselection');
+  assert.match(source, /pn-responsible/, 'must reference the responsible select element');
+});
+
+// ------------------------------------------------------------------
+// TASK-006 (FR-013-FR-015): Recipe/product applicability guidance
+// ------------------------------------------------------------------
+test('production-new.js shows recipe-product applicability guidance (FR-013-FR-015)', () => {
+  const source = readWarehouseFile('views/production-new.js');
+  assert.match(source, /wireRecipeProductGuidance/, 'must define wireRecipeProductGuidance');
+  assert.match(source, /pn-recipe-product-warning/, 'must have recipe-product warning region');
+  assert.match(source, /checkApplicability/, 'must define checkApplicability function');
+  assert.match(source, /recipeId/, 'must check product recipeId for association');
+});
+
+// ------------------------------------------------------------------
+// TASK-007 (FR-016-FR-019): Material availability preview
+// ------------------------------------------------------------------
+test('production-new.js includes pre-order material availability preview (FR-016-FR-019)', () => {
+  const source = readWarehouseFile('views/production-new.js');
+  assert.match(source, /wireMaterialAvailabilityPreview/, 'must define wireMaterialAvailabilityPreview');
+  assert.match(source, /pn-material-availability-preview/, 'must have material preview region');
+  assert.match(source, /previewMaterialAvailability/, 'must call previewMaterialAvailability API');
+  assert.match(source, /hasShortage/, 'must check hasShortage in response');
+  assert.match(source, /debounceTimer/, 'must debounce preview requests');
+});
+
+test('warehouse-api.js exposes previewMaterialAvailability (FR-016)', () => {
+  const source = fs.readFileSync(path.join(warehousePath, 'api', 'warehouse-api.js'), 'utf8');
+  assert.match(source, /function previewMaterialAvailability/, 'must define previewMaterialAvailability');
+  assert.match(source, /material-availability-preview/, 'must target correct endpoint');
+  assert.match(source, /previewMaterialAvailability/, 'must register previewMaterialAvailability in module');
+});
+
 // Regression: buildStagesViewModel used `stageId` (undefined in scope) causing
 // a ReferenceError that blanked #production?id=X (statusEl hidden before the throw).
 test('production.state.js buildStagesViewModel declares stageId from stage.id before using it (blank-page fix)', () => {

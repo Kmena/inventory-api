@@ -207,8 +207,9 @@
           updateMatrixFooter();
           bindMatrixRadios();
         } else {
-          // Single supplier or all catalog → keep the simple table
-          tableRegion.innerHTML = renderers.renderComparisonTable(quotations);
+          // Single supplier or all catalog → keep the simple table.
+          // Pass activeOrderedProductIds so already-covered quotations show "OC generada" en vez del botón.
+          tableRegion.innerHTML = renderers.renderComparisonTable(quotations, activeOrderedProductIds);
           bindSelectButtons();
         }
       } catch (_error) {
@@ -369,55 +370,121 @@
       }
     }
 
-    function renderApprovalBanner(canApproveFlag, selectionId) {
-      const safeSelectionId = rootShellUi.escapeHtml(String(selectionId || ''));
-      const approveButton = canApproveFlag
-        ? `<button
-             type="button"
-             id="quotations-approve-selection-button"
-             class="secondary-button"
-             data-selection-id="${safeSelectionId}"
-             aria-label="Aprobar selección de proveedor y liberar creación de orden de compra"
-           >Aprobar selección</button>`
+    // FR-008, FR-009: Render approval banner listing ALL pending selections
+    function renderApprovalBanner(canApproveFlag, selectionIdOrSelections) {
+      const esc = rootShellUi.escapeHtml;
+
+      // Derive the full list of pending selections from currentSelectionResult
+      let pendingSelections = [];
+      if (currentSelectionResult?.selections) {
+        pendingSelections = currentSelectionResult.selections.filter(
+          (s) => s.requiresApproval || s.approvalRequired,
+        );
+      }
+      if (pendingSelections.length === 0 && selectionIdOrSelections) {
+        // Fallback: single selection
+        pendingSelections = [{ id: selectionIdOrSelections }];
+      }
+
+      const selectionList = pendingSelections.map((sel) => {
+        const selId = esc(String(sel.id || ''));
+        const supplierName = esc(sel.supplierName || sel.supplier?.name || '—');
+        const amount = sel.totalAmount ?? sel.amount ?? '—';
+        const individualBtn = canApproveFlag
+          ? `<button type="button" class="secondary-button quotations-approve-individual-btn" data-selection-id="${selId}" style="font-size:0.82rem;">Aprobar</button>`
+          : '';
+        return `
+          <div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid #fde68a;">
+            <span style="flex:1;">${supplierName} — ${esc(String(amount))}</span>
+            ${individualBtn}
+          </div>`;
+      }).join('');
+
+      const approveAllBtn = canApproveFlag && pendingSelections.length > 0
+        ? `<button type="button" id="quotations-approve-all-selections-button" style="margin-top:0.75rem;">Aprobar todas (${pendingSelections.length})</button>`
         : '';
 
       messageEl.innerHTML = `
-        <div
-          class="message warning approval-banner"
-          role="status"
-          aria-live="polite"
-        >
-          <span>Esta selección requiere aprobación gerencial antes de generar la orden de compra.</span>
-          ${approveButton}
+        <div class="message warning approval-banner" role="status" aria-live="polite">
+          <p style="margin:0 0 0.5rem;font-weight:600;">Selecciones pendientes de aprobación (${pendingSelections.length})</p>
+          <p class="muted" style="margin:0 0 0.5rem;font-size:0.84rem;">Estas selecciones requieren aprobación gerencial antes de generar las órdenes de compra.</p>
+          ${selectionList}
+          ${approveAllBtn}
         </div>
       `;
 
       if (canApproveFlag) {
-        const approveBtn = messageEl.querySelector('#quotations-approve-selection-button');
-        if (approveBtn) {
-          approveBtn.addEventListener('click', () => submitApproveSelection(selectionId));
+        // Individual approve buttons
+        messageEl.querySelectorAll('.quotations-approve-individual-btn').forEach((btn) => {
+          btn.addEventListener('click', () => submitApproveSelection(btn.getAttribute('data-selection-id'), btn));
+        });
+
+        // Approve-all button (sequential)
+        const approveAll = messageEl.querySelector('#quotations-approve-all-selections-button');
+        if (approveAll) {
+          approveAll.addEventListener('click', () => submitApproveAllSelections(pendingSelections));
         }
       }
     }
 
-    async function submitApproveSelection(selectionId) {
-      const approveBtn = messageEl.querySelector('#quotations-approve-selection-button');
-      if (approveBtn) {
-        approveBtn.disabled = true;
-        approveBtn.textContent = 'Aprobando...';
+    async function submitApproveSelection(selectionId, btn) {
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Aprobando...';
       }
-      messageEl.innerHTML = '';
 
       try {
         await quotationsApi.approveSelection(session, selectionId, {});
-        if (currentSelectionResult) {
-          openCreatePoDialog(currentSelectionResult);
+        if (btn) {
+          btn.textContent = '✓ Aprobada';
+          btn.style.color = '#166534';
         }
       } catch (error) {
-        messageEl.innerHTML = rootShellUi.renderInlineMessage(
-          error.message || 'Error al aprobar la selección.',
-          'error',
-        );
+        if (btn) {
+          btn.textContent = 'Error';
+          btn.disabled = false;
+          btn.title = error.message || 'No se pudo aprobar.';
+        }
+      }
+    }
+
+    async function submitApproveAllSelections(selections) {
+      const approveAllBtn = messageEl.querySelector('#quotations-approve-all-selections-button');
+      if (approveAllBtn) {
+        approveAllBtn.disabled = true;
+        approveAllBtn.textContent = 'Aprobando todas...';
+      }
+
+      let allSuccess = true;
+      for (const sel of selections) {
+        const individualBtn = messageEl.querySelector(`[data-selection-id="${sel.id}"]`);
+        try {
+          await quotationsApi.approveSelection(session, sel.id, {});
+          if (individualBtn) {
+            individualBtn.textContent = '✓ Aprobada';
+            individualBtn.style.color = '#166534';
+            individualBtn.disabled = true;
+          }
+        } catch (error) {
+          allSuccess = false;
+          if (individualBtn) {
+            individualBtn.textContent = 'Error';
+            individualBtn.title = error.message || 'No se pudo aprobar.';
+          }
+        }
+      }
+
+      if (approveAllBtn) {
+        approveAllBtn.textContent = allSuccess ? '✓ Todas aprobadas' : 'Aprobación parcial';
+      }
+
+      // After all approvals, open PO creation if all succeeded
+      if (allSuccess && currentSelectionResult) {
+        if (currentSelectionResult.selections) {
+          openCreatePoDialogMixed(currentSelectionResult.selections);
+        } else if (currentSelectionResult.single) {
+          openCreatePoDialog(currentSelectionResult.single);
+        }
       }
     }
 
@@ -449,6 +516,58 @@
       createPoDialog.showModal();
     }
 
+    // FR-003, FR-004, FR-005, FR-006, FR-007: Persistent success state after PO creation
+    function renderCreatedPoSuccessState(createdOrders) {
+      const esc = rootShellUi.escapeHtml;
+      const canIssue = sessionAdapter.hasPermission(session, 'procurement.manage');
+
+      const orderCards = (Array.isArray(createdOrders) ? createdOrders : [createdOrders]).map((po) => {
+        const poId = po?.id || po?.purchaseOrderId || '—';
+        const supplierName = po?.supplier?.name || po?.supplierName || '—';
+        const total = po?.totalAmount ?? po?.total ?? '—';
+        const currency = po?.currency || 'CRC';
+
+        const issueAction = canIssue
+          ? `<button type="button" class="po-success-action" data-action="issue" data-po-id="${esc(String(poId))}" style="background:var(--color-success,#16A34A);color:#fff">Emitir OC #${esc(String(poId))}</button>`
+          : '';
+
+        return `
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:0.75rem 0;border-bottom:1px solid #e5e7eb;">
+            <div style="flex:1;min-width:150px;">
+              <strong>OC #${esc(String(poId))}</strong>
+              <span class="muted" style="margin-left:0.5rem;">${esc(supplierName)}</span>
+              <span class="muted" style="margin-left:0.5rem;">${esc(String(total))} ${esc(currency)}</span>
+            </div>
+            <div class="action-row compact-action-row">
+              ${issueAction}
+              <button type="button" class="secondary-button po-success-action" data-action="view" data-po-id="${esc(String(poId))}">Ver orden de compra</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      tableRegion.innerHTML = `
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:1rem 1.25rem;">
+          <p style="margin:0 0 0.75rem;font-weight:600;font-size:1rem;color:#166534;">✓ Orden(es) de compra creada(s) correctamente</p>
+          ${orderCards}
+          <div style="margin-top:1rem;">
+            <button type="button" class="secondary-button po-success-action" data-action="back-to-requests">Volver a solicitudes</button>
+          </div>
+        </div>
+      `;
+
+      tableRegion.querySelectorAll('.po-success-action').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const action = btn.getAttribute('data-action');
+          if (action === 'view' || action === 'issue') {
+            window.location.hash = '#ordenes_compra';
+          } else if (action === 'back-to-requests') {
+            window.location.hash = '#solicitudes_compra';
+          }
+        });
+      });
+    }
+
     async function submitCreatePurchaseOrder() {
       if (!currentSelectionResult || !currentPurchaseRequestId) return;
 
@@ -457,28 +576,53 @@
       createPoMessage.innerHTML = '';
 
       try {
+        let createdOrders;
+        let requestStatus = 'CLOSED';
         if (currentSelectionResult.mixed) {
           // Batch: one request, one transaction, request closed once at the end.
           createPoSubmit.textContent = 'Creando órdenes...';
-          await quotationsApi.createPurchaseOrdersBatch(session, currentPurchaseRequestId, {
+          const result = await quotationsApi.createPurchaseOrdersBatch(session, currentPurchaseRequestId, {
             notes,
             orders: currentSelectionResult.mixed.map((sel) => ({
               selectionId: sel.id,
               items: sel.assignedItems,
             })),
           });
+          createdOrders = result?.purchaseOrders || result?.orders || (Array.isArray(result) ? result : [result]);
+          requestStatus = result?.requestStatus || 'CLOSED';
         } else {
           createPoSubmit.textContent = 'Creando orden...';
-          await quotationsApi.createPurchaseOrder(session, currentPurchaseRequestId, {
+          const result = await quotationsApi.createPurchaseOrder(session, currentPurchaseRequestId, {
             selectionId: currentSelectionResult.single.id,
             notes,
           });
+          createdOrders = [result];
+          requestStatus = result?.requestStatus || 'CLOSED';
         }
 
         createPoDialog.close();
         messageEl.innerHTML = '';
-        section.hidden = true;
         setShellStatus('Orden(es) de compra creada(s) correctamente.');
+
+        if (requestStatus === 'OPEN') {
+          // Partial order: request still has uncovered products.
+          // Reload the comparison table so the user can continue selecting
+          // providers for the remaining items.
+          await refreshForRequest(currentPurchaseRequestId);
+          const poSummary = (Array.isArray(createdOrders) ? createdOrders : [createdOrders])
+            .map((po) => {
+              const supplier = po?.supplier?.name || po?.supplierName || '—';
+              return rootShellUi.escapeHtml(supplier);
+            })
+            .join(', ');
+          messageEl.innerHTML = rootShellUi.renderInlineMessage(
+            `✓ Orden(es) de compra creada(s) para ${poSummary}. La solicitud sigue abierta — seleccioná proveedor para los productos restantes.`,
+            'success',
+          );
+        } else {
+          // All products covered: show the persistent success state.
+          renderCreatedPoSuccessState(createdOrders);
+        }
       } catch (error) {
         const msg = error.message || 'Error al crear la(s) orden(es) de compra.';
         // Scroll the dialog to top so the error is visible

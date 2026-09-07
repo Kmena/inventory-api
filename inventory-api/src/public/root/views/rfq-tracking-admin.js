@@ -161,11 +161,17 @@
           if (!request) {
             return;
           }
-          currentManualContext = { invitationId, purchaseRequestId, supplierName, request };
+          const invitation = (request.invitations || []).find(
+            (entry) => String(entry.id) === String(invitationId),
+          ) || null;
+          currentManualContext = { invitationId, purchaseRequestId, supplierName, request, invitation };
           manualTitle.textContent = `Registrar respuesta — ${supplierName}`;
           manualSubtitle.textContent = `Solicitud: ${request.title || `#${request.purchaseRequestId}`}`;
           manualMessage.innerHTML = '';
-          manualContent.innerHTML = renderers.renderManualResponseDialog(currentManualContext, request);
+          manualContent.innerHTML = renderers.renderManualResponseDialog(invitation, request);
+          const hasEligibleItems = manualContent.querySelector('[data-has-eligible-items="true"]') !== null;
+          manualSubmitButton.hidden = !hasEligibleItems;
+          manualSubmitButton.disabled = !hasEligibleItems;
           manualDialog.showModal();
         });
       });
@@ -243,7 +249,7 @@
     }
 
     async function submitManualResponse() {
-      if (!currentManualContext) {
+      if (!currentManualContext || manualSubmitButton.hidden) {
         return;
       }
 
@@ -275,7 +281,7 @@
       } catch (error) {
         manualMessage.innerHTML = rootShellUi.renderInlineMessage(error.message || 'No se pudo registrar la respuesta manual.', 'error');
       } finally {
-        manualSubmitButton.disabled = false;
+        manualSubmitButton.disabled = manualSubmitButton.hidden;
         manualSubmitButton.textContent = 'Registrar respuesta';
       }
     }

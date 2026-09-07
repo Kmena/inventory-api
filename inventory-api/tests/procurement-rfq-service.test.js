@@ -33,6 +33,9 @@ function loadRfqServiceWithStubs({ repoOverrides = {}, auditOverrides = {} } = {
     updateInvitation: async () => {
       throw new Error('updateInvitation stub not configured');
     },
+    // Default: all product IDs are eligible (pass-through so existing tests keep working)
+    listEligibleProductSupplierLinks: async (_companyId, _supplierId, productIds) =>
+      (productIds || []).map((productId) => ({ productId })),
     ...repoOverrides,
   };
 
@@ -153,7 +156,7 @@ describe('procurement RFQ service characterization', () => {
     });
 
     it('validates product belongs to request on public response', () => {
-      assert.match(serviceSource, /requestItemIds/);
+      assert.match(serviceSource, /validateResponseItemsEligibility/);
       assert.match(serviceSource, /invalid_product/);
     });
 
@@ -223,6 +226,24 @@ describe('procurement RFQ service characterization', () => {
       assert.ok(result.emailBody.includes('Producto A'));
       assert.ok(result.secureLink.includes('raw-token-xyz'));
       assert.ok(result.expiresAt instanceof Date);
+    });
+
+    it('buildEmailMachote renders only supplier-eligible items when eligibleItems is provided', () => {
+      const invitation = {
+        supplier: { name: 'Proveedor Subset' },
+        purchaseRequest: {
+          title: 'Solicitud Subset',
+          items: [
+            { productId: 10n, quantity: 5, product: { name: 'Harina' } },
+            { productId: 20n, quantity: 3, product: { name: 'Azúcar' } },
+          ],
+        },
+        expiresAt: new Date('2026-12-31'),
+      };
+      const eligibleItems = [{ productId: 10n, quantity: 5, product: { name: 'Harina' } }];
+      const result = buildEmailMachote(invitation, 'token-abc', invitation.purchaseRequest, eligibleItems);
+      assert.ok(result.emailBody.includes('Harina'));
+      assert.ok(!result.emailBody.includes('Azúcar'), 'Ineligible product must not appear in email');
     });
   });
 
@@ -386,6 +407,251 @@ describe('procurement RFQ service characterization', () => {
       assert.equal(result.supplierName, 'Proveedor Activo');
       assert.equal(result.requestTitle, 'Solicitud activa');
       assert.equal(result.items.length, 1);
+    });
+
+    it('getPublicInvitation returns only supplier-eligible request items without omitted counts', async () => {
+      const activeInvitation = {
+        id: 920n,
+        companyId: 7n,
+        purchaseRequestId: 40n,
+        supplierId: 30n,
+        status: 'PREPARED',
+        expiresAt: new Date(Date.now() + 60_000),
+        purchaseRequest: {
+          title: 'Solicitud subset',
+          items: [
+            { productId: 100n, quantity: 2, notes: null, product: { name: 'Harina', unit: 'kg' } },
+            { productId: 200n, quantity: 1, notes: null, product: { name: 'Azúcar', unit: 'kg' } },
+          ],
+        },
+        supplier: { id: 30n, name: 'Proveedor Subset', email: 'subset@example.com' },
+      };
+      const { rfqService, restore } = loadRfqServiceWithStubs({
+        repoOverrides: {
+          findInvitationByTokenHash: async () => activeInvitation,
+          listEligibleProductSupplierLinks: async () => [{ productId: 100n }],
+        },
+      });
+
+      let result;
+      try {
+        result = await rfqService.getPublicInvitation('public-raw-token');
+      } finally {
+        restore();
+      }
+
+      assert.equal(result.items.length, 1, 'only eligible item must be returned');
+      assert.equal(result.items[0].productId, 100n);
+      assert.equal(result.items[0].productName, 'Harina');
+      assert.equal(Object.hasOwn(result, 'omittedCount'), false, 'omittedCount must not be exposed');
+      assert.equal(Object.hasOwn(result, 'ineligibleItems'), false, 'ineligibleItems must not be exposed');
+    });
+
+    it('submitPublicResponse rejects ineligible product atomically — no quotation created, invitation unchanged', async () => {
+      const activeInvitation = {
+        id: 921n,
+        companyId: 7n,
+        purchaseRequestId: 41n,
+        supplierId: 31n,
+        status: 'PREPARED',
+        expiresAt: new Date(Date.now() + 60_000),
+        purchaseRequest: {
+          title: 'Solicitud pública',
+          items: [{ productId: 100n }, { productId: 200n }],
+        },
+        supplier: { id: 31n, name: 'Proveedor Público', email: 'public@example.com' },
+      };
+      let quotationCreated = false;
+      let invitationUpdated = false;
+      const { rfqService, restore } = loadRfqServiceWithStubs({
+        repoOverrides: {
+          transaction: async (work) => work({ tx: true }),
+          findInvitationByTokenHash: async () => activeInvitation,
+          listEligibleProductSupplierLinks: async () => [{ productId: 100n }],
+          createSupplierQuotation: async () => { quotationCreated = true; throw new Error('must not reach'); },
+          updateInvitation: async () => { invitationUpdated = true; return activeInvitation; },
+        },
+      });
+
+      try {
+        await assert.rejects(
+          () => rfqService.submitPublicResponse('public-raw-token', {
+            currency: 'CRC',
+            items: [{ productId: 200, quantity: 2, unitPrice: 100 }],
+          }),
+          (error) => error.statusCode === 400 && error.code === 'validation_error',
+        );
+      } finally {
+        restore();
+      }
+
+      assert.equal(quotationCreated, false, 'quotation must not be created');
+      assert.equal(invitationUpdated, false, 'invitation status must not change');
+    });
+
+    it('submitManualResponse rejects ineligible product atomically — no quotation created, invitation unchanged', async () => {
+      const activeInvitation = {
+        id: 922n,
+        companyId: 7n,
+        purchaseRequestId: 42n,
+        supplierId: 32n,
+        status: 'PREPARED',
+        expiresAt: new Date(Date.now() + 60_000),
+        purchaseRequest: {
+          title: 'Solicitud manual',
+          items: [{ productId: 100n }, { productId: 200n }],
+        },
+        supplier: { id: 32n, name: 'Proveedor Manual', email: 'manual@example.com' },
+      };
+      let quotationCreated = false;
+      let invitationUpdated = false;
+      const { rfqService, restore } = loadRfqServiceWithStubs({
+        repoOverrides: {
+          transaction: async (work) => work({ tx: true }),
+          findInvitationById: async () => activeInvitation,
+          listEligibleProductSupplierLinks: async () => [{ productId: 100n }],
+          createSupplierQuotation: async () => { quotationCreated = true; throw new Error('must not reach'); },
+          updateInvitation: async () => { invitationUpdated = true; return activeInvitation; },
+        },
+      });
+
+      try {
+        await assert.rejects(
+          () => rfqService.submitManualResponse(922n, {
+            currency: 'CRC',
+            items: [{ productId: 200, quantity: 2, unitPrice: 100 }],
+          }, { companyId: '7', sub: '1' }),
+          (error) => error.statusCode === 400 && error.code === 'validation_error',
+        );
+      } finally {
+        restore();
+      }
+
+      assert.equal(quotationCreated, false, 'quotation must not be created');
+      assert.equal(invitationUpdated, false, 'invitation status must not change');
+    });
+
+    it('createRfqInvitations rejects entire request when a supplier has zero eligible products', async () => {
+      const request = {
+        id: 43n,
+        title: 'Solicitud elegibilidad',
+        items: [{ productId: 100n, quantity: 1, product: { name: 'Harina' } }],
+      };
+      let createdInvitation = false;
+      const { rfqService, restore } = loadRfqServiceWithStubs({
+        repoOverrides: {
+          findPurchaseRequestForCompany: async () => request,
+          findSupplierForCompany: async (supplierId) => ({ id: supplierId, name: 'Proveedor Inelegible' }),
+          findActiveInvitationForSupplier: async () => null,
+          listEligibleProductSupplierLinks: async () => [],
+          createInvitation: async () => { createdInvitation = true; throw new Error('must not reach'); },
+        },
+      });
+
+      try {
+        await assert.rejects(
+          () => rfqService.createRfqInvitations(43n, { supplierIds: [31] }, { companyId: '7', sub: '1' }),
+          (error) => error.statusCode === 400 && error.code === 'supplier_not_eligible',
+        );
+      } finally {
+        restore();
+      }
+
+      assert.equal(createdInvitation, false, 'invitation must not be persisted');
+    });
+
+    it('eligible public supplier response creates quotation successfully', async () => {
+      const activeInvitation = {
+        id: 923n,
+        companyId: 7n,
+        purchaseRequestId: 44n,
+        supplierId: 33n,
+        status: 'PREPARED',
+        expiresAt: new Date(Date.now() + 60_000),
+        purchaseRequest: {
+          title: 'Solicitud elegible',
+          items: [{ productId: 100n, quantity: 5 }],
+        },
+        supplier: { id: 33n, name: 'Proveedor Elegible', email: 'ok@example.com' },
+      };
+      const createdQuotation = {
+        id: 999n, supplierId: 33n, companyId: 7n, currency: 'CRC', status: 'SUBMITTED',
+        notes: null, submittedAt: new Date(), createdAt: new Date(), updatedAt: new Date(),
+        supplier: { name: 'Proveedor Elegible', email: 'ok@example.com' },
+        items: [{ id: 1n, productId: 100n, quantity: 5, unitPrice: 20, leadTimeDays: null, availabilityNotes: null, notes: null, product: { name: 'Harina' } }],
+      };
+      let quotationCreated = false;
+      let invitationUpdated = false;
+      const { rfqService, restore } = loadRfqServiceWithStubs({
+        repoOverrides: {
+          transaction: async (work) => work({ tx: true }),
+          findInvitationByTokenHash: async () => activeInvitation,
+          listEligibleProductSupplierLinks: async () => [{ productId: 100n }],
+          createSupplierQuotation: async () => { quotationCreated = true; return createdQuotation; },
+          updateInvitation: async (_id, data) => { invitationUpdated = true; return { ...activeInvitation, ...data }; },
+        },
+      });
+
+      let result;
+      try {
+        result = await rfqService.submitPublicResponse('public-raw-token', {
+          currency: 'CRC',
+          items: [{ productId: 100, quantity: 5, unitPrice: 20 }],
+        });
+      } finally {
+        restore();
+      }
+
+      assert.equal(quotationCreated, true);
+      assert.equal(invitationUpdated, true);
+      assert.ok(result.message);
+    });
+
+    it('getRfqTrackingSummary includes eligibleItems per invitation', async () => {
+      const invitation = {
+        id: 924n,
+        companyId: 7n,
+        purchaseRequestId: 45n,
+        supplierId: 34n,
+        quotationId: null,
+        status: 'PREPARED',
+        responseSource: null,
+        expiresAt: new Date(Date.now() + 60_000),
+        respondedAt: null,
+        createdAt: new Date(),
+        supplier: { id: 34n, name: 'Proveedor Con Items', email: 'items@example.com' },
+        quotation: null,
+      };
+      const { rfqService, restore } = loadRfqServiceWithStubs({
+        repoOverrides: {
+          listRfqTrackingSummary: async () => [{
+            id: 45n,
+            title: 'Solicitud con eligibles',
+            status: 'OPEN',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            items: [
+              { id: 1n, productId: 100n, quantity: 2, notes: null, product: { name: 'Harina', unit: 'kg' } },
+              { id: 2n, productId: 200n, quantity: 1, notes: null, product: { name: 'Azúcar', unit: 'kg' } },
+            ],
+            quotations: [],
+            rfqInvitations: [invitation],
+          }],
+          listEligibleProductSupplierLinks: async () => [{ productId: 100n }],
+        },
+      });
+
+      let result;
+      try {
+        result = await rfqService.getRfqTrackingSummary({ companyId: '7', sub: '1' });
+      } finally {
+        restore();
+      }
+
+      const inv = result[0].invitations[0];
+      assert.equal(inv.eligibleItems.length, 1);
+      assert.equal(inv.eligibleItems[0].productId, 100n);
+      assert.equal(inv.eligibleItems[0].productName, 'Harina');
     });
 
     it('rejects expired invitations for internal manual response after persisting EXPIRED', async () => {
@@ -682,6 +948,10 @@ describe('procurement RFQ service characterization', () => {
 
     it('exports listRfqTrackingSummary', () => {
       assert.equal(typeof rfqRepo.listRfqTrackingSummary, 'function');
+    });
+
+    it('exports listEligibleProductSupplierLinks', () => {
+      assert.equal(typeof rfqRepo.listEligibleProductSupplierLinks, 'function');
     });
   });
 

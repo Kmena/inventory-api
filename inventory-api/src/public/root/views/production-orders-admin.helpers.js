@@ -41,6 +41,10 @@
     return sessionAdapter.hasPermission(session, 'production.approve');
   }
 
+  function canCancelProductionOrders(session, sessionAdapter) {
+    return sessionAdapter.hasPermission(session, 'production.cancel');
+  }
+
   function createDefaultFilters() {
     return {
       searchTerm: '',
@@ -216,6 +220,7 @@
     buildListQuery,
     buildProductionOrdersListSummary,
     canApproveProductionOrders,
+    canCancelProductionOrders,
     canSubmitProductionOrders,
     canViewProductionOrders,
     createDefaultFilters,
