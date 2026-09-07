@@ -593,8 +593,8 @@ test('commercial views E2E: clients supports local filtering and update plus sto
 
   await page.locator('#clients-update-form input[name="legalId"]').fill('3-101-123456');
   await page.getByRole('button', { name: 'Consultar identificacion' }).click();
-  await page.waitForFunction(() => globalThis.document.getElementById('clients-detail-message')?.textContent?.includes('Consulta completada.'));
-  await page.waitForFunction(() => globalThis.document.querySelector('#clients-update-form input[name="name"]')?.value === 'Cliente Norte Hacienda');
+  await page.waitForFunction(() => globalThis.document.getElementById('clients-detail-message')?.textContent?.includes('Datos de Hacienda cargados'));
+  await page.waitForFunction(() => globalThis.document.querySelector('#clients-update-form input[name="legalName"]')?.value === 'Cliente Norte Hacienda');
   assert.equal(state.counters.lookupTaxpayer, 1);
 
   await page.locator('#clients-update-form input[name="phone"]').fill('555-9999');
