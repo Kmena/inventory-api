@@ -3,6 +3,7 @@
   const receiptsApi = rootShell.require('receiptsApi');
   const rootShellUi = rootShell.require('ui');
   const renderers = rootShell.require('views.receiptsAdminRenderers');
+  const feedbackWidget = rootShell.has('feedbackWidget') ? rootShell.require('feedbackWidget') : null;
 
   function render() {
     return `
@@ -112,6 +113,8 @@
     refreshButton.addEventListener('click', loadReceipts);
 
     await loadReceipts();
+    // in-app-feedback nudge after receipts view loads successfully
+    if (feedbackWidget) feedbackWidget.triggerNudge('recibo', session);
   }
 
   rootShell.register('views.receiptsAdmin', {

@@ -6,6 +6,7 @@
   const productionOrdersHelpers = rootShell.require('views.productionOrdersAdminHelpers');
   const productionOrdersRenderers = rootShell.require('views.productionOrdersAdminRenderers');
   const productionOrdersState = rootShell.require('views.productionOrdersAdminState');
+  const feedbackWidget = rootShell.has('feedbackWidget') ? rootShell.require('feedbackWidget') : null;
 
   function render() {
     return `
@@ -407,6 +408,8 @@
           closeApproveConfirmDialog();
           await loadOrders(ordersDataset.pagination.page || 1);
           pageMessage.innerHTML = rootShellUi.renderInlineMessage(`✓ Orden ${approvedOrderCode} aprobada — ${approvedProductName}. Lista para iniciar en /warehouse/.`, 'success');
+          // in-app-feedback nudge after production order approval
+          if (feedbackWidget) feedbackWidget.triggerNudge('produccion', session);
         } catch (error) {
           approveDialogMessage.innerHTML = rootShellUi.renderInlineMessage(
             error?.message || 'No se pudo aprobar la orden.', 'error',

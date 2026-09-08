@@ -9,6 +9,7 @@
   const _rootShellUi   = rootShell.require('ui');
   const helpers        = rootShell.require('views.billingAdminHelpers');
   const renderers      = rootShell.require('views.billingAdminRenderers');
+  const feedbackWidget = rootShell.has('feedbackWidget') ? rootShell.require('feedbackWidget') : null;
 
   const TOAST_VISIBILITY_MS = 4000;
   let toastTimerId = null;
@@ -272,6 +273,8 @@
           }
 
           dialog.close();
+          // in-app-feedback nudge after successful payment registration
+          if (feedbackWidget) feedbackWidget.triggerNudge('billing', sess);
           // Reload receivables list to reflect updated state
           await loadReceivables();
         } catch (err) {

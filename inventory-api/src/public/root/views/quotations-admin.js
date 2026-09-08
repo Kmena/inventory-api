@@ -6,6 +6,7 @@
   const helpers = rootShell.require('views.quotationsAdminHelpers');
   const renderers = rootShell.require('views.quotationsAdminRenderers');
   const comparison = rootShell.require('views.quotationsComparison');
+  const feedbackWidget = rootShell.has('feedbackWidget') ? rootShell.require('feedbackWidget') : null;
 
   function render() {
     return `
@@ -711,6 +712,8 @@
         // Mostrar la comparación con precios de catálogo desde el momento en que se generan los RFQ.
         await comparison.refreshForRequest(currentPurchaseRequestId);
         if (currentMachoteData) openMachoteDialogWithData(currentMachoteData);
+        // in-app-feedback nudge after successful RFQ generation
+        if (feedbackWidget) feedbackWidget.triggerNudge('rfq', session);
       } catch (error) {
         rfqInvitationsMessage.innerHTML = rootShellUi.renderInlineMessage(error.message || 'Error al generar invitaciones.', 'error');
       } finally {

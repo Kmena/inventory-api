@@ -4,6 +4,7 @@
   const ui = rootShell.require('ui');
   const usersHelpers = rootShell.require('views.usersAdminHelpers');
   const usersRenderers = rootShell.require('views.usersAdminRenderers');
+  const feedbackWidget = rootShell.has('feedbackWidget') ? rootShell.require('feedbackWidget') : null;
 
   function renderInlineMessage(text, tone = 'success') {
     const cls = tone === 'error' ? 'message error' : 'message success';
@@ -295,6 +296,7 @@
         closeDialog();
         await loadUsersAndRoles();
         pageMessage.innerHTML = renderInlineMessage('Usuario creado correctamente.');
+        if (feedbackWidget) feedbackWidget.triggerNudge('usuario', session);
       } catch (error) {
         createMessage.innerHTML = renderInlineMessage(buildErrorMessage(error), 'error');
       } finally {
