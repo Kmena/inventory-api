@@ -1,286 +1,649 @@
-# Baseline Audit — Post-Implementation: TASK-012 · purchase-production-order-ux
+# Current Code Audit
+**Agent ID:** `baseline-audit-agent-5c03f7` · `code-puppy-036e14`
+**Date:** 2025-07-14
+**Repository:** `inventory-api`
+**Focus areas:** `companies-admin.js`, `feedback-admin.js`, `access-policy-registry.js` (recent changes)
 
-**Audit ID:** baseline-audit-agent-736930
-**Audit date:** 2026-11-01
-**Scope:** Focused post-implementation baseline audit for TASK-012 — Enforce supplier-product eligibility in quotation responses
-**Specification path:** `inventory-api/specs/purchase-production-order-ux/`
-**Implementation agent:** sdd-implementation-agent-d75f97
-**Previous audit score:** 8.8/10 (Acceptable)
-
-> This is a focused post-implementation baseline audit scoped to the TASK-012 amendment of the `purchase-production-order-ux` specification. The broader repository baseline (architecture, all other modules, CI/CD, Docker, general security) was last audited comprehensively and those findings remain unchanged. Focused regression tests confirm no regressions were introduced outside the TASK-012 file set. canonical `docs/**` artifacts used by the governance tests remain the authoritative source of truth for documentation correctness.
+> **Scope note:** This is a focused post-implementation baseline audit covering the bounded runtime governance changes introduced in this session. Canonical `docs/**` artifacts (current-state, architecture, action-plan) remain the source of truth for full system documentation. `docs/current-state.md` describes implemented state; `docs/architecture.md` describes active runtime architecture.
 
 ---
 
-# Executive Summary
+## Executive Summary
 
-TASK-012 enforces supplier-product eligibility across all quotation response entry points: public RFQ responses, manual RFQ responses, direct supplier quotation creation, RFQ invitation creation, email template generation, and the manual response dialog in the admin tracking view. The implementation adds 12 new tests (8 + 2 + 2) and modifies 10 files within the declared scope. No schema migration was required — the existing `ProductSupplier` / `product_suppliers` composite-key table is used as the sole eligibility authority.
+This audit covers the full repository with emphasis on the three files that received recent changes:
 
-All 6 functional requirements (FR-027 through FR-032) and 5 business rules (BR-011 through BR-015) are correctly implemented and verified by tests. Atomicity is enforced for both public and manual response submissions via database transactions. Tenant isolation is sound: the eligibility query filters by `product.companyId` via a Prisma nested-where join, and public endpoints derive `companyId` from the DB-retrieved invitation (not from user-supplied input). No SQL injection risk exists (all queries are Prisma-parameterized).
+- `src/public/root/views/companies-admin.js` — added Hacienda taxpayer lookup, identification-type dropdown, economic-activity dropdown
+- `src/public/root/views/feedback-admin.js` — added row-click detail modal, fixed `toLocaleDateString` → `toLocaleString`
+- `src/security/access-policy-registry.js` — added `'root'` to `integration.taxpayer.lookup` roles array
 
-Two pre-existing failures in `governance-baseline-sync-guardrails.test.js` were present on the branch before TASK-012 work and are caused by a stale `docs/audit/current-code-audit.md` — the file we are updating right now. They are unrelated to and not caused by TASK-012. All 99 targeted tests pass. npm run lint, npm run lint:public-runtime, npm run typecheck, and npm run build all exit cleanly.
+The repository's baseline architecture is well-structured: layered Express monolith with clear routes → services → repositories separation, Zod validation, comprehensive audit instrumentation, multi-stage Docker, non-root container user, CSP headers, and an extensive automated test suite exceeding 230 test files.
 
-Three minor findings are raised: an N+1 DB query pattern in `getRfqTrackingSummary` (Medium), exact function-body duplication of `listEligibleProductSupplierLinks` across two repository files (Low), and two missing edge-case tests (Low each). No security defects, no correctness defects, no regressions.
-
----
-
-# Overall Score
-
-**Overall Score: 8.8/10**
-
-**Verdict: Acceptable**
-
-**Score justification:**
-- All 6 FRs implemented correctly and verified by tests.
-- Atomicity enforced for both public and manual RFQ response submissions.
-- Tenant isolation correct across all code paths (public token, authenticated internal, batch invitation creation).
-- 12 new focused tests — all critical acceptance criteria have automated coverage.
-- The fall-back behavior in `renderManualResponseDialog` (when `invitation.eligibleItems` is absent) is intentionally preserved and tested.
-- N+1 query in `getRfqTrackingSummary` is a medium-severity debt item that will not impact correctness at current scale, but should be batched before the tracking summary becomes high-traffic.
-- Exact function-body duplication in two repository files is a minor debt and does not create a correctness risk.
-- Two edge-case tests (`refreshInvitationTemplate` rejection; multi-supplier batch partial eligibility) are missing, reducing confidence slightly.
-- Governance guardrail failures are pre-existing and resolved by this audit update.
-- Score held at 8.8/10 — implementation is clean and spec-complete; minor debt items are unchanged from the pre-existing debt baseline.
+**However, the recent changes introduced one confirmed functional defect**: the `companies-admin.js` view calls `clientsApi.listEconomicActivities()` which hits `GET /api/economic-activities`, but the `integration.economic-activities.list` policy was NOT updated to include `'root'`. Root users will always receive a 403 on this endpoint, and the economic-activity dropdown will silently show "No se pudieron cargar las actividades" on every page load. Additionally, the taxpayer policy change lacks a test assertion and carries a metadata inconsistency.
 
 ---
 
-# Repository Overview
+## Overall Score
 
-| Attribute | Value |
-|-----------|-------|
-| Repository root | `inventory-api/` |
-| Runtime | Node.js ≥24, Express, Prisma, PostgreSQL |
-| Frontend | Vanilla JS SPA (root-shell, warehouse-shell) |
-| Test runner | `node:test` (99/99 targeted tests pass; 2 pre-existing failures in governance guardrails) |
-| Lint | ESLint 9 — 0 warnings (backend + public runtime) |
-| Type checking | TypeScript 5 (JSDoc-driven, `tsconfig.typecheck.json`) — 0 errors |
-| Package manager | npm |
-| Container | Docker + docker-compose (dev, prod) |
-| Dependencies (prod) | 101 |
-| Dependencies (total) | 217 |
-| Vulnerabilities | 0 (per `audit-baseline.json`) |
+**6.5 / 10**
 
----
+| Factor | Assessment |
+|---|---|
+| Base architecture | Solid layered monolith, well-governed |
+| Test coverage | Extensive characterization + contract tests |
+| Docker / infrastructure | Production-grade multi-stage Dockerfile |
+| Security | Strong (CSP, CSRF, non-root, audit log) |
+| Documentation structure | Well-separated, update-log maintained |
+| Recent change — `companies-admin.js` | Broken economic-activity dropdown for root (Critical) |
+| Recent change — `feedback-admin.js` | Locale inconsistency, unescaped emoji fallback |
+| Recent change — `access-policy-registry.js` | Missing test, policy metadata inconsistency |
+| Documentation freshness | Recent changes not reflected in `docs/current-state.md` |
 
-# Current Architecture
-
-| Aspect | Observation |
-|--------|-------------|
-| Architectural style | Layered monolith (Express → services → repositories → Prisma) |
-| Module organization | Feature-area grouping in routes, services, repositories |
-| Frontend architecture | IIFE-wrapped modules registered via `window.RootShell` registry |
-| Domain separation | Service layer as primary business boundary |
-| Dependency direction | Routes → Services → Repositories → Prisma; SPAs → API wrappers → Backend |
-| Persistence | Prisma ORM over PostgreSQL |
-| Authentication | JWT + browser sessions (cookie-based) |
-| Authorization | Permission-based (`sessionAdapter.hasPermission` / `authorizeAccessPolicy`) |
-| Deployment | Docker Compose (dev/prod variants) |
-| Tenant isolation | `companyId` scoping at service layer; every repository query constrains by company |
-
-TASK-012 operates entirely within the existing service and repository layers, plus two browser SPA views (root-shell admin, public supplier-quote app). No new routes, schemas, or infrastructure were introduced. The eligibility enforcement reuses the existing `ProductSupplier` model; no architectural boundaries were violated.
+**Verdict: Needs Refactoring** (limited to the recent change slice; baseline is Acceptable)
 
 ---
 
-# Documentation Findings
+## Repository Overview
 
-| ID | Severity | Category | Location | Evidence | Impact | Recommendation |
-|----|----------|----------|----------|----------|--------|----------------|
-| AUD-P12-DOC-001 | Low | Documentation | `docs/audit/current-code-audit.md` (pre-update) | Audit file referenced `create-product-with-subcategory` spec, causing `governance-baseline-sync-guardrails.test.js` to fail on 2 assertions that probe the audit file for bounded-governance and canonical-docs phrases. The failures pre-dated TASK-012. | 2 pre-existing test failures that misleadingly appear as regressions to downstream agents. | Resolved by the current audit update. |
-| AUD-P12-DOC-002 | Low | Documentation | `specs/purchase-production-order-ux/implementation-report.md` | Report is complete and accurate. All 10 changed files listed, commands executed, validation results recorded, existing failures explained. | Positive — full implementation traceability. | None required. |
-| AUD-P12-DOC-003 | Low | Documentation | `specs/purchase-production-order-ux/tasks.md` | TASK-012 status is `Completed` with correct date, affected files, and validation evidence. Other tasks correctly remain `Pending`. | Positive — task lifecycle is correctly tracked. | None required. |
-| AUD-P12-DOC-004 | Suggestion | Documentation | `specs/purchase-production-order-ux/` | No CHANGELOG entry added for TASK-012 in `changelog.md`. The spec's changelog file exists but was not updated. | Low — internal traceability gap. | Add a TASK-012 entry to `specs/purchase-production-order-ux/changelog.md`. |
-
-**Documentation separation assessment:**
-- `docs/current-state.md`: Reflects observable current truth. Uses `p34-bounded-governance-coverage-expansion` posture correctly. ✅
-- `docs/architecture.md`: Records active architectural decisions under bounded governance posture. ✅
-- `docs/action-plan.md`: Future change planning, not conflated with implemented state. ✅
-- `specs/purchase-production-order-ux/`: Spec-scoped documentation correctly encapsulated; current/future state separation is clear. ✅
-- No mixing of current and proposed states observed.
-
----
-
-# Main Modules (Affected by TASK-012)
-
-### `src/repositories/procurement-rfq.repository.js`
-- Added: `listEligibleProductSupplierLinks(companyId, supplierId, productIds, db)` — queries `ProductSupplier` table scoped via `product.companyId` join. Deduplicates product IDs via Set → BigInt normalization. Exported correctly.
-- All pre-existing repository functions unchanged.
-
-### `src/repositories/procurement.repository.js`
-- Added: identical `listEligibleProductSupplierLinks(companyId, supplierId, productIds, db)` — same body as the RFQ repository version (see AUD-P12-002). Exported correctly.
-- All pre-existing repository functions unchanged.
-
-### `src/services/procurement-rfq.service.js`
-- Added private helpers: `getRequestItems`, `getRequestProductIds`, `filterRequestItemsByEligibility`, `getEligibleProductIdsForSupplier`, `getEligibleRequestItemsForSupplier`, `validateResponseItemsEligibility`.
-- Modified: `buildEmailMachote` — accepts optional `eligibleItems` parameter; uses it when provided, falls back to all request items when null/absent.
-- Modified: `createRfqInvitations` — validates eligibility for each supplier before entering transaction; rejects entire batch (not partial) when any supplier has zero eligible products.
-- Modified: `refreshInvitationTemplate` — calls `getEligibleRequestItemsForSupplier`; rejects with 400 when supplier has no eligible products.
-- Modified: `getPublicInvitation` — returns only eligible items in the external view; no `omittedCount` or `ineligibleItems` exposed.
-- Modified: `submitPublicResponse` — validates eligibility inside transaction before creating quotation; atomically rejects on failure.
-- Modified: `submitManualResponse` — validates eligibility inside transaction before creating quotation; atomically rejects on failure.
-- Modified: `getRfqTrackingSummary` — computes `eligibleItems` per invitation using `getEligibleRequestItemsForSupplier`; attaches result to each serialized invitation as `eligibleItems[]`.
-
-### `src/services/procurement.service.js`
-- Added: `validateSupplierProductEligibility(companyId, supplierId, items)` — calls repository, builds eligibility set, throws 400 for any unassociated item.
-- Modified: `createSupplierQuotation` — calls `validateSupplierProductEligibility` after existing request-membership and product-existence checks.
-
-### `src/public/root/views/rfq-tracking-admin.renderers.js`
-- Modified: `renderManualResponseDialog(invitation, request)` — prefers `invitation.eligibleItems` array when present (backend-supplied); falls back to `request.items` when absent (legacy/null path). Renders empty state with `data-has-eligible-items="false"` when items array is empty. Shows informational note about catalog filtering.
-
-### `src/public/root/views/rfq-tracking-admin.js`
-- Modified: `bindManualButtons` — passes full invitation object (with `eligibleItems`) to `renderManualResponseDialog`. After rendering, reads `data-has-eligible-items` attribute to gate submit button: `hidden = !hasEligibleItems`, `disabled = !hasEligibleItems`.
-
-### `src/public/supplier-quote/app.js`
-- Modified: `renderForm(data)` — when `data.items` is empty, renders an informational empty state in the items fieldset instead of a table. The submit button (`sq-submit-button`) is rendered only when `items.length > 0`. This prevents submission when a supplier has no eligible products.
+| Item | Value |
+|---|---|
+| Runtime | Node.js 24, Express 4 |
+| ORM | Prisma 5.22 |
+| Database | PostgreSQL 16 |
+| Session cache | Redis 7 |
+| Validation | Zod 3 |
+| Auth | JWT (Bearer) + Browser session (cookie + Redis) |
+| Frontend delivery | Static files served from the same Express process |
+| Test framework | `node:test` (native) |
+| Container | Docker multi-stage, non-root user `inventory` |
+| CI/CD | Not present in repository (no `.github/workflows/` or equivalent) |
 
 ---
 
-# Main Dependencies (TASK-012 scope)
+## Current Architecture
 
-No new dependencies introduced. The eligibility enforcement reuses:
-- `prisma.$transaction` — existing transaction mechanism
-- `db.productSupplier.findMany` — existing Prisma model, existing table (`product_suppliers`)
-- `createHttpError` — existing error utility
-- Existing `generateTokenPair`, `hashToken` from `secure-token`
+### Architectural Style
+Layered Express modular monolith with browser SPAs delivered from the same runtime.
 
----
+### Layer Dependency Direction (observed)
+```
+HTTP (routes/) → Service layer (services/) → Repository layer (repositories/) → Prisma → PostgreSQL
+Browser SPAs (public/) → REST API (routes/)
+```
 
-# Database Findings
+### Module Groupings
+- **Identity & Access** — `src/middlewares/`, `src/security/`, `src/services/auth.service.js`
+- **Company / Users / Roles** — `src/routes/company.routes.js`, `src/services/company.service.js`
+- **Clients / Stores** — `src/routes/client.routes.js`, `src/services/client.service.js`
+- **Products / Recipes** — `src/services/recipe.service.js`, `src/services/product.service.js`
+- **Inventory / Lots** — `src/services/inventory*.js`
+- **Production / QA** — `src/services/production*.js`, `src/services/quality*.js`
+- **Procurement / Receipts** — `src/services/procurement*.js`, `src/services/receipt.service.js`
+- **Sales / Orders / Billing / Payments** — `src/services/order.service.js`, `src/services/payment.service.js`
+- **Integrations** — `taxpayer.service.js`, `geocoding.service.js`, `economic-activity.service.js`
+- **Feedback** — `src/routes/feedback.routes.js`, `src/services/feedback.service.js`
+- **Root-shell SPA** — `src/public/root/`
+- **Warehouse SPA** — `src/public/warehouse/`
+- **Agent SPA** — `src/public/agent/`
 
-| ID | Severity | Category | Location | Evidence | Impact | Recommendation |
-|----|----------|----------|----------|----------|--------|----------------|
-| AUD-P12-DB-001 | Medium | Performance | `src/services/procurement-rfq.service.js` → `getRfqTrackingSummary` | One `listEligibleProductSupplierLinks` query is executed **per invitation** inside a sequential loop over all open purchase requests. For N requests with M invitations each, this is N×M additional DB round-trips on every tracking page load. | Acceptable at current scale (small number of open requests + invitations). Will degrade under load as procurement volume grows. | Batch the eligibility queries by grouping unique (supplierId, productIds) pairs and executing a single broader query, or add a dedicated aggregate query. Document as known N+1 pattern. |
-| AUD-P12-DB-002 | Low | Correctness | `ProductSupplier` schema | `ProductSupplier` has no `companyId` column. Tenant scoping is achieved through the `product.companyId` join in `listEligibleProductSupplierLinks`. This is correct because `Product.companyId` is the canonical ownership field. | Correct behavior — no data isolation risk. | No action required, but a code comment explaining the indirect company scoping would improve maintainability. |
+### Persistence Strategy
+- Prisma ORM with BigInt PKs throughout (except `feedback.id` which is Int/serial by design decision DEC-004)
+- Additive SQL migrations (no destructive migrations observed)
+- No float money fields observed — money handled via integer/BigInt cents or locale-formatted strings
 
-No new migrations, no schema changes, no unsafe column additions.
+### Authentication
+- Dual path: Bearer JWT (API/mobile) and browser-session cookie (SPA)
+- `authenticate.js` middleware handles both paths
+- Sessions stored in Redis (production) or memory (dev/test)
+- CSRF protection via origin check for state-changing cookie-session requests
 
----
-
-# API Findings
-
-| ID | Severity | Category | Location | Evidence | Impact | Recommendation |
-|----|----------|----------|----------|----------|--------|----------------|
-| AUD-P12-API-001 | Low | Contract | `GET /api/public/supplier-quotations/:token` | Response shape correctly omits `omittedCount` and `ineligibleItems`. Test `AUD-P12-TST-001` verifies `Object.hasOwn(result, 'omittedCount') === false` and `Object.hasOwn(result, 'ineligibleItems') === false`. | FR-027 / BR-015 fully met — no internal catalog data exposed to external suppliers. | None required. |
-| AUD-P12-API-002 | Low | Contract | `POST /api/public/supplier-quotations/:token/response` | 400 with code `validation_error` is returned atomically when any item is ineligible. Quotation row and invitation status mutation are both rolled back. | FR-028 / BR-012 correctly enforced. | None required. |
-| AUD-P12-API-003 | Low | Contract | `POST /api/procurement/requests/:id/rfq-invitations` | 400 with code `supplier_not_eligible` is returned when any submitted supplier has zero eligible products. Entire request is rejected — no partial invitations created. | FR-031 / BR-014 correctly enforced. | None required. |
-
----
-
-# Container Findings
-
-No container changes introduced by TASK-012. Pre-existing Docker configuration is unchanged.
-
----
-
-# Security Findings
-
-| ID | Severity | Category | Location | Evidence | Impact | Recommendation |
-|----|----------|----------|----------|----------|--------|----------------|
-| AUD-P12-SEC-001 | Low | Tenant Isolation | `listEligibleProductSupplierLinks` (both repositories) | The eligibility query does not filter by `supplierId.companyId` directly. It filters via `product: { companyId }` join. The `supplierId` passed to the function is always pre-validated by `findSupplierForCompany` (RFQ path) or by the authenticated scope chain (procurement path) before this call. Defense-in-depth is present via the `product.companyId` join. | Low risk: the indirect scoping is correct and `supplierId` is always caller-validated before reaching this function. | Add a short JSDoc comment on `listEligibleProductSupplierLinks` explaining the tenant scoping strategy (indirect via `product.companyId`, supplierId pre-validated by caller). |
-| AUD-P12-SEC-002 | Low | Information Disclosure | `getPublicInvitation` | Eligible items are silently filtered for the external view. The supplier does not learn how many products were omitted, which suppliers are associated with which products, or any internal catalog detail. This is the correct posture per FR-027 / BR-015. | Positive — no catalog internals exposed. | None required. |
-| AUD-P12-SEC-003 | Low | Input Validation | `validateResponseItemsEligibility` | Two separate checks are applied sequentially: (1) product belongs to the purchase request; (2) product is associated with the supplier through `ProductSupplier`. A response cannot bypass the request-membership check by providing an eligible-but-out-of-scope product. | Correct defense-in-depth layering. | None required. |
-
-No SQL injection risks (all queries use Prisma ORM parameterized operations). No secrets or credentials in source. No command injection surfaces. No path traversal. No new authentication or authorization concerns introduced.
+### Authorization
+- Role-based and permission-based access via `access-policy-registry.js` + `access-policies.js`
+- Actor-scope validation layer (`access-policy-actor-scope.js`) for company/global-root/agent scoping
+- All denials recorded via `audit.recordAuditEventSafelyIfAvailable()`
 
 ---
 
-# Testing Findings
+## Documentation Findings
 
-| ID | Severity | Category | Location | Evidence | Impact | Recommendation |
-|----|----------|----------|----------|----------|--------|----------------|
-| AUD-P12-TST-001 | Low | Missing Coverage | `tests/procurement-rfq-service.test.js` | `refreshInvitationTemplate` zero-eligible-products rejection path is implemented in the service but has no dedicated test. The service code at line 422–424 throws 400 `supplier_not_eligible` when `eligibleItems.length === 0`, but no test exercises this branch. | Low confidence that this branch behaves correctly if the service is refactored. | Add one test: invitation found, invitation available, but `listEligibleProductSupplierLinks` returns `[]` → expect 400 `supplier_not_eligible`. |
-| AUD-P12-TST-002 | Low | Missing Coverage | `tests/procurement-rfq-service.test.js` | `createRfqInvitations` only tests the single-supplier zero-eligible case. No test covers: two suppliers submitted, first is eligible, second has zero eligible products → entire batch rejected, zero invitations created. | BR-014 states any ineligible supplier fails the whole request. The partial-batch failure path is untested for multi-supplier inputs. | Add one test with two suppliers where only the first is eligible; assert `createInvitation` is never called. |
-| AUD-P12-TST-003 | Low | Test Stability | `tests/governance-baseline-sync-guardrails.test.js` | Two tests fail because the audit file was stale before this update. These tests are pre-existing; TASK-012 did not cause them. | Downstream agents may misread them as TASK-012 regressions. | Resolved by the current audit file update. |
-| AUD-P12-TST-004 | Low | Missing Coverage | `src/public/supplier-quote/app.js` | The empty-items state rendering in `app.js` (no submit button when `items.length === 0`) is not covered by any characterization test. | Low risk — this is pure client-side rendering with no server-side consequence (backend validates eligibility independently). | Add a characterization test verifying the empty state renders correctly and `sq-submit-button` is absent when items is `[]`. |
+### Documentation Structure Evaluation
 
-**Test coverage summary (TASK-012 additions):**
+| File | Purpose | Separation Quality |
+|---|---|---|
+| `docs/current-state.md` | Observable current truth | ✅ Clear, well-maintained with per-section update log |
+| `docs/architecture.md` | Active architecture decisions | ✅ Describes implemented state only |
+| `docs/action-plan.md` | Future change planning | ✅ Clearly separated from current state |
+| `docs/tasks.md` | Task tracking | ✅ Task-level; does not mix states |
+| `docs/coding_standard.md` (canonical) | Coding standards | ✅ Properly owned |
+| `docs/coding_standard.md` (bridge) | Compatibility bridge | ✅ Redirects to canonical |
 
-| Test file | New tests | What is verified |
-|-----------|-----------|-----------------|
-| `tests/procurement-rfq-service.test.js` | +8 | Stub default (all-eligible pass-through); `buildEmailMachote` eligible-item filtering; `getPublicInvitation` subset + no-omitted-count; `submitPublicResponse` ineligible rejection (atomic); `submitManualResponse` ineligible rejection (atomic); `createRfqInvitations` zero-eligible rejection; eligible public submission happy path; `getRfqTrackingSummary` `eligibleItems` per invitation. |
-| `tests/procurement-foundation.test.js` | +2 | `createSupplierQuotation` ineligible rejection (quotation not created); eligible quotation creation happy path. |
-| `tests/rfq-tracking-view-characterization.test.js` | +2 | `renderManualResponseDialog` shows only eligible items (ineligible product absent from HTML); empty-state rendering when `eligibleItems` is `[]`. |
-| **Total** | **12** | All 6 FRs and 5 BRs have automated coverage. |
+Documentation separation is **excellent**. Future-state and current-state are clearly delimited. The action plan explicitly marks what is and isn't implemented. No penalty is assessed for the existence of `action-plan.md` or `tasks.md` — these are properly scoped to future work.
 
 ---
 
-# Maintainability Findings
-
-| ID | Severity | Category | Location | Evidence | Impact | Recommendation |
-|----|----------|----------|----------|----------|--------|----------------|
-| AUD-P12-MNT-001 | Low | Duplication | `src/repositories/procurement-rfq.repository.js` and `src/repositories/procurement.repository.js` | `listEligibleProductSupplierLinks` is defined with identical bodies in both files. 12 lines of exact duplication. | If the query logic needs to change (e.g. adding a filter, fixing a bug), both files must be updated together. Risk of drift. | Extract to a shared utility module (e.g. `src/repositories/product-supplier.repository.js` or `src/lib/product-supplier-eligibility.js`) and import from both repositories. |
-| AUD-P12-MNT-002 | Medium | Performance Debt | `src/services/procurement-rfq.service.js` → `getRfqTrackingSummary` | Sequential `await getEligibleRequestItemsForSupplier(...)` inside a nested loop over requests × invitations. See AUD-P12-DB-001. | Latency grows linearly with the product of (open requests) × (invitations per request). | Same recommendation as AUD-P12-DB-001 — batch the eligibility queries. |
-| AUD-P12-MNT-003 | Low | Naming | `src/services/procurement-rfq.service.js` | The `getEligibleProductIdsForSupplier` and `getEligibleRequestItemsForSupplier` functions are private helpers not exported in the module's `exports` block. This is correct, but JSDoc `@returns` tags are missing on the two async eligibility helpers, reducing IDE discoverability. | Minimal — purely cosmetic. | Add `@returns` JSDoc tags to `getEligibleProductIdsForSupplier` and `getEligibleRequestItemsForSupplier`. |
-
----
-
-# Technical Debt
-
-Debt introduced by TASK-012:
-1. **AUD-P12-MNT-001** — function duplication across two repository files (Low)
-2. **AUD-P12-DB-001 / AUD-P12-MNT-002** — N+1 query per invitation in `getRfqTrackingSummary` (Medium)
-
-Pre-existing debt not introduced by TASK-012 (unchanged from previous audit):
-- `mount()` size in several admin view controllers (pre-existing High)
-- vm harness structural gap in characterization tests (pre-existing Medium)
-- Intentionally partial OpenAPI coverage (governance posture — not a defect)
+### AUD-DOC-001
+- **ID:** AUD-DOC-001
+- **Severity:** Medium
+- **Category:** Documentation — Missing Update (current-state truth drift)
+- **Location:** `docs/current-state.md` (update log table, §1 System overview, §4 Existing domains)
+- **Evidence:** The update log's last entry is `2026-11-01`. The following code changes are not reflected:
+  - `companies-admin.js`: Hacienda taxpayer lookup, identification-type `<select>`, economic-activity `<select>`
+  - `feedback-admin.js`: row-click detail modal (`openDetailModal`), `toLocaleString` date fix
+  - `access-policy-registry.js`: `'root'` added to `integration.taxpayer.lookup`
+- **Impact:** `docs/current-state.md` no longer accurately describes current code truth for these three files. Downstream agents and developers relying on it will have incorrect information about root-user taxpayer-lookup behavior and the feedback admin view capabilities.
+- **Recommendation:** Append a row to the MAINT-002 update log table and update §1 and §4 to reflect: (a) root can now call `GET /api/taxpayers/lookup`; (b) `companies-admin.js` wires Hacienda lookup and economic-activity dropdown via `clientsApi`; (c) `feedback-admin.js` includes a row-click detail modal.
 
 ---
 
-# Behavior to Preserve
+## Main Modules
 
-| # | Behavior | Location | Notes |
-|---|----------|----------|-------|
-| BP-001 | Eligible supplier-product public RFQ response creates a `SupplierQuotation` and marks invitation as `RESPONDED` | `submitPublicResponse` | Verified by AUD-P12-TST regression test. |
-| BP-002 | Eligible supplier-product manual RFQ response creates a `SupplierQuotation` and marks invitation as `RESPONDED` | `submitManualResponse` | Consistent with public path. |
-| BP-003 | Eligible direct quotation creation via `createSupplierQuotation` succeeds | `procurement.service.js` | Verified by `procurement-foundation.test.js` happy-path test. |
-| BP-004 | Public RFQ view silently omits ineligible products — no count, no reason disclosed | `getPublicInvitation` | Critical for BR-015. Verified by test. |
-| BP-005 | RFQ invitation creation proceeds correctly when all submitted suppliers are eligible | `createRfqInvitations` | Pre-existing behavior; not regressed. |
-| BP-006 | `renderManualResponseDialog` falls back to all request items when `invitation.eligibleItems` is absent or null | `rfq-tracking-admin.renderers.js` | Legacy/backward-compatible path; explicitly tested. |
-| BP-007 | Expired/cancelled/responded invitation status checks remain operative for public and internal paths | `submitPublicResponse`, `submitManualResponse` | Pre-existing behavior; not regressed. |
-| BP-008 | `buildEmailMachote` falls back to all request items when `eligibleItems` parameter is null/absent | `procurement-rfq.service.js` | Preserves backward compatibility for call sites that don't supply eligible items. |
-
----
-
-# Known Defects
-
-No new defects introduced by TASK-012. Pre-existing defect DEF-PRD-002 from previous audits is unchanged and unrelated to this implementation.
+| Module | File(s) | Responsibility | Size |
+|---|---|---|---|
+| App bootstrap | `src/app.js` | Express setup, CSP, route mounting | 10.7 KB |
+| Auth middleware | `src/middlewares/authenticate.js` | JWT + cookie-session dual auth | 5.6 KB |
+| Access policy registry | `src/security/access-policy-registry.js` | Frozen policy map (role/permission mode) | 22.1 KB |
+| Access policies engine | `src/security/access-policies.js` | Policy lookup + actor-scope guard | 1.7 KB |
+| Companies admin view | `src/public/root/views/companies-admin.js` | Root-shell company CRUD + Hacienda lookup | 20.3 KB |
+| Feedback admin view | `src/public/root/views/feedback-admin.js` | Root-shell feedback list + detail modal | 10.9 KB |
+| Taxpayer service | `src/services/taxpayer.service.js` | Hacienda HTTP adapter + response normalization | 3.0 KB |
+| Economic activity service | `src/services/economic-activity.service.js` | In-memory activity catalog (15 entries) | 1.5 KB |
+| Clients API (browser) | `src/public/root/clients-api.js` | Browser wrapper for client + integration endpoints | 7.3 KB |
+| Companies API (browser) | `src/public/root/companies-api.js` | Browser wrapper for company CRUD | 1.1 KB |
+| Feedback API (browser) | `src/public/root/feedback-api.js` | Browser wrapper for feedback endpoints | 1.2 KB |
 
 ---
 
-# Architectural Debt
+## Main Dependencies
 
-| ID | Severity | Category | Location | Evidence | Impact | Recommendation |
-|----|----------|----------|----------|----------|--------|----------------|
-| AUD-P12-AD-001 | Low | Repository Coupling | Both `procurement-rfq.repository.js` and `procurement.repository.js` | Two repositories own the same DB query for `ProductSupplier` eligibility. Neither is the canonical owner. | Low current risk; drift risk as the codebase evolves. | Extract to a product-supplier–specific repository module or shared DB helper. Not required for TASK-012 scope. |
-| AUD-P12-AD-002 | Medium | Service Complexity | `src/services/procurement-rfq.service.js` | `getRfqTrackingSummary` now does eligibility resolution in-memory per invitation, adding a new responsibility (eligibility transformation) to a function that was already responsible for loading, normalizing, and serializing RFQ tracking data. | Function is growing; N+1 pattern embedded in serialization path. | Consider extracting the eligibility enrichment as a post-load decoration step, separate from serialization. |
-
----
-
-# Unknown Behavior
-
-| # | Behavior | Location | Reason Unknown |
-|---|----------|----------|----------------|
-| UNK-001 | Behavior of `getRfqTrackingSummary` under concurrent access when invitations are being expired mid-request | `persistExpiredInvitationsIfNeeded` + eligibility loop | Expiration mutation + eligibility query are not inside a single atomic transaction in the tracking summary path. Race conditions are unlikely given current scale but not analyzed. |
-| UNK-002 | Manual browser behavior of the supplier-quote empty state (`app.js`) | `src/public/supplier-quote/app.js` | The empty-state rendering is logically correct but not covered by any characterization test. Manual validation is listed as pending in the implementation report. |
-| UNK-003 | Behavior when `invitation.purchaseRequest` is `null` inside `submitPublicResponse` transaction | `procurement-rfq.service.js` | `getEligibleRequestItemsForSupplier` calls `getRequestProductIds(request)` which returns `[]` when request is null, causing `listEligibleProductSupplierLinks` to short-circuit and return `[]`. `validateResponseItemsEligibility` would then reject every item with `validation_error`. This is probably the right behavior, but is not explicitly tested. |
+| Package | Version | Role |
+|---|---|---|
+| `express` | ^4.22.2 | HTTP framework |
+| `@prisma/client` | ^5.22.0 | ORM |
+| `bcrypt` | ^6.0.0 | Password hashing |
+| `jsonwebtoken` | ^9.0.2 | JWT signing/verification |
+| `zod` | ^3.23.8 | Request validation |
+| `cors` | ^2.8.5 | CORS handling |
+| `morgan` | ^1.11.0 | Request logging |
+| `dotenv` | ^16.6.1 | Env var loading |
+| Redis client | Not declared in `package.json` | Session store (requires clarification) |
 
 ---
 
-# Critical Risks
+## Database Findings
 
-No critical risks introduced by TASK-012. The pre-existing critical risks documented in the previous audit remain unchanged.
+### Schema Quality (general)
+- BigInt PKs throughout (consistent)
+- Additive migrations only; no destructive migrations observed in `prisma/migrations/`
+- Indexes on filtered columns (`feedback_resolved_idx`, `feedback_created_at_idx`, `feedback_company_id_idx`)
+- `feedback` table uses denormalized user info (no FK to User or Company) — documented design decision (DEC-004) for audit resilience
+- No float money columns observed
+- `created_at` / `updated_at` audit columns on main entities
+
+### AUD-DB-001
+- **ID:** AUD-DB-001
+- **Severity:** Low
+- **Category:** Schema — Type Mismatch
+- **Location:** `prisma/migrations/20261015000000_add_feedback_table/migration.sql`, `company_id INTEGER`
+- **Evidence:** `company_id INTEGER` in `feedback` — intentionally denormalized without FK. Company PKs elsewhere are BigInt. If company IDs ever exceed `Integer.MAX_VALUE` (~2.1 billion), the `company_id` column would overflow.
+- **Impact:** Low for current scale, but a latent type inconsistency.
+- **Recommendation:** Document the expected ID range for this column or change to `BIGINT` if consistency is preferred.
 
 ---
 
-# Recommended Priorities
+## API Findings
 
-| Priority | ID | Action | Rationale |
-|----------|----|--------|-----------|
-| 1 | AUD-P12-TST-001 | Add test for `refreshInvitationTemplate` zero-eligible rejection | Small effort, covers an implemented but untested branch |
-| 2 | AUD-P12-TST-002 | Add test for multi-supplier batch partial eligibility rejection | BR-014 behavior; low effort |
-| 3 | AUD-P12-DB-001 / AUD-P12-MNT-002 | Batch eligibility queries in `getRfqTrackingSummary` | Prevents latency regression as procurement volume grows |
-| 4 | AUD-P12-MNT-001 / AUD-P12-AD-001 | Extract `listEligibleProductSupplierLinks` to a shared module | Eliminates duplication and establishes a canonical owner |
-| 5 | AUD-P12-TST-004 | Add characterization test for `app.js` empty-items state | Low effort; completes coverage of the public supplier UI path |
+### AUD-001 — CRITICAL
+- **ID:** AUD-001
+- **Severity:** Critical
+- **Category:** Authorization — Broken Endpoint Access for Recent Feature
+- **Location:** `src/security/access-policy-registry.js` (line ~396, `integration.economic-activities.list`); `src/public/root/views/companies-admin.js` (EA select population block in `mount()`)
+- **Evidence:**
+  ```js
+  // access-policy-registry.js
+  'integration.economic-activities.list': {
+    mode: 'role',
+    roles: ['admin', 'sales'],   // ← 'root' NOT added
+    boundary: 'tenant-operational',
+    transition: 'documented-legacy-role',
+  },
+
+  // companies-admin.js mount()
+  clientsApi.listEconomicActivities(session)   // ← called by root users
+    .then((activities) => { /* populate eaSelect */ })
+    .catch(() => {
+      eaSelect.innerHTML = '<option value="">No se pudieron cargar las actividades</option>';
+    });
+  ```
+  - `companies-admin.js` is exclusively accessible to `root` users (its route is protected by `company.root-companies.list` with `actorScope: 'global-root'`).
+  - `clientsApi.listEconomicActivities()` calls `GET /api/economic-activities`.
+  - That route is guarded by `authorizeAccessPolicy('integration.economic-activities.list')` which calls `authorize('admin', 'sales')`.
+  - Root users always fail this check with 403.
+  - The `.catch()` swallows the error silently.
+- **Impact:** The economic-activity dropdown in the company creation form is **permanently broken for all root users**. No error is surfaced to the user. The update to `integration.taxpayer.lookup` (adding `'root'`) was applied but the parallel update to `integration.economic-activities.list` was not.
+- **Recommendation:** Add `'root'` to `roles` in `integration.economic-activities.list` in `access-policy-registry.js`. This is a one-line change that mirrors the fix already applied to `integration.taxpayer.lookup`.
 
 ---
 
-*Audit produced by baseline-audit-agent-736930 · TASK-012 scope · purchase-production-order-ux · 2026-11-01*
+### AUD-002
+- **ID:** AUD-002
+- **Severity:** Medium
+- **Category:** Policy Metadata — Boundary Inconsistency
+- **Location:** `src/security/access-policy-registry.js` line ~390, `integration.taxpayer.lookup`
+- **Evidence:**
+  ```js
+  'integration.taxpayer.lookup': {
+    mode: 'role',
+    roles: ['root', 'admin', 'sales'],
+    boundary: 'tenant-operational',      // ← misleading after adding 'root'
+    transition: 'documented-legacy-role',
+  },
+  ```
+  `'root'` is a platform-global actor (`companyId = null`). `boundary: 'tenant-operational'` indicates this policy applies only to actors inside a company tenant. Adding `'root'` without updating `boundary` creates a metadata inconsistency.
+- **Impact:** Any tooling or documentation that relies on the `boundary` field to classify endpoint scope will misclassify this endpoint as company-scoped only.
+- **Recommendation:** Update `boundary` to `'multi-scope'` or split the policy into a platform variant and a tenant variant. At minimum, add a JSDoc comment clarifying that root access is permitted for the company-creation workflow.
+
+---
+
+### AUD-003
+- **ID:** AUD-003
+- **Severity:** Medium
+- **Category:** Cross-Domain Coupling
+- **Location:** `src/public/root/views/companies-admin.js` lines 2–3
+- **Evidence:**
+  ```js
+  const companiesApi = rootShell.require('companiesApi');
+  const clientsApi = rootShell.require('clientsApi');  // ← cross-domain dependency
+  ```
+  `companies-admin.js` (platform-global root view) depends on `clientsApi` (designed for company-scoped client management) to call `lookupTaxpayer` and `listEconomicActivities`. These are integration utilities first introduced in the clients-admin context and reused here for convenience.
+- **Impact:** The company management view is tightly coupled to the client management API module. Changes to `clientsApi`'s public interface could silently break `companies-admin.js`. This coupling is invisible from the module manifest.
+- **Recommendation:** In the long term, extract `lookupTaxpayer` and `listEconomicActivities` to a shared `integrationApi` module accessible from both workspaces. In the short term, add a comment in `companies-admin.js` explaining why these specific functions from `clientsApi` are reused here.
+
+---
+
+### AUD-004
+- **ID:** AUD-004
+- **Severity:** Low
+- **Category:** DRY Violation — Duplicated UX Logic
+- **Location:** `src/public/root/views/companies-admin.js` (lines 224–278), `src/public/root/views/clients-admin.js` (taxpayer lookup block)
+- **Evidence:** Both views implement a function named `runTaxpayerLookup()` with identical structure: disable button, call `clientsApi.lookupTaxpayer()`, auto-populate form fields, handle errors, re-enable button. The blur-trigger and click-trigger wiring is structurally identical in both views.
+- **Impact:** Any bug fix or UX improvement to the taxpayer lookup flow must be applied in two separate places.
+- **Recommendation:** Extract the taxpayer lookup UX pattern into a shared helper (e.g., `integrationHelpers.attachTaxpayerLookup(container, clientsApi, session, { fieldMapping })`) reusable from both views.
+
+---
+
+## Security Findings
+
+### AUD-005
+- **ID:** AUD-005
+- **Severity:** Low
+- **Category:** XSS — Defense in Depth Gap
+- **Location:** `src/public/root/views/feedback-admin.js`, `renderRatingEmoji()` function (and its call sites in `renderFeedbackRow` and `openDetailModal`)
+- **Evidence:**
+  ```js
+  const RATING_EMOJI = { 1: '😞', 2: '😐', 3: '😊', 4: '😄', 5: '🤩' };
+
+  function renderRatingEmoji(rating) {
+    return RATING_EMOJI[rating] || String(rating);  // ← String(rating) not escaped
+  }
+  // Called as:
+  `<td>${renderRatingEmoji(item.rating)}</td>`
+  `<h2 ...>${renderRatingEmoji(item.rating)} ${renderCategoryLabel(item.category)}</h2>`
+  ```
+  The fallback `String(rating)` is injected directly into the HTML template without `ui.escapeHtml()`. By contrast, `renderCategoryLabel()` correctly uses `ui.escapeHtml(String(category))` on its fallback path.
+- **Impact:** If `rating` is outside 1–5 (data corruption, future schema change, direct DB insert), the raw value enters the DOM unescaped. The `createFeedbackSchema` validates `z.number().int().min(1).max(5)` at submission time, which significantly reduces practical risk. However, the defense-in-depth gap is inconsistent with the rest of the file.
+- **Recommendation:** Change the fallback to `ui.escapeHtml(String(rating))`. Negligible cost, eliminates the risk.
+
+---
+
+### AUD-006
+- **ID:** AUD-006
+- **Severity:** Suggestion
+- **Category:** Security — Inline Styles in Modal
+- **Location:** `src/public/root/views/feedback-admin.js`, `openDetailModal()` function
+- **Evidence:** The feedback detail modal is constructed with extensive inline CSS (`style="..."` attributes):
+  ```js
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:10000', ...
+  ].join(';');
+  // And in innerHTML:
+  style="background:#fff;color:#1e293b;border-radius:12px;padding:24px;..."
+  ```
+- **Impact:** Not a direct security vulnerability, but inline styles increase `style-src` attack surface if the CSP ever needs tightening. The rest of the SPA uses `styles.css` for presentation. This modal is an outlier that is harder to restyle globally.
+- **Recommendation:** Extract modal styles to `styles.css` using CSS classes. This is consistent with how other overlays and dialogs are styled in the SPA.
+
+---
+
+## Container Findings
+
+### Dockerfile Assessment
+
+| Check | Status |
+|---|---|
+| Multi-stage build | ✅ `base → build → runtime` |
+| Non-root user | ✅ `USER inventory` (created in runtime stage) |
+| Node.js image (major version pinned) | ✅ `node:24-bullseye-slim` |
+| Dev dependencies excluded | ✅ `npm prune --omit=dev` in build stage |
+| Health check present | ✅ `HEALTHCHECK` with `/health/ready` endpoint |
+| Port exposed | ✅ `EXPOSE 2500` |
+| Secrets in image | ✅ Not present; only `.env.example` copied |
+| Image digest pinned | ⚠️ No digest hash — floating tag `24-bullseye-slim` |
+
+### AUD-CONT-001
+- **ID:** AUD-CONT-001
+- **Severity:** Low
+- **Category:** Container — Floating Image Tag
+- **Location:** `Dockerfile` line 1
+- **Evidence:** `FROM node:24-bullseye-slim AS base` — no digest hash pinning.
+- **Impact:** A base image update could introduce unexpected behavior in production builds.
+- **Recommendation:** Pin to a specific digest (e.g., `node:24-bullseye-slim@sha256:...`) for production stability.
+
+---
+
+## Testing Findings
+
+### Test Suite Quality
+
+The test suite is extensive: 230+ test files using Node's native `node:test` runner. Test categories observed: characterization, contract, migration validation, governance, service unit, and browser E2E (Playwright). Coverage is broad across the main domain areas.
+
+### AUD-TEST-001
+- **ID:** AUD-TEST-001
+- **Severity:** High
+- **Category:** Testing — Missing Assertion for New Policy Change
+- **Location:** `tests/taxpayer-characterization.test.js`, test named "taxpayer lookup route keeps admin and sales role restrictions"
+- **Evidence:**
+  ```js
+  test('taxpayer lookup route keeps admin and sales role restrictions', async () => {
+    // Verifies: warehouse role → 403 ✅
+    // Verifies: admin role → allowed ✅
+    // Verifies: sales role → allowed ✅
+    // Missing: root role → allowed ← NOT TESTED after policy change
+  });
+  ```
+  The `integration.taxpayer.lookup` policy was recently updated to `roles: ['root', 'admin', 'sales']`. No existing test verifies that `root` is now allowed. The test label ("keeps admin and sales role restrictions") is now incorrect — it omits `root`.
+- **Impact:** If the policy change is accidentally reverted, no test would catch it. The test provides false confidence about the complete set of authorized roles.
+- **Recommendation:** Add:
+  ```js
+  const rootAllowedError = await runGuard(guard, { role: 'root', companyId: null });
+  assert.equal(rootAllowedError, undefined);
+  ```
+  Update the test name to: `'taxpayer lookup route allows root, admin and sales; denies all others'`.
+
+---
+
+### AUD-TEST-002
+- **ID:** AUD-TEST-002
+- **Severity:** Medium
+- **Category:** Testing — Missing Feature Coverage
+- **Location:** `tests/` (no characterization file for the new `companies-admin.js` features)
+- **Evidence:** Searching for `companiesAdmin` in tests yields only surface/smoke/router registration references. No test characterizes: (a) the `runTaxpayerLookup()` flow, (b) the EA dropdown population via `clientsApi.listEconomicActivities`, (c) the identification-type select structure. The critical defect (AUD-001) would have been detectable via a test that verifies EA endpoint access under a root session.
+- **Impact:** New companies-admin features are fully uncharacterized. Regressions in the lookup or dropdown behavior will not be caught by the automated test suite.
+- **Recommendation:** Create `tests/companies-admin-view-characterization.test.js` covering:
+  1. Registration of `views.companiesAdmin`
+  2. Render HTML structure (form fields, EA select, lookup button)
+  3. Source contract: `clientsApi.lookupTaxpayer` and `clientsApi.listEconomicActivities` are called
+  4. Source contract: identification-type select contains the 4 CR options
+  5. Static check: EA select has `id="companies-ea-select"` to confirm wiring
+
+---
+
+### AUD-TEST-003
+- **ID:** AUD-TEST-003
+- **Severity:** Low
+- **Category:** Testing — Missing Detail Modal Coverage
+- **Location:** `tests/feedback-admin-view-characterization.test.js`
+- **Evidence:** The 10 existing tests for `feedback-admin.js` cover registration, render structure, and static source contracts. None characterizes `openDetailModal()` behavior, `data-feedback-id` row attribute presence, or the `formatDate()` locale.
+- **Impact:** The detail modal — the main behavioral addition in this change — is untested. The locale bug (AUD-MAINT-001) would be caught by a test that calls `formatDate()` and inspects the locale string.
+- **Recommendation:** Add tests for:
+  1. `renderFeedbackRow()` output includes `data-feedback-id` attribute
+  2. Source contains `openDetailModal` reference (static contract)
+  3. Source uses `toLocaleString` (not just `toLocaleDateString`) after the fix
+
+---
+
+## Maintainability Findings
+
+### AUD-MAINT-001
+- **ID:** AUD-MAINT-001
+- **Severity:** Medium
+- **Category:** Inconsistent Locale
+- **Location:** `src/public/root/views/feedback-admin.js`, `formatDate()` function (line 26)
+- **Evidence:**
+  ```js
+  function formatDate(dateStr, opts) {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleString('es', opts);  // ← 'es' (generic Spanish)
+  }
+  ```
+  All other date/time formatting in the repository consistently uses `'es-CR'` (Costa Rican Spanish):
+  - `src/public/root/ui.js`: `toLocaleDateString('es-CR', ...)`
+  - `src/public/root/views/billing-admin.helpers.js`: `toLocaleDateString('es-CR', ...)`
+  - `src/public/root/views/lots-admin.helpers.js`: `toLocaleDateString('es-CR', ...)`
+  - `src/public/warehouse/views/inventory.js`: `toLocaleDateString('es-CR', ...)`
+  - `src/public/root/views/movements-admin.helpers.js`: `toLocaleString('es-CR', ...)`
+
+  The fix from `toLocaleDateString` → `toLocaleString` was correct (to include time), but the locale was not corrected from `'es'` to `'es-CR'`.
+- **Impact:** Dates in the feedback admin view may display with a different format (month name style, separator characters) than the rest of the UI. Minor but visible inconsistency for end users.
+- **Recommendation:** Change `'es'` to `'es-CR'` in `feedback-admin.js` `formatDate()`.
+
+---
+
+### AUD-MAINT-002
+- **ID:** AUD-MAINT-002
+- **Severity:** Low
+- **Category:** Hardcoded Domain Values in HTML Template
+- **Location:** `src/public/root/views/companies-admin.js`, `render()` function (fiscalConfig fieldset)
+- **Evidence:**
+  ```html
+  <select name="fiscalConfig.identificationType" required>
+    <option value="">Selecciona</option>
+    <option value="01">01 — Cédula Física</option>
+    <option value="02">02 — Cédula Jurídica</option>
+    <option value="03">03 — DIMEX</option>
+    <option value="04">04 — NITE</option>
+  </select>
+  ```
+  These Costa Rica-specific identification type codes are hardcoded in the view's `render()` function. A similar pattern exists in `clients-admin.js` (observed via the `canLookupTaxpayer` / economic-activity wiring context).
+- **Impact:** Any change to the catalog requires changes in multiple view files. Low risk for a single-country deployment, but creates duplication.
+- **Recommendation:** Extract CR identification types to a shared constant (e.g., `src/public/root/constants.js`) and render options dynamically. This avoids the same values appearing in multiple views.
+
+---
+
+### AUD-MAINT-003
+- **ID:** AUD-MAINT-003
+- **Severity:** Low
+- **Category:** Fragile Reset Logic
+- **Location:** `src/public/root/views/companies-admin.js`, form submit handler (post-success block)
+- **Evidence:**
+  ```js
+  form.reset();
+  form.querySelector('[name="fiscalConfig.defaultBranchCode"]').value = '001';
+  form.querySelector('[name="fiscalConfig.defaultTerminalCode"]').value = '00001';
+  form.querySelector('[name="fiscalConfig.haciendaEnvironment"]').value = 'STAGING';
+  ```
+  After `form.reset()`, three fields are manually re-seeded. The `<input>` elements already have `value="001"` and `value="00001"` in the HTML template, so `form.reset()` should restore them via `defaultValue`. The `<select>` for `haciendaEnvironment` does need manual restoration if the user changed it. The duplication is partially redundant and partially necessary, but not clearly documented.
+- **Impact:** If new default-valued fields are added to the form, developers may forget to include them in this reset block.
+- **Recommendation:** Consolidate post-reset restoration into a named `resetFormToDefaults()` function with a comment explaining which fields require manual reset (only `<select>` elements where `defaultValue` is not `form.reset()`-restored by all browsers).
+
+---
+
+### AUD-MAINT-004
+- **ID:** AUD-MAINT-004
+- **Severity:** Suggestion
+- **Category:** Hardcoded Static Catalog (Architectural Debt)
+- **Location:** `src/services/economic-activity.service.js`
+- **Evidence:**
+  ```js
+  const ACTIVITIES = [
+    { code: '471101', name: 'Venta al por menor en supermercados' },
+    // ... 14 more entries — total: 15
+  ];
+  ```
+  Costa Rica's CIIU-4 classification has several hundred codes. The current list is a minimal subset used as a placeholder.
+- **Impact:** Users creating companies or clients can only see 15 activities in the dropdown. If the taxpayer lookup returns a code not in the list, the fallback `new Option(...)` path is used in both `companies-admin.js` and `clients-admin.js`. The dropdown's primary usefulness is limited.
+- **Recommendation:** Either expand the catalog from the official CIIU-4 source, load it from the Hacienda API at startup, or store it in the database via a seeded reference table.
+
+---
+
+### AUD-MAINT-005
+- **ID:** AUD-MAINT-005
+- **Severity:** Suggestion
+- **Category:** Authorization Model Ambiguity
+- **Location:** `src/security/access-policy-registry.js` (mode: 'role' policies), `prisma/migrations/20261010000000_backfill_integration_taxpayer_permissions/migration.sql`
+- **Evidence:** The route `GET /api/taxpayers/lookup` uses `mode: 'role'` (checks `req.auth.role`). The database also has a permission named `integration.taxpayer.lookup` (assigned to root/admin/sales via backfill migration). Because the route's policy uses `mode: 'role'`, the DB permission has no effect on access control for this route. However, the permission name mirrors the policy ID exactly, creating an apparent dual authorization system.
+- **Impact:** Developers may incorrectly assume that granting the `integration.taxpayer.lookup` DB permission to a new role is sufficient to enable access. In practice, only the policy registry `roles` array controls access for role-mode policies.
+- **Recommendation:** Add a comment in `access-policy-registry.js` clarifying that `mode: 'role'` checks `req.auth.role` (not DB permissions) and that DB permissions govern UI-level permission gating only.
+
+---
+
+## Technical Debt
+
+### Summary of Active Debt
+
+| ID | Severity | Description |
+|---|---|---|
+| AUD-001 | Critical | `integration.economic-activities.list` missing `'root'` → EA dropdown broken for root |
+| AUD-002 | Medium | `integration.taxpayer.lookup` boundary metadata inconsistent after adding root |
+| AUD-003 | Medium | `companies-admin.js` depends on `clientsApi` (cross-domain coupling) |
+| AUD-004 | Low | Taxpayer lookup UX duplicated between `companies-admin.js` and `clients-admin.js` |
+| AUD-MAINT-004 | Suggestion | Hardcoded 15-entry economic activity catalog (incomplete CIIU-4) |
+| AUD-MAINT-005 | Suggestion | Dual authorization signal: DB permission + role-mode policy for same resource |
+
+---
+
+## Behavior to Preserve
+
+| # | Behavior | Location |
+|---|---|---|
+| BP-001 | Taxpayer lookup normalizes Hacienda responses (`name`, `email`, `phone`, `economicActivityCode`, `economicActivityName`) | `src/services/taxpayer.service.js` |
+| BP-002 | Lookup auto-populates `legalName`, `company.name`, `email`, `phone` on company create form | `src/public/root/views/companies-admin.js` `runTaxpayerLookup()` |
+| BP-003 | Lookup fires on field blur (if non-empty) and on explicit button click | `src/public/root/views/companies-admin.js` event listeners |
+| BP-004 | On successful lookup, economic activity option is added as a new `<option>` if the code is not already in the select | `src/public/root/views/companies-admin.js` `runTaxpayerLookup()` |
+| BP-005 | Lookup button is disabled during in-flight request and re-enabled when complete (success or error) | `src/public/root/views/companies-admin.js` `runTaxpayerLookup()` |
+| BP-006 | Feedback row click opens the detail modal; resolve button click resolves the item WITHOUT opening the modal (close-first-check pattern) | `src/public/root/views/feedback-admin.js` delegated click handler |
+| BP-007 | Detail modal is dismissed on Escape key, backdrop click, or close-button click | `src/public/root/views/feedback-admin.js` `openDetailModal()` |
+| BP-008 | `currentItems` (in-memory list) is the source of truth for modal data — no extra API call on row click | `src/public/root/views/feedback-admin.js` `mount()` |
+| BP-009 | `root` role is now permitted to call `GET /api/taxpayers/lookup` | `src/security/access-policy-registry.js` |
+| BP-010 | `feedback.list-global` and `feedback.resolve` policies allow `root` only (not admin, not sales) | `src/security/access-policy-registry.js` |
+| BP-011 | Taxpayer lookup is rate-limited per user via `taxpayerLookupThrottle` | `src/routes/taxpayer.routes.js` |
+| BP-012 | Identification number is stripped of non-digits before the Hacienda HTTP call | `src/services/taxpayer.service.js` |
+| BP-013 | Only one feedback detail overlay can exist at a time (existing overlay removed before creating a new one) | `src/public/root/views/feedback-admin.js` `openDetailModal()` |
+
+---
+
+## Known Defects
+
+### DEF-001 — CRITICAL
+**Economic activity dropdown always broken for root users**
+
+`companies-admin.js` calls `clientsApi.listEconomicActivities(session)` → `GET /api/economic-activities`. The route requires `integration.economic-activities.list` policy, which has `roles: ['admin', 'sales']`. Root users always receive 403. The `.catch()` block swallows the error silently; the dropdown shows "No se pudieron cargar las actividades." This is a direct consequence of updating `integration.taxpayer.lookup` to include `'root'` but not applying the same change to `integration.economic-activities.list`.
+
+**Workaround:** If the taxpayer lookup returns an economic activity code, the code is manually added as an `<option>` in the select via `runTaxpayerLookup()`. This partially compensates but only when a successful lookup occurs.
+
+---
+
+### DEF-002 — MEDIUM
+**Feedback date formatting uses generic `'es'` locale instead of `'es-CR'`**
+
+`formatDate()` in `feedback-admin.js` uses `new Date(dateStr).toLocaleString('es', opts)`. All other views use `'es-CR'`. The date fix (`toLocaleDateString` → `toLocaleString`) was correct, but the locale was not updated.
+
+---
+
+### DEF-003 — LOW
+**`renderRatingEmoji()` fallback not HTML-escaped**
+
+`String(rating)` is injected without `ui.escapeHtml()` when rating is outside {1,2,3,4,5}. Schema validation limits ratings to 1–5, making practical exploitation unlikely, but the defense-in-depth gap exists.
+
+---
+
+## Architectural Debt
+
+### ARCH-001 — Cross-domain module dependency
+`companies-admin.js` (platform-global root view) depends on `clientsApi` (company-scoped client management module) for `lookupTaxpayer` and `listEconomicActivities`. See AUD-003.
+
+### ARCH-002 — Policy boundary metadata inconsistency
+`integration.taxpayer.lookup` has `boundary: 'tenant-operational'` but now includes `'root'` (platform-global actor). See AUD-002.
+
+### ARCH-003 — Hardcoded incomplete economic activity catalog
+`economic-activity.service.js` has 15 hardcoded CIIU-4 entries. The full catalog has hundreds. See AUD-MAINT-004.
+
+### ARCH-004 — Dual authorization signal for role-mode policies
+DB-level permissions for `integration.taxpayer.lookup` / `integration.economic-activities.list` have no runtime effect because the routes use `mode: 'role'`. See AUD-MAINT-005.
+
+### ARCH-005 — Inline styles in feedback detail modal
+`openDetailModal()` constructs the modal entirely with inline CSS, inconsistent with the SPA's `styles.css` pattern. See AUD-006.
+
+---
+
+## Unknown Behavior
+
+### UNK-001
+**Redis client package not declared in `package.json`**
+`src/services/browser-session-redis.store.js` uses Redis but no Redis client package (`ioredis`, `redis`) appears in `package.json`. The actual package and its version are unknown without inspecting the lockfile.
+**Status: Requires clarification.**
+
+### UNK-002
+**Race condition between EA select population and taxpayer lookup auto-select**
+In `companies-admin.js`, `clientsApi.listEconomicActivities()` is fire-and-forget (not awaited). `runTaxpayerLookup()` checks `!eaSelect.value` before adding the activity option. If the lookup resolves before the EA list loads, `eaSelect.value` is empty and the code adds the option. If after, the outcome depends on timing and user interaction. The actual UX behavior under load or slow network conditions is unknown without browser testing.
+**Status: Requires browser validation.**
+
+### UNK-003
+**Focus behavior when feedback detail modal is closed**
+`openDetailModal()` focuses `#feedback-detail-close` on open. On close/Escape, no focus-return logic returns focus to the triggering row. Whether this causes accessibility (keyboard navigation) issues is unknown without browser testing.
+**Status: Requires browser validation.**
+
+---
+
+## Critical Risks
+
+| Risk | Severity | Finding |
+|---|---|---|
+| Economic-activity dropdown permanently broken for root users | Critical | AUD-001, DEF-001 |
+| New 'root' taxpayer-access is untested — silent regression risk | High | AUD-TEST-001 |
+| companies-admin new features are entirely uncharacterized | Medium | AUD-TEST-002 |
+| docs/current-state.md diverges from code | Medium | AUD-DOC-001 |
+
+---
+
+## Recommended Priorities
+
+### Immediate (before next production deployment)
+
+1. **[AUD-001] Fix broken EA dropdown for root users.**
+   Add `'root'` to `integration.economic-activities.list` roles in `access-policy-registry.js`. One-line change.
+
+2. **[AUD-MAINT-001] Fix locale inconsistency in `feedback-admin.js`.**
+   Change `toLocaleString('es', opts)` → `toLocaleString('es-CR', opts)` in `formatDate()`.
+
+3. **[AUD-005] Fix unescaped emoji fallback.**
+   Change `String(rating)` → `ui.escapeHtml(String(rating))` in `renderRatingEmoji()`.
+
+### Short-term (next sprint)
+
+4. **[AUD-TEST-001] Add root role assertion to taxpayer characterization test.**
+   Add root-allowed scenario and update test name.
+
+5. **[AUD-002] Update `integration.taxpayer.lookup` boundary metadata.**
+   Change to `'multi-scope'` or add a clarifying comment.
+
+6. **[AUD-TEST-002] Add `companies-admin-view-characterization.test.js`.**
+   Cover render structure, lookup wiring, and EA dropdown source contract.
+
+7. **[AUD-TEST-003] Add detail modal coverage to `feedback-admin-view-characterization.test.js`.**
+   Cover `data-feedback-id`, modal call site, and `formatDate` locale.
+
+8. **[AUD-DOC-001] Update `docs/current-state.md`.**
+   Add update-log entries and §1/§4 text for: root taxpayer policy change, companies-admin Hacienda lookup, feedback-admin detail modal.
+
+### Medium-term
+
+9. **[AUD-004] Extract shared taxpayer-lookup UX helper.**
+   Reduce DRY violation between `companies-admin.js` and `clients-admin.js`.
+
+10. **[AUD-MAINT-002] Extract identification types to a shared constant.**
+
+11. **[AUD-006] Move feedback modal styles to `styles.css`.**
+
+12. **[AUD-MAINT-004] Expand economic activity catalog beyond 15 entries.**
+
+---
+
+*Produced by `baseline-audit-agent-5c03f7` — inspection only, no production code was modified.*

@@ -1,6 +1,7 @@
 (function attachRootShellCompaniesAdminView(globalScope) {
   const rootShell = /** @type {any} */ (globalScope).RootShell;
   const companiesApi = rootShell.require('companiesApi');
+  const clientsApi = rootShell.require('clientsApi');
   const rootShellUi = rootShell.require('ui');
 
   function render(session) {
@@ -39,9 +40,30 @@
               <div class="root-form-grid">
                 <label><span>Razon social *</span><input name="fiscalConfig.legalName" type="text" required minlength="2" maxlength="255" /></label>
                 <label><span>Nombre comercial</span><input name="fiscalConfig.commercialName" type="text" maxlength="255" /></label>
-                <label><span>Tipo de identificacion *</span><input name="fiscalConfig.identificationType" type="text" required maxlength="20" /></label>
-                <label><span>Numero de identificacion *</span><input name="fiscalConfig.identificationNumber" type="text" required minlength="3" maxlength="100" /></label>
-                <label><span>Actividad economica</span><input name="fiscalConfig.economicActivityCode" type="text" maxlength="50" /></label>
+                <label>
+                  <span>Tipo de identificacion *</span>
+                  <select name="fiscalConfig.identificationType" required>
+                    <option value="">Selecciona</option>
+                    <option value="01">01 — Cédula Física</option>
+                    <option value="02">02 — Cédula Jurídica</option>
+                    <option value="03">03 — DIMEX</option>
+                    <option value="04">04 — NITE</option>
+                  </select>
+                </label>
+                <label class="root-form-grid__full">
+                  <span>Numero de identificacion *</span>
+                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <input id="companies-identification-input" name="fiscalConfig.identificationNumber" type="text" required minlength="3" maxlength="100" style="flex:1;min-width:160px;" />
+                    <button id="companies-lookup-button" type="button" class="secondary-button">Consultar Hacienda</button>
+                  </div>
+                  <div id="companies-lookup-message" aria-live="polite" style="margin-top:4px;"></div>
+                </label>
+                <label class="root-form-grid__full">
+                  <span>Actividad economica</span>
+                  <select id="companies-ea-select" name="fiscalConfig.economicActivityCode">
+                    <option value="">Cargando actividades...</option>
+                  </select>
+                </label>
                 <label><span>Provincia</span><input name="fiscalConfig.province" type="text" maxlength="100" /></label>
                 <label><span>Canton</span><input name="fiscalConfig.canton" type="text" maxlength="100" /></label>
                 <label><span>Distrito</span><input name="fiscalConfig.district" type="text" maxlength="100" /></label>
@@ -191,8 +213,63 @@
     const form = /** @type {HTMLFormElement | null} */ (container.querySelector('#companies-create-form'));
     const submitButton = /** @type {HTMLButtonElement | null} */ (container.querySelector('#companies-submit-button'));
 
+    const lookupInput = /** @type {HTMLInputElement | null} */ (container.querySelector('#companies-identification-input'));
+    const lookupButton = /** @type {HTMLButtonElement | null} */ (container.querySelector('#companies-lookup-button'));
+    const lookupMessage = /** @type {HTMLElement | null} */ (container.querySelector('#companies-lookup-message'));
+
     if (!listRegion || !listMessage || !formMessage || !form || !submitButton) {
       return;
+    }
+
+    async function runTaxpayerLookup() {
+      const query = lookupInput?.value.trim();
+      if (!query || !lookupMessage) return;
+
+      lookupMessage.innerHTML = '<small class="muted">Consultando Hacienda...</small>';
+      if (lookupButton) lookupButton.disabled = true;
+
+      try {
+        const taxpayer = await clientsApi.lookupTaxpayer(session, query);
+
+        const nameInput = /** @type {HTMLInputElement | null} */ (form.querySelector('[name="company.name"]'));
+        const emailInput = /** @type {HTMLInputElement | null} */ (form.querySelector('[name="company.email"]'));
+        const phoneInput = /** @type {HTMLInputElement | null} */ (form.querySelector('[name="company.phone"]'));
+        const legalNameInput = /** @type {HTMLInputElement | null} */ (form.querySelector('[name="fiscalConfig.legalName"]'));
+        const eaSelect = /** @type {HTMLSelectElement | null} */ (form.querySelector('#companies-ea-select'));
+
+        if (legalNameInput && taxpayer?.name) legalNameInput.value = taxpayer.name;
+        if (nameInput && taxpayer?.name && !nameInput.value) nameInput.value = taxpayer.name;
+        if (emailInput && taxpayer?.email && !emailInput.value) emailInput.value = taxpayer.email;
+        if (phoneInput && taxpayer?.phone && !phoneInput.value) phoneInput.value = taxpayer.phone;
+
+        if (eaSelect && taxpayer?.economicActivityCode && !eaSelect.value) {
+          const code = taxpayer.economicActivityCode;
+          const existingOpt = eaSelect.querySelector(`option[value="${CSS.escape(code)}"]`);
+          if (!existingOpt) {
+            const newOpt = globalScope.document.createElement('option');
+            newOpt.value = code;
+            newOpt.text = `${code} — ${taxpayer.economicActivityName || code}`;
+            eaSelect.appendChild(newOpt);
+          }
+          eaSelect.value = code;
+        }
+
+        lookupMessage.innerHTML = '<small style="color:#16a34a;">✓ Datos cargados desde Hacienda</small>';
+      } catch (err) {
+        const msg = rootShellUi.escapeHtml(err?.message || 'No se pudo consultar la identificacion.');
+        lookupMessage.innerHTML = `<small style="color:#dc2626;">${msg}</small>`;
+      } finally {
+        if (lookupButton) lookupButton.disabled = false;
+      }
+    }
+
+    if (lookupInput) {
+      lookupInput.addEventListener('blur', () => {
+        if (lookupInput.value.trim()) runTaxpayerLookup();
+      });
+    }
+    if (lookupButton) {
+      lookupButton.addEventListener('click', runTaxpayerLookup);
     }
 
     async function refreshCompanies() {
@@ -272,6 +349,21 @@
         target.textContent = nextIsActive ? 'Activar' : 'Desactivar';
       }
     });
+
+    // Cargar actividades económicas en el select
+    const eaSelect = /** @type {HTMLSelectElement | null} */ (container.querySelector('#companies-ea-select'));
+    if (eaSelect) {
+      clientsApi.listEconomicActivities(session)
+        .then((activities) => {
+          const opts = Array.isArray(activities)
+            ? activities.map((a) => `<option value="${rootShellUi.escapeHtml(a.code || a.value || '')}">${rootShellUi.escapeHtml(a.code || a.value || '')} — ${rootShellUi.escapeHtml(a.name || a.label || '')}</option>`).join('')
+            : '';
+          eaSelect.innerHTML = `<option value="">Selecciona actividad económica</option>${opts}`;
+        })
+        .catch(() => {
+          eaSelect.innerHTML = '<option value="">No se pudieron cargar las actividades</option>';
+        });
+    }
 
     await refreshCompanies();
   }
