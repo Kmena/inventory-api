@@ -182,3 +182,65 @@ test('sensitive root-shell modules keep isolated characterization coverage and e
   assert.match(billingHelpersSource, /function escapeHtml\(/);
   assert.match(billingRenderersSource, /rootShell\.register\('views\.billingAdminRenderers'/);
 });
+
+test('in-app-feedback: feedback modules are registered in runtime-contract.js and loaded in index.html', () => {
+  const runtimeContractSource = readRootFile('runtime-contract.js');
+  const indexSource = readRootFile('index.html');
+
+  assert.match(runtimeContractSource, /path: '\/root\/feedback-api\.js'/);
+  assert.match(runtimeContractSource, /registers: \['feedbackApi'\]/);
+  assert.match(runtimeContractSource, /path: '\/root\/feedback-widget\.js'/);
+  assert.match(runtimeContractSource, /registers: \['feedbackWidget'\]/);
+  assert.match(runtimeContractSource, /path: '\/root\/views\/feedback-admin\.js'/);
+  assert.match(runtimeContractSource, /registers: \['views\.feedbackAdmin'\]/);
+
+  assert.match(indexSource, /\/root\/feedback-api\.js/);
+  assert.match(indexSource, /\/root\/feedback-widget\.js/);
+  assert.match(indexSource, /\/root\/views\/feedback-admin\.js/);
+});
+
+test('in-app-feedback: feedback-api.js registers feedbackApi and calls InventoryAuth.fetchJson', () => {
+  const feedbackApiSource = readRootFile('feedback-api.js');
+
+  assert.match(feedbackApiSource, /rootShell\.register\('feedbackApi'/);
+  assert.match(feedbackApiSource, /function submitFeedback\(/);
+  assert.match(feedbackApiSource, /function listFeedback\(/);
+  assert.match(feedbackApiSource, /function resolveFeedback\(/);
+  assert.match(feedbackApiSource, /inventoryAuth\.fetchJson\(/);
+  assert.match(feedbackApiSource, /\/api\/feedback/);
+});
+
+test('in-app-feedback: feedback-widget.js registers feedbackWidget with init and triggerNudge', () => {
+  const feedbackWidgetSource = readRootFile('feedback-widget.js');
+
+  assert.match(feedbackWidgetSource, /rootShell\.register\('feedbackWidget'/);
+  assert.match(feedbackWidgetSource, /function init\(/);
+  assert.match(feedbackWidgetSource, /function triggerNudge\(/);
+  assert.match(feedbackWidgetSource, /feedbackApi\.submitFeedback\(/);
+  // Widget must NOT use rootShell.require for feedbackApi (lazy require allowed)
+  assert.match(feedbackWidgetSource, /feedbackApi/);
+});
+
+test('in-app-feedback: feedback-admin view registers views.feedbackAdmin with render and mount', () => {
+  const feedbackAdminSource = readRootFile(path.join('views', 'feedback-admin.js'));
+
+  assert.match(feedbackAdminSource, /rootShell\.register\('views\.feedbackAdmin'/);
+  assert.match(feedbackAdminSource, /function render\(/);
+  assert.match(feedbackAdminSource, /async function mount\(/);
+  assert.match(feedbackAdminSource, /feedbackApi\.listFeedback\(/);
+  assert.match(feedbackAdminSource, /feedbackApi\.resolveFeedback\(/);
+  assert.match(feedbackAdminSource, /data-resolve-feedback-id/);
+});
+
+test('in-app-feedback: router.js dispatches feedback routeKey to feedbackAdminView', () => {
+  const routerSource = readRootFile('router.js');
+  assert.match(routerSource, /feedbackAdminView/);
+  assert.match(routerSource, /routeKey === 'feedback'/);
+  assert.match(routerSource, /views\.feedbackAdmin/);
+});
+
+test('in-app-feedback: app.js initializes feedbackWidget after session bootstrap', () => {
+  const appSource = readRootFile('app.js');
+  assert.match(appSource, /feedbackWidget\.init\(activeSession\)/);
+  assert.match(appSource, /rootShell\.has\('feedbackWidget'\)/);
+});

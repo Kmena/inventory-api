@@ -165,6 +165,8 @@ function createRouterHarness() {
   browserWindow.RootShell.register('views.receiptsAdmin', createView('receipts-view'));
   browserWindow.RootShell.register('views.fiscalRefsAdmin', createView('fiscal-refs-view'));
   browserWindow.RootShell.register('views.usersAdmin', createView('users-view'));
+  // in-app-feedback stub
+  browserWindow.RootShell.register('views.feedbackAdmin', createView('feedback-admin-view'));
 
   executeRootScript('router.js', context);
   return browserWindow.RootShell.require('router');

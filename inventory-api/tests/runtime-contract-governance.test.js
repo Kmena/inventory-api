@@ -37,6 +37,8 @@ const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   supplierRouter: 'src/routes/supplier.routes.js',
   // recepciones-fiscales-workspace: global fiscal references listing endpoint
   fiscalReferenceRouter: 'src/routes/fiscal-reference.routes.js',
+  // in-app-feedback feature
+  feedbackRouter: 'src/routes/feedback.routes.js',
 });
 
 function read(filePath) {
