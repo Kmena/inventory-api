@@ -6,6 +6,7 @@
   const clientsRenderers = rootShell.require('views.clientsAdminRenderers');
   const clientsState = rootShell.require('views.clientsAdminState');
   const clientsAdminStoreDialog = rootShell.require('views.clientsAdminStoreDialog');
+  const feedbackWidget = rootShell.has('feedbackWidget') ? rootShell.require('feedbackWidget') : null;
 
   function render(session) {
     const companyId = rootShellUi.escapeHtml(session?.user?.companyId || 'sin empresa');
@@ -511,6 +512,7 @@
         await loadClientDetail(createdClient.id);
         pageMessage.innerHTML = rootShellUi.renderInlineMessage('Cliente creado correctamente.');
         setShellStatus('Cliente creado correctamente.');
+        if (feedbackWidget) feedbackWidget.triggerNudge('cliente', session);
       } catch (error) {
         createMessage.innerHTML = rootShellUi.renderInlineMessage(error.message || 'No se pudo crear el cliente.', 'error');
         setShellStatus('No se pudo crear el cliente.', 'error');

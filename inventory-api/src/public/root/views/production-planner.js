@@ -26,6 +26,7 @@
       recipesApi: rootShell.require('recipesApi'),
       rootShellUi: rootShell.require('ui'),
       sessionAdapter: rootShell.require('sessionAdapter'),
+      feedbackWidget: rootShell.has('feedbackWidget') ? rootShell.require('feedbackWidget') : null,
     };
   }
 
@@ -767,6 +768,8 @@
           await deps.productionAdminApi.approveProductionOrder(session, orderId, {});
           await refresh();
           pageMessage.innerHTML = deps.rootShellUi.renderInlineMessage('Orden aprobada. Lista para iniciar en /warehouse/.', 'success');
+          // in-app-feedback nudge after production order creation and approval
+          if (deps.feedbackWidget) deps.feedbackWidget.triggerNudge('planificacion', session);
         } catch (err) {
           pageMessage.innerHTML = deps.rootShellUi.renderInlineMessage(err?.message || 'Error al aprobar.', 'error');
         }

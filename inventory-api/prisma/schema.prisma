@@ -2058,3 +2058,26 @@ model SupplierQuotationInvitation {
   @@index([status, expiresAt])
   @@map("supplier_quotation_invitations")
 }
+
+/// In-app feedback submitted by authenticated users.
+/// No FK to User or Company — denormalized for audit resilience (DEC-002).
+model Feedback {
+  id          Int       @id @default(autoincrement())
+  rating      Int
+  category    String    @db.VarChar(20)
+  comment     String    @db.Text
+  improvement String?   @db.Text
+  context     String    @db.VarChar(20)
+  route       String?   @db.VarChar(500)
+  userEmail   String?   @map("user_email") @db.VarChar(255)
+  userName    String?   @map("user_name") @db.VarChar(255)
+  companyId   Int?      @map("company_id")
+  resolved    Boolean   @default(false)
+  resolvedAt  DateTime? @map("resolved_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([resolved], name: "feedback_resolved_idx")
+  @@index([createdAt(sort: Desc)], name: "feedback_created_at_idx")
+  @@index([companyId], name: "feedback_company_id_idx")
+  @@map("feedback")
+}

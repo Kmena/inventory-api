@@ -245,7 +245,7 @@ test('browser E2E: a global root browser session sees Companies Admin only and c
 
   await page.locator('input[name="company.name"]').fill('Beta Demo');
   await page.locator('input[name="fiscalConfig.legalName"]').fill('Beta Demo S.A.');
-  await page.locator('input[name="fiscalConfig.identificationType"]').fill('JURIDICA');
+  await page.locator('select[name="fiscalConfig.identificationType"]').selectOption('02');
   await page.locator('input[name="fiscalConfig.identificationNumber"]').fill('3102123456');
   await page.locator('input[name="rootUser.fullName"]').fill('Brenda Admin');
   await page.locator('input[name="rootUser.username"]').fill('brenda-admin');

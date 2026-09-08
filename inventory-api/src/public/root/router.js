@@ -30,6 +30,8 @@
   const fiscalRefsAdminView = rootShell.require('views.fiscalRefsAdmin');
   // users-admin-view feature
   const usersAdminView = rootShell.require('views.usersAdmin');
+  // in-app-feedback feature
+  const feedbackAdminView = rootShell.require('views.feedbackAdmin');
 
   function normalizeHashRoute(hashValue) {
     return String(hashValue || '').replace(/^#/, '').trim();
@@ -154,6 +156,10 @@
 
     if (item.routeKey === 'users') {
       return usersAdminView;
+    }
+
+    if (item.routeKey === 'feedback') {
+      return feedbackAdminView;
     }
 
     return inProcessView;

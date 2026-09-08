@@ -51,6 +51,20 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'platform-global',
     transition: 'stable-role',
   },
+  'feedback.list-global': {
+    mode: 'role',
+    roles: ['root'],
+    boundary: 'platform-global',
+    transition: 'stable-role',
+    actorScope: 'global-root',
+  },
+  'feedback.resolve': {
+    mode: 'role',
+    roles: ['root'],
+    boundary: 'platform-global',
+    transition: 'stable-role',
+    actorScope: 'global-root',
+  },
   'user.list-company': {
     mode: 'role',
     roles: ['admin'],
@@ -375,13 +389,13 @@ const ACCESS_POLICIES = Object.freeze({
   },
   'integration.taxpayer.lookup': {
     mode: 'role',
-    roles: ['admin', 'sales'],
-    boundary: 'tenant-operational',
+    roles: ['root', 'admin', 'sales'],
+    boundary: 'platform-and-tenant',
     transition: 'documented-legacy-role',
   },
   'integration.economic-activities.list': {
     mode: 'role',
-    roles: ['admin', 'sales'],
+    roles: ['root', 'admin', 'sales'],
     boundary: 'tenant-operational',
     transition: 'documented-legacy-role',
   },

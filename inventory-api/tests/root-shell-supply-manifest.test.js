@@ -240,3 +240,27 @@ test('legacy standalone productionItem and purchasesItem remain in items array f
   assert.ok(routeKeys.includes('production'), 'legacy production routeKey must remain for backward-compat');
   assert.ok(routeKeys.includes('purchases'), 'legacy purchases routeKey must remain for backward-compat');
 });
+
+// in-app-feedback manifest governance
+test('manifest.js declares feedbackItem with correct root-scoped properties', () => {
+  const manifestSource = readRootFile('manifest.js');
+  assert.match(manifestSource, /id: 'feedback'/);
+  assert.match(manifestSource, /routeKey: 'feedback'/);
+  assert.match(manifestSource, /href: '\/root\/#feedback'/);
+  assert.match(manifestSource, /dependencyTag: 'in-app-feedback'/);
+  assert.match(manifestSource, /icon: 'message-circle'/);
+});
+
+test('manifest items flat array contains feedback routeKey with root-global actorScope', () => {
+  const manifest = buildManifest();
+  const feedbackItem = manifest.items.find((i) => i.routeKey === 'feedback');
+  assert.ok(feedbackItem, 'feedback routeKey must be in manifest.items');
+  assert.equal(feedbackItem.implemented, true, 'feedback must be implemented');
+  assert.equal(feedbackItem.actorScope, 'root-global', 'feedback must be root-global scoped');
+});
+
+test('topNavItems includes feedbackItem for root navigation', () => {
+  const manifest = buildManifest();
+  const topNavRouteKeys = manifest.topNavItems.map((i) => i.routeKey);
+  assert.ok(topNavRouteKeys.includes('feedback'), 'feedback must be in topNavItems');
+});

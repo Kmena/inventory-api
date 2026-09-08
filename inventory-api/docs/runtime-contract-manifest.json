@@ -596,6 +596,33 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "production-material-preview-outside-current-openapi-baseline",
       "reason": "TASK-006 (purchase-production-order-ux): Pre-order material availability preview. Advisory computation without persistence. Ruta activa en runtime protegida por production.create, pero excluida del contrato OpenAPI parcial hasta formalización."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/feedback",
+      "expressPath": "/",
+      "routeFile": "src/routes/feedback.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "in-app-feedback-submit-outside-current-openapi-baseline",
+      "reason": "in-app-feedback feature: Submission endpoint for authenticated users. Protegido por authenticate (cualquier rol). Excluido del contrato OpenAPI parcial en esta iteración inicial del feature."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/feedback",
+      "expressPath": "/admin",
+      "routeFile": "src/routes/feedback.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "in-app-feedback-admin-list-outside-current-openapi-baseline",
+      "reason": "in-app-feedback feature: Admin listing endpoint for root user only (feedback.list-global policy). Excluido del contrato OpenAPI parcial en esta iteración inicial del feature."
+    },
+    {
+      "method": "PATCH",
+      "mountPath": "/api/feedback",
+      "expressPath": "/admin/:id/resolve",
+      "routeFile": "src/routes/feedback.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "in-app-feedback-resolve-outside-current-openapi-baseline",
+      "reason": "in-app-feedback feature: Admin resolve endpoint for root user only (feedback.resolve policy). Excluido del contrato OpenAPI parcial en esta iteración inicial del feature."
     }
   ]
 }

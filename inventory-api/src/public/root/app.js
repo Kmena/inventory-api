@@ -133,6 +133,7 @@ function renderIcon(iconName) {
     'shopping-bag': '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
     'shopping-cart': '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.72a2 2 0 0 0 2-1.62L23 6H6"/>',
     truck: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+    'message-circle': '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
     'user-cog': '<circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path d="M3 21a6 6 0 0 1 12 0"/><path d="m19.5 10.5.6 1.1 1.2.3-.8.9.1 1.2-1.1-.5-1.1.5.1-1.2-.8-.9 1.2-.3Z"/>',
     'users-round': '<path d="M18 21a8 8 0 0 0-12 0"/><circle cx="12" cy="10" r="4"/><path d="M22 21a8 8 0 0 0-4-6.92"/><path d="M2 21a8 8 0 0 1 4-6.92"/>',
     warehouse: '<path d="M3 10 12 4l9 6v10H3V10Z"/><path d="M3 10h18"/><path d="M8 14h8"/><path d="M8 18h8"/>',
@@ -463,6 +464,12 @@ async function bootstrapRootShell() {
   configureShellForActor(effectiveSession);
   setStatus('Sesion lista.');
   await renderCurrentRoute();
+
+  // in-app-feedback: initialize floating feedback button after session is established
+  const feedbackWidget = rootShell.has('feedbackWidget') ? rootShell.require('feedbackWidget') : null;
+  if (feedbackWidget && activeSession) {
+    feedbackWidget.init(activeSession);
+  }
 }
 
 window.addEventListener('hashchange', async () => {

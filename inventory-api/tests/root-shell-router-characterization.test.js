@@ -61,6 +61,8 @@ function createRouterHarness() {
   browserWindow.RootShell.register('views.fiscalRefsAdmin', createView('fiscal-refs-view'));
   // users-admin-view stub
   browserWindow.RootShell.register('views.usersAdmin', createView('users-view'));
+  // in-app-feedback stub
+  browserWindow.RootShell.register('views.feedbackAdmin', createView('feedback-admin-view'));
 
   executeRootScript('router.js', context);
 
@@ -270,4 +272,18 @@ test('router resolves referencias_fiscales route to fiscal-refs admin view for c
   const rootResolution = router.resolveRoute('#referencias_fiscales', createRootSession());
   assert.equal(rootResolution.allowed, false);
   assert.equal(rootResolution.routeKey, 'home');
+});
+
+test('router resolves feedback route to feedback admin view for root actors', () => {
+  const router = createRouterHarness();
+  const rootSession = createRootSession();
+
+  const resolution = router.resolveRoute('#feedback', rootSession);
+  assert.equal(resolution.allowed, true);
+  assert.equal(resolution.routeKey, 'feedback');
+  assert.equal(resolution.view.name, 'feedback-admin-view');
+
+  // Company admin users cannot access feedback (root-global scope)
+  const adminResolution = router.resolveRoute('#feedback', createCompanyAdminSession());
+  assert.equal(adminResolution.allowed, false);
 });

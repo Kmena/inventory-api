@@ -86,6 +86,21 @@
     dependencyTag: 'p37-root-companies-admin',
   });
 
+  const feedbackItem = createRouteItem({
+    id: 'feedback',
+    label: 'Feedback',
+    routeKey: 'feedback',
+    href: '/root/#feedback',
+    implemented: true,
+    activeMatchers: ['feedback'],
+    visibilityRule: guards.isRootUser,
+    actorScope: 'root-global',
+    icon: 'message-circle',
+    includeInRootNav: true,
+    includeInLanding: true,
+    dependencyTag: 'in-app-feedback',
+  });
+
   const adminHomeItem = createAdminPendingEntry('admin-home', 'Inicio', 'house', {
     routeKey: 'admin_home',
   });
@@ -407,6 +422,7 @@
   const items = [
     homeItem,
     companiesItem,
+    feedbackItem,
     adminHomeItem,
     productsItem,
     lotsItem,
@@ -439,7 +455,7 @@
     genericInProcessItem,
   ];
 
-  const topNavItems = [homeItem, companiesItem];
+  const topNavItems = [homeItem, companiesItem, feedbackItem];
 
   const adminSidebarSections = [
     {

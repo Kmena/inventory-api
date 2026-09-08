@@ -92,6 +92,8 @@ test('access policies preserve strict registry lookups and explicit actor-scope 
     ['company.list-global', 'global-root'],
     ['company.root-companies.create', 'global-root'],
     ['company.root-companies.list', 'global-root'],
+    ['feedback.list-global', 'global-root'],
+    ['feedback.resolve', 'global-root'],
     ['role.company.create', 'company-admin'],
     ['role.company.list', 'company-admin'],
     ['role.company.update', 'company-admin'],

@@ -3,6 +3,7 @@
   const quotationsApi = rootShell.require('quotationsApi');
   const rootShellUi = rootShell.require('ui');
   const renderers = rootShell.require('views.purchaseRequestsAdminRenderers');
+  const feedbackWidget = rootShell.has('feedbackWidget') ? rootShell.require('feedbackWidget') : null;
 
   function render() {
     return `
@@ -74,6 +75,8 @@
 
         const openCount = requests.filter((r) => r.status === 'OPEN').length;
         listSummary.textContent = `${requests.length} solicitud(es) · ${openCount} abierta(s)`;
+        // in-app-feedback nudge after purchase requests view loads successfully
+        if (feedbackWidget) feedbackWidget.triggerNudge('compras', session);
       } catch (error) {
         listRegion.innerHTML = '<p class="empty-state">No se pudieron cargar las solicitudes.</p>';
         pageMessage.innerHTML = rootShellUi.renderInlineMessage(
