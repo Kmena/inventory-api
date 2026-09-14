@@ -43,6 +43,7 @@ test('createCompanyClientDocument infers MIME type from the file extension when 
     }, {
       companyId: '91',
       sub: '7',
+      permissions: ['clients.view.all'],
     }),
   );
 
@@ -65,6 +66,7 @@ test('createCompanyClientDocument rejects mismatched MIME type and file extensio
         }, {
           companyId: '91',
           sub: '7',
+          permissions: ['clients.view.all'],
         }),
         (error) => error?.statusCode === 400 && error?.code === 'validation_error' && /mime|extension/i.test(error.message),
       );

@@ -85,6 +85,7 @@ function createCompanyAdminSession() {
       id: '22',
       role: { code: 'admin' },
       companyId: '77',
+      permissions: ['users.view', 'roles.view', 'roles.manage'],
     },
   };
 }

@@ -61,9 +61,27 @@
     });
   }
 
+  async function updateCompanyUser(session, userId, payload) {
+    return sendJson(session, `/api/users/company/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudo actualizar el usuario.',
+    });
+  }
+
+  async function assignCompanyUserRole(session, userId, payload) {
+    return sendJson(session, `/api/users/company/${encodeURIComponent(userId)}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudo cambiar el rol del usuario.',
+    });
+  }
+
   rootShell.register('usersApi', {
     listCompanyUsers,
     listCompanyRoles,
     createCompanyUser,
+    updateCompanyUser,
+    assignCompanyUserRole,
   });
 }(window));

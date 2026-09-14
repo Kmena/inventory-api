@@ -4,6 +4,7 @@
   const ui = rootShell.require('ui');
   const usersHelpers = rootShell.require('views.usersAdminHelpers');
   const usersRenderers = rootShell.require('views.usersAdminRenderers');
+  const guards = rootShell.require('guards');
   const feedbackWidget = rootShell.has('feedbackWidget') ? rootShell.require('feedbackWidget') : null;
 
   function renderInlineMessage(text, tone = 'success') {
@@ -122,6 +123,10 @@
 
     container.innerHTML = render(session);
 
+    const canCreateUsers = guards.hasPermission(session, 'users.create');
+    const canUpdateUsers = guards.hasPermission(session, 'users.update');
+    const canAssignRoles = guards.hasPermission(session, 'users.assign-role');
+
     // ── Referencias DOM ────────────────────────────────────────────────────────
     const pageMessage = container.querySelector('#users-page-message');
     const listRegion = container.querySelector('#users-list-region');
@@ -166,7 +171,8 @@
     function renderRoleOptionsCurrentState() {
       const rolesWithDashboard = composeRolesWithDashboard(rolesResponse);
       roleSelect.innerHTML = usersRenderers.renderRoleOptions(rolesWithDashboard);
-      openCreateButton.disabled = Boolean(rolesLoadError);
+      openCreateButton.hidden = !canCreateUsers;
+      openCreateButton.disabled = Boolean(rolesLoadError) || !canCreateUsers;
       roleGuidance.textContent = rolesLoadError
         ? `No se pudieron cargar los roles: ${rolesLoadError}`
         : '';
@@ -191,13 +197,19 @@
       }
 
       listRegion.innerHTML = usersRenderers.renderList(filteredUsers, selectedUserId);
+      if (!canCreateUsers && !canUpdateUsers && !canAssignRoles) {
+        pageMessage.innerHTML = renderInlineMessage('Modo solo lectura: tu rol permite consultar usuarios, pero no crear ni modificar registros.', 'success');
+      }
 
       const selectedUser = composedUsers.find((u) => String(u.id) === String(selectedUserId))
         || composedUsers[0]
         || null;
 
       detailTitle.textContent = selectedUser?.fullName || 'Selecciona un usuario';
-      detailRegion.innerHTML = usersRenderers.renderDetail(selectedUser);
+      detailRegion.innerHTML = usersRenderers.renderDetail(selectedUser, {
+        canUpdateUsers,
+        canAssignRoles,
+      });
 
       renderRoleOptionsCurrentState();
     }

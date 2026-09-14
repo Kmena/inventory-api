@@ -43,25 +43,25 @@ test('global user creation remains root-only', async () => {
   assert.equal(allowedError, undefined);
 });
 
-test('company user creation remains company-admin-only', async () => {
+test('company user creation requires users.create permission regardless of role code', async () => {
   const guard = getRouteGuard(userRoutes, '/company', 'post');
 
-  const deniedError = await runGuard(guard, { role: 'sales', companyId: '7' });
+  const deniedError = await runGuard(guard, { role: 'admin', companyId: '7', permissions: [] });
   assert.equal(deniedError?.statusCode, 403);
   assert.equal(deniedError?.code, 'forbidden');
 
-  const allowedError = await runGuard(guard, { role: 'admin', companyId: '7' });
+  const allowedError = await runGuard(guard, { role: 'custom-admin', companyId: '7', permissions: ['users.create'] });
   assert.equal(allowedError, undefined);
 });
 
-test('role administration router keeps admin gate for company role listing', async () => {
+test('role administration router requires roles.view for company role listing', async () => {
   const adminGuard = getRouteGuard(roleRoutes, '/company', 'get');
 
-  const deniedError = await runGuard(adminGuard, { role: 'sales', companyId: '7' });
+  const deniedError = await runGuard(adminGuard, { role: 'admin', companyId: '7', permissions: [] });
   assert.equal(deniedError?.statusCode, 403);
   assert.equal(deniedError?.code, 'forbidden');
 
-  const allowedError = await runGuard(adminGuard, { role: 'admin', companyId: '7' });
+  const allowedError = await runGuard(adminGuard, { role: 'custom-admin', companyId: '7', permissions: ['roles.view'] });
   assert.equal(allowedError, undefined);
 });
 

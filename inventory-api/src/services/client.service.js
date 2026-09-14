@@ -27,6 +27,54 @@ function assertCompanyUser(auth) {
   }
 }
 
+function actorPermissions(auth) {
+  if (!Array.isArray(auth?.permissions)) {
+    return new Set();
+  }
+  return new Set(auth.permissions);
+}
+
+function hasAllCompanyClientScope(auth) {
+  return actorPermissions(auth).has('clients.view.all');
+}
+
+function hasRouteScopedClientScope(auth) {
+  return actorPermissions(auth).has('clients.view');
+}
+
+function assertClientScopePermission(auth) {
+  if (!hasAllCompanyClientScope(auth) && !hasRouteScopedClientScope(auth)) {
+    throw createHttpError(403, 'No tiene permisos para acceder a este cliente', 'forbidden');
+  }
+}
+
+function actorUserId(auth) {
+  if (!auth?.sub) {
+    throw createHttpError(403, 'Se requiere un usuario autenticado', 'forbidden');
+  }
+  return BigInt(auth.sub);
+}
+
+async function findClientInActorScope(clientId, auth) {
+  assertCompanyUser(auth);
+  assertClientScopePermission(auth);
+  const companyId = BigInt(auth.companyId);
+
+  if (hasAllCompanyClientScope(auth)) {
+    return clientRepository.findCompanyClientById(clientId, companyId);
+  }
+
+  return clientRepository.findRouteScopedCompanyClientById(clientId, companyId, actorUserId(auth));
+}
+
+async function assertClientInActorScope(clientId, auth) {
+  const client = await findClientInActorScope(clientId, auth);
+  if (!client) {
+    throw createHttpError(404, 'Cliente no encontrado', 'not_found');
+  }
+  return client;
+}
+
 function serializeClientDocument(document) {
   return {
     ...document,
@@ -49,7 +97,11 @@ function serializeClient(client) {
 
 async function listCompanyClients(auth, pagination = null) {
   assertCompanyUser(auth);
-  const clients = await clientRepository.findCompanyClients(BigInt(auth.companyId), pagination);
+  const companyId = BigInt(auth.companyId);
+  assertClientScopePermission(auth);
+  const clients = hasAllCompanyClientScope(auth)
+    ? await clientRepository.findCompanyClients(companyId, pagination)
+    : await clientRepository.findRouteScopedCompanyClients(companyId, actorUserId(auth), pagination);
   if (pagination) {
     const paginatedClients = /** @type {{ items: Array<any>, totalItems: number }} */ (clients);
     return buildPaginatedResponse(paginatedClients.items.map(serializeClient), pagination, paginatedClients.totalItems);
@@ -109,7 +161,7 @@ function listClientDocumentTypes() {
 
 async function getClient(id, auth) {
   assertCompanyUser(auth);
-  const client = await clientRepository.findCompanyClientById(id, BigInt(auth.companyId));
+  const client = await findClientInActorScope(id, auth);
   if (!client) throw createHttpError(404, 'Cliente no encontrado', 'not_found');
   return serializeClient(client);
 }
@@ -159,10 +211,7 @@ async function createCompanyClient(payload, auth) {
 async function createCompanyClientStore(clientId, payload, auth) {
   assertCompanyUser(auth);
 
-  const client = await clientRepository.findCompanyClientById(clientId, BigInt(auth.companyId));
-  if (!client) {
-    throw createHttpError(404, 'Cliente no encontrado', 'not_found');
-  }
+  const client = await assertClientInActorScope(clientId, auth);
 
   const subregion = await regionRepository.findCompanySubregionById(payload.subregionId, BigInt(auth.companyId));
   if (!subregion) {
@@ -220,10 +269,7 @@ async function createCompanyClientDocument(clientId, payload, auth) {
   assertCompanyUser(auth);
 
   const companyId = BigInt(auth.companyId);
-  const client = await clientRepository.findCompanyClientById(clientId, companyId);
-  if (!client) {
-    throw createHttpError(404, 'Cliente no encontrado', 'not_found');
-  }
+  await assertClientInActorScope(clientId, auth);
 
   const file = validateClientDocumentPayload(payload);
   const documentId = await clientRepository.reserveClientDocumentId();
@@ -269,10 +315,7 @@ async function createCompanyClientStoreDocument(clientId, storeId, payload, auth
 
   const companyId = BigInt(auth.companyId);
 
-  const client = await clientRepository.findCompanyClientById(clientId, companyId);
-  if (!client) {
-    throw createHttpError(404, 'Cliente no encontrado', 'not_found');
-  }
+  await assertClientInActorScope(clientId, auth);
 
   // Validate that storeId belongs to clientId and is active
   const store = await prisma.clientStore.findFirst({
@@ -331,6 +374,8 @@ async function getCompanyClientDocumentDownload(clientId, documentId, auth) {
   assertCompanyUser(auth);
 
   const companyId = BigInt(auth.companyId);
+  await assertClientInActorScope(clientId, auth);
+
   const document = await clientRepository.findCompanyClientDocumentById(documentId, clientId, companyId);
   if (!document) {
     throw createHttpError(404, 'Documento no encontrado', 'not_found');
@@ -359,10 +404,7 @@ async function getCompanyClientDocumentDownload(clientId, documentId, auth) {
 async function createCompanyClientReference(clientId, payload, auth) {
   assertCompanyUser(auth);
 
-  const client = await clientRepository.findCompanyClientById(clientId, BigInt(auth.companyId));
-  if (!client) {
-    throw createHttpError(404, 'Cliente no encontrado', 'not_found');
-  }
+  await assertClientInActorScope(clientId, auth);
 
   return clientRepository.createClientReference({
     clientId,
@@ -380,7 +422,7 @@ async function createCompanyClientReference(clientId, payload, auth) {
 async function updateClient(id, payload, auth) {
   assertCompanyUser(auth);
   const companyId = BigInt(auth.companyId);
-  const existingClient = await clientRepository.findCompanyClientById(id, companyId);
+  const existingClient = await findClientInActorScope(id, auth);
   if (!existingClient) {
     throw createHttpError(404, 'Cliente no encontrado', 'not_found');
   }
@@ -392,7 +434,7 @@ async function updateClient(id, payload, auth) {
 async function removeClient(id, auth) {
   assertCompanyUser(auth);
   const companyId = BigInt(auth.companyId);
-  const existingClient = await clientRepository.findCompanyClientById(id, companyId);
+  const existingClient = await findClientInActorScope(id, auth);
   if (!existingClient) {
     throw createHttpError(404, 'Cliente no encontrado', 'not_found');
   }
@@ -427,6 +469,7 @@ async function getClientLedger(clientId, auth, options = {}) {
 async function updateCompanyClientStoreCreditLimit(clientId, storeId, payload, auth) {
   assertCompanyUser(auth);
   const companyId = BigInt(auth.companyId);
+  await assertClientInActorScope(clientId, auth);
 
   const store = await prisma.clientStore.findFirst({
     where: {

@@ -50,7 +50,7 @@
     }).join('');
   }
 
-  function renderDetail(composedUser) {
+  function renderDetail(composedUser, actions = {}) {
     if (!composedUser) {
       return '<p class="empty-state">Selecciona un usuario para ver sus detalles.</p>';
     }
@@ -69,7 +69,10 @@
 
     return `
       <section class="detail-section">
-        <h3 class="detail-section__title">Identificacion</h3>
+        <div class="page-header">
+          <h3 class="detail-section__title">Identificacion</h3>
+          ${actions.canUpdateUsers ? '<button class="secondary-button" type="button" data-user-edit>Editar datos</button>' : ''}
+        </div>
         <dl class="detail-dl">
           <dt>Nombre</dt><dd>${ui.escapeHtml(composedUser.fullName || '—')}</dd>
           <dt>Usuario</dt><dd>${ui.escapeHtml(composedUser.username || '—')}</dd>
@@ -79,7 +82,10 @@
         </dl>
       </section>
       <section class="detail-section">
-        <h3 class="detail-section__title">Rol y acceso</h3>
+        <div class="page-header">
+          <h3 class="detail-section__title">Rol y acceso</h3>
+          ${actions.canAssignRoles ? '<button class="secondary-button" type="button" data-user-assign-role>Cambiar rol</button>' : ''}
+        </div>
         <dl class="detail-dl">
           <dt>Rol</dt><dd>${ui.escapeHtml(composedUser.role?.name || '—')}</dd>
           <dt>Codigo</dt><dd><code>${ui.escapeHtml(composedUser.role?.code || '—')}</code></dd>

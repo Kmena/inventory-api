@@ -324,6 +324,7 @@ test('updateCompanyRole allows editing own role when protected permissions are k
           { code: 'inventory.manage' },
           { code: 'settings.manage' },
           { code: 'users.manage' },
+          { code: 'roles.manage' },
         ],
         updateCompanyRolePermissions: async () => ({
           ...createCompanyRole({ id: 50n }),
@@ -331,6 +332,7 @@ test('updateCompanyRole allows editing own role when protected permissions are k
             { isEnabled: true, permission: { code: 'root.access', isActive: true } },
             { isEnabled: true, permission: { code: 'settings.manage', isActive: true } },
             { isEnabled: true, permission: { code: 'users.manage', isActive: true } },
+            { isEnabled: true, permission: { code: 'roles.manage', isActive: true } },
             { isEnabled: true, permission: { code: 'inventory.manage', isActive: true } },
           ],
         }),
@@ -352,11 +354,11 @@ test('updateCompanyRole allows editing own role when protected permissions are k
     async () => {
       const result = await roleService.updateCompanyRole(
         '50',
-        { permissionCodes: ['root.access', 'settings.manage', 'users.manage', 'inventory.manage'] },
+        { permissionCodes: ['root.access', 'settings.manage', 'users.manage', 'roles.manage', 'inventory.manage'] },
         { companyId: '1', roleId: '50' },
         createRequest(),
       );
-      assert.equal(result.permissions.length, 4);
+      assert.equal(result.permissions.length, 5);
     },
   );
 });

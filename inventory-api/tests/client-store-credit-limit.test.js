@@ -171,7 +171,7 @@ test('createCompanyClientStore persists creditLimit and currency during store cr
       name: 'Sucursal Centro',
       creditLimit: 1800.5,
       currency: 'USD',
-    }, { companyId: '7' });
+    }, { companyId: '7', permissions: ['clients.view.all'] });
 
     assert.equal(capturedPayloads.length, 1);
     assert.equal(capturedPayloads[0].creditLimit, 1800.5);

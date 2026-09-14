@@ -265,6 +265,24 @@
       "reason": "La operación root/global de listado de usuarios sigue activa en runtime, pero la cobertura OpenAPI parcial prioriza el flujo company-scoped ya gobernado y no promete todavía la superficie global completa."
     },
     {
+      "method": "PATCH",
+      "mountPath": "/api/users",
+      "expressPath": "/company/:userId",
+      "routeFile": "src/routes/user.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "fb6-company-user-update-outside-current-openapi-baseline",
+      "reason": "Endpoint company-scoped de actualización de datos no sensibles de usuario creado para la migración FB6 permission-based; permanece protegido por users.update y tenant scope, pero queda fuera del OpenAPI parcial hasta refresco contractual completo."
+    },
+    {
+      "method": "PATCH",
+      "mountPath": "/api/users",
+      "expressPath": "/company/:userId/role",
+      "routeFile": "src/routes/user.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "fb6-company-user-role-assignment-outside-current-openapi-baseline",
+      "reason": "Endpoint company-scoped para cambio de rol de usuario creado para la migración FB6; permanece protegido por users.assign-role, tenant scope y prevención de escalamiento de roles.manage, pero queda fuera del OpenAPI parcial hasta refresco contractual completo."
+    },
+    {
       "method": "POST",
       "mountPath": "/api/orders",
       "expressPath": "/:id/approve",
@@ -623,6 +641,24 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "in-app-feedback-resolve-outside-current-openapi-baseline",
       "reason": "in-app-feedback feature: Admin resolve endpoint for root user only (feedback.resolve policy). Excluido del contrato OpenAPI parcial en esta iteración inicial del feature."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/auth",
+      "expressPath": "/change-password",
+      "routeFile": "src/routes/auth.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "auth-change-password-superseded-by-me-password",
+      "reason": "Endpoint legado de cambio de contraseña en el namespace auth. Supersedido por PATCH /api/me/password (me.routes.js) que usa códigos de error 400 de dominio correctos. Se mantiene en runtime por compatibilidad pero no forma parte del contrato OpenAPI parcial."
+    },
+    {
+      "method": "PATCH",
+      "mountPath": "/api/me",
+      "expressPath": "/password",
+      "routeFile": "src/routes/me.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "me-change-password-outside-current-openapi-baseline",
+      "reason": "users-account-self-service feature: Cambio de contraseña propia del usuario autenticado. El endpoint usa req.auth.sub exclusivamente; no acepta userId externo. Excluido del contrato OpenAPI parcial hasta que se extienda el baseline con la familia /api/me/."
     }
   ]
 }

@@ -103,11 +103,30 @@
     `).join('');
   }
 
-  function renderClientDetail(client, classifications, documentTypes, zoneOptions, canDeactivate, economicActivities) {
+  function renderClientDetail(client, classifications, documentTypes, zoneOptions, permissions, economicActivities) {
     if (!client) {
       return '<p class="empty-state">Selecciona un cliente del listado para abrir el detalle contextual.</p>';
     }
 
+    const actionPermissions = typeof permissions === 'boolean'
+      ? {
+        canCreateClient: true,
+        canEditClient: true,
+        canCreateReference: true,
+        canUploadDocument: true,
+        canDownloadDocument: true,
+        canManageCredit: true,
+        canDeactivate: permissions,
+      }
+      : (permissions || {});
+    const canEditClient = Boolean(actionPermissions.canEditClient);
+    const canCreateClient = Boolean(actionPermissions.canCreateClient);
+    const canCreateReference = Boolean(actionPermissions.canCreateReference);
+    const canUploadDocument = Boolean(actionPermissions.canUploadDocument);
+    const canDownloadDocument = Boolean(actionPermissions.canDownloadDocument);
+    const canManageCredit = Boolean(actionPermissions.canManageCredit);
+    const canDeactivate = Boolean(actionPermissions.canDeactivate);
+    const canLookupTaxpayer = Boolean(actionPermissions.canLookupTaxpayer);
     return `
       <section class="stack-section">
         <div class="page-header">
@@ -170,8 +189,8 @@
             <label class="root-form-grid__full"><span>Direccion</span><textarea name="address" rows="3" maxlength="1000">${rootShellUi.escapeHtml(client.address || '')}</textarea></label>
           </div>
           <div class="action-row compact-action-row">
-            <button type="submit">Guardar cambios</button>
-            <button id="clients-lookup-taxpayer-button" class="secondary-button" type="button">Consultar identificacion</button>
+            ${canEditClient ? '<button type="submit">Guardar cambios</button>' : ''}
+            ${canEditClient && canLookupTaxpayer ? '<button id="clients-lookup-taxpayer-button" class="secondary-button" type="button">Consultar identificacion</button>' : ''}
             ${canDeactivate ? '<button id="clients-deactivate-button" class="secondary-button danger-button" type="button">Desactivar cliente</button>' : ''}
           </div>
         </form>
@@ -181,12 +200,12 @@
       <section class="stack-section">
         <div class="page-header">
           <h4>Tiendas</h4>
-          <button
+          ${canCreateClient ? `<button
             type="button"
             id="clients-add-store-button"
             data-client-id="${rootShellUi.escapeHtml(client.id)}"
             data-client-name="${rootShellUi.escapeHtml(client.name || '')}"
-          >+ Agregar tienda</button>
+          >+ Agregar tienda</button>` : ''}
         </div>
         <div id="clients-stores-list" class="inline-card-grid">
           ${renderInlineEntries(client.stores || [], 'Este cliente aun no tiene tiendas registradas.', (store) => `
@@ -196,7 +215,7 @@
               ${store.latitude && store.longitude ? `<p class="muted" style="font-size:0.78rem;">📍 ${rootShellUi.escapeHtml(String(store.latitude))}, ${rootShellUi.escapeHtml(String(store.longitude))}</p>` : '<p class="muted" style="font-size:0.78rem;">Sin coordenadas</p>'}
               ${renderStoreActiveOrdersBadges(store.orders || [])}
               <p class="muted" style="font-size:0.78rem;">${renderStoreFiscalSummary(store)}</p>
-              <form class="clients-store-credit-form" data-client-id="${rootShellUi.escapeHtml(client.id)}" data-store-id="${rootShellUi.escapeHtml(store.id)}" style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              ${canManageCredit ? `<form class="clients-store-credit-form" data-client-id="${rootShellUi.escapeHtml(client.id)}" data-store-id="${rootShellUi.escapeHtml(store.id)}" style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <label style="font-size:0.8rem;display:flex;align-items:center;gap:4px;">
                   <span style="white-space:nowrap;">Límite crédito</span>
                   <input name="creditLimit" type="number" min="0" step="0.01" value="${rootShellUi.escapeHtml(String(store.creditLimit ?? 0))}" style="width:100px;" />
@@ -205,7 +224,7 @@
                 <span class="muted" style="font-size:0.78rem;">${renderStoreCreditSummary(store)}</span>
                 <button type="submit" class="secondary-button" style="font-size:0.78rem;padding:4px 10px;">Guardar</button>
                 <div class="clients-store-credit-msg" aria-live="polite"></div>
-              </form>
+              </form>` : `<p class="muted" style="font-size:0.78rem;">${renderStoreCreditSummary(store)}</p>`}
             </article>
           `)}
         </div>
@@ -218,11 +237,11 @@
             <article class="inline-card">
               <strong>${rootShellUi.escapeHtml(document.documentType || document.fileName || 'Documento')}</strong>
               <p class="muted">${rootShellUi.escapeHtml(document.fileName || 'Sin archivo')}</p>
-              <button class="secondary-button" type="button" data-document-download="${rootShellUi.escapeHtml(document.id)}">Descargar</button>
+              ${canDownloadDocument ? `<button class="secondary-button" type="button" data-document-download="${rootShellUi.escapeHtml(document.id)}">Descargar</button>` : ''}
             </article>
           `)}
         </div>
-        <form id="clients-document-form" class="root-form root-form--compact">
+        ${canUploadDocument ? `<form id="clients-document-form" class="root-form root-form--compact">
           <input type="hidden" name="clientId" value="${rootShellUi.escapeHtml(client.id)}" />
           <div class="root-form-grid">
             <label><span>Tipo de documento *</span><select name="documentType" required><option value="">Selecciona</option>${(documentTypes || []).map((item) => `<option value="${rootShellUi.escapeHtml(item.value || item.code || item.name || '')}">${rootShellUi.escapeHtml(item.label || item.name || item.value || item.code || 'Documento')}</option>`).join('')}</select></label>
@@ -239,7 +258,7 @@
             <label class="root-form-grid__full"><span>Notas</span><textarea name="notes" rows="2"></textarea></label>
           </div>
           <div class="action-row compact-action-row"><button id="clients-document-submit-button" type="submit">Agregar documento</button></div>
-        </form>
+        </form>` : ''}
       </section>
 
       <section class="stack-section">
@@ -252,7 +271,7 @@
             </article>
           `)}
         </div>
-        <form id="clients-reference-form" class="root-form root-form--compact">
+        ${canCreateReference ? `<form id="clients-reference-form" class="root-form root-form--compact">
           <input type="hidden" name="clientId" value="${rootShellUi.escapeHtml(client.id)}" />
           <div class="root-form-grid">
             <label><span>Nombre *</span><input name="name" type="text" required minlength="2" maxlength="255" /></label>
@@ -263,7 +282,7 @@
             <label><span>Monto</span><input name="amount" type="number" min="0" step="0.01" /></label>
           </div>
           <div class="action-row compact-action-row"><button type="submit">Agregar referencia</button></div>
-        </form>
+        </form>` : ''}
       </section>
     `;
   }

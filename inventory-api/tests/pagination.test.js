@@ -73,7 +73,7 @@ test('listCompanyClients returns paginated metadata when pagination is requested
         };
       },
     }]],
-    () => clientService.listCompanyClients({ companyId: '15' }, { page: 2, pageSize: 1, skip: 1, take: 1 }),
+    () => clientService.listCompanyClients({ companyId: '15', permissions: ['clients.view.all'] }, { page: 2, pageSize: 1, skip: 1, take: 1 }),
   );
 
   assert.deepEqual(receivedPagination, { page: 2, pageSize: 1, skip: 1, take: 1 });

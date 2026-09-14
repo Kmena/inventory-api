@@ -187,7 +187,7 @@ async function createCompanyRole(payload, auth, req = null) {
   return serializedRole;
 }
 
-const SELF_LOCKOUT_PROTECTED_PERMISSIONS = ['settings.manage', 'users.manage'];
+const SELF_LOCKOUT_PROTECTED_PERMISSIONS = ['settings.manage', 'users.manage', 'roles.manage'];
 
 function assertNotGlobalRole(role) {
   if (!role.companyId) {

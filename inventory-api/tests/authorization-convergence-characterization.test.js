@@ -30,20 +30,20 @@ async function runGuard(guard, auth) {
   return nextError;
 }
 
-test('role administration routes stay company-admin-only through centralized access policies', async () => {
+test('role administration routes use roles.view and roles.manage through centralized access policies', async () => {
   const permissionsGuard = getRouteGuard(roleRoutes, '/permissions', 'get');
   const createRoleGuard = getRouteGuard(roleRoutes, '/company', 'post');
 
-  const deniedPermissions = await runGuard(permissionsGuard, { role: 'sales', companyId: '7' });
+  const deniedPermissions = await runGuard(permissionsGuard, { role: 'admin', companyId: '7', permissions: [] });
   assert.equal(deniedPermissions?.statusCode, 403);
 
-  const allowedPermissions = await runGuard(permissionsGuard, { role: 'admin', companyId: '7' });
+  const allowedPermissions = await runGuard(permissionsGuard, { role: 'custom', companyId: '7', permissions: ['roles.view'] });
   assert.equal(allowedPermissions, undefined);
 
-  const deniedCreateRole = await runGuard(createRoleGuard, { role: 'warehouse', companyId: '7' });
+  const deniedCreateRole = await runGuard(createRoleGuard, { role: 'admin', companyId: '7', permissions: ['roles.view'] });
   assert.equal(deniedCreateRole?.statusCode, 403);
 
-  const allowedCreateRole = await runGuard(createRoleGuard, { role: 'admin', companyId: '7' });
+  const allowedCreateRole = await runGuard(createRoleGuard, { role: 'custom', companyId: '7', permissions: ['roles.manage'] });
   assert.equal(allowedCreateRole, undefined);
 });
 

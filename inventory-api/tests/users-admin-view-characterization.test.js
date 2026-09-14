@@ -227,18 +227,20 @@ test('manifest item users tiene implemented true tras el cambio', () => {
   assert.ok(item, 'users item debe existir en manifest');
   assert.equal(item.implemented, true);
   assert.equal(item.destination, 'implemented');
-  assert.equal(item.actorScope, 'company-admin');
+  assert.equal(item.actorScope, 'permission:users.view');
   assert.equal(item.dependencyTag, 'users-admin-view');
 });
 
 // ── Source-level: estructura de modulos ───────────────────────────────────────
 
-test('users-api.js registra usersApi con las tres funciones requeridas', () => {
+test('users-api.js registra usersApi con las funciones requeridas', () => {
   const source = readRootFile('users-api.js');
   assert.match(source, /rootShell\.register\('usersApi'/);
   assert.match(source, /listCompanyUsers/);
   assert.match(source, /listCompanyRoles/);
   assert.match(source, /createCompanyUser/);
+  assert.match(source, /updateCompanyUser/);
+  assert.match(source, /assignCompanyUserRole/);
   assert.match(source, /inventoryAuth\.fetchJson/);
   assert.match(source, /inventoryAuth\.buildHeaders/);
 });
