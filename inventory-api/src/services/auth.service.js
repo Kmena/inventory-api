@@ -1,5 +1,6 @@
 const bcrypt = require('bcrypt');
 
+const { bcryptRounds } = require('../config');
 const userRepository = require('../repositories/user.repository');
 const { signAccessToken } = require('../lib/auth');
 const { createHttpError } = require('../lib/errors');
@@ -157,6 +158,40 @@ async function login(payload, req = null, options = {}) {
   };
 }
 
+async function changePassword(userId, payload, req = null) {
+  const user = await userRepository.findAuthenticatedUserById(BigInt(userId));
+  if (!user) {
+    throw createHttpError(404, 'Usuario no encontrado', 'not_found');
+  }
+
+  const isCurrentValid = await bcrypt.compare(payload.currentPassword, user.passwordHash);
+  if (!isCurrentValid) {
+    await audit.recordAuditEventIfAvailable({
+      req,
+      action: 'auth.change_password',
+      resourceType: 'user',
+      resourceId: user.id,
+      outcome: 'REJECTED',
+      reasonCode: 'invalid_credentials',
+      metadata: { username: user.username },
+    });
+    throw createHttpError(401, 'Contraseña actual incorrecta', 'unauthorized');
+  }
+
+  const newPasswordHash = await bcrypt.hash(payload.newPassword, bcryptRounds);
+  await userRepository.updateUserPasswordHash(user.id, newPasswordHash);
+
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'auth.change_password',
+    resourceType: 'user',
+    resourceId: user.id,
+    outcome: 'SUCCESS',
+    metadata: { username: user.username },
+  });
+}
+
 module.exports = {
   login,
+  changePassword,
 };

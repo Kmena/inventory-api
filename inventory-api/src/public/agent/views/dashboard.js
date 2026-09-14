@@ -94,6 +94,7 @@ function renderDashboard(dashboardData, stores, goalsData, goalsError, ordersDat
             🗺️ Ver mapa
           </button>
           <button type="button" id="dashboard-refresh-btn" class="secondary-button">Actualizar</button>
+          <button type="button" id="dashboard-account-btn" class="secondary-button" aria-label="Abrir Mi cuenta">Mi cuenta</button>
           <button type="button" id="dashboard-logout-btn" class="secondary-button" style="color:#dc2626;">Cerrar sesión</button>
         </div>
       </header>
@@ -263,6 +264,20 @@ async function render(containerEl, session, _params) {
       refreshBtn.textContent = 'Actualizando…';
       await render(containerEl, session, _params);
       if (toastEl) helpers.showToast('Ruta actualizada', toastEl);
+    });
+  }
+
+  // Mi cuenta
+  const accountBtn = containerEl.querySelector('#dashboard-account-btn');
+  if (accountBtn) {
+    accountBtn.addEventListener('click', () => {
+      const inventoryAccountDialog = /** @type {any} */ (window).InventoryAccountDialog;
+      if (!inventoryAccountDialog) return;
+      inventoryAccountDialog.open(session, {
+        onSuccess() {
+          if (toastEl) helpers.showToast('Contraseña actualizada correctamente.', toastEl);
+        },
+      });
     });
   }
 

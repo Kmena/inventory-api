@@ -33,6 +33,7 @@ const taxpayerRouter = require('./routes/taxpayer.routes');
 const geocodingRouter = require('./routes/geocoding.routes');
 const economicActivityRouter = require('./routes/economic-activity.routes');
 const feedbackRouter = require('./routes/feedback.routes');
+const meRouter = require('./routes/me.routes');
 const {
   smallPayloadParsers,
   mediumPayloadParsers,
@@ -256,6 +257,7 @@ app.use('/api/taxpayers', ...smallPayloadParsers, taxpayerRouter);
 app.use('/api/geocoding', ...smallPayloadParsers, geocodingRouter);
 app.use('/api/economic-activities', ...mediumPayloadParsers, economicActivityRouter);
 app.use('/api/feedback', ...mediumPayloadParsers, feedbackRouter);
+app.use('/api/me', ...smallPayloadParsers, meRouter);
 
 app.use((error, req, res, _next) => {
   const friendlyError = getFriendlyError(error);
