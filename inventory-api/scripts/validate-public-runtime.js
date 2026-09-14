@@ -122,6 +122,8 @@ const expectedJavaScriptFiles = [
   'root/views/zones-admin.js',
   'root/warehouses-api.js',
   'root/zones-api.js',
+  'shared/account-api.js',
+  'shared/account-dialog.js',
   'shared/auth.js',
   'shared/session.js',
   'supplier-quote/app.js',

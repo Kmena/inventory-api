@@ -17,6 +17,20 @@
       requiresScripts: [],
     },
     {
+      path: '/shared/account-api.js',
+      category: 'shared-helper',
+      registers: [],
+      requiresModules: [],
+      requiresScripts: ['/shared/auth.js'],
+    },
+    {
+      path: '/shared/account-dialog.js',
+      category: 'shared-helper',
+      registers: [],
+      requiresModules: [],
+      requiresScripts: ['/shared/account-api.js'],
+    },
+    {
       path: '/root/registry.js',
       category: 'registry',
       registers: [],
@@ -687,7 +701,7 @@
       path: '/root/views/users-admin.js',
       category: 'view-provider',
       registers: ['views.usersAdmin'],
-      requiresModules: ['usersApi', 'ui', 'views.usersAdminHelpers', 'views.usersAdminRenderers'],
+      requiresModules: ['usersApi', 'ui', 'guards', 'views.usersAdminHelpers', 'views.usersAdminRenderers'],
       requiresScripts: [
         '/root/registry.js',
         '/root/users-api.js',
@@ -708,7 +722,7 @@
       category: 'bootstrap-consumer',
       registers: [],
       requiresModules: ['runtimeContract'],
-      requiresScripts: ['/shared/session.js', '/shared/auth.js', '/root/registry.js', '/root/runtime-contract.js', '/root/session-adapter.js', '/root/guards.js', '/root/manifest.js', '/root/router.js'],
+      requiresScripts: ['/shared/session.js', '/shared/auth.js', '/shared/account-dialog.js', '/root/registry.js', '/root/runtime-contract.js', '/root/session-adapter.js', '/root/guards.js', '/root/manifest.js', '/root/router.js'],
     },
   ]);
 
