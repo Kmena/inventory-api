@@ -569,7 +569,14 @@ test('commercial views E2E: clients supports local filtering and update plus sto
   t.after(() => stopServer(server, sockets));
 
   const page = await createBrowserPage(t);
-  const adminUser = createBrowserSessionUser();
+  // FB7 granular guards: each UI action requires a specific permission in the session.
+  // clients.delete     → "Desactivar cliente" button
+  // clients.edit       → "Guardar cambios" (update form)
+  // clients.create     → "Nuevo cliente" dialog + "+ Agregar tienda"
+  // integration.taxpayer.lookup → "Consultar identificacion"
+  const adminUser = createBrowserSessionUser({
+    permissions: ['clients.create', 'clients.edit', 'clients.delete', 'integration.taxpayer.lookup'],
+  });
   const state = await stubClientsRuntime(page, baseUrl, adminUser);
   await seedBrowserSession(page, baseUrl, adminUser);
   await openCompanyAdminView(page, baseUrl, 'Clientes', '#clients', 'Clientes');
