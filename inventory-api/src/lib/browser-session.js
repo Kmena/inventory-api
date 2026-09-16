@@ -57,8 +57,16 @@ function isSecureRequest(req) {
 }
 
 function shouldUseSecureCookie(req) {
-  if (String(process.env.FORCE_SECURE_BROWSER_SESSION_COOKIE || '').trim().toLowerCase() === 'true') {
+  const forcedValue = String(process.env.FORCE_SECURE_BROWSER_SESSION_COOKIE || '').trim().toLowerCase();
+  if (forcedValue === 'true') {
     return true;
+  }
+  // Allow explicit opt-out for HTTP-only production deployments (e.g. behind a plain-IP EC2
+  // without TLS termination). Set FORCE_SECURE_BROWSER_SESSION_COOKIE=false in .env.production.
+  // WARNING: cookies will be transmitted unencrypted — only use on trusted/VPN networks or
+  // temporarily until an HTTPS reverse proxy is in place.
+  if (forcedValue === 'false') {
+    return false;
   }
 
   return nodeEnv === 'production' || isSecureRequest(req);
