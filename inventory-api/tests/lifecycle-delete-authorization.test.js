@@ -13,11 +13,11 @@ function getDeleteRouteGuard(router, path) {
   return layer.route.stack[0].handle;
 }
 
-test('client DELETE route keeps admin-only authorization', async () => {
+test('client DELETE route requires explicit clients.delete permission instead of admin role', async () => {
   const guard = getDeleteRouteGuard(clientRoutes, '/:id');
   let nextError = null;
 
-  await guard({ auth: { role: 'sales' } }, {}, (error) => {
+  await guard({ auth: { role: 'admin', permissions: [] } }, {}, (error) => {
     nextError = error;
   });
 
@@ -25,7 +25,7 @@ test('client DELETE route keeps admin-only authorization', async () => {
   assert.equal(nextError?.code, 'forbidden');
 
   let allowedError = 'not-called';
-  await guard({ auth: { role: 'admin' } }, {}, (error) => {
+  await guard({ auth: { role: 'custom-client-admin', permissions: ['clients.delete'] } }, {}, (error) => {
     allowedError = error;
   });
   assert.equal(allowedError, undefined);

@@ -20,7 +20,21 @@ const createCompanyUserSchema = z.object({
   roleId: z.coerce.bigint(),
 });
 
+const updateCompanyUserSchema = z.object({
+  fullName: z.string().min(2).max(255).optional(),
+  email: z.string().email().nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+}).refine((value) => Object.keys(value).length > 0, {
+  message: 'Debe enviar al menos un campo para actualizar',
+});
+
+const assignCompanyUserRoleSchema = z.object({
+  roleId: z.coerce.bigint(),
+});
+
 module.exports = {
   createUserSchema,
   createCompanyUserSchema,
+  updateCompanyUserSchema,
+  assignCompanyUserRoleSchema,
 };

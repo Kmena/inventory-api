@@ -3,7 +3,7 @@ const express = require('express');
 const validate = require('../middlewares/validate');
 const authenticate = require('../middlewares/authenticate');
 const { enforceLoginThrottle, registerLoginThrottleResult } = require('../middlewares/login-throttle');
-const { loginSchema } = require('../schemas/auth.schema');
+const { loginSchema, changePasswordSchema } = require('../schemas/auth.schema');
 const authService = require('../services/auth.service');
 const browserSessionService = require('../services/browser-session.service');
 const {
@@ -53,6 +53,29 @@ router.post('/logout', authenticate, async (req, res, next) => {
       await browserSessionService.invalidateBrowserSession(req.browserSessionId, { req });
     }
     clearBrowserSessionCookies(res, req);
+    return res.status(204).end();
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * @deprecated Usar PATCH /api/me/password.
+ *
+ * Este endpoint está reemplazado por PATCH /api/me/password, que:
+ *   - usa el verbo HTTP correcto (PATCH en lugar de POST),
+ *   - devuelve 400 CURRENT_PASSWORD_INVALID en lugar de 401 cuando la contraseña actual es incorrecta,
+ *   - acepta currentPassword de cualquier longitud (min 1 en lugar de min 8),
+ *   - verifica same-as-current con bcrypt en lugar de comparación de texto.
+ *
+ * Se mantiene temporalmente para compatibilidad con clientes externos.
+ * No lo usan los shells embebidos (root, warehouse, agent).
+ */
+router.post('/change-password', authenticate, validate(changePasswordSchema), async (req, res, next) => {
+  try {
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Link', '</api/me/password>; rel="successor-version"');
+    await authService.changePassword(req.auth.sub, req.body, req);
     return res.status(204).end();
   } catch (error) {
     return next(error);

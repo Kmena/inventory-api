@@ -89,6 +89,41 @@ function createUser(data) {
   });
 }
 
+function findUserByIdForCompany(id, companyId) {
+  return prisma.user.findFirst({
+    where: { id, companyId },
+    include: userRelationsInclude(),
+  });
+}
+
+function updateCompanyUserFields(id, companyId, data) {
+  // companyId is included in the WHERE clause for defense-in-depth (P5-002).
+  // The service already verifies company ownership via findUserByIdForCompany before
+  // calling this function, but adding it here prevents hypothetical bypass paths.
+  return prisma.user.update({
+    where: { id, companyId },
+    data,
+    include: userRelationsInclude(),
+  });
+}
+
+function assignCompanyUserRole(id, companyId, roleId) {
+  // companyId included for defense-in-depth (P5-002). Same rationale as above.
+  return prisma.user.update({
+    where: { id, companyId },
+    data: { roleId },
+    include: userRelationsInclude(),
+  });
+}
+
+function updateUserPasswordHash(id, passwordHash) {
+  return prisma.user.update({
+    where: { id },
+    data: { passwordHash },
+    select: { id: true, username: true },
+  });
+}
+
 function findActiveUsersByRoleId(roleId, companyId = null) {
   return prisma.user.findMany({
     where: {
@@ -113,5 +148,9 @@ module.exports = {
   findUserByUsernameWithRelations,
   findAuthenticatedUserById,
   createUser,
+  findUserByIdForCompany,
+  updateCompanyUserFields,
+  assignCompanyUserRole,
+  updateUserPasswordHash,
   findActiveUsersByRoleId,
 };

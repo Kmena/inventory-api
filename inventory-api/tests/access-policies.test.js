@@ -44,8 +44,8 @@ test('access policies centralize stable role and permission boundaries', () => {
   assert.equal(paymentApprovePolicy.transition, 'permission-governed');
 
   const clientUploadPolicy = getAccessPolicy('client.document.upload');
-  assert.equal(clientUploadPolicy.mode, 'role');
-  assert.deepEqual(clientUploadPolicy.roles, ['admin', 'sales']);
+  assert.equal(clientUploadPolicy.mode, 'permission');
+  assert.deepEqual(clientUploadPolicy.permissions, ['clients.documents.upload']);
 
   const geocodingPolicy = getAccessPolicy('integration.geocoding.search');
   assert.equal(geocodingPolicy.mode, 'role');
@@ -94,9 +94,6 @@ test('access policies preserve strict registry lookups and explicit actor-scope 
     ['company.root-companies.list', 'global-root'],
     ['feedback.list-global', 'global-root'],
     ['feedback.resolve', 'global-root'],
-    ['role.company.create', 'company-admin'],
-    ['role.company.list', 'company-admin'],
-    ['role.company.update', 'company-admin'],
   ]);
 
   assert.deepEqual(getAccessPolicy('product.import').permissions, ['products.import', 'products.manage']);
@@ -128,22 +125,22 @@ test('authorizeAccessPolicy preserves global-root company listing semantics', as
   assert.equal(allowedError, undefined);
 });
 
-test('authorizeAccessPolicy preserves company-admin role administration semantics', async () => {
+test('authorizeAccessPolicy enforces FB6 role administration permissions', async () => {
   const listGuard = authorizeAccessPolicy('role.company.list');
   const createGuard = authorizeAccessPolicy('role.company.create');
 
-  const deniedListScopeError = await runGuard(listGuard, { role: 'admin', companyId: null });
-  assert.equal(deniedListScopeError?.statusCode, 403);
-  assert.equal(deniedListScopeError?.code, 'forbidden');
+  const deniedListError = await runGuard(listGuard, { role: 'admin', companyId: '7', permissions: [] });
+  assert.equal(deniedListError?.statusCode, 403);
+  assert.equal(deniedListError?.code, 'forbidden');
 
-  const deniedCreateScopeError = await runGuard(createGuard, { role: 'admin', companyId: null });
-  assert.equal(deniedCreateScopeError?.statusCode, 403);
-  assert.equal(deniedCreateScopeError?.code, 'forbidden');
+  const deniedCreateError = await runGuard(createGuard, { role: 'admin', companyId: '7', permissions: ['roles.view'] });
+  assert.equal(deniedCreateError?.statusCode, 403);
+  assert.equal(deniedCreateError?.code, 'forbidden');
 
-  const allowedListError = await runGuard(listGuard, { role: 'admin', companyId: '7' });
+  const allowedListError = await runGuard(listGuard, { role: 'custom', companyId: '7', permissions: ['roles.view'] });
   assert.equal(allowedListError, undefined);
 
-  const allowedCreateError = await runGuard(createGuard, { role: 'admin', companyId: '7' });
+  const allowedCreateError = await runGuard(createGuard, { role: 'custom', companyId: '7', permissions: ['roles.manage'] });
   assert.equal(allowedCreateError, undefined);
 });
 
@@ -154,13 +151,8 @@ test('authorizeAccessPolicy records actor-scope audit metadata when a base-allow
     recordedPayloads.push(payload);
     return null;
   }, async () => {
-    const roleCompanyCreateGuard = authorizeAccessPolicy('role.company.create');
     const rootListGuard = authorizeAccessPolicy('company.list-global');
     const agentWorkspaceGuard = authorizeAccessPolicy('agent.workspace.access');
-
-    const deniedCompanyAdminScope = await runGuard(roleCompanyCreateGuard, { role: 'admin', companyId: null });
-    assert.equal(deniedCompanyAdminScope?.statusCode, 403);
-    assert.equal(deniedCompanyAdminScope?.code, 'forbidden');
 
     const deniedGlobalRootScope = await runGuard(rootListGuard, { role: 'root', companyId: '7' });
     assert.equal(deniedGlobalRootScope?.statusCode, 403);
@@ -176,7 +168,7 @@ test('authorizeAccessPolicy records actor-scope audit metadata when a base-allow
     assert.equal(deniedAgentWorkspaceScope?.code, 'forbidden');
   });
 
-  assert.equal(recordedPayloads.length, 3);
+  assert.equal(recordedPayloads.length, 2);
   assert.deepEqual(recordedPayloads.map((payload) => ({
     action: payload.action,
     reasonCode: payload.reasonCode,
@@ -185,14 +177,6 @@ test('authorizeAccessPolicy records actor-scope audit metadata when a base-allow
     role: payload.metadata.role,
     companyId: payload.metadata.companyId,
   })), [
-    {
-      action: 'security.authorization.access_policy',
-      reasonCode: 'actor_scope_denied',
-      policyId: 'role.company.create',
-      actorScope: 'company-admin',
-      role: 'admin',
-      companyId: null,
-    },
     {
       action: 'security.authorization.access_policy',
       reasonCode: 'actor_scope_denied',
@@ -287,7 +271,7 @@ test('authorizeAccessPolicy rejects actors missing new supply/intake permissions
   assert.equal(allowedReceiptReverse, undefined);
 });
 
-test('authorizeAccessPolicy preserves admin/sales semantics for integration and client upload guards', async () => {
+test('authorizeAccessPolicy uses permissions for migrated integration and client upload guards', async () => {
   const geocodingGuard = authorizeAccessPolicy('integration.geocoding.search');
   const clientUploadGuard = authorizeAccessPolicy('client.document.upload');
 
@@ -300,6 +284,6 @@ test('authorizeAccessPolicy preserves admin/sales semantics for integration and 
   const deniedClientUploadError = await runGuard(clientUploadGuard, { role: 'warehouse', companyId: '7' });
   assert.equal(deniedClientUploadError?.statusCode, 403);
 
-  const allowedClientUploadError = await runGuard(clientUploadGuard, { role: 'admin', companyId: '7' });
+  const allowedClientUploadError = await runGuard(clientUploadGuard, { role: 'custom-sales', companyId: '7', permissions: ['clients.documents.upload'] });
   assert.equal(allowedClientUploadError, undefined);
 });

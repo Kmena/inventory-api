@@ -97,7 +97,7 @@ test('createCompanyClientDocument persists files outside the public directory an
         throw new Error('deleteClientDocument should not be called on successful writes');
       },
     }]],
-    () => clientService.createCompanyClientDocument(5n, payload, { companyId: '9' }),
+    () => clientService.createCompanyClientDocument(5n, payload, { companyId: '9', permissions: ['clients.view.all'] }),
   );
 
   const privateFilePath = buildPrivateClientDocumentPath({
@@ -149,7 +149,7 @@ test('createCompanyClientDocument removes the DB record when file persistence fa
     ],
     async () => {
       await assert.rejects(
-        () => clientService.createCompanyClientDocument(5n, payload, { companyId: '9' }),
+        () => clientService.createCompanyClientDocument(5n, payload, { companyId: '9', permissions: ['clients.view.all'] }),
         (error) => {
           assert.equal(error.statusCode, 500);
           assert.equal(error.code, 'internal_server_error');
@@ -213,7 +213,7 @@ test('createCompanyClientDocument reports cleanup failure when file persistence 
     ],
     async () => {
       await assert.rejects(
-        () => clientService.createCompanyClientDocument(5n, payload, { companyId: '9' }),
+        () => clientService.createCompanyClientDocument(5n, payload, { companyId: '9', permissions: ['clients.view.all'] }),
         (error) => {
           assert.equal(error.statusCode, 500);
           assert.equal(error.code, 'internal_server_error');
@@ -266,7 +266,7 @@ test('createCompanyClientDocument reserves the document id up front and no longe
         operations.push({ step: 'delete-db-record-unexpected' });
       },
     }]],
-    () => clientService.createCompanyClientDocument(5n, payload, { companyId: '9' }),
+    () => clientService.createCompanyClientDocument(5n, payload, { companyId: '9', permissions: ['clients.view.all'] }),
   );
 
   const privateFilePath = buildPrivateClientDocumentPath({
@@ -290,11 +290,12 @@ test('createCompanyClientDocument reserves the document id up front and no longe
 test('getCompanyClientDocumentDownload rejects documents outside the authenticated tenant', async () => {
   await withModuleStubs(
     [[clientRepository, {
+      findCompanyClientById: async () => ({ id: 5n, companyId: 44n, isActive: true }),
       findCompanyClientDocumentById: async () => null,
     }]],
     async () => {
       await assert.rejects(
-        () => clientService.getCompanyClientDocumentDownload(5n, 12n, { companyId: '44' }),
+        () => clientService.getCompanyClientDocumentDownload(5n, 12n, { companyId: '44', permissions: ['clients.view.all'] }),
         (error) => {
           assert.equal(error.statusCode, 404);
           assert.equal(error.code, 'not_found');
@@ -329,7 +330,11 @@ test('document download route returns an attachment for the authenticated tenant
           status: 'ACTIVE',
           companyId: 9n,
           company: { isActive: true },
-          role: { code: 'admin', isActive: true, rolePermissions: [] },
+          role: {
+            code: 'admin',
+            isActive: true,
+            rolePermissions: [{ isEnabled: true, permission: { code: 'clients.documents.download', isActive: true } }],
+          },
         }),
       }],
       [clientService, {
@@ -346,7 +351,10 @@ test('document download route returns an attachment for the authenticated tenant
           id: 7n,
           username: 'admin-demo',
           companyId: 9n,
-          role: { code: 'admin', rolePermissions: [] },
+          role: {
+            code: 'admin',
+            rolePermissions: [{ isEnabled: true, permission: { code: 'clients.documents.download', isActive: true } }],
+          },
         });
 
         const response = await fetch(`${baseUrl}/api/clients/5/documents/12/download`, {

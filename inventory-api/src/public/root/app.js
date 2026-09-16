@@ -1,6 +1,7 @@
 (() => {
 const inventoryAuth = /** @type {any} */ (window).InventoryAuth;
 const inventorySession = /** @type {any} */ (window).InventorySession;
+const inventoryAccountDialog = /** @type {any} */ (window).InventoryAccountDialog;
 const rootShell = /** @type {any} */ (window).RootShell;
 const runtimeContract = rootShell.require('runtimeContract');
 const [rootShellSessionAdapter, rootShellGuards, rootShellManifest, rootShellRouter] = runtimeContract.requireModules(runtimeContract.bootstrapModuleNames);
@@ -12,6 +13,7 @@ const userNameElement = /** @type {HTMLElement | null} */ (document.getElementBy
 const userRoleElement = /** @type {HTMLElement | null} */ (document.getElementById('root-user-role'));
 const identityBlock = /** @type {HTMLElement | null} */ (document.getElementById('root-identity-block'));
 const logoutButton = /** @type {HTMLButtonElement | null} */ (document.getElementById('root-logout-button'));
+const accountButton = /** @type {HTMLButtonElement | null} */ (document.getElementById('root-account-button'));
 const navElement = /** @type {HTMLElement | null} */ (document.getElementById('root-nav'));
 const navLinksElement = /** @type {HTMLElement | null} */ (document.getElementById('root-nav-links'));
 const adminSidebar = /** @type {HTMLElement | null} */ (document.getElementById('root-admin-sidebar'));
@@ -25,7 +27,7 @@ const sidebarIdentitySlot = /** @type {HTMLElement | null} */ (document.getEleme
 const rootLogoutSlot = /** @type {HTMLElement | null} */ (document.getElementById('root-logout-slot-root'));
 const sidebarLogoutSlot = /** @type {HTMLElement | null} */ (document.getElementById('root-logout-slot-sidebar'));
 
-if (!shellElement || !statusElement || !viewElement || !userNameElement || !userRoleElement || !identityBlock || !logoutButton || !navElement || !navLinksElement || !adminSidebar || !adminNavElement || !mainElement || !overlayElement || !drawerButton || !collapseButton || !headerIdentitySlot || !sidebarIdentitySlot || !rootLogoutSlot || !sidebarLogoutSlot) {
+if (!shellElement || !statusElement || !viewElement || !userNameElement || !userRoleElement || !identityBlock || !logoutButton || !accountButton || !navElement || !navLinksElement || !adminSidebar || !adminNavElement || !mainElement || !overlayElement || !drawerButton || !collapseButton || !headerIdentitySlot || !sidebarIdentitySlot || !rootLogoutSlot || !sidebarLogoutSlot) {
   throw new Error('No se encontraron los elementos base del shell root.');
 }
 
@@ -486,6 +488,15 @@ logoutButton.addEventListener('click', async () => {
   await inventoryAuth.logout(activeSession, {
     headers: {
       'X-Inventory-Browser-Session': 'cookie',
+    },
+  });
+});
+
+accountButton.addEventListener('click', () => {
+  if (!activeSession || !inventoryAccountDialog) return;
+  inventoryAccountDialog.open(activeSession, {
+    onSuccess() {
+      setStatus('Contraseña actualizada correctamente.', 'success');
     },
   });
 });

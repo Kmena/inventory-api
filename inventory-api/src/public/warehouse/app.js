@@ -226,12 +226,25 @@ function updateTabBarActive(activeView) {
 // -----------------------------------------------------------------------
 
 function renderIdentity(session) {
+  const inventoryAccountDialog = /** @type {any} */ (window).InventoryAccountDialog;
   const userName = session?.user?.fullName || session?.user?.username || 'Usuario';
   identitySlotEl.innerHTML = `
     <span class="warehouse-identity__name">${escapeHtml(userName)}</span>
+    <button type="button" class="secondary-button" id="warehouse-account-button" style="font-size:0.82rem;padding:4px 10px;" aria-label="Abrir Mi cuenta">Mi cuenta</button>
     <button type="button" class="warehouse-identity__logout" id="warehouse-logout-button">Salir</button>
   `;
   identitySlotEl.hidden = false;
+
+  const accountBtn = document.getElementById('warehouse-account-button');
+  if (accountBtn && inventoryAccountDialog) {
+    accountBtn.addEventListener('click', () => {
+      inventoryAccountDialog.open(session, {
+        onSuccess() {
+          showToast('Contraseña actualizada correctamente.');
+        },
+      });
+    });
+  }
 
   const logoutBtn = document.getElementById('warehouse-logout-button');
   if (logoutBtn) {

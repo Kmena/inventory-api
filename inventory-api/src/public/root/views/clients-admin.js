@@ -260,8 +260,26 @@
       return;
     }
 
-    const canDeactivate = session?.user?.role?.code === 'admin';
-    const canLookupTaxpayer = Boolean((session?.user?.permissions || []).includes('integration.taxpayer.lookup'));
+    const permissionSet = new Set(session?.user?.permissions || []);
+    const canCreateClient = permissionSet.has('clients.create');
+    const canEditClient = permissionSet.has('clients.edit');
+    const canCreateReference = permissionSet.has('clients.references.create');
+    const canUploadDocument = permissionSet.has('clients.documents.upload');
+    const canDownloadDocument = permissionSet.has('clients.documents.download');
+    const canManageCredit = permissionSet.has('clients.credit.manage');
+    const canDeactivate = permissionSet.has('clients.delete');
+    const canLookupTaxpayer = permissionSet.has('integration.taxpayer.lookup');
+    const clientActionPermissions = {
+      canCreateClient,
+      canEditClient,
+      canCreateReference,
+      canUploadDocument,
+      canDownloadDocument,
+      canManageCredit,
+      canDeactivate,
+      canLookupTaxpayer,
+    };
+    openCreateButton.hidden = !canCreateClient;
 
     // Reveal Consultar button in create form when user has taxpayer-lookup permission
     const createLookupButton = /** @type {HTMLButtonElement | null} */ (container.querySelector('#clients-create-lookup-button'));
@@ -330,7 +348,7 @@
       listSummary.textContent = clientsState.buildClientsListSummary(clients.length, filteredClients.length);
       listRegion.innerHTML = clientsRenderers.renderClientList(filteredClients, selectedClientId);
       detailTitle.textContent = selectedClient ? selectedClient.name || 'Detalle de cliente' : 'Selecciona un cliente';
-      detailRegion.innerHTML = clientsRenderers.renderClientDetail(selectedClient, classifications, documentTypes, zoneOptions, canDeactivate, economicActivities);
+      detailRegion.innerHTML = clientsRenderers.renderClientDetail(selectedClient, classifications, documentTypes, zoneOptions, clientActionPermissions, economicActivities);
     }
 
     async function loadClients() {
@@ -417,7 +435,10 @@
       if (createLookupButton) createLookupButton.disabled = true;
     }
 
-    openCreateButton.addEventListener('click', () => dialog.showModal());
+    openCreateButton.addEventListener('click', () => {
+      if (!canCreateClient) return;
+      dialog.showModal();
+    });
     closeCreateButton.addEventListener('click', closeDialog);
     cancelCreateButton.addEventListener('click', closeDialog);
 
@@ -530,6 +551,7 @@
 
       // Botón [+ Agregar tienda] — abre el dialog con mapa Leaflet
       if (target.id === 'clients-add-store-button') {
+        if (!canCreateClient) return;
         const btnClientId = target.getAttribute('data-client-id') || String(selectedClientId || '');
         const btnClientName = target.getAttribute('data-client-name') || '';
         clientsAdminStoreDialog.open(
@@ -574,6 +596,7 @@
 
       const downloadButton = target.closest('[data-document-download]');
       if (downloadButton instanceof globalScope.HTMLButtonElement) {
+        if (!canDownloadDocument) return;
         const client = getSelectedClient();
         if (!client) {
           return;
@@ -602,6 +625,7 @@
       }
 
       if (target.id === 'clients-lookup-taxpayer-button') {
+        if (!canEditClient || !canLookupTaxpayer) return;
         const editLookupBtn = /** @type {HTMLButtonElement} */ (target);
         const editLegalIdInput = /** @type {HTMLInputElement | null} */ (detailRegion.querySelector('input[name="legalId"]'));
         const legalId = editLegalIdInput?.value?.trim();
@@ -650,6 +674,7 @@
       }
 
       if (target.id === 'clients-deactivate-button') {
+        if (!canDeactivate) return;
         const client = getSelectedClient();
         if (!client) {
           return;
@@ -764,7 +789,7 @@
     });
 
     // Blur automático en el legalId del form de edición (igual que en create dialog)
-    if (canLookupTaxpayer) {
+    if (canLookupTaxpayer && canEditClient) {
       detailRegion.addEventListener('input', (event) => {
         const target = event.target;
         if (!(target instanceof globalScope.HTMLInputElement) || target.name !== 'legalId') return;
@@ -804,6 +829,7 @@
       const clientId = String(formData.get('clientId') || selectedClientId || '');
       try {
         if (form.id === 'clients-update-form') {
+          if (!canEditClient) return;
           await clientsApi.updateClient(session, clientId, clientsHelpers.buildClientPayload(formData));
           await loadClients();
           await loadClientDetail(clientId);
@@ -813,6 +839,7 @@
         }
 
         if (form.classList.contains('clients-store-credit-form')) {
+          if (!canManageCredit) return;
           const storeId = form.getAttribute('data-store-id') || '';
           const creditLimit = parseFloat(String(formData.get('creditLimit') || '0'));
           const msgEl = form.querySelector('.clients-store-credit-msg');
@@ -826,6 +853,7 @@
         }
 
         if (form.id === 'clients-document-form') {
+          if (!canUploadDocument) return;
           const fileFeedback = /** @type {HTMLElement | null} */ (form.querySelector('#clients-document-file-feedback'));
           if (isDocumentFileProcessing) {
             if (fileFeedback) {
@@ -850,6 +878,7 @@
         }
 
         if (form.id === 'clients-reference-form') {
+          if (!canCreateReference) return;
           await clientsApi.createReference(session, clientId, clientsHelpers.buildReferencePayload(formData));
           await loadClientDetail(clientId);
           detailMessage.innerHTML = rootShellUi.renderInlineMessage('Referencia creada correctamente.');

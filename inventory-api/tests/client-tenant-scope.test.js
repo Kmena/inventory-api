@@ -43,7 +43,7 @@ test('listClients returns only company-scoped clients', async () => {
         return [{ id: 7n, name: 'Cliente A', _count: { stores: 2 } }];
       },
     },
-    () => clientService.listClients({ companyId: '15' }),
+    () => clientService.listClients({ companyId: '15', permissions: ['clients.view.all'] }),
   );
 
   assert.equal(receivedCompanyId, 15n);
@@ -76,7 +76,7 @@ test('getClient returns not found when the client is outside the authenticated c
     },
     async () => {
       await assert.rejects(
-        () => clientService.getClient(10n, { companyId: '22' }),
+        () => clientService.getClient(10n, { companyId: '22', permissions: ['clients.view.all'] }),
         (error) => {
           assert.equal(error.statusCode, 404);
           assert.equal(error.code, 'not_found');
@@ -118,7 +118,7 @@ test('updateClient scopes writes to the authenticated company', async () => {
         return { id: clientId, companyId, ...payload };
       },
     },
-    () => clientService.updateClient(9n, { name: 'Actualizado', companyId: 999n }, { companyId: '30' }),
+    () => clientService.updateClient(9n, { name: 'Actualizado', companyId: 999n }, { companyId: '30', permissions: ['clients.view.all'] }),
   );
 
   assert.deepEqual(receivedLookup, { clientId: 9n, companyId: 30n });
@@ -138,7 +138,7 @@ test('removeClient rejects deleting a client from another company', async () => 
     },
     async () => {
       await assert.rejects(
-        () => clientService.removeClient(11n, { companyId: '31' }),
+        () => clientService.removeClient(11n, { companyId: '31', permissions: ['clients.view.all'] }),
         (error) => {
           assert.equal(error.statusCode, 404);
           assert.equal(error.code, 'not_found');
@@ -162,7 +162,7 @@ test('removeClient converts DELETE compatibility flow into soft delete', async (
         return { count: 1 };
       },
     },
-    () => clientService.removeClient(21n, { companyId: '31' }),
+    () => clientService.removeClient(21n, { companyId: '31', permissions: ['clients.view.all'] }),
   );
 
   assert.deepEqual(receivedSoftDelete, { clientId: 21n, companyId: 31n });

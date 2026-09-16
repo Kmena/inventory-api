@@ -18,48 +18,34 @@ async function runGuard(guard, auth) {
   return nextError;
 }
 
-// La politica role.company.update usa mode:'role', roles:['admin'] — igual que list y create.
-// Solo el rol global 'admin' puede editar roles de empresa.
-
-test('PUT /company/:roleId route allows the admin role regardless of permissions', async () => {
+test('PUT /company/:roleId route requires roles.manage regardless of role code', async () => {
   const guard = getRouteGuard(roleRoutes, '/company/:roleId', 'put');
 
-  const allowedAdmin = await runGuard(guard, {
+  const deniedAdmin = await runGuard(guard, {
     role: 'admin',
     companyId: '7',
     permissions: [],
   });
-  assert.equal(allowedAdmin, undefined);
+  assert.equal(deniedAdmin?.statusCode, 403);
+
+  const allowedCustom = await runGuard(guard, {
+    role: 'custom-operator',
+    companyId: '7',
+    permissions: ['roles.manage'],
+  });
+  assert.equal(allowedCustom, undefined);
 });
 
-test('PUT /company/:roleId denies actors whose role is not admin (e.g. sales, warehouse)', async () => {
-  const guard = getRouteGuard(roleRoutes, '/company/:roleId', 'put');
-
-  const deniedSales = await runGuard(guard, {
-    role: 'sales',
-    companyId: '7',
-    permissions: ['settings.manage'],
-  });
-  assert.equal(deniedSales?.statusCode, 403);
-
-  const deniedWarehouse = await runGuard(guard, {
-    role: 'warehouse',
-    companyId: '7',
-    permissions: ['settings.manage', 'users.manage'],
-  });
-  assert.equal(deniedWarehouse?.statusCode, 403);
-});
-
-test('existing GET and POST role routes remain unchanged', async () => {
+test('GET and POST role routes use roles.view and roles.manage respectively', async () => {
   const listGuard = getRouteGuard(roleRoutes, '/company', 'get');
   const createGuard = getRouteGuard(roleRoutes, '/company', 'post');
 
-  const listAllowed = await runGuard(listGuard, { role: 'admin', companyId: '7' });
+  const listAllowed = await runGuard(listGuard, { role: 'custom', companyId: '7', permissions: ['roles.view'] });
   assert.equal(listAllowed, undefined);
 
-  const createAllowed = await runGuard(createGuard, { role: 'admin', companyId: '7' });
+  const createAllowed = await runGuard(createGuard, { role: 'custom', companyId: '7', permissions: ['roles.manage'] });
   assert.equal(createAllowed, undefined);
 
-  const listDenied = await runGuard(listGuard, { role: 'sales', companyId: '7' });
+  const listDenied = await runGuard(listGuard, { role: 'admin', companyId: '7', permissions: [] });
   assert.equal(listDenied?.statusCode, 403);
 });

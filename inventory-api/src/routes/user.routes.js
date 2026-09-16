@@ -4,7 +4,12 @@ const authenticate = require('../middlewares/authenticate');
 const { authorizeAccessPolicy } = require('../security/access-policies');
 const validate = require('../middlewares/validate');
 const { parsePaginationQuery } = require('../lib/pagination');
-const { createUserSchema, createCompanyUserSchema } = require('../schemas/user.schema');
+const {
+  createUserSchema,
+  createCompanyUserSchema,
+  updateCompanyUserSchema,
+  assignCompanyUserRoleSchema,
+} = require('../schemas/user.schema');
 const userService = require('../services/user.service');
 
 const router = express.Router();
@@ -32,6 +37,24 @@ router.post('/company', authorizeAccessPolicy('user.create-company'), validate(c
   try {
     const user = await userService.registerCompanyUser(req.body, req.auth, req);
     return res.status(201).json(user);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch('/company/:userId', authorizeAccessPolicy('user.update-company'), validate(updateCompanyUserSchema), async (req, res, next) => {
+  try {
+    const user = await userService.updateCompanyUser(req.params.userId, req.body, req.auth, req);
+    return res.json(user);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch('/company/:userId/role', authorizeAccessPolicy('user.assign-role-company'), validate(assignCompanyUserRoleSchema), async (req, res, next) => {
+  try {
+    const user = await userService.assignCompanyUserRole(req.params.userId, req.body, req.auth, req);
+    return res.json(user);
   } catch (error) {
     return next(error);
   }

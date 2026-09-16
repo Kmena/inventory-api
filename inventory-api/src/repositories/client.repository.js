@@ -55,8 +55,8 @@ function findAllClients() {
   });
 }
 
-function findCompanyClients(companyId, pagination = null) {
-  const where = buildDefaultClientWhere({ companyId });
+function findCompanyClients(companyId, pagination = null, additionalWhere = {}) {
+  const where = buildDefaultClientWhere({ companyId, ...additionalWhere });
   const orderBy = clientListOrderBy;
 
   if (!pagination) {
@@ -77,6 +77,48 @@ function findCompanyClients(companyId, pagination = null) {
       include: clientInclude(),
     }),
   ]).then(([totalItems, items]) => ({ totalItems, items }));
+}
+
+function buildRouteScopedClientWhere(companyId, userId) {
+  return {
+    stores: {
+      some: {
+        isActive: true,
+        subregion: {
+          salesRoutes: {
+            some: {
+              companyId,
+              salesRoute: {
+                isActive: true,
+                assignments: {
+                  some: {
+                    companyId,
+                    userId,
+                    isActive: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function findRouteScopedCompanyClients(companyId, userId, pagination = null) {
+  return findCompanyClients(companyId, pagination, buildRouteScopedClientWhere(companyId, userId));
+}
+
+function findRouteScopedCompanyClientById(id, companyId, userId) {
+  return prisma.client.findFirst({
+    where: buildDefaultClientWhere({
+      id,
+      companyId,
+      ...buildRouteScopedClientWhere(companyId, userId),
+    }),
+    include: clientInclude(),
+  });
 }
 
 function findClientById(id) {
@@ -345,8 +387,10 @@ function findClientLedger(clientId, companyId, options = {}, db = prisma) {
 module.exports = {
   findAllClients,
   findCompanyClients,
+  findRouteScopedCompanyClients,
   findClientById,
   findCompanyClientById,
+  findRouteScopedCompanyClientById,
   findCompanyClassificationById,
   findCompanyClassifications,
   countClientStores,

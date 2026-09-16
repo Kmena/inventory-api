@@ -39,6 +39,8 @@ const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   fiscalReferenceRouter: 'src/routes/fiscal-reference.routes.js',
   // in-app-feedback feature
   feedbackRouter: 'src/routes/feedback.routes.js',
+  // users-account-self-service: PATCH /api/me/password
+  meRouter: 'src/routes/me.routes.js',
 });
 
 function read(filePath) {

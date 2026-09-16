@@ -139,7 +139,7 @@ test('createCompanyClientStore persists override fiscal fields when provided', a
       emailBilling: 'facturacion@sucursal.test',
       economicActivityCode: '6201',
       economicActivityName: 'Servicios',
-    }, { companyId: '7' });
+    }, { companyId: '7', permissions: ['clients.view.all'] });
 
     assert.equal(capturedPayloads.length, 1);
     assert.equal(capturedPayloads[0].legalName, 'Sucursal Fiscal SA');
@@ -169,7 +169,7 @@ test('createCompanyClientStore preserves inherit semantics when override fields 
     await clientService.createCompanyClientStore(15n, {
       subregionId: 44n,
       name: 'Sucursal Heredada',
-    }, { companyId: '7' });
+    }, { companyId: '7', permissions: ['clients.view.all'] });
 
     assert.equal(capturedPayloads.length, 1);
     assert.equal('legalName' in capturedPayloads[0], false);

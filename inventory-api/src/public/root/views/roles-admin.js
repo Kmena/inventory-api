@@ -3,7 +3,7 @@
   var rolesApi = rootShell.require('rolesApi');
   var rootShellUi = rootShell.require('ui');
 
-  var SELF_LOCKOUT_CODES = ['settings.manage', 'users.manage'];
+  var SELF_LOCKOUT_CODES = ['settings.manage', 'users.manage', 'roles.manage'];
 
   function render(session) {
     var companyId = rootShellUi.escapeHtml(session?.user?.companyId || 'sin empresa');
@@ -277,15 +277,15 @@
     var editingRoleId = null;
     var currentUserRoleId = session?.user?.roleId ? String(session.user.roleId) : null;
     var confirmResolve = null;
-    // El rol global 'admin' (isCompanyAdmin) y root pueden editar roles de empresa.
-    // La politica de API role.company.update usa mode: 'role', roles: ['admin'].
-    // Tambien se admite settings.manage y roles.manage para compatibilidad.
     var sessionPermissions = session?.user?.permissions || [];
-    var sessionRoleCode = session?.user?.role?.code;
-    var canEditRoles = sessionRoleCode === 'root'
-      || sessionRoleCode === 'admin'
-      || sessionPermissions.includes('settings.manage')
-      || sessionPermissions.includes('roles.manage');
+    var canEditRoles = sessionPermissions.includes('roles.manage');
+    if (!canEditRoles) {
+      formMessage.innerHTML = rootShellUi.renderInlineMessage('Modo solo lectura: podés consultar roles y permisos, pero no modificarlos.');
+      submitButton.hidden = true;
+      clearButton.hidden = true;
+      var nameInput = form.querySelector('input[name="name"]');
+      if (nameInput) { nameInput.disabled = true; }
+    }
     /** @type {string|null} Selected landing permission code */
     var _selectedLandingCode = null;
     /** @type {Set<string>} Source of truth for selected operational permission codes — survives search re-renders. */
@@ -318,6 +318,10 @@
     function renderPermissionsRegion() {
       renderLandingRegion();
       permissionsRegion.innerHTML = renderPermissions(availablePermissions, getSelectedPermissionCodes(), searchInput.value, isEditingOwnRole());
+      if (!canEditRoles) {
+        Array.from(landingRegion.querySelectorAll('input')).forEach(function (input) { input.disabled = true; });
+        Array.from(permissionsRegion.querySelectorAll('input')).forEach(function (input) { input.disabled = true; });
+      }
       attachCategoryToggles();
       updateSelectionCount();
     }
@@ -463,6 +467,7 @@
     }
 
     form.addEventListener('change', function (event) {
+      if (!canEditRoles) { return; }
       if (event.target instanceof globalScope.HTMLInputElement && event.target.name === 'landingPermission') {
         _selectedLandingCode = event.target.value || null;
       }
@@ -492,6 +497,7 @@
     });
 
     clearButton.addEventListener('click', function () {
+      if (!canEditRoles) { return; }
       if (editingRoleId) {
         exitEditMode();
         return;
@@ -503,6 +509,7 @@
 
     form.addEventListener('submit', async function (event) {
       event.preventDefault();
+      if (!canEditRoles) { return; }
       formMessage.innerHTML = '';
 
       if (!form.reportValidity()) {

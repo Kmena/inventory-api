@@ -10,10 +10,18 @@
     return roleCode === 'admin' && Boolean(session?.user?.companyId);
   }
 
+  function hasPermission(session, permissionCode) {
+    return Boolean((session?.user?.permissions || []).includes(permissionCode));
+  }
+
+  function hasAnyPermission(session, permissionCodes) {
+    return (permissionCodes || []).some((permissionCode) => hasPermission(session, permissionCode));
+  }
+
   function hasProcurementAccess(session) {
     return Boolean(
       session?.user?.companyId &&
-      (session?.user?.permissions || []).includes('procurement.manage')
+      hasPermission(session, 'procurement.manage')
     );
   }
 
@@ -53,7 +61,9 @@
 
   rootShell.register('guards', {
     canAccessRoute,
+    hasAnyPermission,
     hasExplicitRootLanding,
+    hasPermission,
     hasProcurementAccess,
     isCompanyAdmin,
     isEligibleRootShellSession,

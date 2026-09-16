@@ -271,6 +271,8 @@ test('browser E2E: a company-admin browser session sees Roles y permisos only an
     companyId: '77',
     fullName: 'Admin Demo',
     username: 'admin-demo',
+    // FB6/FB7: roles nav link requires roles.view; create-role form requires roles.manage
+    permissions: ['roles.view', 'roles.manage'],
   });
   const permissions = [
     { code: 'orders.view', module: 'orders', action: 'view', isActive: true },
