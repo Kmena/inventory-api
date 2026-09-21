@@ -210,7 +210,9 @@
         };
         try {
           await inventoryApi.createInventoryRequest(session, payload);
-          messageRegion.innerHTML = rootShellUi.renderInlineMessage('Solicitud de ajuste creada correctamente.');
+          // Switch to requests tab so the user sees the created request
+          // and doesn't re-submit thinking nothing happened.
+          activeTab = 'requests';
           await loadData();
         } catch (error) {
           messageRegion.innerHTML = rootShellUi.renderInlineMessage(error.message || 'No se pudo crear la solicitud.', 'error');
@@ -235,7 +237,9 @@
         };
         try {
           await inventoryApi.createInventoryRequest(session, payload);
-          messageRegion.innerHTML = rootShellUi.renderInlineMessage('Solicitud de traslado creada correctamente.');
+          // Switch to requests tab so the user sees the created request
+          // and doesn't re-submit thinking nothing happened.
+          activeTab = 'requests';
           await loadData();
         } catch (error) {
           messageRegion.innerHTML = rootShellUi.renderInlineMessage(error.message || 'No se pudo crear la solicitud.', 'error');
