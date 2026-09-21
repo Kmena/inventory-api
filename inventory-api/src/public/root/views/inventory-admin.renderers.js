@@ -79,10 +79,11 @@
       // shapes carry warehouseId directly. Generate one button-pair per stock
       // entry so sourceWarehouseId is never empty (avoids FK violation).
       const stocks = Array.isArray(item?.warehouseLotStocks) && item.warehouseLotStocks.length > 0
-        ? item.warehouseLotStocks
+        ? item.warehouseLotStocks.filter((s) => Number(s?.quantity ?? 0) > 0)
         : [{ warehouseId: item?.warehouseId || item?.warehouse?.id || '', warehouse: item?.warehouse || null, quantity: item?.quantity ?? item?.availableQuantity ?? '0' }];
-      const multiWh = stocks.length > 1;
-      const actionButtons = stocks.map((s) => {
+      const activeStocks = stocks.length > 0 ? stocks : [{ warehouseId: item?.warehouseId || item?.warehouse?.id || '', warehouse: item?.warehouse || null, quantity: '0' }];
+      const multiWh = activeStocks.length > 1;
+      const actionButtons = activeStocks.map((s) => {
         const wId = rootShellUi.escapeHtml(String(s?.warehouseId || s?.warehouse?.id || ''));
         const wName = multiWh ? rootShellUi.escapeHtml(String(s?.warehouse?.name || wId)) : '';
         const wQty = rootShellUi.escapeHtml(String(s?.quantity ?? '0'));
