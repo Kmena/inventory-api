@@ -52,11 +52,33 @@ async function findCompanyWarehouses(companyId, pagination = null) {
   };
 }
 
+function findCompanyWarehouseById(id, companyId, db = prisma) {
+  return db.warehouse.findFirst({ where: { id, companyId } });
+}
+
 function createCompanyWarehouse(data) {
   return prisma.warehouse.create({ data });
 }
 
+async function updateCompanyWarehouse(id, companyId, data, db = prisma) {
+  const result = await db.warehouse.updateMany({ where: { id, companyId }, data });
+  if (result.count === 0) return null;
+  return findCompanyWarehouseById(id, companyId, db);
+}
+
+function getWarehouseInventoryUsage(id, companyId, db = prisma) {
+  return Promise.all([
+    db.warehouseStock.count({ where: { warehouseId: id, warehouse: { companyId }, OR: [{ quantity: { not: 0 } }, { reservedQuantity: { not: 0 } }] } }),
+    db.warehouseLotStock.count({ where: { warehouseId: id, warehouse: { companyId }, OR: [{ quantity: { not: 0 } }, { reservedQuantity: { not: 0 } }] } }),
+    db.stockMovement.count({ where: { warehouseId: id, companyId } }),
+    db.order.count({ where: { warehouseId: id, companyId, status: { in: ['APPROVED'] } } }),
+  ]).then(([stockCount, lotStockCount, movementCount, pendingOrderCount]) => ({ stockCount, lotStockCount, movementCount, pendingOrderCount }));
+}
+
 module.exports = {
   findCompanyWarehouses,
+  findCompanyWarehouseById,
   createCompanyWarehouse,
+  updateCompanyWarehouse,
+  getWarehouseInventoryUsage,
 };

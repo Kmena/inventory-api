@@ -64,13 +64,14 @@ if (!headerEl || !viewTitleEl || !statusEl || !viewEl || !tabBarEl || !identityS
 // -----------------------------------------------------------------------
 
 const VIEW_MODULE_KEYS = /** @type {Record<string, string>} */ ({
-  'receipts':            'views.receipts',
-  'receive-from-po':     'views.receiveFromPo',
-  'inspections':         'views.inspections',
-  'production':          'views.production',
-  'recipe-consultation': 'views.recipeConsultation',
-  'inventory':           'views.inventory',
-  'dispatching':         'views.dispatching',
+  'receipts':              'views.receipts',
+  'receive-from-po':       'views.receiveFromPo',
+  'inspections':           'views.inspections',
+  'production':            'views.production',
+  'recipe-consultation':   'views.recipeConsultation',
+  'inventory':             'views.inventory',
+  'dispatching':           'views.dispatching',
+  'inventory-requests':    'views.inventoryRequests',
 });
 
 const TAB_DEFINITIONS = [
@@ -111,6 +112,12 @@ const TAB_DEFINITIONS = [
     icon:       '🚚',
     /** @param {string[]} p */ permission: (p) => p.includes('inventory.manage'),
   },
+  {
+    view:       'inventory-requests',
+    label:      'Solicitudes',
+    icon:       '📋',
+    /** @param {string[]} p */ permission: (p) => p.includes('inventory.requests.execute'),
+  },
 ];
 
 const VIEW_LABELS = /** @type {Record<string, string>} */ ({
@@ -120,6 +127,7 @@ const VIEW_LABELS = /** @type {Record<string, string>} */ ({
   'production':          'Ordenes en proceso',
   'recipe-consultation': 'Consulta de receta',
   'inventory':           'Inventario',
+  'inventory-requests':  'Solicitudes de movimiento',
 });
 
 // -----------------------------------------------------------------------

@@ -24,6 +24,7 @@ const fiscalReferenceRouter = require('./routes/fiscal-reference.routes');
 const orderRouter = require('./routes/order.routes');
 const invoiceRouter = require('./routes/invoice.routes');
 const paymentRouter = require('./routes/payment.routes');
+const entitlementRouter = require('./routes/entitlement.routes');
 const inventoryRouter = require('./routes/inventory.routes');
 const warehouseRouter = require('./routes/warehouse.routes');
 const regionRouter = require('./routes/region.routes');
@@ -247,6 +248,7 @@ app.use('/api/fiscal-references', ...mediumPayloadParsers, fiscalReferenceRouter
 app.use('/api/orders', ...mediumPayloadParsers, orderRouter);
 app.use('/api/invoices', ...mediumPayloadParsers, invoiceRouter);
 app.use('/api/payments', ...mediumPayloadParsers, paymentRouter);
+app.use('/api/entitlements', ...mediumPayloadParsers, entitlementRouter);
 app.use('/api/inventory', ...mediumPayloadParsers, inventoryRouter);
 app.use('/api/warehouses', ...mediumPayloadParsers, warehouseRouter);
 app.use('/api/warehouse-orders', ...mediumPayloadParsers, require('./routes/warehouse-orders.routes'));

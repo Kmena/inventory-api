@@ -12,6 +12,7 @@
   const routesAdminView = rootShell.require('views.routesAdmin');
   const warehousesAdminView = rootShell.require('views.warehousesAdmin');
   const productsAdminView = rootShell.require('views.productsAdmin');
+  const inventoryAdminView = rootShell.require('views.inventoryAdmin');
   const lotsAdminView = rootShell.require('views.lotsAdmin');
   const movementsAdminView = rootShell.require('views.movementsAdmin');
   const recipesAdminView = rootShell.require('views.recipesAdmin');
@@ -34,7 +35,30 @@
   const feedbackAdminView = rootShell.require('views.feedbackAdmin');
 
   function normalizeHashRoute(hashValue) {
-    return String(hashValue || '').replace(/^#/, '').trim();
+    const routeValue = String(hashValue || '').replace(/^#/, '').trim();
+    const routeKey = routeValue.split('?')[0];
+    if (routeKey === 'lots' || routeKey === 'movements') {
+      return 'inventory';
+    }
+    if (routeKey === 'locations') {
+      return 'warehouses';
+    }
+    return routeKey;
+  }
+
+  function normalizeHashTarget(hashValue) {
+    const routeValue = String(hashValue || '').replace(/^#/, '').trim();
+    const [routeKey, queryString = ''] = routeValue.split('?');
+    if (routeKey === 'lots') {
+      return 'inventory?tab=lots';
+    }
+    if (routeKey === 'movements') {
+      return 'inventory?tab=history';
+    }
+    if (routeKey === 'locations') {
+      return 'warehouses';
+    }
+    return queryString ? `${routeKey}?${queryString}` : routeKey;
   }
 
   function findNavigationItem(routeKey) {
@@ -96,6 +120,10 @@
 
     if (item.routeKey === 'products') {
       return productsAdminView;
+    }
+
+    if (item.routeKey === 'inventory') {
+      return inventoryAdminView;
     }
 
     if (item.routeKey === 'lots') {
@@ -167,6 +195,7 @@
 
   function resolveRoute(hashValue, session) {
     const requestedRouteKey = normalizeHashRoute(hashValue);
+    const normalizedHashTarget = normalizeHashTarget(hashValue);
     const requestedItem = requestedRouteKey ? findNavigationItem(requestedRouteKey) : null;
 
     if (!requestedItem) {
@@ -178,6 +207,7 @@
         routeKey: fallbackRouteKey,
         item: fallbackItem,
         view: getRouteView(fallbackItem),
+        normalizedHashTarget: fallbackRouteKey,
       };
     }
 
@@ -190,6 +220,7 @@
         routeKey: fallbackRouteKey,
         item: fallbackItem,
         view: getRouteView(fallbackItem),
+        normalizedHashTarget: fallbackRouteKey,
       };
     }
 
@@ -199,6 +230,7 @@
       routeKey: requestedItem.routeKey,
       item: requestedItem,
       view: getRouteView(requestedItem),
+      normalizedHashTarget,
     };
   }
 
@@ -209,6 +241,7 @@
   rootShell.register('router', {
     findNavigationItem,
     normalizeHashRoute,
+    normalizeHashTarget,
     getFirstAccessibleRoute,
     renderRoute,
     resolveRoute,

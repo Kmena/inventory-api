@@ -751,6 +751,98 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'tenant-operational',
     transition: 'permission-governed',
   },
+  // MASTER-007 / NPP-TASK-014 — entitlement management access policies.
+  // Sources:
+  //   * specs/non-physical-products-mvp/security.md §1
+  //   * specs/inventori-product-inventory-master-plan/decisions.md DEC-004
+  // DEC-004 keeps manual activation permission separate from generic
+  // entitlement management: possession of 'entitlements.manage' does NOT
+  // grant manual activation. Callers must additionally hold
+  // 'entitlements.activate.manual' for that operation.
+  'entitlements.view': {
+    mode: 'permission',
+    permissions: ['entitlements.view', 'entitlements.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  'entitlements.manage': {
+    mode: 'permission',
+    permissions: ['entitlements.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  'entitlements.activate.manual': {
+    mode: 'permission',
+    permissions: ['entitlements.activate.manual'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  // MASTER-006 / INV-TASK-014 — inventory + locations permission foundation.
+  // Sources:
+  //   * specs/inventory-ux-mvp/security.md §2
+  //   * specs/inventori-product-inventory-master-plan/tasks.md §MASTER-006
+  // The consuming routes/controllers are scheduled for later waves; these
+  // policies exist now so that when routes are wired they can adopt the
+  // registry without further governance changes. Stock-changing operations
+  // are kept SEPARATE from read-only inventory policies:
+  //   * inventory.initial-inventory.create and inventory.transfers.create
+  //     require dedicated permissions, NOT inventory.manage.
+  //   * inventory.lots.list and locations.view remain strictly read-only.
+  'inventory.initial-inventory.create': {
+    mode: 'permission',
+    permissions: ['inventory.initial-inventory.create'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  'inventory.transfers.create': {
+    mode: 'permission',
+    permissions: ['inventory.transfers.create'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  'inventory.lots.list': {
+    mode: 'permission',
+    permissions: ['inventory.lots.list', 'inventory.view', 'inventory.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  'locations.view': {
+    mode: 'permission',
+    permissions: ['locations.view', 'locations.manage', 'inventory.view', 'inventory.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  'locations.manage': {
+    mode: 'permission',
+    permissions: ['locations.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  // inventory-requests spec — async admin→warehouse movement-request flow
+  'inventory.requests.create': {
+    mode: 'permission',
+    permissions: ['inventory.manage'],
+    boundary: 'tenant-permission',
+    transition: 'fb6-permission-migration',
+  },
+  'inventory.requests.list': {
+    mode: 'permission',
+    permissions: ['inventory.manage', 'inventory.view', 'inventory.requests.execute'],
+    boundary: 'tenant-permission',
+    transition: 'fb6-permission-migration',
+  },
+  'inventory.requests.cancel': {
+    mode: 'permission',
+    permissions: ['inventory.manage'],
+    boundary: 'tenant-permission',
+    transition: 'fb6-permission-migration',
+  },
+  'inventory.requests.execute': {
+    mode: 'permission',
+    permissions: ['inventory.requests.execute'],
+    boundary: 'tenant-permission',
+    transition: 'fb6-permission-migration',
+  },
 });
 
 module.exports = {

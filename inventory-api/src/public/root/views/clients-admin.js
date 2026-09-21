@@ -1,6 +1,9 @@
 (function attachRootShellClientsAdminView(globalScope) {
   const rootShell = /** @type {any} */ (globalScope).RootShell;
   const clientsApi = rootShell.require('clientsApi');
+  function getEntitlementsApi() {
+    return rootShell.has('entitlementsApi') ? rootShell.require('entitlementsApi') : null;
+  }
   const rootShellUi = rootShell.require('ui');
   const clientsHelpers = rootShell.require('views.clientsAdminHelpers');
   const clientsRenderers = rootShell.require('views.clientsAdminRenderers');
@@ -269,6 +272,9 @@
     const canManageCredit = permissionSet.has('clients.credit.manage');
     const canDeactivate = permissionSet.has('clients.delete');
     const canLookupTaxpayer = permissionSet.has('integration.taxpayer.lookup');
+    const canViewEntitlements = permissionSet.has('entitlements.view') || permissionSet.has('entitlements.manage');
+    const canManageEntitlements = permissionSet.has('entitlements.manage');
+    const canManuallyActivateEntitlements = permissionSet.has('entitlements.activate.manual');
     const clientActionPermissions = {
       canCreateClient,
       canEditClient,
@@ -307,6 +313,7 @@
     let economicActivities = [];
     let selectedClientId = null;
     let clientDetailsById = {};
+    let entitlementsByClientId = {};
     let isDocumentFileProcessing = false;
     /** @type {boolean} Flag para el form de edición — evita re-consultar tras éxito */
     let editLookupDone = false;
@@ -348,7 +355,14 @@
       listSummary.textContent = clientsState.buildClientsListSummary(clients.length, filteredClients.length);
       listRegion.innerHTML = clientsRenderers.renderClientList(filteredClients, selectedClientId);
       detailTitle.textContent = selectedClient ? selectedClient.name || 'Detalle de cliente' : 'Selecciona un cliente';
-      detailRegion.innerHTML = clientsRenderers.renderClientDetail(selectedClient, classifications, documentTypes, zoneOptions, clientActionPermissions, economicActivities);
+      const selectedClientWithEntitlements = selectedClient
+        ? { ...selectedClient, entitlements: entitlementsByClientId[String(selectedClient.id)] || selectedClient.entitlements || [] }
+        : selectedClient;
+      detailRegion.innerHTML = clientsRenderers.renderClientDetail(selectedClientWithEntitlements, classifications, documentTypes, zoneOptions, {
+        ...clientActionPermissions,
+        canManageEntitlements: canManageEntitlements,
+        canManuallyActivateEntitlements: canManuallyActivateEntitlements,
+      }, economicActivities);
     }
 
     async function loadClients() {
@@ -390,12 +404,29 @@
       }
     }
 
+    async function loadClientEntitlements(clientId) {
+      const entitlementsApi = getEntitlementsApi();
+      if (!entitlementsApi || !canViewEntitlements) {
+        entitlementsByClientId[String(clientId)] = [];
+        return;
+      }
+      try {
+        const response = await entitlementsApi.listEntitlements(session, { clientId });
+        entitlementsByClientId[String(clientId)] = Array.isArray(response?.items) ? response.items : Array.isArray(response) ? response : [];
+      } catch (_error) {
+        entitlementsByClientId[String(clientId)] = [];
+      }
+    }
+
     async function loadClientDetail(clientId) {
       setShellStatus('Cargando detalle del cliente...');
       detailMessage.innerHTML = '';
       editLookupDone = false; // resetear al cargar otro cliente
       try {
-        const detail = await clientsApi.getClientDetail(session, clientId);
+        const [detail] = await Promise.all([
+          clientsApi.getClientDetail(session, clientId),
+          loadClientEntitlements(clientId),
+        ]);
         clientDetailsById[String(clientId)] = detail;
         selectedClientId = clientId;
         renderCurrentState();
@@ -546,6 +577,40 @@
     detailRegion.addEventListener('click', async (event) => {
       const target = event.target instanceof globalScope.HTMLElement ? event.target : null;
       if (!target) {
+        return;
+      }
+
+      if (target.id === 'clients-entitlement-manual-activate-button') {
+        const manualForm = detailRegion.querySelector('#clients-entitlement-manual-form');
+        if (manualForm instanceof globalScope.HTMLElement) manualForm.hidden = !manualForm.hidden;
+        return;
+      }
+
+      const cancelEntitlementButton = target.closest('[data-entitlement-cancel]');
+      if (cancelEntitlementButton && getEntitlementsApi() && canManageEntitlements) {
+        const entitlementId = cancelEntitlementButton.getAttribute('data-entitlement-cancel');
+        if (!entitlementId || !globalScope.confirm('¿Cancelar este acceso? Esta acción no modifica facturas ni pagos.')) return;
+        try {
+          await getEntitlementsApi().cancelEntitlement(session, entitlementId, { reason: 'Cancelado desde ficha de cliente' });
+          await loadClientDetail(selectedClientId);
+          detailMessage.innerHTML = rootShellUi.renderInlineMessage('Acceso cancelado correctamente.');
+        } catch (error) {
+          detailMessage.innerHTML = rootShellUi.renderInlineMessage(error.message || 'No se pudo cancelar el acceso.', 'error');
+        }
+        return;
+      }
+
+      const renewEntitlementButton = target.closest('[data-entitlement-renew]');
+      if (renewEntitlementButton && getEntitlementsApi() && canManageEntitlements) {
+        const entitlementId = renewEntitlementButton.getAttribute('data-entitlement-renew');
+        if (!entitlementId) return;
+        try {
+          await getEntitlementsApi().renewEntitlement(session, entitlementId, { reason: 'Renovado desde ficha de cliente' });
+          await loadClientDetail(selectedClientId);
+          detailMessage.innerHTML = rootShellUi.renderInlineMessage('Acceso renovado correctamente.');
+        } catch (error) {
+          detailMessage.innerHTML = rootShellUi.renderInlineMessage(error.message || 'No se pudo renovar el acceso.', 'error');
+        }
         return;
       }
 
@@ -828,6 +893,19 @@
       const formData = new FormData(form);
       const clientId = String(formData.get('clientId') || selectedClientId || '');
       try {
+        if (form.id === 'clients-entitlement-manual-form') {
+          const entitlementsApi = getEntitlementsApi();
+          if (!entitlementsApi || !canManuallyActivateEntitlements) return;
+          await entitlementsApi.manuallyActivateEntitlement(session, {
+            clientId: Number(clientId),
+            productId: Number(formData.get('productId')),
+            reason: String(formData.get('reason') || 'Activación manual autorizada').trim(),
+          });
+          await loadClientDetail(clientId);
+          detailMessage.innerHTML = rootShellUi.renderInlineMessage('Acceso activado correctamente.');
+          return;
+        }
+
         if (form.id === 'clients-update-form') {
           if (!canEditClient) return;
           await clientsApi.updateClient(session, clientId, clientsHelpers.buildClientPayload(formData));

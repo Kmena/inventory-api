@@ -67,7 +67,18 @@ function findInvoicesForDebtReview(companyId, db = prisma) {
 function createInvoice(data, db = prisma) {
   return db.invoice.create({
     data,
-    include: { client: true, order: true, payments: true },
+    include: { client: true, order: true, payments: true, items: true },
+  });
+}
+
+function createInvoiceItems(data, db = prisma) {
+  if (!Array.isArray(data) || data.length === 0 || !db.invoiceItem?.createMany) {
+    return Promise.resolve({ count: 0 });
+  }
+
+  return db.invoiceItem.createMany({
+    data,
+    skipDuplicates: true,
   });
 }
 
@@ -148,6 +159,7 @@ module.exports = {
   findInvoicesForDebtReview,
   findCompanyInvoiceForFinancialSync,
   createInvoice,
+  createInvoiceItems,
   updateCompanyInvoice,
   updateCompanyInvoiceFinancialState,
   cancelCompanyInvoice,

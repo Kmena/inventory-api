@@ -206,6 +206,19 @@
 
     const invoiceRows = invoices.map((inv) => {
       const payments = Array.isArray(inv.payments) ? inv.payments : [];
+      const invoiceItems = Array.isArray(inv.items) ? inv.items : Array.isArray(inv.invoiceItems) ? inv.invoiceItems : [];
+      const itemRows = invoiceItems.length === 0
+        ? '<p class="muted" style="font-size:0.82rem;padding:8px 0;">No se encontraron items facturados para esta factura.</p>'
+        : `<table class="products-admin-table" style="font-size:0.82rem;">
+            <thead><tr><th>Producto</th><th>Tipo</th><th class="numeric-cell">Cant.</th><th class="numeric-cell">Total</th></tr></thead>
+            <tbody>${invoiceItems.map((item) => `
+              <tr>
+                <td>${bh.escapeHtml(item.productName || item.description || item.product?.name || 'Item')}</td>
+                <td>${bh.escapeHtml(item.itemKind || item.kind || 'PRODUCT')}</td>
+                <td class="numeric-cell">${bh.escapeHtml(String(item.quantity ?? '—'))}</td>
+                <td class="numeric-cell">${bh.formatCurrency(item.lineTotal ?? item.total ?? item.amount ?? 0)}</td>
+              </tr>`).join('')}</tbody>
+          </table>`;
       const paymentRows = payments.length === 0
         ? '<p class="muted" style="font-size:0.82rem;padding:8px 0;">Sin pagos registrados.</p>'
         : `<table class="products-admin-table" style="font-size:0.82rem;">
@@ -233,6 +246,12 @@
         <tr>
           <td colspan="5" style="padding:0;">
             <div class="billing-invoice-payments">
+              <details>
+                <summary style="cursor:pointer;font-size:0.82rem;color:#3B82F6;padding:4px 0;">
+                  Items facturados (${invoiceItems.length})
+                </summary>
+                <div style="margin-top:8px;">${itemRows}</div>
+              </details>
               <details>
                 <summary style="cursor:pointer;font-size:0.82rem;color:#3B82F6;padding:4px 0;">
                   ${payments.length > 0 ? `Ver ${payments.length} pago(s)` : 'Sin pagos'}

@@ -4,6 +4,7 @@ const prisma = require('../lib/prisma');
 const invoiceRepository = require('../repositories/invoice.repository');
 const paymentRepository = require('../repositories/payment.repository');
 const { getActorUserId } = require('./approval-baseline.service');
+const entitlementService = require('./entitlement.service');
 
 const nodeEnv = process.env.NODE_ENV || 'production';
 
@@ -58,6 +59,45 @@ function calculateInvoiceAmount(items) {
   return Math.max(0, total);
 }
 
+function resolveInvoiceItemKind(product) {
+  if (product?.commercialBehavior === 'ENTITLEMENT') {
+    return 'ENTITLEMENT';
+  }
+  if (product?.controlsInventory === false || product?.productNature === 'SERVICE') {
+    return 'SERVICE';
+  }
+  return 'PHYSICAL_GOOD';
+}
+
+function buildInvoiceItemSnapshots(invoice, order) {
+  return (order.items || []).map((item) => {
+    const quantity = Number(item.quantity || 0);
+    const unitPrice = Number(item.unitPrice || 0);
+    const totalDiscount = Number(item.totalDiscount || 0);
+    const subtotal = Math.max(0, quantity * unitPrice - totalDiscount);
+    const product = item.product || null;
+
+    return {
+      invoiceId: invoice.id,
+      orderItemId: item.id ?? null,
+      productId: item.productId ?? product?.id ?? null,
+      companyId: order.companyId,
+      lineKind: resolveInvoiceItemKind(product),
+      descriptionSnapshot: product?.name || item.description || 'Linea facturada',
+      productCodeSnapshot: product?.code || null,
+      quantity,
+      unitPrice,
+      discountPercent: Number(item.discountPercent || 0),
+      discountAmount: Number(item.discountAmount || 0),
+      taxCategorySnapshot: product?.taxCategory || null,
+      taxRateSnapshot: product?.taxRate == null ? null : Number(product.taxRate),
+      subtotal,
+      tax: 0,
+      total: subtotal,
+    };
+  });
+}
+
 /**
  * Calculates the due date based on paymentCondition and paymentDays.
  * @param {string} paymentCondition
@@ -107,7 +147,7 @@ async function executeBillingLogic(order, client, auth, db) {
   const dueAt = calculateDueAt(order.paymentCondition, client?.paymentDays);
   const number = await generateUniqueInvoiceNumber(order.id, db);
 
-  // Create invoice
+  // Create invoice and immutable billed-line snapshots.
   const invoice = await invoiceRepository.createInvoice({
     clientId: order.clientId,
     orderId: order.id,
@@ -115,6 +155,7 @@ async function executeBillingLogic(order, client, auth, db) {
     amount: invoiceAmount,
     dueAt,
   }, db);
+  await invoiceRepository.createInvoiceItems(buildInvoiceItemSnapshots(invoice, order), db);
 
   let payment = null;
 
@@ -154,8 +195,9 @@ async function executeBillingLogic(order, client, auth, db) {
         submittedAt: new Date(),
       }, db);
     }
+  } else if (order.paymentCondition === 'CREDIT') {
+    await entitlementService.activateEntitlementsForApprovedCreditInvoice(invoice, auth, null, db);
   }
-  // CREDIT: no payment created
 
   return { invoice, payment };
 }
@@ -171,7 +213,7 @@ async function executeBillingLogic(order, client, auth, db) {
  */
 async function generateBillingOnDispatch(order, client, auth) {
   try {
-    return await executeBillingLogic(order, client, auth, prisma);
+    return await prisma.$transaction((tx) => executeBillingLogic(order, client, auth, tx));
   } catch (err) {
     logBillingEvent('error', 'billing_trigger_failed', order?.id, 'Billing trigger failed for order', err);
     return null;
@@ -184,4 +226,6 @@ module.exports = {
   calculateInvoiceAmount,
   calculateDueAt,
   executeBillingLogic,
+  buildInvoiceItemSnapshots,
+  resolveInvoiceItemKind,
 };

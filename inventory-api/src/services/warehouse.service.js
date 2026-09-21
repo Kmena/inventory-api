@@ -31,6 +31,8 @@ function serializeWarehouse(warehouse) {
     isSellableSource: warehouse.isSellableSource,
     isActive: warehouse.isActive,
     createdAt: warehouse.createdAt,
+    locationType: warehouse.locationType,
+    locationNature: warehouse.locationNature,
     updatedAt: warehouse.updatedAt,
   };
 }
@@ -65,6 +67,13 @@ async function listCompanyWarehouses(auth, pagination = null) {
   };
 }
 
+async function getCompanyWarehouse(id, auth) {
+  assertCompanyAdmin(auth);
+  const warehouse = await warehouseRepository.findCompanyWarehouseById(id, BigInt(auth.companyId));
+  if (!warehouse) throw createHttpError(404, 'Ubicacion no encontrada para la empresa', 'not_found');
+  return serializeWarehouse(warehouse);
+}
+
 async function createCompanyWarehouse(payload, auth) {
   assertCompanyAdmin(auth);
 
@@ -80,6 +89,8 @@ async function createCompanyWarehouse(payload, auth) {
       code: normalizeCode(payload.code),
       name: payload.name.trim(),
       warehouseType: payload.warehouseType,
+      locationType: payload.locationType ?? 'BODEGA',
+      locationNature: payload.locationNature ?? (isVirtual ? 'VIRTUAL' : 'PHYSICAL'),
       isVirtual,
       isSellableSource,
       isActive: payload.isActive ?? true,
@@ -94,7 +105,54 @@ async function createCompanyWarehouse(payload, auth) {
   }
 }
 
+async function updateCompanyWarehouse(id, payload, auth) {
+  assertCompanyAdmin(auth);
+  const existing = await warehouseRepository.findCompanyWarehouseById(id, BigInt(auth.companyId));
+  if (!existing) throw createHttpError(404, 'Ubicacion no encontrada para la empresa', 'not_found');
+  const nextWarehouseType = payload.warehouseType ?? existing.warehouseType;
+  const typeDefinition = getWarehouseTypeDefinition(nextWarehouseType);
+  const isVirtual = isVirtualWarehouseType(nextWarehouseType);
+  const data = {
+    ...(payload.code ? { code: normalizeCode(payload.code) } : {}),
+    ...(payload.name ? { name: payload.name.trim() } : {}),
+    ...(payload.warehouseType ? { warehouseType: nextWarehouseType, isVirtual } : {}),
+    ...(payload.locationType ? { locationType: payload.locationType } : {}),
+    ...(payload.locationNature ? { locationNature: payload.locationNature } : {}),
+    ...(Object.prototype.hasOwnProperty.call(payload, 'isSellableSource') ? { isSellableSource: isVirtual ? false : payload.isSellableSource } : {}),
+    ...(Object.prototype.hasOwnProperty.call(payload, 'isActive') ? { isActive: payload.isActive } : {}),
+  };
+  if (payload.warehouseType && !Object.prototype.hasOwnProperty.call(payload, 'isSellableSource')) {
+    data.isSellableSource = isVirtual ? false : typeDefinition.defaultSellableSource;
+  }
+  try {
+    const updated = await warehouseRepository.updateCompanyWarehouse(id, BigInt(auth.companyId), data);
+    if (!updated) throw createHttpError(404, 'Ubicacion no encontrada para la empresa', 'not_found');
+    return serializeWarehouse(updated);
+  } catch (error) {
+    if (error.code === 'P2002') throw createHttpError(409, 'Ya existe una ubicacion con ese codigo o nombre', 'conflict');
+    throw error;
+  }
+}
+
+async function updateCompanyWarehouseStatus(id, payload, auth) {
+  assertCompanyAdmin(auth);
+  const companyId = BigInt(auth.companyId);
+  const warehouse = await warehouseRepository.findCompanyWarehouseById(id, companyId);
+  if (!warehouse) throw createHttpError(404, 'Ubicacion no encontrada para la empresa', 'not_found');
+  if (payload.isActive === false) {
+    const usage = await warehouseRepository.getWarehouseInventoryUsage(id, companyId);
+    if (usage.stockCount > 0 || usage.lotStockCount > 0 || usage.pendingOrderCount > 0) {
+      throw createHttpError(409, 'No se puede desactivar una ubicacion con stock, reservas u operaciones pendientes', 'location_has_stock');
+    }
+  }
+  const updated = await warehouseRepository.updateCompanyWarehouse(id, companyId, { isActive: payload.isActive });
+  return serializeWarehouse(updated);
+}
+
 module.exports = {
   listCompanyWarehouses,
+  getCompanyWarehouse,
   createCompanyWarehouse,
+  updateCompanyWarehouse,
+  updateCompanyWarehouseStatus,
 };

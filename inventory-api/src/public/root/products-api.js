@@ -28,6 +28,20 @@
     });
   }
 
+  async function getProductInventorySummary(session, productId) {
+    return inventoryAuth.fetchJson(session, `/api/products/${encodeURIComponent(productId)}/inventory-summary`, {
+      fallbackMessage: 'No se pudo cargar el resumen de inventario del producto.',
+    });
+  }
+
+  async function updateProductInventoryConfig(session, productId, payload) {
+    return inventoryAuth.fetchJson(session, `/api/products/${encodeURIComponent(productId)}/inventory-config`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudo guardar la configuracion de inventario del producto.',
+    });
+  }
+
   async function createProduct(session, payload) {
     return inventoryAuth.fetchJson(session, '/api/products/', {
       method: 'POST',
@@ -60,7 +74,9 @@
     createProduct,
     deactivateProduct,
     getProduct,
+    getProductInventorySummary,
     listProducts,
     updateProduct,
+    updateProductInventoryConfig,
   });
 }(window));

@@ -3660,6 +3660,561 @@
           }
         }
       }
+    },
+    "/api/entitlements": {
+      "get": {
+        "tags": [
+          "Entitlements"
+        ],
+        "summary": "List company customer entitlements",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-runtime-source": {
+          "method": "GET",
+          "mountPath": "/api/entitlements",
+          "expressPath": "/",
+          "routeFile": "src/routes/entitlement.routes.js"
+        }
+      }
+    },
+    "/api/entitlements/manual-activate": {
+      "post": {
+        "tags": [
+          "Entitlements"
+        ],
+        "summary": "Manually activate a customer entitlement",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-runtime-source": {
+          "method": "POST",
+          "mountPath": "/api/entitlements",
+          "expressPath": "/manual-activate",
+          "routeFile": "src/routes/entitlement.routes.js"
+        }
+      }
+    },
+    "/api/entitlements/{id}": {
+      "get": {
+        "tags": [
+          "Entitlements"
+        ],
+        "summary": "Get a customer entitlement",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-runtime-source": {
+          "method": "GET",
+          "mountPath": "/api/entitlements",
+          "expressPath": "/:id",
+          "routeFile": "src/routes/entitlement.routes.js"
+        }
+      }
+    },
+    "/api/entitlements/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Entitlements"
+        ],
+        "summary": "Cancel a customer entitlement",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-runtime-source": {
+          "method": "POST",
+          "mountPath": "/api/entitlements",
+          "expressPath": "/:id/cancel",
+          "routeFile": "src/routes/entitlement.routes.js"
+        }
+      }
+    },
+    "/api/entitlements/{id}/renew": {
+      "post": {
+        "tags": [
+          "Entitlements"
+        ],
+        "summary": "Renew a customer entitlement",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-runtime-source": {
+          "method": "POST",
+          "mountPath": "/api/entitlements",
+          "expressPath": "/:id/renew",
+          "routeFile": "src/routes/entitlement.routes.js"
+        }
+      }
+    },
+    "/api/inventory/lots": {
+      "get": {
+        "operationId": "listInventoryLots",
+        "summary": "Listar lotes de inventario con filtros de negocio",
+        "tags": [
+          "inventory"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Sin permisos"
+          },
+          "404": {
+            "description": "No encontrado"
+          },
+          "409": {
+            "description": "Conflicto"
+          }
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/lots"
+        }
+      }
+    },
+    "/api/inventory/lots/{id}": {
+      "get": {
+        "operationId": "getInventoryLot",
+        "summary": "Obtener detalle tenant-scoped de lote de inventario",
+        "tags": [
+          "inventory"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Sin permisos"
+          },
+          "404": {
+            "description": "No encontrado"
+          },
+          "409": {
+            "description": "Conflicto"
+          }
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/lots/:id"
+        }
+      }
+    },
+    "/api/inventory/initial-inventory": {
+      "post": {
+        "operationId": "createInitialInventory",
+        "summary": "Crear carga inicial atomica de inventario",
+        "tags": [
+          "inventory"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Creado"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Sin permisos"
+          },
+          "404": {
+            "description": "No encontrado"
+          },
+          "409": {
+            "description": "Conflicto"
+          }
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/initial-inventory"
+        }
+      }
+    },
+    "/api/inventory/transfers": {
+      "post": {
+        "operationId": "transferInventory",
+        "summary": "Registrar traslado atomico y balanceado de inventario",
+        "tags": [
+          "inventory"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Creado"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Sin permisos"
+          },
+          "404": {
+            "description": "No encontrado"
+          },
+          "409": {
+            "description": "Conflicto"
+          }
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/inventory",
+          "routeFile": "src/routes/inventory.routes.js",
+          "expressPath": "/transfers"
+        }
+      }
+    },
+    "/api/products/{id}/inventory-summary": {
+      "get": {
+        "operationId": "getProductInventorySummary",
+        "summary": "Obtener resumen de inventario de producto",
+        "tags": [
+          "products",
+          "inventory"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Sin permisos"
+          },
+          "404": {
+            "description": "No encontrado"
+          },
+          "409": {
+            "description": "Conflicto"
+          }
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/products",
+          "routeFile": "src/routes/product.routes.js",
+          "expressPath": "/:id/inventory-summary"
+        }
+      }
+    },
+    "/api/products/{id}/inventory-config": {
+      "put": {
+        "operationId": "updateProductInventoryConfig",
+        "summary": "Actualizar configuracion de inventario de producto",
+        "tags": [
+          "products",
+          "inventory"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Sin permisos"
+          },
+          "404": {
+            "description": "No encontrado"
+          },
+          "409": {
+            "description": "Conflicto"
+          }
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/products",
+          "routeFile": "src/routes/product.routes.js",
+          "expressPath": "/:id/inventory-config"
+        }
+      }
+    },
+    "/api/warehouses/company/{id}": {
+      "get": {
+        "operationId": "getCompanyWarehouse",
+        "summary": "Obtener detalle de Ubicacion",
+        "tags": [
+          "warehouses"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Sin permisos"
+          },
+          "404": {
+            "description": "No encontrado"
+          },
+          "409": {
+            "description": "Conflicto"
+          }
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/warehouses",
+          "routeFile": "src/routes/warehouse.routes.js",
+          "expressPath": "/company/:id"
+        }
+      },
+      "put": {
+        "operationId": "updateCompanyWarehouse",
+        "summary": "Actualizar campos seguros de Ubicacion",
+        "tags": [
+          "warehouses"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Sin permisos"
+          },
+          "404": {
+            "description": "No encontrado"
+          },
+          "409": {
+            "description": "Conflicto"
+          }
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/warehouses",
+          "routeFile": "src/routes/warehouse.routes.js",
+          "expressPath": "/company/:id"
+        }
+      }
+    },
+    "/api/warehouses/company/{id}/status": {
+      "patch": {
+        "operationId": "updateCompanyWarehouseStatus",
+        "summary": "Activar o desactivar Ubicacion con guardas",
+        "tags": [
+          "warehouses"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Sin permisos"
+          },
+          "404": {
+            "description": "No encontrado"
+          },
+          "409": {
+            "description": "Conflicto"
+          }
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/warehouses",
+          "routeFile": "src/routes/warehouse.routes.js",
+          "expressPath": "/company/:id/status"
+        }
+      }
+    },
+    "/api/clients/{clientId}/entitlements": {
+      "get": {
+        "operationId": "listClientEntitlements",
+        "summary": "Listar derechos comerciales tenant-scoped de un cliente",
+        "tags": [
+          "Entitlements"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Sin permisos"
+          },
+          "404": {
+            "description": "No encontrado"
+          },
+          "409": {
+            "description": "Conflicto"
+          }
+        },
+        "x-runtime-source": {
+          "mountPath": "/api/clients",
+          "routeFile": "src/routes/client.routes.js",
+          "expressPath": "/:clientId/entitlements"
+        }
+      }
     }
   }
 }

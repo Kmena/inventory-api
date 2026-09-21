@@ -195,6 +195,16 @@ function buildImportedProductData(row, companyId, category, auth) {
     minStock: normalizeOptionalNumber(row.minStock),
     maxStock: normalizeOptionalNumber(row.maxStock),
     standbyStock: normalizeOptionalNumber(row.standbyStock) ?? 0,
+    // Import path preserves current physical inventory behavior. Capability
+    // reclassification is intentionally out of the import scope (MASTER-002 /
+    // NPP-TASK-002); non-physical imports are not part of Wave 0.
+    productNature: 'GOOD',
+    controlsInventory: true,
+    commercialBehavior: 'STANDARD',
+    entitlementKind: null,
+    defaultValidityCount: null,
+    defaultValidityUnit: null,
+    billingInterval: null,
   };
 }
 
@@ -208,6 +218,25 @@ function buildProductWriteData(payload, auth, existingProduct) {
     ?? normalizeInventoryType(existingProduct?.productType)
     ?? deriveInventoryTypeFromCategoryType(categoryType);
   const requiresLot = payload.requiresLot ?? existingProduct?.requiresLot ?? ((payload.lotStrategy ?? existingProduct?.lotStrategy ?? 'TRACKED') === 'TRACKED');
+
+  // Capability foundation (MASTER-002 / NPP-TASK-002).
+  // Conservative defaults preserve current physical behavior for existing rows
+  // and for callers that do not send capability fields.
+  const productNature = payload.productNature ?? existingProduct?.productNature ?? 'GOOD';
+  const controlsInventory = payload.controlsInventory ?? existingProduct?.controlsInventory ?? true;
+  const commercialBehavior = payload.commercialBehavior ?? existingProduct?.commercialBehavior ?? 'STANDARD';
+  const entitlementKind = Object.prototype.hasOwnProperty.call(payload, 'entitlementKind')
+    ? payload.entitlementKind
+    : (existingProduct?.entitlementKind ?? null);
+  const defaultValidityCount = Object.prototype.hasOwnProperty.call(payload, 'defaultValidityCount')
+    ? payload.defaultValidityCount
+    : (existingProduct?.defaultValidityCount ?? null);
+  const defaultValidityUnit = Object.prototype.hasOwnProperty.call(payload, 'defaultValidityUnit')
+    ? payload.defaultValidityUnit
+    : (existingProduct?.defaultValidityUnit ?? null);
+  const billingInterval = Object.prototype.hasOwnProperty.call(payload, 'billingInterval')
+    ? payload.billingInterval
+    : (existingProduct?.billingInterval ?? null);
 
   return {
     ...payload,
@@ -242,6 +271,13 @@ function buildProductWriteData(payload, auth, existingProduct) {
       ?? existingProduct?.kgConversionFactor
       ?? existingProduct?.conversionFactor
       ?? 1,
+    productNature,
+    controlsInventory,
+    commercialBehavior,
+    entitlementKind,
+    defaultValidityCount,
+    defaultValidityUnit,
+    billingInterval,
   };
 }
 
@@ -492,6 +528,103 @@ async function createProduct(payload, auth) {
   });
 }
 
+function summarizeProductInventory(product, evidence) {
+  if (product.controlsInventory === false) {
+    return {
+      inventoryApplicability: 'NOT_APPLICABLE',
+      configuration: {
+        controlsInventory: false,
+        requiresLot: false,
+        requiresExpiration: false,
+        lotStrategy: product.lotStrategy,
+        allowedWarehouseIds: [],
+      },
+    };
+  }
+
+  const totals = evidence.stocks.reduce((acc, stock) => {
+    acc.onHand += Number(stock.quantity || 0);
+    acc.reserved += Number(stock.reservedQuantity || 0);
+    return acc;
+  }, { onHand: 0, reserved: 0 });
+  const businessLotIds = new Set(evidence.lotStocks
+    .filter((lotStock) => !lotStock.lot?.isSystemGenerated)
+    .map((lotStock) => lotStock.lotId.toString()));
+
+  return {
+    inventoryApplicability: 'APPLIES',
+    totalStock: totals.onHand,
+    reservedStock: totals.reserved,
+    availableStock: Math.max(0, totals.onHand - totals.reserved),
+    locationCount: evidence.stocks.filter((stock) => Number(stock.quantity || 0) !== 0 || Number(stock.reservedQuantity || 0) !== 0).length,
+    businessLotCount: businessLotIds.size,
+    hasMovementHistory: evidence.movementCount > 0,
+    configuration: {
+      controlsInventory: true,
+      requiresLot: product.requiresLot === true,
+      requiresExpiration: product.requiresExpiration === true,
+      lotStrategy: product.lotStrategy,
+      allowedWarehouseIds: (product.allowedWarehouses || []).map((allowed) => allowed.warehouseId),
+    },
+  };
+}
+
+async function getProductInventorySummary(id, auth) {
+  const scope = authScope(auth);
+  const product = await productRepository.findProductById(id, scope.companyId);
+  if (!product) throw createHttpError(404, 'Producto no encontrado', 'not_found');
+  const evidence = await productRepository.findProductInventoryEvidence(scope.companyId, id);
+  return summarizeProductInventory(product, evidence);
+}
+
+async function assertSafeInventoryConfigTransition(product, payload, evidence) {
+  const hasStock = evidence.stocks.some((stock) => Number(stock.quantity || 0) !== 0 || Number(stock.reservedQuantity || 0) !== 0);
+  const hasBusinessLots = evidence.lotStocks.some((lotStock) => !lotStock.lot?.isSystemGenerated);
+  const hasHistory = evidence.movementCount > 0;
+
+  if (product.controlsInventory === false) {
+    throw createHttpError(409, 'Inventario no aplica para este producto', 'inventory_not_applicable');
+  }
+  if (payload.lotStrategy && payload.lotStrategy !== product.lotStrategy && (hasStock || hasHistory || hasBusinessLots)) {
+    throw createHttpError(409, 'No se puede cambiar la estrategia de lotes con stock o historial existente', 'conflict');
+  }
+  if (payload.requiresLot === false && hasBusinessLots) {
+    throw createHttpError(409, 'No se puede desactivar lote trazable con lotes existentes', 'conflict');
+  }
+  if (payload.requiresExpiration === false && hasBusinessLots && product.requiresExpiration) {
+    throw createHttpError(409, 'No se puede desactivar vencimiento con lotes historicos existentes', 'conflict');
+  }
+}
+
+async function updateProductInventoryConfig(id, payload, auth) {
+  const scope = authScope(auth);
+  const product = await productRepository.findProductById(id, scope.companyId);
+  if (!product) throw createHttpError(404, 'Producto no encontrado', 'not_found');
+  const normalizedAllowedWarehouseIds = buildNormalizedAllowedWarehouseIds(payload.allowedWarehouseIds);
+
+  return productRepository.transaction(async (tx) => {
+    if (Object.prototype.hasOwnProperty.call(payload, 'allowedWarehouseIds')) {
+      await ensureAllowedWarehousesBelongToCompany(scope.companyId, normalizedAllowedWarehouseIds, tx);
+    }
+    const evidence = await productRepository.findProductInventoryEvidence(scope.companyId, id, tx);
+    await assertSafeInventoryConfigTransition(product, payload, evidence);
+    const data = {
+      ...(Object.prototype.hasOwnProperty.call(payload, 'requiresLot') ? { requiresLot: payload.requiresLot } : {}),
+      ...(Object.prototype.hasOwnProperty.call(payload, 'requiresExpiration') ? { requiresExpiration: payload.requiresExpiration } : {}),
+      ...(Object.prototype.hasOwnProperty.call(payload, 'lotStrategy') ? { lotStrategy: payload.lotStrategy } : {}),
+    };
+    if (Object.keys(data).length > 0) {
+      await productRepository.updateProduct(id, scope.companyId, data, tx);
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'allowedWarehouseIds')) {
+      await productRepository.replaceProductAllowedWarehouses(id, normalizedAllowedWarehouseIds, tx);
+    }
+    const reloadedProduct = await productRepository.findProductById(id, scope.companyId, tx);
+    const reloadedEvidence = await productRepository.findProductInventoryEvidence(scope.companyId, id, tx);
+    return summarizeProductInventory(reloadedProduct, reloadedEvidence);
+  });
+}
+
 async function updateProduct(id, payload, auth) {
   const scope = authScope(auth);
   const existingProduct = await getProduct(id, auth);
@@ -663,6 +796,8 @@ module.exports = {
   listProducts,
   listCategories,
   getProduct,
+  getProductInventorySummary,
+  updateProductInventoryConfig,
   createCategory,
   createSubcategory,
   createProduct,

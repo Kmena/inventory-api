@@ -266,6 +266,7 @@ function findSellableProductAvailabilityRows(companyId) {
         companyId,
         isActive: true,
         inCatalog: true,
+        controlsInventory: true,
       },
     },
     orderBy: [{ product: { name: 'asc' } }, { productId: 'asc' }, { warehouseId: 'asc' }, { lotId: 'asc' }],

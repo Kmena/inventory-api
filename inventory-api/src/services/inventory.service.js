@@ -25,6 +25,9 @@ const {
   createMovement,
   resolveUniqueInternalLotNumber,
   reserveLots,
+  isInventoryControlledProduct,
+  usesSystemLotStrategy,
+  getOrCreateSystemLot,
   assertOrderHasOperationalWarehouse,
   getActiveAllocations,
 } = require('./inventory-transaction-support.service');
@@ -33,6 +36,34 @@ const { calculateInvoiceAmount } = require('./billing-trigger.service');
 
 async function acquireCompanyInventoryAdvisoryLock(tx, companyId) {
   await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, tx);
+}
+
+function serializeStockRow(row, lotCount = 0) {
+  const onHand = number(row.quantity);
+  const reserved = number(row.reservedQuantity);
+  const available = Math.max(0, onHand - reserved);
+  return {
+    ...row,
+    product: row.product ? { id: row.product.id, code: row.product.code, sku: row.product.sku, name: row.product.name } : null,
+    location: row.warehouse ? { id: row.warehouse.id, code: row.warehouse.code, name: row.warehouse.name } : null,
+    warehouse: row.warehouse,
+    onHand,
+    reserved,
+    available,
+    lotCount,
+    inventoryStatus: onHand <= 0 ? 'ZERO' : reserved > 0 && available <= 0 ? 'RESERVED' : 'AVAILABLE',
+  };
+}
+
+function serializeLot(lot) {
+  const isSystemGenerated = Boolean(lot.isSystemGenerated);
+  return {
+    ...lot,
+    visibleLotLabel: isSystemGenerated ? 'Sin lote visible' : (lot.lotNumber || lot.internalLotNumber),
+    internalLotNumber: isSystemGenerated ? null : lot.internalLotNumber,
+    lotNumber: isSystemGenerated ? null : lot.lotNumber,
+    manufacturerLotNumber: isSystemGenerated ? null : lot.manufacturerLotNumber,
+  };
 }
 
 async function listMovements(auth, filters = {}, pagination = null) {
@@ -45,52 +76,94 @@ async function listMovements(auth, filters = {}, pagination = null) {
   return buildPaginatedResponse(paginatedMovements.items, pagination, paginatedMovements.totalItems);
 }
 
-async function listStocks(auth, filters = {}) {
+async function listStocks(auth, filters = {}, pagination = null) {
   const { companyId } = authScope(auth);
   const [items, lots] = await Promise.all([
     inventoryRepository.findWarehouseStocks(companyId, filters),
-    inventoryRepository.findWarehouseLotStocks(companyId, filters),
+    inventoryRepository.findWarehouseLotStocks(companyId, { ...filters, includeSystem: true }),
   ]);
-  return { items, lots };
+  const lotCounts = new Map();
+  for (const lotStock of /** @type {Array<any>} */ (lots)) {
+    const key = `${lotStock.productId.toString()}:${lotStock.warehouseId.toString()}`;
+    const current = lotCounts.get(key) || new Set();
+    if (!lotStock.lot?.isSystemGenerated) {
+      current.add(lotStock.lotId.toString());
+    }
+    lotCounts.set(key, current);
+  }
+  const serializedItems = items.map((item) => serializeStockRow(
+    item,
+    lotCounts.get(`${item.productId.toString()}:${item.warehouseId.toString()}`)?.size || 0,
+  ));
+  const response = { items: serializedItems, lots: /** @type {Array<any>} */ (lots).map((lotStock) => ({ ...lotStock, lot: serializeLot(lotStock.lot) })) };
+  if (!pagination) {
+    return response;
+  }
+  return buildPaginatedResponse(response.items, pagination, response.items.length);
+}
+
+async function listLots(auth, filters = {}, pagination = null) {
+  const { companyId } = authScope(auth);
+  const lots = await inventoryRepository.findLotsForCompany(companyId, filters, pagination);
+  if (!pagination) {
+    return /** @type {Array<any>} */ (lots).map(serializeLot);
+  }
+  const paginatedLots = /** @type {{ items: Array<any>, totalItems: number }} */ (lots);
+  return buildPaginatedResponse(paginatedLots.items.map(serializeLot), pagination, paginatedLots.totalItems);
+}
+
+async function getLot(lotId, auth) {
+  const { companyId } = authScope(auth);
+  const lot = await inventoryRepository.findLotForCompanyById(lotId, companyId);
+  if (!lot) throw createHttpError(404, 'Lote no encontrado para la empresa', 'not_found');
+  return serializeLot(lot);
 }
 
 async function registerStockEntryInTransaction(tx, payload, auth) {
   const context = await getInventoryContext(tx, auth, payload.warehouseId, payload.productId);
   await acquireCompanyInventoryAdvisoryLock(tx, context.companyId);
   const requestedInternalLotNumber = payload.internalLotNumber || payload.lotNumber;
-
-  if (!requestedInternalLotNumber) {
-    throw createHttpError(400, 'Toda existencia requiere numero de lote interno', 'validation_error');
-  }
-
-  const lotNumberResolution = await resolveUniqueInternalLotNumber(
-    tx,
-    context.companyId,
-    requestedInternalLotNumber,
-  );
-  const internalLotNumber = lotNumberResolution.assigned;
   const isQuarantineEntry = context.warehouse.warehouseType === 'QUARANTINE';
   const lotStatus = isQuarantineEntry ? 'QUARANTINED' : 'AVAILABLE';
   const qaStatus = isQuarantineEntry ? 'PENDING' : 'APPROVED';
   const normalizedDates = normalizeLotDates(payload);
+  let lotNumberResolution = null;
+  let lot = null;
 
-  const lot = await inventoryRepository.createLot({
-    companyId: context.companyId,
-    productId: context.product.id,
-    supplierId: payload.supplierId ?? null,
-    invoiceNumber: payload.invoiceNumber,
-    lotNumber: internalLotNumber,
-    internalLotNumber,
-    manufacturerLotNumber: payload.manufacturerLotNumber ?? payload.lotNumber ?? null,
-    productionDate: normalizedDates.productionDate,
-    expirationDate: normalizedDates.expirationDate,
-    entryDate: normalizedDates.entryDate,
-    quantity: payload.quantity,
-    originalQuantity: payload.quantity,
-    status: lotStatus,
-    qaStatus,
-    casNumber: payload.casNumber,
-  }, tx);
+  if (usesSystemLotStrategy(context.product)) {
+    if (payload.internalLotNumber || payload.lotNumber || payload.manufacturerLotNumber) {
+      throw createHttpError(400, 'Los productos con lote de sistema no aceptan numeros de lote visibles', 'lot_not_allowed');
+    }
+    lot = await getOrCreateSystemLot(tx, context, 0);
+  } else {
+    if (!requestedInternalLotNumber) {
+      throw createHttpError(400, 'Toda existencia con lote de negocio requiere numero de lote interno', 'validation_error');
+    }
+
+    lotNumberResolution = await resolveUniqueInternalLotNumber(
+      tx,
+      context.companyId,
+      requestedInternalLotNumber,
+    );
+    const internalLotNumber = lotNumberResolution.assigned;
+    lot = await inventoryRepository.createLot({
+      companyId: context.companyId,
+      productId: context.product.id,
+      supplierId: payload.supplierId ?? null,
+      invoiceNumber: payload.invoiceNumber,
+      lotNumber: internalLotNumber,
+      internalLotNumber,
+      manufacturerLotNumber: payload.manufacturerLotNumber ?? payload.lotNumber ?? null,
+      productionDate: normalizedDates.productionDate,
+      expirationDate: normalizedDates.expirationDate,
+      entryDate: normalizedDates.entryDate,
+      quantity: payload.quantity,
+      originalQuantity: payload.quantity,
+      status: lotStatus,
+      qaStatus,
+      casNumber: payload.casNumber,
+    }, tx);
+  }
 
   const lotStock = await changeLotStock(tx, context, lot, payload.quantity, 0);
   const warehouseStock = await changeWarehouseStock(tx, context, payload.quantity, 0);
@@ -100,6 +173,9 @@ async function registerStockEntryInTransaction(tx, payload, auth) {
     { quantity: { increment: payload.quantity } },
     tx,
   );
+  if (lot.isSystemGenerated) {
+    lot = await inventoryRepository.updateLotById(lot.id, { quantity: { increment: payload.quantity } }, tx);
+  }
   const movement = await createMovement(tx, context, {
     lotId: lot.id,
     movementType: 'IN',
@@ -109,12 +185,12 @@ async function registerStockEntryInTransaction(tx, payload, auth) {
     reasonCode: payload.reasonCode,
     sourceType: 'lot_entry',
     sourceId: lot.id,
-    note: lotNumberResolution.collision
+    note: lotNumberResolution?.collision
       ? `${payload.note ?? 'Entrada manual de inventario'} | Lote solicitado ${lotNumberResolution.requested}; asignado ${lotNumberResolution.assigned}`
       : payload.note ?? 'Entrada manual de inventario',
   });
 
-  if (lotNumberResolution.collision) {
+  if (lotNumberResolution?.collision) {
     await inventoryRepository.createInventoryAlert({
       companyId: context.companyId,
       productId: context.product.id,
@@ -138,7 +214,7 @@ async function registerStockEntryInTransaction(tx, payload, auth) {
     lot,
     lotStock: lotStock.record,
     movement,
-    lotNumberCollision: lotNumberResolution.collision ? lotNumberResolution : null,
+    lotNumberCollision: lotNumberResolution?.collision ? lotNumberResolution : null,
   };
 }
 
@@ -270,15 +346,176 @@ async function updateLotQa(lotId, payload, auth, req = null) {
   return result.updatedLot;
 }
 
+function normalizeInitialLotNumber(row) {
+  return row.internalLotNumber || row.lotNumber || row.manufacturerLotNumber;
+}
+
+function assertNoDuplicateInitialInventoryRows(rows, product) {
+  const keys = new Set();
+  for (const row of rows) {
+    const lotKey = usesSystemLotStrategy(product) ? 'system' : normalizeInitialLotNumber(row);
+    const key = `${row.warehouseId.toString()}:${lotKey || ''}`;
+    if (keys.has(key)) {
+      throw createHttpError(409, 'La carga inicial contiene filas duplicadas para la misma ubicacion/lote', 'duplicate_inventory_operation');
+    }
+    keys.add(key);
+  }
+}
+
+async function createInitialInventory(payload, auth, req = null) {
+  const result = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
+    const firstContext = await getInventoryContext(tx, auth, payload.rows[0].warehouseId, payload.productId);
+    await acquireCompanyInventoryAdvisoryLock(tx, firstContext.companyId);
+
+    const existingOperation = await inventoryRepository.findInventoryOperationByIdempotencyKey(
+      firstContext.companyId,
+      'INITIAL_INVENTORY',
+      payload.idempotencyKey,
+      tx,
+    );
+    if (existingOperation) {
+      return { operation: existingOperation, movements: [], idempotentReplay: true };
+    }
+
+    const evidence = await inventoryRepository.countProductInventoryEvidence(firstContext.companyId, firstContext.product.id, tx);
+    if (evidence.movementCount > 0 || evidence.stockCount > 0 || number(firstContext.product.quantity) !== 0 || number(firstContext.product.reservedQuantity) !== 0) {
+      throw createHttpError(409, 'La carga inicial solo aplica a productos sin historial ni stock previo', 'initial_inventory_already_registered');
+    }
+
+    assertNoDuplicateInitialInventoryRows(payload.rows, firstContext.product);
+    const movementGroupId = randomUUID();
+    const operation = await inventoryRepository.createInventoryOperation({
+      companyId: firstContext.companyId,
+      operationType: 'INITIAL_INVENTORY',
+      idempotencyKey: payload.idempotencyKey,
+      status: 'COMPLETED',
+      productId: firstContext.product.id,
+      movementGroupId,
+      reasonCode: 'INITIAL_INVENTORY',
+      note: payload.note || null,
+      metadata: { rowCount: payload.rows.length },
+      createdByUserId: firstContext.userId,
+    }, tx);
+    const movements = [];
+    let totalQuantity = 0;
+
+    for (const row of payload.rows) {
+      const context = row.warehouseId === firstContext.warehouse.id
+        ? firstContext
+        : await getInventoryContext(tx, auth, row.warehouseId, payload.productId);
+      let lot = null;
+      if (usesSystemLotStrategy(context.product)) {
+        if (row.lotNumber || row.internalLotNumber || row.manufacturerLotNumber || row.expirationDate || row.productionDate) {
+          throw createHttpError(400, 'La carga inicial con lote de sistema no acepta campos de lote visible', 'lot_not_allowed');
+        }
+        lot = await getOrCreateSystemLot(tx, context, 0);
+      } else {
+        const requestedInternalLotNumber = normalizeInitialLotNumber(row);
+        if (!requestedInternalLotNumber) {
+          throw createHttpError(400, 'La carga inicial requiere identificador de lote de negocio', 'lot_required');
+        }
+        if (context.product.requiresExpiration && !row.expirationDate) {
+          throw createHttpError(400, 'El producto requiere fecha de vencimiento para el lote', 'validation_error');
+        }
+        const normalizedDates = normalizeLotDates(row);
+        lot = await inventoryRepository.createLot({
+          companyId: context.companyId,
+          productId: context.product.id,
+          supplierId: null,
+          invoiceNumber: null,
+          lotNumber: requestedInternalLotNumber,
+          internalLotNumber: requestedInternalLotNumber,
+          manufacturerLotNumber: row.manufacturerLotNumber ?? row.lotNumber ?? null,
+          productionDate: normalizedDates.productionDate,
+          expirationDate: normalizedDates.expirationDate,
+          entryDate: new Date(),
+          quantity: row.quantity,
+          originalQuantity: row.quantity,
+          status: 'AVAILABLE',
+          qaStatus: 'APPROVED',
+        }, tx);
+      }
+
+      await changeLotStock(tx, context, lot, row.quantity, 0);
+      const warehouseStock = await changeWarehouseStock(tx, context, row.quantity, 0);
+      if (lot.isSystemGenerated) {
+        lot = await inventoryRepository.updateLotById(lot.id, { quantity: { increment: row.quantity }, originalQuantity: { increment: row.quantity } }, tx);
+      }
+      totalQuantity += Number(row.quantity);
+      movements.push(await createMovement(tx, context, {
+        lotId: lot.id,
+        movementType: 'IN',
+        quantity: row.quantity,
+        quantityBefore: warehouseStock.before,
+        quantityAfter: warehouseStock.after,
+        reasonCode: 'INITIAL_INVENTORY',
+        movementGroupId,
+        sourceType: 'inventory_operation',
+        sourceId: operation.id,
+        note: payload.note || 'Carga inicial de inventario',
+      }));
+    }
+
+    await inventoryRepository.updateProductById(firstContext.product.id, firstContext.companyId, { quantity: { increment: totalQuantity } }, tx);
+    const completedOperation = await tx.inventoryOperation.update({
+      where: { id: operation.id },
+      data: { metadata: { rowCount: payload.rows.length, totalQuantity } },
+    });
+
+    return { operation: completedOperation, movements, idempotentReplay: false };
+  }));
+
+  if (!result.idempotentReplay) {
+    await audit.recordAuditEventIfAvailable({
+      req,
+      action: 'inventory.initial_inventory.create',
+      resourceType: 'inventory_operation',
+      resourceId: result.operation.id,
+      outcome: 'SUCCESS',
+      afterState: { operationId: result.operation.id, movementGroupId: result.operation.movementGroupId },
+      metadata: { idempotencyKey: payload.idempotencyKey, rowCount: payload.rows.length },
+    });
+  }
+
+  return result;
+}
+
 async function adjustStock(payload, auth, req = null) {
   const result = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const context = await getInventoryContext(tx, auth, payload.warehouseId, payload.productId);
-    if (!payload.lotId) {
-      throw createHttpError(400, 'Todo ajuste de inventario requiere lote', 'validation_error');
+    await acquireCompanyInventoryAdvisoryLock(tx, context.companyId);
+    const existingOperation = await inventoryRepository.findInventoryOperationByIdempotencyKey(
+      context.companyId,
+      'ADJUSTMENT',
+      payload.idempotencyKey,
+      tx,
+    );
+    if (existingOperation) {
+      return { operation: existingOperation, idempotentReplay: true };
     }
-
+    const movementGroupId = randomUUID();
+    const operation = await inventoryRepository.createInventoryOperation({
+      companyId: context.companyId,
+      operationType: 'ADJUSTMENT',
+      idempotencyKey: payload.idempotencyKey || null,
+      productId: context.product.id,
+      sourceWarehouseId: context.warehouse.id,
+      movementGroupId,
+      reasonCode: payload.reasonCode,
+      note: payload.note,
+      createdByUserId: context.userId,
+      metadata: { direction: payload.direction, quantity: payload.quantity },
+    }, tx);
     let lot = null;
-    if (payload.lotId) {
+    if (usesSystemLotStrategy(context.product)) {
+      if (payload.lotId) {
+        throw createHttpError(400, 'Los productos con lote de sistema no aceptan lote visible', 'lot_not_allowed');
+      }
+      lot = await getOrCreateSystemLot(tx, context, 0);
+    } else {
+      if (!payload.lotId) {
+        throw createHttpError(400, 'Todo ajuste de inventario con lote de negocio requiere lote', 'validation_error');
+      }
       lot = await inventoryRepository.findLotForProduct(payload.lotId, context.product.id, tx);
       if (!lot) throw createHttpError(404, 'Lote no encontrado para el producto', 'not_found');
     }
@@ -313,13 +550,18 @@ async function adjustStock(payload, auth, req = null) {
       quantityBefore: warehouseStock.before,
       quantityAfter: warehouseStock.after,
       reasonCode: payload.reasonCode,
-      sourceType: 'manual_adjustment',
-      sourceId: lot?.id,
+      movementGroupId,
+      sourceType: 'inventory_operation',
+      sourceId: operation.id,
       note: `${payload.direction}: ${payload.note}`,
     });
 
-    return { product, warehouseStock: warehouseStock.record, lotStock: lotStock?.record ?? null, lot, movement };
+    return { operation, product, warehouseStock: warehouseStock.record, lotStock: lotStock?.record ?? null, lot, movement };
   }));
+
+  if (result.idempotentReplay) {
+    return result;
+  }
 
   await audit.recordAuditEventIfAvailable({
     req,
@@ -344,6 +586,138 @@ async function adjustStock(payload, auth, req = null) {
   return result;
 }
 
+async function transferInventory(payload, auth, req = null) {
+  if (payload.sourceWarehouseId === payload.destinationWarehouseId) {
+    throw createHttpError(400, 'La ubicacion origen y destino deben ser diferentes', 'validation_error');
+  }
+
+  const result = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
+    const sourceContext = await getInventoryContext(tx, auth, payload.sourceWarehouseId, payload.productId);
+    await acquireCompanyInventoryAdvisoryLock(tx, sourceContext.companyId);
+    const destinationContext = await getInventoryContext(tx, auth, payload.destinationWarehouseId, payload.productId);
+    const existingOperation = await inventoryRepository.findInventoryOperationByIdempotencyKey(
+      sourceContext.companyId,
+      'TRANSFER',
+      payload.idempotencyKey,
+      tx,
+    );
+    if (existingOperation) {
+      return { operation: existingOperation, idempotentReplay: true };
+    }
+
+    let sourceLot = null;
+    let destinationLot = null;
+    if (usesSystemLotStrategy(sourceContext.product)) {
+      if (payload.lotId) {
+        throw createHttpError(400, 'Los productos con lote de sistema no aceptan lote visible', 'lot_not_allowed');
+      }
+      sourceLot = await getOrCreateSystemLot(tx, sourceContext, 0);
+      destinationLot = await getOrCreateSystemLot(tx, destinationContext, 0);
+    } else {
+      if (!payload.lotId) {
+        throw createHttpError(400, 'Todo traslado con lote de negocio requiere lote', 'validation_error');
+      }
+      sourceLot = await inventoryRepository.findLotForProduct(payload.lotId, sourceContext.product.id, tx);
+      if (!sourceLot) throw createHttpError(404, 'Lote no encontrado para el producto', 'not_found');
+      destinationLot = sourceLot;
+    }
+
+    const movementGroupId = randomUUID();
+    const operation = await inventoryRepository.createInventoryOperation({
+      companyId: sourceContext.companyId,
+      operationType: 'TRANSFER',
+      idempotencyKey: payload.idempotencyKey,
+      productId: sourceContext.product.id,
+      sourceWarehouseId: sourceContext.warehouse.id,
+      destinationWarehouseId: destinationContext.warehouse.id,
+      movementGroupId,
+      reasonCode: payload.reasonCode,
+      note: payload.note || null,
+      createdByUserId: sourceContext.userId,
+      metadata: { quantity: payload.quantity, sourceLotId: sourceLot.id.toString(), destinationLotId: destinationLot.id.toString() },
+    }, tx);
+
+    const sourceWarehouseStock = await changeWarehouseStock(tx, sourceContext, -payload.quantity, 0);
+    const sourceLotStock = await changeLotStock(tx, sourceContext, sourceLot, -payload.quantity, 0);
+    const destinationWarehouseStock = await changeWarehouseStock(tx, destinationContext, payload.quantity, 0);
+    const destinationLotStock = await changeLotStock(tx, destinationContext, destinationLot, payload.quantity, 0);
+
+    if (sourceLot.id !== destinationLot.id) {
+      await inventoryRepository.updateLotById(sourceLot.id, { quantity: { decrement: payload.quantity } }, tx);
+      destinationLot = await inventoryRepository.updateLotById(destinationLot.id, { quantity: { increment: payload.quantity } }, tx);
+    }
+
+    const outMovement = await createMovement(tx, sourceContext, {
+      lotId: sourceLot.id,
+      movementType: 'TRANSFER_OUT',
+      quantity: payload.quantity,
+      quantityBefore: sourceWarehouseStock.before,
+      quantityAfter: sourceWarehouseStock.after,
+      reasonCode: payload.reasonCode,
+      movementGroupId,
+      sourceType: 'inventory_operation',
+      sourceId: operation.id,
+      note: payload.note || 'Traslado de inventario',
+    });
+    const inMovement = await createMovement(tx, destinationContext, {
+      lotId: destinationLot.id,
+      movementType: 'TRANSFER_IN',
+      quantity: payload.quantity,
+      quantityBefore: destinationWarehouseStock.before,
+      quantityAfter: destinationWarehouseStock.after,
+      reasonCode: payload.reasonCode,
+      movementGroupId,
+      sourceType: 'inventory_operation',
+      sourceId: operation.id,
+      note: payload.note || 'Traslado de inventario',
+    });
+
+    return {
+      operation,
+      sourceWarehouseStock: sourceWarehouseStock.record,
+      destinationWarehouseStock: destinationWarehouseStock.record,
+      sourceLotStock: sourceLotStock.record,
+      destinationLotStock: destinationLotStock.record,
+      sourceLot,
+      destinationLot,
+      movements: [outMovement, inMovement],
+    };
+  }));
+
+  if (result.idempotentReplay) {
+    return result;
+  }
+
+  await audit.recordAuditEventIfAvailable({
+    req,
+    action: 'inventory.transfer.create',
+    resourceType: 'inventory_operation',
+    resourceId: result.operation.id,
+    outcome: 'SUCCESS',
+    afterState: { operationId: result.operation.id, movementGroupId: result.operation.movementGroupId },
+    metadata: {
+      productId: payload.productId,
+      sourceWarehouseId: payload.sourceWarehouseId,
+      destinationWarehouseId: payload.destinationWarehouseId,
+      quantity: payload.quantity,
+    },
+  });
+
+  return result;
+}
+
+function splitOrderItemsByInventoryApplicability(order) {
+  const inventoryItems = [];
+  const nonInventoryItems = [];
+  for (const item of order.items || []) {
+    if (isInventoryControlledProduct(item.product)) {
+      inventoryItems.push(item);
+    } else {
+      nonInventoryItems.push(item);
+    }
+  }
+  return { inventoryItems, nonInventoryItems };
+}
 
 async function reserveStockForOrder(orderId, auth, req = null) {
   const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
@@ -351,7 +725,7 @@ async function reserveStockForOrder(orderId, auth, req = null) {
     const order = /** @type {any} */ (await inventoryRepository.findOrderForCompany(
       orderId,
       scope.companyId,
-      { items: true, warehouse: true },
+      { items: { include: { product: true } }, warehouse: true },
       tx,
     ));
 
@@ -363,8 +737,10 @@ async function reserveStockForOrder(orderId, auth, req = null) {
       throw createHttpError(409, 'El pedido no se puede aprobar en su estado actual', 'conflict');
     }
 
-    // Auto-assign sellable warehouse when the order was created without one (e.g. agent orders)
-    if (!order.warehouseId) {
+    const { inventoryItems } = splitOrderItemsByInventoryApplicability(order);
+
+    // Auto-assign sellable warehouse when inventory-controlled lines need one (e.g. agent orders).
+    if (!order.warehouseId && inventoryItems.length > 0) {
       const sellableWarehouse = await inventoryRepository.findFirstSellableWarehouse(scope.companyId, tx);
       if (!sellableWarehouse) {
         throw createHttpError(409, 'No hay bodegas vendibles activas para asignar al pedido. Cree o active una bodega como fuente vendible.', 'conflict');
@@ -374,11 +750,13 @@ async function reserveStockForOrder(orderId, auth, req = null) {
       await inventoryRepository.updateOrderById(order.id, { warehouseId: sellableWarehouse.id }, {}, tx);
     }
 
-    assertOrderHasOperationalWarehouse(order);
+    if (inventoryItems.length > 0) {
+      assertOrderHasOperationalWarehouse(order);
+    }
 
     const movementGroupId = randomUUID();
 
-    for (const item of order.items) {
+    for (const item of inventoryItems) {
       const context = await getInventoryContext(tx, auth, order.warehouseId, item.productId, { requireSellable: true });
       const quantity = number(item.quantity);
       const stock = await changeWarehouseStock(tx, context, 0, quantity);
@@ -459,7 +837,7 @@ async function releaseStockReservation(orderId, cancel, auth, req = null) {
     const order = /** @type {any} */ (await inventoryRepository.findOrderForCompany(
       orderId,
       scope.companyId,
-      { items: true },
+      { items: { include: { product: true } } },
       tx,
     ));
 
@@ -468,12 +846,15 @@ async function releaseStockReservation(orderId, cancel, auth, req = null) {
       throw createHttpError(409, 'El pedido no tiene reservas activas para liberar', 'conflict');
     }
 
-    assertOrderHasOperationalWarehouse(order);
+    const { inventoryItems } = splitOrderItemsByInventoryApplicability(order);
+    if (inventoryItems.length > 0) {
+      assertOrderHasOperationalWarehouse(order);
+    }
 
-    const allocations = await getActiveAllocations(tx, order);
+    const allocations = inventoryItems.length > 0 ? await getActiveAllocations(tx, order) : [];
     const movementGroupId = randomUUID();
 
-    for (const item of order.items) {
+    for (const item of inventoryItems) {
       const context = await getInventoryContext(tx, auth, order.warehouseId, item.productId);
       const itemAllocations = allocations.filter((allocation) => allocation.productId === item.productId);
       const reserved = itemAllocations.reduce((sum, allocation) => sum + allocation.quantity, 0);
@@ -567,7 +948,7 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
     const order = /** @type {any} */ (await inventoryRepository.findOrderForCompany(
       orderId,
       scope.companyId,
-      { items: true },
+      { items: { include: { product: true } } },
       tx,
     ));
 
@@ -576,12 +957,15 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
       throw createHttpError(409, 'El pedido debe estar aprobado antes de despacharse', 'conflict');
     }
 
-    assertOrderHasOperationalWarehouse(order);
+    const { inventoryItems } = splitOrderItemsByInventoryApplicability(order);
+    if (inventoryItems.length > 0) {
+      assertOrderHasOperationalWarehouse(order);
+    }
 
-    const allocations = await getActiveAllocations(tx, order);
+    const allocations = inventoryItems.length > 0 ? await getActiveAllocations(tx, order) : [];
     const movementGroupId = randomUUID();
 
-    for (const item of order.items) {
+    for (const item of inventoryItems) {
       const context = await getInventoryContext(tx, auth, order.warehouseId, item.productId, { requireSellable: true });
       const itemAllocations = allocations.filter((allocation) => allocation.productId === item.productId);
       const reserved = itemAllocations.reduce((sum, allocation) => sum + allocation.quantity, 0);
@@ -694,7 +1078,7 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
     return inventoryRepository.updateOrderById(
       orderId,
       {
-        status: 'DELIVERED',
+        status: inventoryItems.length > 0 ? 'DELIVERED' : 'FULFILLED',
         dispatchedAt: new Date(),
         ...(dispatchUserId ? { dispatchedById: dispatchUserId } : {}),
         ...(transportPayload?.transportMethod    ? { transportMethod:      transportPayload.transportMethod }    : {}),
@@ -730,13 +1114,17 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
 module.exports = {
   listMovements,
   listStocks,
+  listLots,
+  getLot,
   listInventoryAlerts,
   getInventoryAlert,
   updateInventoryAlertStatus,
   registerStockEntry,
   registerStockEntryInTransaction,
+  createInitialInventory,
   updateLotQa,
   adjustStock,
+  transferInventory,
   reserveStockForOrder,
   releaseStockReservation,
   dispatchOrder,

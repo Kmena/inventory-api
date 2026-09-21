@@ -83,6 +83,22 @@ const PERMISSION_METADATA = Object.freeze([
   Object.freeze({ code: 'collections.assign', category: 'collections', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Asignar cobranza', notes: 'Capacidad de coordinación operativa' }),
   Object.freeze({ code: 'collections.payments.approve', category: 'collections', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Aprobar pagos', notes: 'Capacidad financiera sensible' }),
   Object.freeze({ code: 'collections.payments.reverse', category: 'collections', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Revertir pagos', notes: 'Capacidad financiera sensible' }),
+  // MASTER-007 / NPP-TASK-014 — commercial entitlements (subscriptions,
+  // memberships, courses). DEC-004 keeps manual activation separate from
+  // entitlements.manage: 'entitlements.manage' does NOT include the manual
+  // activation capability.
+  Object.freeze({ code: 'entitlements.view', category: 'entitlements', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Ver derechos comerciales', notes: 'Consulta suscripciones, memberships y cursos activos por cliente' }),
+  Object.freeze({ code: 'entitlements.manage', category: 'entitlements', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Gestionar derechos comerciales', notes: 'Crea, edita y cancela derechos comerciales — excluye activación manual' }),
+  Object.freeze({ code: 'entitlements.activate.manual', category: 'entitlements', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Activar derecho manualmente', notes: 'Activa un derecho sin aprobación de pago/crédito; requiere justificación', requiresJustification: true }),
+  // MASTER-006 / INV-TASK-014 — inventory + locations permissions.
+  // Stock-changing operations are sensitive; read-only listings are operational.
+  Object.freeze({ code: 'inventory.initial-inventory.create', category: 'inventory', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Registrar inventario inicial', notes: 'Carga única de existencias iniciales por producto y ubicación' }),
+  Object.freeze({ code: 'inventory.transfers.create', category: 'inventory', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Registrar traslados', notes: 'Movimiento atómico de stock entre ubicaciones' }),
+  Object.freeze({ code: 'inventory.lots.list', category: 'inventory', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Ver listado de lotes', notes: 'Consulta lotes existentes; incluye badges de lote de sistema' }),
+  Object.freeze({ code: 'locations.view', category: 'locations', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Ver ubicaciones', notes: 'Consulta ubicaciones activas y su naturaleza' }),
+  Object.freeze({ code: 'locations.manage', category: 'locations', sensitivity: 'sensitive', scope: 'tenant', uiLabel: 'Gestionar ubicaciones', notes: 'Crear, editar y desactivar ubicaciones; controla allowedWarehouseIds' }),
+  // inventory-requests spec — warehouse operator permission for async movement flow
+  Object.freeze({ code: 'inventory.requests.execute', category: 'inventory', sensitivity: 'operational', scope: 'tenant', uiLabel: 'Ejecutar solicitudes de movimiento', notes: 'Permite al operador de bodega ejecutar solicitudes ADJUSTMENT y TRANSFER creadas por el admin' }),
 ]);
 
 const GOVERNED_OPERATIONS = Object.freeze([

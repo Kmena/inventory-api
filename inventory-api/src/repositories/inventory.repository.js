@@ -8,12 +8,31 @@ function transaction(work) {
 }
 
 function findAllMovements(companyId, filters = {}, pagination = null) {
-  const where = {
+  const where = /** @type {any} */ ({
     companyId,
     ...(filters.warehouseId ? { warehouseId: filters.warehouseId } : {}),
     ...(filters.productId ? { productId: filters.productId } : {}),
     ...(filters.lotId ? { lotId: filters.lotId } : {}),
-  };
+    ...(filters.movementType ? { movementType: filters.movementType } : {}),
+    ...(filters.reasonCode ? { reasonCode: filters.reasonCode } : {}),
+    ...(filters.sourceType ? { sourceType: filters.sourceType } : {}),
+    ...(filters.sourceId ? { sourceId: filters.sourceId } : {}),
+    ...(filters.dateFrom || filters.dateTo ? {
+      createdAt: {
+        ...(filters.dateFrom ? { gte: filters.dateFrom } : {}),
+        ...(filters.dateTo ? { lte: filters.dateTo } : {}),
+      },
+    } : {}),
+    ...(filters.q ? {
+      OR: [
+        { product: { name: { contains: filters.q, mode: 'insensitive' } } },
+        { product: { code: { contains: filters.q, mode: 'insensitive' } } },
+        { warehouse: { name: { contains: filters.q, mode: 'insensitive' } } },
+        { lot: { internalLotNumber: { contains: filters.q, mode: 'insensitive' } } },
+        { lot: { lotNumber: { contains: filters.q, mode: 'insensitive' } } },
+      ],
+    } : {}),
+  });
   const orderBy = /** @type {StockMovementOrderByWithRelationInput} */ ({ id: 'desc' });
   const include = {
     product: true,
@@ -42,13 +61,33 @@ function findAllMovements(companyId, filters = {}, pagination = null) {
   ]).then(([totalItems, items]) => ({ totalItems, items }));
 }
 
+function buildProductStockFilters(filters = {}) {
+  return /** @type {any} */ ({
+    ...(filters.productId ? { id: filters.productId } : {}),
+    ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+    ...(filters.q ? {
+      OR: [
+        { name: { contains: filters.q, mode: 'insensitive' } },
+        { code: { contains: filters.q, mode: 'insensitive' } },
+        { sku: { contains: filters.q, mode: 'insensitive' } },
+      ],
+    } : {}),
+  });
+}
+
 function findWarehouseStocks(companyId, filters = {}) {
+  const quantityFilter = filters.stockStatus === 'WITH_STOCK' ? { quantity: { gt: 0 } }
+    : filters.stockStatus === 'ZERO' ? { quantity: 0 }
+      : filters.stockStatus === 'RESERVED' ? { reservedQuantity: { gt: 0 } }
+        : {};
+
   return prisma.warehouseStock.findMany({
-    where: {
+    where: /** @type {any} */ ({
       warehouse: { companyId },
+      product: buildProductStockFilters(filters),
+      ...quantityFilter,
       ...(filters.warehouseId ? { warehouseId: filters.warehouseId } : {}),
-      ...(filters.productId ? { productId: filters.productId } : {}),
-    },
+    }),
     orderBy: [
       { warehouse: { name: 'asc' } },
       { product: { name: 'asc' } },
@@ -62,11 +101,12 @@ function findWarehouseStocks(companyId, filters = {}) {
 
 function findWarehouseLotStocks(companyId, filters = {}) {
   return prisma.warehouseLotStock.findMany({
-    where: {
+    where: /** @type {any} */ ({
       warehouse: { companyId },
+      product: buildProductStockFilters(filters),
       ...(filters.warehouseId ? { warehouseId: filters.warehouseId } : {}),
-      ...(filters.productId ? { productId: filters.productId } : {}),
-    },
+      ...(filters.includeSystem ? {} : { lot: { isSystemGenerated: false } }),
+    }),
     orderBy: [{ warehouseId: 'asc' }, { productId: 'asc' }, { lotId: 'asc' }],
     include: { warehouse: true, product: true, lot: true },
   });
@@ -177,7 +217,10 @@ function loadInventoryContext(companyId, warehouseId, productId, db = prisma) {
   return Promise.all([
     db.inventory.findUnique({ where: { companyId } }),
     db.warehouse.findFirst({ where: { id: warehouseId, companyId } }),
-    db.product.findFirst({ where: { id: productId, companyId } }),
+    db.product.findFirst({
+      where: { id: productId, companyId },
+      include: { allowedWarehouses: { orderBy: { warehouseId: 'asc' } } },
+    }),
   ]).then(([inventory, warehouse, product]) => ({ inventory, warehouse, product }));
 }
 
@@ -202,6 +245,33 @@ function updateWarehouseStockRecord(where, data, db = prisma) {
 
 function findWarehouseStockRecordById(id, db = prisma) {
   return db.warehouseStock.findUnique({ where: { id } });
+}
+
+function findInventoryOperationByIdempotencyKey(companyId, operationType, idempotencyKey, db = prisma) {
+  if (!idempotencyKey) return Promise.resolve(null);
+  return db.inventoryOperation.findFirst({
+    where: { companyId, operationType, idempotencyKey },
+  });
+}
+
+function createInventoryOperation(data, db = prisma) {
+  return db.inventoryOperation.create({ data });
+}
+
+function countProductInventoryEvidence(companyId, productId, db = prisma) {
+  return Promise.all([
+    db.stockMovement.count({ where: { companyId, productId } }),
+    db.warehouseStock.count({ where: { productId, warehouse: { companyId }, OR: [{ quantity: { not: 0 } }, { reservedQuantity: { not: 0 } }] } }),
+  ]).then(([movementCount, stockCount]) => ({ movementCount, stockCount }));
+}
+
+function getProductInventorySummary(companyId, productId, db = prisma) {
+  return Promise.all([
+    db.product.findFirst({ where: { id: productId, companyId }, include: { allowedWarehouses: { include: { warehouse: true }, orderBy: { warehouseId: 'asc' } } } }),
+    db.warehouseStock.findMany({ where: { productId, warehouse: { companyId } }, include: { warehouse: true } }),
+    db.warehouseLotStock.findMany({ where: { productId, warehouse: { companyId }, quantity: { gt: 0 }, lot: { isSystemGenerated: false } }, include: { lot: true } }),
+    db.stockMovement.count({ where: { companyId, productId } }),
+  ]).then(([product, stocks, lotStocks, movementCount]) => ({ product, stocks, lotStocks, movementCount }));
 }
 
 function findWarehouseLotStockRecord(warehouseId, lotId, db = prisma) {
@@ -367,6 +437,80 @@ function findLotForProduct(lotId, productId, db = prisma) {
   });
 }
 
+function findSystemLot(companyId, productId, warehouseId, db = prisma) {
+  return db.lot.findFirst({
+    where: {
+      companyId,
+      productId,
+      isSystemGenerated: true,
+      systemLotKey: `product:${productId.toString()}:warehouse:${warehouseId.toString()}`,
+    },
+  });
+}
+
+function createSystemLot(companyId, productId, warehouseId, quantity = 0, db = prisma) {
+  const systemLotKey = `product:${productId.toString()}:warehouse:${warehouseId.toString()}`;
+  return db.lot.create({
+    data: {
+      companyId,
+      productId,
+      internalLotNumber: `SYS-${companyId.toString()}-${productId.toString()}-${warehouseId.toString()}`,
+      lotNumber: null,
+      manufacturerLotNumber: null,
+      quantity,
+      originalQuantity: quantity,
+      status: 'AVAILABLE',
+      qaStatus: 'APPROVED',
+      isSystemGenerated: true,
+      systemLotKey,
+    },
+  });
+}
+
+function findLotsForCompany(companyId, filters = {}, pagination = null, db = prisma) {
+  const where = /** @type {any} */ ({
+    companyId,
+    ...(filters.productId ? { productId: filters.productId } : {}),
+    ...(filters.lotStatus ? { status: filters.lotStatus } : {}),
+    ...(filters.qaStatus ? { qaStatus: filters.qaStatus } : {}),
+    ...(filters.includeSystem ? {} : { isSystemGenerated: false }),
+    ...(filters.expirationFrom || filters.expirationTo ? {
+      expirationDate: {
+        ...(filters.expirationFrom ? { gte: filters.expirationFrom } : {}),
+        ...(filters.expirationTo ? { lte: filters.expirationTo } : {}),
+      },
+    } : {}),
+    ...(filters.warehouseId ? { warehouseLotStocks: { some: { warehouseId: filters.warehouseId } } } : {}),
+    ...(filters.q ? {
+      OR: [
+        { internalLotNumber: { contains: filters.q, mode: 'insensitive' } },
+        { lotNumber: { contains: filters.q, mode: 'insensitive' } },
+        { manufacturerLotNumber: { contains: filters.q, mode: 'insensitive' } },
+        { product: { name: { contains: filters.q, mode: 'insensitive' } } },
+        { product: { code: { contains: filters.q, mode: 'insensitive' } } },
+      ],
+    } : {}),
+  });
+  const orderBy = /** @type {any} */ ([{ expirationDate: 'asc' }, { id: 'asc' }]);
+  const include = { product: true, warehouseLotStocks: { include: { warehouse: true } } };
+
+  if (!pagination) {
+    return db.lot.findMany({ where, orderBy, include });
+  }
+
+  return db.$transaction([
+    db.lot.count({ where }),
+    db.lot.findMany({ where, orderBy, skip: pagination.skip, take: pagination.take, include }),
+  ]).then(([totalItems, items]) => ({ totalItems, items }));
+}
+
+function findLotForCompanyById(lotId, companyId, db = prisma) {
+  return db.lot.findFirst({
+    where: { id: lotId, companyId },
+    include: { product: true, warehouseLotStocks: { include: { warehouse: true } } },
+  });
+}
+
 function findOrderForCompany(orderId, companyId, include = {}, db = prisma) {
   return db.order.findFirst({
     where: { id: orderId, companyId },
@@ -413,6 +557,10 @@ module.exports = {
   createWarehouseStockRecord,
   updateWarehouseStockRecord,
   findWarehouseStockRecordById,
+  findInventoryOperationByIdempotencyKey,
+  createInventoryOperation,
+  countProductInventoryEvidence,
+  getProductInventorySummary,
   findWarehouseLotStockRecord,
   createWarehouseLotStockRecord,
   updateWarehouseLotStockRecord,
@@ -432,6 +580,10 @@ module.exports = {
   resolveOpenLotAlerts,
   findFirstSellableWarehouse,
   findLotForProduct,
+  findSystemLot,
+  createSystemLot,
+  findLotsForCompany,
+  findLotForCompanyById,
   findOrderForCompany,
   updateOrderById,
   findLotById,

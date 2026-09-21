@@ -42,6 +42,7 @@ function createRouterHarness() {
   browserWindow.RootShell.register('views.routesAdmin', createView('routes-view'));
   browserWindow.RootShell.register('views.warehousesAdmin', createView('warehouses-view'));
   browserWindow.RootShell.register('views.productsAdmin', createView('products-view'));
+  browserWindow.RootShell.register('views.inventoryAdmin', createView('inventory-view'));
   browserWindow.RootShell.register('views.lotsAdmin', createView('lots-view'));
   browserWindow.RootShell.register('views.movementsAdmin', createView('movements-view'));
   browserWindow.RootShell.register('views.recipesAdmin', createView('recipes-view'));
@@ -156,13 +157,15 @@ test('router resolves supported actor routes and unknown hashes without changing
 
   const adminLotsResolution = router.resolveRoute('#lots', createCompanyAdminSession());
   assert.equal(adminLotsResolution.allowed, true);
-  assert.equal(adminLotsResolution.routeKey, 'lots');
-  assert.equal(adminLotsResolution.view.name, 'lots-view');
+  assert.equal(adminLotsResolution.routeKey, 'inventory');
+  assert.equal(adminLotsResolution.normalizedHashTarget, 'inventory?tab=lots');
+  assert.equal(adminLotsResolution.view.name, 'inventory-view');
 
   const adminMovementsResolution = router.resolveRoute('#movements', createCompanyAdminSession());
   assert.equal(adminMovementsResolution.allowed, true);
-  assert.equal(adminMovementsResolution.routeKey, 'movements');
-  assert.equal(adminMovementsResolution.view.name, 'movements-view');
+  assert.equal(adminMovementsResolution.routeKey, 'inventory');
+  assert.equal(adminMovementsResolution.normalizedHashTarget, 'inventory?tab=history');
+  assert.equal(adminMovementsResolution.view.name, 'inventory-view');
 
   const adminRecipesResolution = router.resolveRoute('#recetas', createCompanyAdminSession());
   assert.equal(adminRecipesResolution.allowed, true);

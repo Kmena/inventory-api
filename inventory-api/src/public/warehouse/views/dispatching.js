@@ -97,7 +97,22 @@ function renderAllocations(allocations, items, availableLots) {
     const productId = String(item.productId);
     const itemAllocs = (allocations || []).filter((a) => String(a.productId) === productId);
     const fifoLots = itemAllocs.map((a) => renderLotBadge(a.lot)).join(' ');
-    const isLotTracked = item.product?.lotStrategy && item.product.lotStrategy !== 'NONE';
+    const controlsInventory = item.product?.controlsInventory !== false;
+    const isLotTracked = controlsInventory && item.product?.lotStrategy && item.product.lotStrategy !== 'NONE';
+
+    if (!controlsInventory) {
+      return `
+        <div style="padding:6px 0;border-bottom:1px solid #f1f5f9;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+            <div>
+              <span style="font-size:0.85rem;font-weight:600;">${esc(item.product?.name || '—')}</span>
+              <span class="warehouse-muted" style="font-size:0.78rem;"> · ${esc(item.product?.code || '')}</span>
+              <div><span class="warehouse-muted" style="font-size:0.78rem;">No requiere inventario</span></div>
+            </div>
+            <div style="text-align:right;"><span style="font-size:0.85rem;">× ${esc(String(item.quantity))}</span><div style="margin-top:4px;"><span class="warehouse-muted" style="font-size:0.78rem;">Sin lote ni despacho físico</span></div></div>
+          </div>
+        </div>`;
+    }
 
     // Available lots for this product (excluding already-reserved ones as fallback)
     const productAvailableLots = (availableLots || []).filter((ls) => String(ls.productId) === productId);

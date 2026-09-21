@@ -329,7 +329,7 @@
       category: 'view-provider',
       registers: ['views.productsAdmin'],
       requiresModules: ['productsApi', 'categoriesApi', 'ui', 'sessionAdapter', 'views.productsAdminHelpers', 'views.productsAdminRenderers', 'views.productsAdminState'],
-      requiresScripts: ['/root/registry.js', '/root/products-api.js', '/root/categories-api.js', '/root/ui.js', '/root/session-adapter.js', '/root/views/products-admin.helpers.js', '/root/views/products-admin.renderers.js', '/root/views/products-admin.state.js'],
+      requiresScripts: ['/root/registry.js', '/root/products-api.js', '/root/inventory-api.js', '/root/categories-api.js', '/root/ui.js', '/root/session-adapter.js', '/root/views/products-admin.helpers.js', '/root/views/products-admin.renderers.js', '/root/views/products-admin.state.js'],
     },
     {
       path: '/root/views/lots-admin.helpers.js',
@@ -379,6 +379,27 @@
       registers: ['views.movementsAdmin'],
       requiresModules: ['inventoryApi', 'warehousesApi', 'ui', 'sessionAdapter', 'views.movementsAdminHelpers', 'views.movementsAdminRenderers'],
       requiresScripts: ['/root/registry.js', '/root/inventory-api.js', '/root/warehouses-api.js', '/root/ui.js', '/root/session-adapter.js', '/root/views/movements-admin.helpers.js', '/root/views/movements-admin.renderers.js'],
+    },
+    {
+      path: '/root/views/inventory-admin.helpers.js',
+      category: 'view-provider',
+      registers: ['views.inventoryAdminHelpers'],
+      requiresModules: [],
+      requiresScripts: ['/root/registry.js'],
+    },
+    {
+      path: '/root/views/inventory-admin.renderers.js',
+      category: 'view-provider',
+      registers: ['views.inventoryAdminRenderers'],
+      requiresModules: ['ui', 'views.inventoryAdminHelpers'],
+      requiresScripts: ['/root/registry.js', '/root/ui.js', '/root/views/inventory-admin.helpers.js'],
+    },
+    {
+      path: '/root/views/inventory-admin.js',
+      category: 'view-provider',
+      registers: ['views.inventoryAdmin'],
+      requiresModules: ['inventoryApi', 'ui', 'views.inventoryAdminHelpers', 'views.inventoryAdminRenderers', 'sessionAdapter'],
+      requiresScripts: ['/root/registry.js', '/root/inventory-api.js', '/root/ui.js', '/root/session-adapter.js', '/root/views/inventory-admin.helpers.js', '/root/views/inventory-admin.renderers.js'],
     },
     {
       path: '/root/views/home.js',
@@ -633,6 +654,13 @@
       requiresScripts: ['/shared/auth.js', '/root/registry.js'],
     },
     {
+      path: '/root/entitlements-api.js',
+      category: 'provider',
+      registers: ['entitlementsApi'],
+      requiresModules: [],
+      requiresScripts: ['/shared/auth.js', '/root/registry.js'],
+    },
+    {
       path: '/root/views/billing-admin.helpers.js',
       category: 'view-provider',
       registers: ['views.billingAdminHelpers'],
@@ -714,8 +742,8 @@
       path: '/root/router.js',
       category: 'consumer-provider',
       registers: ['router'],
-      requiresModules: ['manifest', 'guards', 'views.home', 'views.inProcess', 'views.companiesAdmin', 'views.rolesAdmin', 'views.zonesAdmin', 'views.agentsAdmin', 'views.clientsAdmin', 'views.routesAdmin', 'views.warehousesAdmin', 'views.suppliersAdmin', 'views.productsAdmin', 'views.lotsAdmin', 'views.movementsAdmin', 'views.recipesAdmin', 'views.productionOrdersAdmin', 'views.productionPlanner', 'views.billingAdmin', 'views.approvalsAdmin', 'views.quotationsAdmin', 'views.rfqTrackingAdmin', 'views.purchaseRequestsAdmin', 'views.purchaseOrdersAdmin', 'views.receiptsAdmin', 'views.fiscalRefsAdmin', 'views.usersAdmin', 'views.feedbackAdmin'],
-      requiresScripts: ['/root/registry.js', '/root/manifest.js', '/root/guards.js', '/root/views/home.js', '/root/views/in-process.js', '/root/recipes-api.js', '/root/views/recipes-admin.helpers.js', '/root/views/recipes-admin.state.js', '/root/views/recipes-admin.renderers.js', '/root/views/recipes-admin.version-editor.js', '/root/views/recipes-admin.js', '/root/views/production-orders-admin.js', '/root/views/production-planner.js', '/root/views/companies-admin.js', '/root/views/roles-admin.js', '/root/views/zones-admin.js', '/root/views/agents-admin.js', '/root/views/clients-admin.js', '/root/views/routes-admin.js', '/root/views/warehouses-admin.js', '/root/views/suppliers-admin.js', '/root/views/products-admin.js', '/root/views/lots-admin.helpers.js', '/root/views/lots-admin.state.js', '/root/views/lots-admin.renderers.js', '/root/views/lots-admin.js', '/root/views/movements-admin.js', '/root/quotations-api.js', '/root/views/quotations-admin.helpers.js', '/root/views/quotations-admin.renderers.js', '/root/views/quotations-comparison.renderers.js', '/root/views/quotations-comparison.js', '/root/views/quotations-admin.js', '/root/rfq-tracking-api.js', '/root/views/rfq-tracking-admin.renderers.js', '/root/views/rfq-tracking-admin.js', '/root/purchase-orders-api.js', '/root/views/purchase-requests-admin.renderers.js', '/root/views/purchase-requests-admin.js', '/root/views/purchase-orders-admin.renderers.js', '/root/views/purchase-orders-admin.js', '/root/orders-api.js', '/root/views/approvals-admin.js', '/root/receipts-api.js', '/root/views/receipts-admin.renderers.js', '/root/views/receipts-admin.js', '/root/views/fiscal-refs-admin.renderers.js', '/root/views/fiscal-refs-admin.js', '/root/billing-api.js', '/root/views/billing-admin.helpers.js', '/root/views/billing-admin.renderers.js', '/root/views/billing-admin.js', '/root/users-api.js', '/root/views/users-admin.helpers.js', '/root/views/users-admin.renderers.js', '/root/views/users-admin.js', '/root/feedback-api.js', '/root/feedback-widget.js', '/root/views/feedback-admin.js'],
+      requiresModules: ['manifest', 'guards', 'views.home', 'views.inProcess', 'views.companiesAdmin', 'views.rolesAdmin', 'views.zonesAdmin', 'views.agentsAdmin', 'views.clientsAdmin', 'views.routesAdmin', 'views.warehousesAdmin', 'views.suppliersAdmin', 'views.productsAdmin', 'views.inventoryAdmin', 'views.lotsAdmin', 'views.movementsAdmin', 'views.recipesAdmin', 'views.productionOrdersAdmin', 'views.productionPlanner', 'views.billingAdmin', 'views.approvalsAdmin', 'views.quotationsAdmin', 'views.rfqTrackingAdmin', 'views.purchaseRequestsAdmin', 'views.purchaseOrdersAdmin', 'views.receiptsAdmin', 'views.fiscalRefsAdmin', 'views.usersAdmin', 'views.feedbackAdmin'],
+      requiresScripts: ['/root/registry.js', '/root/manifest.js', '/root/guards.js', '/root/views/home.js', '/root/views/in-process.js', '/root/recipes-api.js', '/root/views/recipes-admin.helpers.js', '/root/views/recipes-admin.state.js', '/root/views/recipes-admin.renderers.js', '/root/views/recipes-admin.version-editor.js', '/root/views/recipes-admin.js', '/root/views/production-orders-admin.js', '/root/views/production-planner.js', '/root/views/companies-admin.js', '/root/views/roles-admin.js', '/root/views/zones-admin.js', '/root/views/agents-admin.js', '/root/views/clients-admin.js', '/root/views/routes-admin.js', '/root/views/warehouses-admin.js', '/root/views/suppliers-admin.js', '/root/views/products-admin.js', '/root/views/inventory-admin.helpers.js', '/root/views/inventory-admin.renderers.js', '/root/views/inventory-admin.js', '/root/views/lots-admin.helpers.js', '/root/views/lots-admin.state.js', '/root/views/lots-admin.renderers.js', '/root/views/lots-admin.js', '/root/views/movements-admin.js', '/root/quotations-api.js', '/root/views/quotations-admin.helpers.js', '/root/views/quotations-admin.renderers.js', '/root/views/quotations-comparison.renderers.js', '/root/views/quotations-comparison.js', '/root/views/quotations-admin.js', '/root/rfq-tracking-api.js', '/root/views/rfq-tracking-admin.renderers.js', '/root/views/rfq-tracking-admin.js', '/root/purchase-orders-api.js', '/root/views/purchase-requests-admin.renderers.js', '/root/views/purchase-requests-admin.js', '/root/views/purchase-orders-admin.renderers.js', '/root/views/purchase-orders-admin.js', '/root/orders-api.js', '/root/views/approvals-admin.js', '/root/receipts-api.js', '/root/views/receipts-admin.renderers.js', '/root/views/receipts-admin.js', '/root/views/fiscal-refs-admin.renderers.js', '/root/views/fiscal-refs-admin.js', '/root/billing-api.js', '/root/entitlements-api.js', '/root/views/billing-admin.helpers.js', '/root/views/billing-admin.renderers.js', '/root/views/billing-admin.js', '/root/users-api.js', '/root/views/users-admin.helpers.js', '/root/views/users-admin.renderers.js', '/root/views/users-admin.js', '/root/feedback-api.js', '/root/feedback-widget.js', '/root/views/feedback-admin.js'],
     },
     {
       path: '/root/app.js',

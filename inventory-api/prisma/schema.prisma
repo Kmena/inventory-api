@@ -26,6 +26,7 @@ enum OrderStatus {
   APPROVED
   IN_PRODUCTION
   DELIVERED
+  FULFILLED
   CANCELLED
   REJECTED
 }
@@ -66,6 +67,8 @@ enum StockMovementType {
   ADJUSTMENT
   RESERVE
   RELEASE
+  TRANSFER_OUT
+  TRANSFER_IN
 }
 
 enum WarehouseType {
@@ -79,6 +82,18 @@ enum WarehouseType {
   ADMIN_VIRTUAL
   COURSES_VIRTUAL
   AFFILIATIONS_VIRTUAL
+}
+
+enum LocationType {
+  BODEGA
+  ALMACEN
+  CEDI
+  OTHER
+}
+
+enum LocationNature {
+  PHYSICAL
+  VIRTUAL
 }
 
 enum ProductSourcingMethod {
@@ -108,6 +123,47 @@ enum ProductNetContentUnit {
   KG
   M
   UN
+}
+
+enum ProductNature {
+  GOOD
+  SERVICE
+}
+
+enum ProductCommercialBehavior {
+  STANDARD
+  ENTITLEMENT
+}
+
+enum ProductEntitlementKind {
+  SUBSCRIPTION
+  MEMBERSHIP
+  AFFILIATION
+  COURSE
+  SERVICE_PERIOD
+}
+
+enum ProductValidityUnit {
+  DAY
+  MONTH
+  YEAR
+}
+
+enum ProductBillingInterval {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum InvoiceItemKind {
+  PHYSICAL_GOOD
+  SERVICE
+  ENTITLEMENT
+}
+
+enum CustomerEntitlementStatus {
+  ACTIVE
+  CANCELLED
 }
 
 enum RecipeQuantityBasis {
@@ -275,6 +331,10 @@ model Company {
   fiscalDocumentReferences FiscalDocumentReference[]
   rfqInvitations           SupplierQuotationInvitation[]
   productionRecolectionStages ProductionRecolectionStage[]
+  invoiceItems             InvoiceItem[]
+  inventoryOperations      InventoryOperation[]
+  customerEntitlements     CustomerEntitlement[]
+  inventoryRequests        InventoryRequest[]
 
   @@map("companies")
 }
@@ -405,6 +465,8 @@ model User {
   auditEvents           AuditEvent[]            @relation("audit_event_actor")
   rfqInvitationsCreated SupplierQuotationInvitation[] @relation("rfq_invitation_created_by_user")
   rfqInvitationsManualResponse SupplierQuotationInvitation[] @relation("rfq_invitation_manual_response_by_user")
+  inventoryRequestsCreated  InventoryRequest[] @relation("inventory_request_requested_by")
+  inventoryRequestsAssigned InventoryRequest[] @relation("inventory_request_assigned_to")
 
   @@index([companyId, id])
   @@map("users")
@@ -556,6 +618,7 @@ model Client {
   invoices       Invoice[]
   routeVisitLogs RouteVisitLog[]
   orderStoreBackfillAudits OrderStoreBackfillAudit[]
+  entitlements   CustomerEntitlement[]
 
   @@unique([companyId, code])
   @@index([companyId, isActive])
@@ -752,6 +815,8 @@ model Warehouse {
   code             String
   name             String
   warehouseType    WarehouseType   @default(GENERAL) @map("warehouse_type")
+  locationType     LocationType    @default(BODEGA) @map("location_type")
+  locationNature   LocationNature  @default(PHYSICAL) @map("location_nature")
   isVirtual        Boolean         @default(false) @map("is_virtual")
   isSellableSource Boolean         @default(false) @map("is_sellable_source")
   isActive         Boolean         @default(true) @map("is_active")
@@ -767,6 +832,8 @@ model Warehouse {
   destinationProductionOrders ProductionOrder[] @relation("production_order_destination_warehouse")
   purchaseReceipts PurchaseReceipt[]
   allowedProducts  ProductAllowedWarehouse[]
+  sourceInventoryRequests      InventoryRequest[] @relation("inventory_request_source")
+  destinationInventoryRequests InventoryRequest[] @relation("inventory_request_destination")
 
   @@unique([companyId, code])
   @@unique([companyId, name])
@@ -880,6 +947,13 @@ model Product {
   sourcingMethod   ProductSourcingMethod? @map("sourcing_method")
   inventoryType    ProductInventoryType?  @map("inventory_type")
   productType      String            @default("FINISHED_PRODUCT") @map("product_type")
+  productNature    ProductNature     @default(GOOD) @map("product_nature")
+  controlsInventory Boolean          @default(true) @map("controls_inventory")
+  commercialBehavior ProductCommercialBehavior @default(STANDARD) @map("commercial_behavior")
+  entitlementKind  ProductEntitlementKind? @map("entitlement_kind")
+  defaultValidityCount Int?          @map("default_validity_count")
+  defaultValidityUnit  ProductValidityUnit? @map("default_validity_unit")
+  billingInterval  ProductBillingInterval? @map("billing_interval")
   sellableKind     String            @default("STANDARD") @map("sellable_kind")
   unit             String            @default("KG")
   cabysCode        String?           @map("cabys_code")
@@ -937,8 +1011,13 @@ model Product {
   receiptInspections ReceiptInspection[] @relation("receipt_inspection_product")
   recolectionEntries    ProductionRecolectionEntry[]
   recolectionReconciliations ProductionRecolectionReconciliation[]
+  invoiceItems      InvoiceItem[]
+  entitlements      CustomerEntitlement[]
+  inventoryRequests InventoryRequest[]
 
   @@unique([companyId, code])
+  @@index([companyId, controlsInventory])
+  @@index([companyId, commercialBehavior, entitlementKind])
   @@map("products")
 }
 
@@ -1281,6 +1360,8 @@ model Lot {
   status                LotStatus           @default(QUARANTINED)
   qaStatus              LotQaStatus         @default(PENDING) @map("qa_status")
   casNumber             String?             @map("cas_number")
+  isSystemGenerated     Boolean             @default(false) @map("is_system_generated")
+  systemLotKey          String?             @map("system_lot_key")
   createdAt             DateTime            @default(now()) @map("created_at")
   updatedAt             DateTime            @updatedAt @map("updated_at")
   company               Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1298,10 +1379,13 @@ model Lot {
   stageLosses           ProductionStageLoss[]
   recolectionEntries    ProductionRecolectionEntry[]
   recolectionReconciliations ProductionRecolectionReconciliation[]
+  inventoryRequests     InventoryRequest[]
 
   @@unique([companyId, internalLotNumber])
+  @@unique([companyId, systemLotKey], name: "lots_company_system_lot_key_unique")
   @@index([productId])
   @@index([expirationDate, status, qaStatus])
+  @@index([companyId, productId, isSystemGenerated])
   @@map("lots")
 }
 
@@ -1379,6 +1463,30 @@ model StockMovement {
   @@map("stock_movements")
 }
 
+model InventoryOperation {
+  id                     BigInt   @id @default(autoincrement())
+  companyId              BigInt   @map("company_id")
+  operationType          String   @map("operation_type")
+  idempotencyKey         String?  @map("idempotency_key")
+  status                 String   @default("COMPLETED")
+  productId              BigInt?  @map("product_id")
+  sourceWarehouseId      BigInt?  @map("source_warehouse_id")
+  destinationWarehouseId BigInt?  @map("destination_warehouse_id")
+  movementGroupId        String?  @map("movement_group_id")
+  reasonCode             String?  @map("reason_code")
+  note                   String?
+  metadata               Json?
+  createdByUserId        BigInt?  @map("created_by_user_id")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+  company                Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, operationType, idempotencyKey], name: "inventory_operations_company_type_idempotency_unique")
+  @@index([companyId, operationType, createdAt])
+  @@index([movementGroupId])
+  @@map("inventory_operations")
+}
+
 model Order {
   id            BigInt       @id @default(autoincrement())
   companyId      BigInt      @map("company_id")
@@ -1425,6 +1533,7 @@ model Order {
   invoices      Invoice[]
   productionOrders ProductionOrder[]
   storeBackfillAudit OrderStoreBackfillAudit?
+  entitlements  CustomerEntitlement[]
 
   @@index([warehouseId])
   @@index([clientStoreId])
@@ -1475,10 +1584,93 @@ model OrderItem {
   updatedAt       DateTime @updatedAt @map("updated_at")
   order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product         Product  @relation(fields: [productId], references: [id])
+  invoiceItems    InvoiceItem[]
+  entitlements    CustomerEntitlement[]
 
   @@index([orderId])
   @@index([productId])
   @@map("order_items")
+}
+
+model InvoiceItem {
+  id                   BigInt          @id @default(autoincrement())
+  invoiceId            BigInt          @map("invoice_id")
+  orderItemId          BigInt?         @map("order_item_id")
+  productId            BigInt?         @map("product_id")
+  companyId            BigInt          @map("company_id")
+  lineKind             InvoiceItemKind @map("line_kind")
+  descriptionSnapshot  String          @map("description_snapshot")
+  productCodeSnapshot  String?         @map("product_code_snapshot")
+  quantity             Decimal         @db.Decimal(14, 3)
+  unitPrice            Decimal         @db.Decimal(14, 2) @map("unit_price")
+  discountPercent      Decimal         @default(0) @db.Decimal(8, 2) @map("discount_percent")
+  discountAmount       Decimal         @default(0) @db.Decimal(14, 2) @map("discount_amount")
+  taxCategorySnapshot  String?         @map("tax_category_snapshot")
+  taxRateSnapshot      Decimal?        @db.Decimal(5, 2) @map("tax_rate_snapshot")
+  subtotal             Decimal         @db.Decimal(14, 2)
+  tax                  Decimal         @default(0) @db.Decimal(14, 2)
+  total                Decimal         @db.Decimal(14, 2)
+  createdAt            DateTime        @default(now()) @map("created_at")
+
+  company              Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoice              Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  orderItem            OrderItem?      @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  product              Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  entitlements         CustomerEntitlement[]
+
+  @@unique([invoiceId, orderItemId], name: "invoice_items_invoice_order_item_unique")
+  @@index([companyId, invoiceId])
+  @@index([productId])
+  @@map("invoice_items")
+}
+
+model CustomerEntitlement {
+  id                       BigInt                    @id @default(autoincrement())
+  companyId                BigInt                    @map("company_id")
+  clientId                 BigInt                    @map("client_id")
+  productId                BigInt                    @map("product_id")
+  sourceOrderId            BigInt?                   @map("source_order_id")
+  sourceOrderItemId        BigInt?                   @map("source_order_item_id")
+  sourceInvoiceId          BigInt?                   @map("source_invoice_id")
+  sourceInvoiceItemId      BigInt?                   @map("source_invoice_item_id")
+  previousEntitlementId    BigInt?                   @map("previous_entitlement_id")
+  status                   CustomerEntitlementStatus @default(ACTIVE)
+  entitlementKind          ProductEntitlementKind    @map("entitlement_kind")
+  startDate                DateTime                  @map("start_date")
+  endDate                  DateTime?                 @map("end_date")
+  activatedAt              DateTime?                 @map("activated_at")
+  activatedByUserId        BigInt?                   @map("activated_by_user_id")
+  activationSource         String                    @map("activation_source")
+  manualActivationReason   String?                   @map("manual_activation_reason") @db.Text
+  cancelledAt              DateTime?                 @map("cancelled_at")
+  cancelledByUserId        BigInt?                   @map("cancelled_by_user_id")
+  cancellationReason       String?                   @map("cancellation_reason") @db.Text
+  priceSnapshot            Decimal                   @db.Decimal(14, 2) @map("price_snapshot")
+  currencySnapshot         String                    @default("CRC") @map("currency_snapshot")
+  validityCountSnapshot    Int?                      @map("validity_count_snapshot")
+  validityUnitSnapshot     ProductValidityUnit?      @map("validity_unit_snapshot")
+  billingIntervalSnapshot  ProductBillingInterval?   @map("billing_interval_snapshot")
+  metadata                 Json?
+  createdAt                DateTime                  @default(now()) @map("created_at")
+  updatedAt                DateTime                  @updatedAt @map("updated_at")
+
+  company                  Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client                   Client                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  product                  Product                   @relation(fields: [productId], references: [id])
+  sourceOrder              Order?                    @relation(fields: [sourceOrderId], references: [id], onDelete: SetNull)
+  sourceOrderItem          OrderItem?                @relation(fields: [sourceOrderItemId], references: [id], onDelete: SetNull)
+  sourceInvoice            Invoice?                  @relation(fields: [sourceInvoiceId], references: [id], onDelete: SetNull)
+  sourceInvoiceItem        InvoiceItem?              @relation(fields: [sourceInvoiceItemId], references: [id], onDelete: SetNull)
+  previousEntitlement      CustomerEntitlement?      @relation("entitlement_renewal", fields: [previousEntitlementId], references: [id], onDelete: SetNull)
+  renewals                 CustomerEntitlement[]     @relation("entitlement_renewal")
+
+  @@unique([companyId, sourceOrderItemId], name: "customer_entitlements_source_order_item_unique")
+  @@unique([companyId, sourceInvoiceItemId], name: "customer_entitlements_source_invoice_item_unique")
+  @@index([companyId, clientId, status])
+  @@index([companyId, productId])
+  @@index([companyId, endDate])
+  @@index([previousEntitlementId])
+  @@map("customer_entitlements")
 }
 
 model Invoice {
@@ -1496,6 +1688,8 @@ model Invoice {
   client    Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   order     Order?        @relation(fields: [orderId], references: [id])
   payments  Payment[]
+  items     InvoiceItem[]
+  entitlements CustomerEntitlement[]
 
   @@index([clientId])
   @@index([orderId])
@@ -2080,4 +2274,45 @@ model Feedback {
   @@index([createdAt(sort: Desc)], name: "feedback_created_at_idx")
   @@index([companyId], name: "feedback_company_id_idx")
   @@map("feedback")
+}
+
+/// Async movement request: admin creates, operator picks up and executes.
+/// type: ADJUSTMENT | TRANSFER
+/// status: PENDING | IN_PROGRESS | COMPLETED | CANCELLED
+model InventoryRequest {
+  id                     BigInt     @id @default(autoincrement())
+  companyId              BigInt     @map("company_id")
+  type                   String
+  status                 String     @default("PENDING")
+  lotId                  BigInt     @map("lot_id")
+  productId              BigInt     @map("product_id")
+  sourceWarehouseId      BigInt     @map("source_warehouse_id")
+  destinationWarehouseId BigInt?    @map("destination_warehouse_id")
+  quantity               Decimal?   @db.Decimal(14, 3)
+  requestedByUserId      BigInt     @map("requested_by_user_id")
+  requestedAt            DateTime   @default(now()) @map("requested_at")
+  assignedToUserId       BigInt?    @map("assigned_to_user_id")
+  note                   String?
+  operatorNote           String?    @map("operator_note")
+  completedAt            DateTime?  @map("completed_at")
+  pickedUpAt             DateTime?  @map("picked_up_at")
+  deliveredAt            DateTime?  @map("delivered_at")
+  resultOperationId      BigInt?    @map("result_operation_id")
+  cancelledAt            DateTime?  @map("cancelled_at")
+  cancelledReason        String?    @map("cancelled_reason")
+  createdAt              DateTime   @default(now()) @map("created_at")
+  updatedAt              DateTime   @updatedAt @map("updated_at")
+
+  company              Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lot                  Lot        @relation(fields: [lotId], references: [id])
+  product              Product    @relation(fields: [productId], references: [id])
+  sourceWarehouse      Warehouse  @relation("inventory_request_source", fields: [sourceWarehouseId], references: [id])
+  destinationWarehouse Warehouse? @relation("inventory_request_destination", fields: [destinationWarehouseId], references: [id])
+  requestedByUser      User       @relation("inventory_request_requested_by", fields: [requestedByUserId], references: [id])
+  assignedToUser       User?      @relation("inventory_request_assigned_to", fields: [assignedToUserId], references: [id])
+
+  @@index([companyId, status, createdAt])
+  @@index([companyId, type, status])
+  @@index([lotId])
+  @@map("inventory_requests")
 }

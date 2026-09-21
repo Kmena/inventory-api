@@ -103,6 +103,50 @@
     `).join('');
   }
 
+  function renderEntitlementStatus(status) {
+    const labels = { ACTIVE: 'Activo', CANCELLED: 'Cancelado', EXPIRED: 'Vencido', PENDING: 'Pendiente' };
+    return labels[status] || status || 'Sin estado';
+  }
+
+  function renderEntitlementsSection(client, permissions) {
+    const entitlements = Array.isArray(client?.entitlements) ? client.entitlements : [];
+    const canManage = Boolean(permissions?.canManageEntitlements);
+    const canActivate = Boolean(permissions?.canManuallyActivateEntitlements);
+    return `
+      <section class="stack-section" id="clients-entitlements-section">
+        <div class="page-header">
+          <div>
+            <h4>Suscripciones y accesos</h4>
+            <p class="muted">Accesos comerciales del cliente. No generan stock, lote ni despacho de inventario.</p>
+          </div>
+          ${canActivate ? `<button id="clients-entitlement-manual-activate-button" class="secondary-button" type="button" data-client-id="${rootShellUi.escapeHtml(client.id)}">Activar manualmente</button>` : ''}
+        </div>
+        <div id="clients-entitlements-message" aria-live="polite"></div>
+        <div class="inline-card-grid">
+          ${renderInlineEntries(entitlements, 'Este cliente aún no tiene suscripciones ni accesos registrados.', (entitlement) => `
+            <article class="inline-card" data-entitlement-id="${rootShellUi.escapeHtml(entitlement.id)}">
+              <strong>${rootShellUi.escapeHtml(entitlement.productName || entitlement.product?.name || 'Acceso')}</strong>
+              <p class="muted">Estado: ${rootShellUi.escapeHtml(renderEntitlementStatus(entitlement.status))}</p>
+              <p class="muted">Vigencia: ${rootShellUi.escapeHtml(rootShellUi.formatDate(entitlement.startsAt || entitlement.activatedAt))} — ${rootShellUi.escapeHtml(entitlement.endsAt ? rootShellUi.formatDate(entitlement.endsAt) : 'Sin vencimiento')}</p>
+              ${canManage ? `<div class="action-row compact-action-row">
+                <button class="secondary-button" type="button" data-entitlement-renew="${rootShellUi.escapeHtml(entitlement.id)}">Renovar</button>
+                <button class="secondary-button danger-button" type="button" data-entitlement-cancel="${rootShellUi.escapeHtml(entitlement.id)}">Cancelar</button>
+              </div>` : ''}
+            </article>
+          `)}
+        </div>
+        ${canActivate ? `<form id="clients-entitlement-manual-form" class="root-form root-form--compact" hidden>
+          <input type="hidden" name="clientId" value="${rootShellUi.escapeHtml(client.id)}" />
+          <div class="root-form-grid">
+            <label><span>ID de producto *</span><input name="productId" type="number" min="1" required /></label>
+            <label><span>Motivo</span><input name="reason" type="text" maxlength="255" placeholder="Activación manual autorizada" /></label>
+          </div>
+          <div class="action-row compact-action-row"><button type="submit">Activar acceso</button></div>
+        </form>` : ''}
+      </section>
+    `;
+  }
+
   function renderClientDetail(client, classifications, documentTypes, zoneOptions, permissions, economicActivities) {
     if (!client) {
       return '<p class="empty-state">Selecciona un cliente del listado para abrir el detalle contextual.</p>';
@@ -229,6 +273,8 @@
           `)}
         </div>
       </section>
+
+      ${renderEntitlementsSection(client, actionPermissions)}
 
       <section class="stack-section">
         <h4>Documentos</h4>

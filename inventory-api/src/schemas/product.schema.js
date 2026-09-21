@@ -6,6 +6,21 @@ const productInventoryTypeSchema = z.enum(['RAW_MATERIAL', 'PACKAGING', 'WORK_IN
 const productPresentationTypeSchema = z.enum(['VOLUME', 'MASS', 'LENGTH', 'COUNT']);
 const productNetContentUnitSchema = z.enum(['ML', 'L', 'G', 'KG', 'M', 'UN']);
 
+// Capability foundation (MASTER-002 / NPP-TASK-002).
+// Approved by specs/non-physical-products-mvp/data-model.md §1-§3
+// and coordinated by specs/inventori-product-inventory-master-plan/decisions.md C-01.
+const productNatureSchema = z.enum(['GOOD', 'SERVICE']);
+const productCommercialBehaviorSchema = z.enum(['STANDARD', 'ENTITLEMENT']);
+const productEntitlementKindSchema = z.enum([
+  'SUBSCRIPTION',
+  'MEMBERSHIP',
+  'AFFILIATION',
+  'COURSE',
+  'SERVICE_PERIOD',
+]);
+const productValidityUnitSchema = z.enum(['DAY', 'MONTH', 'YEAR']);
+const productBillingIntervalSchema = z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']);
+
 /** Units that correspond to the VOLUME presentation type. */
 const VOLUME_UNITS = ['ML', 'L'];
 /** Units that correspond to the MASS presentation type. */
@@ -69,6 +84,13 @@ const productFieldsSchema = z.object({
   isActive: z.boolean().optional(),
   lotStrategy: z.literal('TRACKED').optional(),
   inCatalog: z.boolean().optional(),
+  productNature: productNatureSchema.optional(),
+  controlsInventory: z.boolean().optional(),
+  commercialBehavior: productCommercialBehaviorSchema.optional(),
+  entitlementKind: productEntitlementKindSchema.optional().nullable(),
+  defaultValidityCount: z.coerce.number().int().positive().optional().nullable(),
+  defaultValidityUnit: productValidityUnitSchema.optional().nullable(),
+  billingInterval: productBillingIntervalSchema.optional().nullable(),
   netContent: z.number().min(0).optional(),
   conversionFactor: z.number().min(0).optional(),
   kgConversionFactor: z.number().min(0).optional(),
@@ -90,6 +112,9 @@ const productFieldsSchema = z.object({
  *   explicitly included in the same payload (i.e. its key exists in the object).
  */
 function validatePresentationType(payload, context, strict) {
+  // Physical measurement constraints are irrelevant for non-inventory products.
+  if (payload.controlsInventory === false) return;
+
   const { presentationType } = payload;
   if (!presentationType) return;
 
@@ -180,6 +205,146 @@ function validatePresentationType(payload, context, strict) {
   // COUNT has no additional field constraints at schema level.
 }
 
+/**
+ * Validates the Product capability invariants approved in
+ * specs/non-physical-products-mvp/domain-model.md §3.
+ *
+ * When `strict` is true (create path), any capability field present must be
+ * internally consistent even if other capability fields are absent — the
+ * backfill defaults (`productNature=GOOD`, `controlsInventory=true`,
+ * `commercialBehavior=STANDARD`, `entitlementKind=null`) are assumed for the
+ * absent ones. When `strict` is false (update path), only cross-field
+ * consistency between the fields present in the same payload is enforced.
+ *
+ * The rules encoded here are (from data-model.md §3):
+ *  - `controlsInventory=false` forbids `initialLots`, positive `quantity`,
+ *    `allowedWarehouseIds`, `requiresLot=true`, `requiresExpiration=true`.
+ *  - `requiresExpiration=true` implies `requiresLot=true` and
+ *    `controlsInventory=true`.
+ *  - `commercialBehavior=STANDARD` implies `entitlementKind=null`.
+ *  - `commercialBehavior=ENTITLEMENT` implies `controlsInventory=false`,
+ *    `productNature=SERVICE` and non-null `entitlementKind`.
+ *
+ * @param {object} payload - Parsed payload object.
+ * @param {import('zod').RefinementCtx} context - Zod refinement context.
+ * @param {boolean} strict - Create path uses strict backfill assumption.
+ */
+function validateProductCapabilities(payload, context, strict) {
+  const has = (key) => Object.prototype.hasOwnProperty.call(payload, key);
+
+  const productNature = payload.productNature
+    ?? (strict ? 'GOOD' : undefined);
+  const controlsInventory = payload.controlsInventory
+    ?? (strict ? true : undefined);
+  const commercialBehavior = payload.commercialBehavior
+    ?? (strict ? 'STANDARD' : undefined);
+  const entitlementKind = has('entitlementKind') ? payload.entitlementKind : undefined;
+
+  // Non-inventory boundary — controlsInventory=false forbids inventory config.
+  if (controlsInventory === false) {
+    if (Array.isArray(payload.initialLots) && payload.initialLots.length > 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['initialLots'],
+        message: 'Un producto que no controla inventario no admite lotes iniciales',
+      });
+    }
+    if ((payload.quantity ?? 0) > 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['quantity'],
+        message: 'Un producto que no controla inventario no admite existencias',
+      });
+    }
+    if (Array.isArray(payload.allowedWarehouseIds) && payload.allowedWarehouseIds.length > 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['allowedWarehouseIds'],
+        message: 'Un producto que no controla inventario no admite bodegas autorizadas',
+      });
+    }
+    if (payload.requiresLot === true) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['requiresLot'],
+        message: 'Un producto que no controla inventario no puede requerir lote',
+      });
+    }
+    if (payload.requiresExpiration === true) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['requiresExpiration'],
+        message: 'Un producto que no controla inventario no puede requerir vencimiento',
+      });
+    }
+  }
+
+  // requiresExpiration=true requires requiresLot=true and controlsInventory=true.
+  if (payload.requiresExpiration === true) {
+    if (payload.requiresLot === false) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['requiresExpiration'],
+        message: 'El seguimiento de vencimiento requiere lotes trazables',
+      });
+    }
+    if (controlsInventory === false) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['requiresExpiration'],
+        message: 'El seguimiento de vencimiento solo aplica a productos con control de inventario',
+      });
+    }
+  }
+
+  // commercialBehavior=STANDARD implies entitlementKind=null.
+  if (commercialBehavior === 'STANDARD') {
+    if (entitlementKind !== undefined && entitlementKind !== null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['entitlementKind'],
+        message: 'Los productos estándar no admiten tipo de derecho comercial',
+      });
+    }
+  }
+
+  // commercialBehavior=ENTITLEMENT implies
+  //   controlsInventory=false, productNature=SERVICE, entitlementKind non-null.
+  if (commercialBehavior === 'ENTITLEMENT') {
+    if (controlsInventory === true) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['controlsInventory'],
+        message: 'Los productos con derecho comercial no controlan inventario',
+      });
+    }
+    if (productNature === 'GOOD') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['productNature'],
+        message: 'Los productos con derecho comercial deben ser de naturaleza SERVICE',
+      });
+    }
+    // Require entitlementKind explicitly on create.
+    // On update, only complain if the caller is setting it to null while behavior=ENTITLEMENT.
+    if (strict) {
+      if (entitlementKind === undefined || entitlementKind === null) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['entitlementKind'],
+          message: 'Los productos con derecho comercial requieren tipo de derecho (subscripción, membresía, afiliación, curso o período de servicio)',
+        });
+      }
+    } else if (has('entitlementKind') && (entitlementKind === null)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['entitlementKind'],
+        message: 'No se puede vaciar el tipo de derecho mientras el producto siga siendo ENTITLEMENT',
+      });
+    }
+  }
+}
+
 const createProductSchema = productFieldsSchema.extend({
   initialLots: z.array(initialLotSchema).default([]),
 }).superRefine((payload, context) => {
@@ -220,6 +385,7 @@ const createProductSchema = productFieldsSchema.extend({
     });
   }
   validatePresentationType(payload, context, true);
+  validateProductCapabilities(payload, context, true);
 });
 
 const updateProductSchema = productFieldsSchema.partial().omit({
@@ -242,6 +408,7 @@ const updateProductSchema = productFieldsSchema.partial().omit({
   }
   // Soft validation: only checks cross-field consistency for fields explicitly provided in the payload.
   validatePresentationType(payload, context, false);
+  validateProductCapabilities(payload, context, false);
 });
 
 const createCategorySchema = z.object({
@@ -312,6 +479,28 @@ const importProductRowSchema = z.object({
   }
 });
 
+const updateProductInventoryConfigSchema = z.object({
+  requiresLot: z.boolean().optional(),
+  requiresExpiration: z.boolean().optional(),
+  lotStrategy: z.enum(['TRACKED', 'SYSTEM', 'NONE']).optional(),
+  allowedWarehouseIds: z.array(z.coerce.bigint()).optional(),
+}).strict().superRefine((payload, context) => {
+  if (payload.requiresExpiration === true && payload.requiresLot === false) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['requiresExpiration'],
+      message: 'El seguimiento de vencimiento requiere lotes trazables',
+    });
+  }
+  if (payload.allowedWarehouseIds && new Set(payload.allowedWarehouseIds.map(String)).size !== payload.allowedWarehouseIds.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['allowedWarehouseIds'],
+      message: 'Las ubicaciones autorizadas no pueden repetirse',
+    });
+  }
+});
+
 const importProductsSchema = z.object({
   rows: z.array(importProductRowSchema).min(1),
 });
@@ -319,10 +508,16 @@ const importProductsSchema = z.object({
 module.exports = {
   createProductSchema,
   updateProductSchema,
+  updateProductInventoryConfigSchema,
   createCategorySchema,
   createSubcategorySchema,
   importProductsSchema,
   productPresentationTypeSchema,
   productNetContentUnitSchema,
+  productNatureSchema,
+  productCommercialBehaviorSchema,
+  productEntitlementKindSchema,
+  productValidityUnitSchema,
+  productBillingIntervalSchema,
 };
 

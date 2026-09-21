@@ -8,6 +8,7 @@ const ORDER_STATUS_LABELS = {
   APPROVED:      { bg: '#D1FAE5', color: '#065F46', label: 'Aprobado' },
   IN_PRODUCTION: { bg: '#DBEAFE', color: '#1E40AF', label: 'En producción' },
   DELIVERED:     { bg: '#E2E8F0', color: '#374151', label: 'Entregado' },
+  FULFILLED:     { bg: '#E0F2FE', color: '#075985', label: 'Completado' },
   CANCELLED:     { bg: '#F1F5F9', color: '#64748B', label: 'Cancelado' },
   REJECTED:      { bg: '#FEE2E2', color: '#991B1B', label: 'Devuelto al agente' },
 };
@@ -73,12 +74,18 @@ function renderOrderRow(order) {
   const isDraft    = order.status === 'DRAFT';
   const isApproved  = order.status === 'APPROVED';
 
-  const itemsSummary = (order.items || []).slice(0, 5).map((item) =>
-    `<div style="display:flex;justify-content:space-between;gap:8px;font-size:0.8rem;padding:2px 0;">
-      <span>${escapeHtml(item.product?.name || 'Producto')}</span>
+  const hasInventoryLines = (order.items || []).some((item) => item.product?.controlsInventory !== false);
+  const hasNonInventoryLines = (order.items || []).some((item) => item.product?.controlsInventory === false);
+  const orderKindBadge = hasInventoryLines && hasNonInventoryLines
+    ? '<span class="badge badge-info" style="margin-left:6px;">Orden mixta</span>'
+    : '';
+  const itemsSummary = (order.items || []).slice(0, 5).map((item) => {
+    const requiresInventory = item.product?.controlsInventory !== false;
+    return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:0.8rem;padding:2px 0;">
+      <span>${escapeHtml(item.product?.name || 'Producto')} <span class="badge">${requiresInventory ? 'Requiere inventario' : 'No requiere inventario'}</span></span>
       <span>${item.quantity} × ${currency(item.unitPrice)}</span>
-    </div>`
-  ).join('');
+    </div>`;
+  }).join('');
   const moreItems = itemCount > 5 ? `<div style="font-size:0.78rem;color:#64748b;">… y ${itemCount - 5} más</div>` : '';
 
   return `
@@ -86,7 +93,7 @@ function renderOrderRow(order) {
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
         <div>
           <strong style="font-size:1rem;">#${escapeHtml(String(order.orderNumber || order.id))}</strong>
-          <span style="margin-left:8px;">${statusBadge(order.status)}</span>
+          <span style="margin-left:8px;">${statusBadge(order.status)}</span>${orderKindBadge}
         </div>
         <span style="font-size:0.82rem;color:#64748b;">${escapeHtml(formatDate(order.createdAt))}</span>
       </div>
