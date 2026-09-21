@@ -401,7 +401,7 @@ test('listInventoryRequests returns serialized array for company', async () => {
   const req2 = buildRequest({ id: 2n, status: 'IN_PROGRESS', type: 'TRANSFER', assignedToUserId: 10n });
 
   return withRepositoryStubs({
-    findAllRequests: async (companyId, filters) => {
+    findAllRequests: async (companyId, _filters) => {
       assert.equal(String(companyId), '7');
       return [req1, req2];
     },

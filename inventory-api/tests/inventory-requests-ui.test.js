@@ -67,7 +67,7 @@ function createRootHarness() {
   const evalScope = { window: { RootShell: rootShell } };
   function evalFile(relPath) {
     const src = readRootFile(relPath);
-    const fn = new Function('window', 'RootShell', src); // eslint-disable-line no-new-func
+    const fn = new Function('window', 'RootShell', src);
     fn.call(evalScope, evalScope.window, rootShell);
   }
 
