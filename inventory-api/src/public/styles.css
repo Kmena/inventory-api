@@ -2879,9 +2879,10 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
   background: #fff;
 }
 
+/* Products master/detail: narrow selector + wide detail workspace */
 .products-workspace-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+  grid-template-columns: 300px 1fr;
   gap: 18px;
   align-items: start;
 }
@@ -2892,11 +2893,175 @@ input[type='file']::file-selector-button:hover { background: #dce6ff; }
 }
 
 .products-detail-card {
-  min-height: 100%;
+  min-height: 300px;
 }
 
+/* Legacy table — kept for fallback but table min-width removed to avoid H-scroll */
 .products-admin-table {
-  min-width: 980px;
+  min-width: unset;
+  width: 100%;
+}
+
+/* ── Product selector (left compact list) ── */
+.products-selector-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.products-selector-status {
+  font-size: 0.78rem;
+  padding: 0 4px 4px;
+}
+
+.products-selector-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.products-selector-item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.products-selector-item:hover {
+  background: #c9cacd;
+  border-color: var(--border);
+}
+
+.products-selector-item:focus-visible {
+  outline: 2px solid var(--primary, #1f6feb);
+  outline-offset: 1px;
+}
+
+.products-selector-item.is-selected {
+  background: #eef5ff;
+  border-color: var(--primary, #1f6feb);
+}
+
+.products-selector-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: black;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.products-selector-code {
+  font-size: 0.74rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Product detail workspace (right wide panel) ── */
+.products-detail-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.products-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.products-detail-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.products-detail-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.products-detail-code {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin: 0;
+  font-family: monospace;
+}
+
+.products-detail-badges {
+  margin-top: 4px;
+}
+
+.products-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.products-detail-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Detail info grid: 4 cols on wide, 2 on medium, 1 on narrow */
+.products-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.products-detail-description {
+  grid-column: 1 / -1;
+}
+
+/* Responsive: tablet */
+@media (max-width: 1100px) {
+  .products-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Responsive: mobile — stack selector and detail vertically */
+@media (max-width: 820px) {
+  .products-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+  .products-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 540px) {
+  .products-detail-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .products-admin-table th {
@@ -5001,6 +5166,12 @@ dialog.root-dialog::backdrop {
     grid-column: 1 / -1;
   }
 
+  .warehouse-main {
+    grid-column: 2;
+    max-width: none;
+    padding: 20px 24px;
+  }
+
   .warehouse-tab-bar {
     top: 56px;
     left: 0;
@@ -5017,4 +5188,186 @@ dialog.root-dialog::backdrop {
     min-height: 72px;
     font-size: 0.65rem;
   }
+}
+
+/* ── Inventory-requests view: table, buttons, modal ─────────────────────── */
+
+.warehouse-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.warehouse-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.warehouse-table th,
+.warehouse-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.warehouse-table th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.warehouse-table td.warehouse-actions {
+  white-space: nowrap;
+}
+
+.warehouse-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--border);
+  color: var(--text);
+}
+
+.warehouse-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--wh-accent);
+  color: #fff;
+  transition: opacity 0.15s;
+}
+
+.warehouse-button:hover:not(:disabled) { opacity: 0.88; }
+.warehouse-button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.warehouse-button.secondary {
+  background: transparent;
+  color: var(--wh-accent);
+  border: 1.5px solid var(--wh-accent);
+}
+
+.warehouse-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.warehouse-input {
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: var(--card);
+  color: var(--text);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.warehouse-input:focus {
+  outline: none;
+  border-color: var(--wh-accent);
+}
+
+.warehouse-action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.warehouse-detail-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  font-size: 0.875rem;
+  margin: 0 0 12px;
+}
+
+.warehouse-detail-list dt {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.warehouse-detail-list dd {
+  margin: 0;
+}
+
+.warehouse-message--success {
+  color: var(--success, #2d7d46);
+  font-size: 0.875rem;
+}
+
+.warehouse-message--error {
+  color: var(--danger);
+  font-size: 0.875rem;
+}
+
+/* Modal backdrop + box */
+.warehouse-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.warehouse-modal {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 24px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.warehouse-modal h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* Adjustment modal — preview + admin note */
+.warehouse-adjustment-preview {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: var(--border);
+  color: var(--text);
+  text-align: center;
+  margin: 0;
+}
+
+.warehouse-adjustment-preview--in {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.warehouse-adjustment-preview--out {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.ir-admin-note {
+  font-style: italic;
+  color: var(--muted);
+  font-size: 0.8rem;
 }

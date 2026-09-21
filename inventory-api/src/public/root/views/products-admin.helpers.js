@@ -140,7 +140,103 @@
   }
 
   function resolveInventoryVisible(product) {
+    if (typeof product?.controlsInventory === 'boolean') {
+      return product.controlsInventory;
+    }
     return typeof product?.quantity !== 'undefined' || typeof product?.reservedQuantity !== 'undefined';
+  }
+
+  const BUSINESS_PRESETS = Object.freeze({
+    PHYSICAL_GOOD: {
+      label: 'Producto físico inventariable',
+      description: 'Requiere stock, lotes o ubicación según su configuración.',
+      productNature: 'PHYSICAL',
+      controlsInventory: true,
+      commercialBehavior: 'ONE_TIME',
+      entitlementKind: null,
+    },
+    SERVICE: {
+      label: 'Servicio',
+      description: 'Se vende sin stock, lote, ubicación, reserva ni despacho de inventario.',
+      productNature: 'SERVICE',
+      controlsInventory: false,
+      commercialBehavior: 'ONE_TIME',
+      entitlementKind: null,
+    },
+    SUBSCRIPTION: {
+      label: 'Suscripción',
+      description: 'Activa derechos comerciales sin efectos de inventario.',
+      productNature: 'SUBSCRIPTION',
+      controlsInventory: false,
+      commercialBehavior: 'ENTITLEMENT',
+      entitlementKind: 'SUBSCRIPTION',
+    },
+    MEMBERSHIP: {
+      label: 'Membresía',
+      description: 'Activa membresía del cliente sin inventario físico.',
+      productNature: 'MEMBERSHIP',
+      controlsInventory: false,
+      commercialBehavior: 'ENTITLEMENT',
+      entitlementKind: 'MEMBERSHIP',
+    },
+    DIGITAL_ACCESS: {
+      label: 'Acceso digital',
+      description: 'Entrega acceso digital sin stock ni lote.',
+      productNature: 'DIGITAL',
+      controlsInventory: false,
+      commercialBehavior: 'ENTITLEMENT',
+      entitlementKind: 'DIGITAL_ACCESS',
+    },
+    DIGITAL_LICENSE: {
+      label: 'Licencia digital',
+      description: 'Entrega licencia digital sin inventario físico.',
+      productNature: 'DIGITAL',
+      controlsInventory: false,
+      commercialBehavior: 'ENTITLEMENT',
+      entitlementKind: 'LICENSE',
+    },
+  });
+
+  function getBusinessPreset(product) {
+    const productNature = product?.productNature || 'PHYSICAL';
+    const controlsInventory = typeof product?.controlsInventory === 'boolean' ? product.controlsInventory : true;
+    const commercialBehavior = product?.commercialBehavior || 'ONE_TIME';
+    const entitlementKind = product?.entitlementKind || null;
+    const match = Object.entries(BUSINESS_PRESETS).find(([_key, preset]) => (
+      preset.productNature === productNature
+      && preset.controlsInventory === controlsInventory
+      && preset.commercialBehavior === commercialBehavior
+      && (preset.entitlementKind || null) === entitlementKind
+    ));
+    return match ? match[0] : (controlsInventory ? 'PHYSICAL_GOOD' : 'SERVICE');
+  }
+
+  function getBusinessPresetOptions() {
+    return Object.entries(BUSINESS_PRESETS).map(([value, preset]) => ({ value, ...preset }));
+  }
+
+  function getBusinessPresetDefinition(value) {
+    return BUSINESS_PRESETS[value] || BUSINESS_PRESETS.PHYSICAL_GOOD;
+  }
+
+  function getProductNatureLabel(product) {
+    const labels = {
+      PHYSICAL: 'Producto físico',
+      SERVICE: 'Servicio',
+      SUBSCRIPTION: 'Suscripción',
+      MEMBERSHIP: 'Membresía',
+      DIGITAL: 'Digital',
+    };
+    return labels[product?.productNature] || 'Producto físico';
+  }
+
+  function getCommercialBehaviorLabel(product) {
+    const labels = {
+      ONE_TIME: 'Venta única',
+      RECURRING: 'Recurrente',
+      ENTITLEMENT: 'Derecho / acceso',
+    };
+    return labels[product?.commercialBehavior] || 'Venta única';
   }
 
   function buildProductsMetrics(items, categories) {
@@ -179,6 +275,7 @@
     // Desmarcado o ausente => null/undefined => false.
     // La casilla viene marcada por defecto en el HTML del formulario.
     const inCatalog = formData.get('inCatalog') === 'on';
+    const businessPreset = getBusinessPresetDefinition(String(formData.get('businessPreset') || 'PHYSICAL_GOOD'));
 
     // netContentUnit es el campo de unidad del producto (siempre requerido en el form).
     // Se usa también como `unit` para mantener compatibilidad con el resto del sistema
@@ -194,9 +291,22 @@
       currency: currency || undefined,
       price: parseOptionalNumber(formData.get('price')),
       minStock: parseOptionalNumber(formData.get('minStock')),
-      maxStock: parseOptionalNumber(formData.get('maxStock')),
+      maxStock: businessPreset.controlsInventory ? parseOptionalNumber(formData.get('maxStock')) : undefined,
       inCatalog,
+      productNature: businessPreset.productNature,
+      controlsInventory: businessPreset.controlsInventory,
+      commercialBehavior: businessPreset.commercialBehavior,
+      entitlementKind: businessPreset.entitlementKind,
     };
+
+    if (!businessPreset.controlsInventory) {
+      payload.minStock = 0;
+      payload.maxStock = 0;
+      payload.requiresLot = false;
+      payload.requiresExpiration = false;
+      payload.lotStrategy = 'SYSTEM';
+      payload.allowedWarehouseIds = [];
+    }
 
     // netContentUnit siempre se envía (el campo es obligatorio en el form).
     if (rawNetContentUnit) payload.netContentUnit = rawNetContentUnit;
@@ -308,7 +418,12 @@
     formatCurrency,
     formatNumber,
     getAllSubcategories,
+    getBusinessPreset,
+    getBusinessPresetDefinition,
+    getBusinessPresetOptions,
     getCategoryTypeLabel,
+    getCommercialBehaviorLabel,
+    getProductNatureLabel,
     hasActiveFilters,
     normalizeProductsResponse,
     resolveInventoryVisible,

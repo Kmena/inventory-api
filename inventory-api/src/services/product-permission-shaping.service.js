@@ -16,6 +16,32 @@ function decorateWarehouseLotStock(stock) {
   };
 }
 
+/**
+ * Adds the derived `inventoryApplicability` field required by the master plan
+ * so the frontend can safely render "No aplica" for products that do not
+ * control inventory. See
+ * specs/non-physical-products-mvp/api-contracts.md §1 and
+ * specs/inventori-product-inventory-master-plan/integration-gates.md
+ * CHECKPOINT A / CHECKPOINT I.
+ *
+ * The field is derived — never persisted — so it can be recomputed safely on
+ * every read without a migration.
+ *
+ * @param {any} product - Product row already enriched with warehouseLotStocks.
+ * @returns {any} Product with `inventoryApplicability` populated.
+ */
+function withInventoryApplicability(product) {
+  if (!product) return product;
+  if (Object.prototype.hasOwnProperty.call(product, 'inventoryApplicability')) {
+    return product;
+  }
+  const controlsInventory = product.controlsInventory !== false;
+  return {
+    ...product,
+    inventoryApplicability: controlsInventory ? 'APPLIES' : 'NOT_APPLICABLE',
+  };
+}
+
 function serializeProductForPermissions(product, auth) {
   if (!product) return product;
   const enrichedProduct = Array.isArray(product.warehouseLotStocks)
@@ -24,7 +50,8 @@ function serializeProductForPermissions(product, auth) {
         warehouseLotStocks: product.warehouseLotStocks.map(decorateWarehouseLotStock),
       }
     : product;
-  if (hasPermission(auth, 'inventory.view', 'inventory.manage')) return enrichedProduct;
+  const productWithApplicability = withInventoryApplicability(enrichedProduct);
+  if (hasPermission(auth, 'inventory.view', 'inventory.manage')) return productWithApplicability;
   const {
     quantity: _quantity,
     reservedQuantity: _reservedQuantity,
@@ -34,7 +61,7 @@ function serializeProductForPermissions(product, auth) {
     warehouseStocks: _warehouseStocks,
     warehouseLotStocks: _warehouseLotStocks,
     ...catalogProduct
-  } = enrichedProduct;
+  } = productWithApplicability;
   return catalogProduct;
 }
 

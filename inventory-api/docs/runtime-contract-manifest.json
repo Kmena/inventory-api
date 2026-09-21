@@ -659,6 +659,69 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "me-change-password-outside-current-openapi-baseline",
       "reason": "users-account-self-service feature: Cambio de contraseña propia del usuario autenticado. El endpoint usa req.auth.sub exclusivamente; no acepta userId externo. Excluido del contrato OpenAPI parcial hasta que se extienda el baseline con la familia /api/me/."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/inventory",
+      "expressPath": "/requests",
+      "routeFile": "src/routes/inventory.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventory-requests-outside-current-openapi-baseline",
+      "reason": "inventory-requests spec: Creación de solicitudes de movimiento admin→bodega (ADJUSTMENT/TRANSFER). Ruta activa en runtime protegida por inventory.manage. Excluida del contrato OpenAPI parcial hasta formalización del spec."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/inventory",
+      "expressPath": "/requests",
+      "routeFile": "src/routes/inventory.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventory-requests-outside-current-openapi-baseline",
+      "reason": "inventory-requests spec: Listado de solicitudes de movimiento. Ruta activa en runtime protegida por inventory.manage/view/requests.execute. Excluida del contrato OpenAPI parcial hasta formalización."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/inventory",
+      "expressPath": "/requests/:id",
+      "routeFile": "src/routes/inventory.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventory-requests-outside-current-openapi-baseline",
+      "reason": "inventory-requests spec: Detalle de solicitud de movimiento. Ruta activa en runtime protegida por inventory.manage. Excluida del contrato OpenAPI parcial."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/inventory",
+      "expressPath": "/requests/:id/cancel",
+      "routeFile": "src/routes/inventory.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventory-requests-outside-current-openapi-baseline",
+      "reason": "inventory-requests spec: Cancelación de solicitud pendiente por el admin. Ruta activa protegida por inventory.manage. Excluida del contrato OpenAPI parcial."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/inventory",
+      "expressPath": "/requests/:id/pickup",
+      "routeFile": "src/routes/inventory.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventory-requests-outside-current-openapi-baseline",
+      "reason": "inventory-requests spec: Confirmación de pickup del operador (TRANSFER: PENDING→IN_PROGRESS). Ruta activa protegida por inventory.requests.execute. Excluida del contrato OpenAPI parcial."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/inventory",
+      "expressPath": "/requests/:id/execute",
+      "routeFile": "src/routes/inventory.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventory-requests-outside-current-openapi-baseline",
+      "reason": "inventory-requests spec: Ejecución de solicitud (ADJUSTMENT/TRANSFER → COMPLETED). Ruta activa protegida por inventory.requests.execute. Excluida del contrato OpenAPI parcial."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/inventory",
+      "expressPath": "/requests/:id/confirm-delivery",
+      "routeFile": "src/routes/inventory.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventory-requests-outside-current-openapi-baseline",
+      "reason": "inventory-requests spec: Confirmación de entrega física (TRANSFER: IN_PROGRESS→DELIVERED). Ruta activa protegida por inventory.requests.execute. Excluida del contrato OpenAPI parcial."
     }
   ]
 }

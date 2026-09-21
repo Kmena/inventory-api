@@ -117,30 +117,45 @@
     includeInRootNav: false,
     dependencyTag: 'inventory-admin-views',
   });
+  const inventoryItem = createRouteItem({
+    id: 'inventory',
+    label: 'Inventario',
+    routeKey: 'inventory',
+    href: '/root/#inventory',
+    implemented: true,
+    activeMatchers: ['inventory', 'lots', 'movements'],
+    visibilityRule: isProcurementOrAdmin,
+    actorScope: 'company-admin',
+    icon: 'boxes',
+    includeInRootNav: false,
+    dependencyTag: 'inventory-ux-mvp',
+  });
   const lotsItem = createRouteItem({
     id: 'lots',
     label: 'Lotes',
     routeKey: 'lots',
-    href: '/root/#lots',
+    href: '/root/#inventory?tab=lots',
     implemented: true,
     activeMatchers: ['lots'],
     visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'layers-3',
     includeInRootNav: false,
+    includeInLanding: false,
     dependencyTag: 'inventory-admin-views',
   });
   const movementsItem = createRouteItem({
     id: 'movements',
     label: 'Movimientos',
     routeKey: 'movements',
-    href: '/root/#movements',
+    href: '/root/#inventory?tab=history',
     implemented: true,
     activeMatchers: ['movements'],
     visibilityRule: isProcurementOrAdmin,
     actorScope: 'company-admin',
     icon: 'arrow-left-right',
     includeInRootNav: false,
+    includeInLanding: false,
     dependencyTag: 'inventory-admin-views',
   });
   // Legacy standalone — kept for routing backward-compat (sidebar replaced by produccion-group)
@@ -336,11 +351,11 @@
   const purchasesItem = createAdminPendingEntry('purchases', 'Compras', 'shopping-bag');
   const warehousesItem = createRouteItem({
     id: 'warehouses',
-    label: 'Bodegas',
+    label: 'Ubicaciones',
     routeKey: 'warehouses',
     href: '/root/#warehouses',
     implemented: true,
-    activeMatchers: ['warehouses'],
+    activeMatchers: ['warehouses', 'locations'],
     visibilityRule: guards.isCompanyAdmin,
     actorScope: 'company-admin',
     icon: 'warehouse',
@@ -425,6 +440,7 @@
     feedbackItem,
     adminHomeItem,
     productsItem,
+    inventoryItem,
     lotsItem,
     movementsItem,
     // Legacy standalone kept for routing backward-compat (replaced in sidebar by produccion-group)
@@ -482,10 +498,8 @@
           visibilityRule: isProcurementOrAdmin,
           actorScope: 'company-admin',
           items: [
-            { type: 'item', ...warehousesItem },
             { type: 'item', ...productsItem },
-            { type: 'item', ...lotsItem },
-            { type: 'item', ...movementsItem },
+            { type: 'item', ...inventoryItem },
           ],
         },
         // TASK-016: produccion-group (replaces standalone productionItem in sidebar)
@@ -553,6 +567,7 @@
       entries: [
         { type: 'item', ...usersItem },
         { type: 'item', ...rolesPermissionsItem },
+        { type: 'item', ...warehousesItem },
         { type: 'item', ...settingsItem },
       ],
     },

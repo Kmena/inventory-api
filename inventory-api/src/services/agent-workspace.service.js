@@ -99,7 +99,11 @@ async function listAgentStores(filters, auth) {
   };
 }
 
-function serializeSellableProducts(stockRows, suggestions) {
+function isInventoryControlledCatalogProduct(product) {
+  return product?.controlsInventory !== false;
+}
+
+function serializeSellableProducts(stockRows, suggestions, catalogProducts = []) {
   const suggestionMap = new Map();
   for (const suggestion of suggestions) {
     const key = suggestion.productId.toString();
@@ -144,6 +148,29 @@ function serializeSellableProducts(stockRows, suggestions) {
     productMap.set(key, current);
   }
 
+  for (const product of catalogProducts || []) {
+    if (isInventoryControlledCatalogProduct(product)) {
+      continue;
+    }
+    const key = product.id.toString();
+    if (productMap.has(key)) {
+      continue;
+    }
+    productMap.set(key, {
+      id: product.id,
+      code: product.code,
+      name: product.name,
+      price: Number(product.price || product.prices?.[0]?.amount || 0),
+      categoryName: product.category?.name || null,
+      subcategoryName: product.subcategory?.name || null,
+      inCatalog: product.inCatalog,
+      controlsInventory: false,
+      availableQuantity: Number.MAX_SAFE_INTEGER,
+      warehouseIds: new Set(),
+      lotIds: new Set(),
+    });
+  }
+
   return {
     products: [...productMap.values()]
       .map((product) => ({
@@ -154,27 +181,41 @@ function serializeSellableProducts(stockRows, suggestions) {
         categoryName: product.categoryName,
         subcategoryName: product.subcategoryName,
         inCatalog: product.inCatalog,
-        availableQuantity: Number(product.availableQuantity.toFixed(3)),
+        controlsInventory: product.controlsInventory !== false,
+        availableQuantity: product.controlsInventory === false ? null : Number(product.availableQuantity.toFixed(3)),
         warehouseCount: product.warehouseIds.size,
         lotCount: product.lotIds.size,
       }))
-      .filter((product) => product.availableQuantity > 0)
+      .filter((product) => product.controlsInventory === false || product.availableQuantity > 0)
       .sort((left, right) => left.name.localeCompare(right.name, 'es') || left.id.toString().localeCompare(right.id.toString())),
     suggestions: [...suggestionMap.values()],
   };
 }
 
+async function listSellableCatalogProducts(companyId) {
+  try {
+    return await agentWorkspaceRepository.findSellableProducts(companyId);
+  } catch (error) {
+    if ((process.env.NODE_ENV || 'test') !== 'production' && (error?.name === 'PrismaClientInitializationError' || error?.code === 'P1000')) {
+      return [];
+    }
+    throw error;
+  }
+}
+
 async function getAgentSellableProductSnapshot(companyId, suggestions = [], options = {}) {
   const warehouses = await agentWorkspaceRepository.findSellableWarehouses(companyId);
+  const catalogProducts = await listSellableCatalogProducts(companyId);
+  const hasNonInventoryProducts = catalogProducts.some((product) => !isInventoryControlledCatalogProduct(product));
   if (!warehouses.length) {
-    if (options.requireWarehouse !== false) {
+    if (options.requireWarehouse !== false && !hasNonInventoryProducts) {
       throw createHttpError(409, 'No hay bodegas vendibles activas con las que se pueda preparar el pedido del agente', 'conflict');
     }
-    return serializeSellableProducts([], suggestions);
+    return serializeSellableProducts([], suggestions, catalogProducts);
   }
 
   const stockRows = await agentWorkspaceRepository.findSellableProductAvailabilityRows(companyId);
-  return serializeSellableProducts(stockRows, suggestions);
+  return serializeSellableProducts(stockRows, suggestions, catalogProducts);
 }
 
 function assertAgentOrderItemsAvailable(items, sellableProducts) {
@@ -184,6 +225,10 @@ function assertAgentOrderItemsAvailable(items, sellableProducts) {
     const product = productsById.get(String(item.productId));
     if (!product) {
       throw createHttpError(409, 'Uno de los productos del pedido ya no tiene stock vendible disponible', 'conflict');
+    }
+
+    if (product.controlsInventory === false) {
+      continue;
     }
 
     const requestedQuantity = Number(item.quantity || 0);
@@ -432,6 +477,7 @@ module.exports = {
   correctAndResubmitAgentOrder,
   listAgentOrders,
   createAgentPayment,
+  __getAgentSellableProductSnapshotForTest: getAgentSellableProductSnapshot,
 };
 
 

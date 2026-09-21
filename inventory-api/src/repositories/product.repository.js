@@ -116,6 +116,14 @@ function findCompanyWarehousesByIds(companyId, warehouseIds, db = prisma) {
   });
 }
 
+function findProductInventoryEvidence(companyId, productId, db = prisma) {
+  return Promise.all([
+    db.warehouseStock.findMany({ where: { productId, warehouse: { companyId } }, include: { warehouse: true } }),
+    db.warehouseLotStock.findMany({ where: { productId, warehouse: { companyId }, quantity: { gt: 0 } }, include: { lot: true, warehouse: true } }),
+    db.stockMovement.count({ where: { companyId, productId } }),
+  ]).then(([stocks, lotStocks, movementCount]) => ({ stocks, lotStocks, movementCount }));
+}
+
 function findCompanySuppliersByIds(companyId, supplierIds, db = prisma) {
   return db.supplier.findMany({
     where: {
@@ -257,6 +265,7 @@ module.exports = {
   findProductsByIds,
   findInventoryByCompanyId,
   findCompanyWarehousesByIds,
+  findProductInventoryEvidence,
   findCompanySuppliersByIds,
   findActiveCategoriesByInventoryId,
   findActiveCategoriesWithSubcategories,

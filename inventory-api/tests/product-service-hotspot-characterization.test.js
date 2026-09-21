@@ -133,6 +133,16 @@ test('updateProduct routes the final mutation through the company-scoped reposit
       inCatalog: true,
       lotStrategy: 'TRACKED',
       kgConversionFactor: 1,
+      // MASTER-002 (Product capability foundation): capability fields are now
+      // part of the persisted write shape. Existing physical Products keep
+      // conservative defaults (GOOD / controlsInventory=true / STANDARD).
+      productNature: 'GOOD',
+      controlsInventory: true,
+      commercialBehavior: 'STANDARD',
+      entitlementKind: null,
+      defaultValidityCount: null,
+      defaultValidityUnit: null,
+      billingInterval: null,
     },
     receivedTx: tx,
   });

@@ -10,8 +10,8 @@
     return `
       <section class="root-hero" aria-labelledby="root-view-title">
         <p class="eyebrow">Inventario</p>
-        <h2 id="root-view-title">Bodegas</h2>
-        <p class="muted">Consulta y crea bodegas de la empresa sin prometer flujos de stock o movimientos que aun no estan soportados.</p>
+        <h2 id="root-view-title">Ubicaciones</h2>
+        <p class="muted">Configura los lugares donde puede existir stock fisico. Las ubicaciones virtuales heredadas no representan servicios nuevos.</p>
       </section>
 
       <section class="routes-page warehouses-page" id="warehouses-page">
@@ -21,12 +21,12 @@
         <article class="card root-card warehouses-workspace">
           <div class="page-header warehouses-header">
             <div>
-              <h3>Bodegas de la empresa</h3>
+              <h3>Ubicaciones de la empresa</h3>
               <p id="warehouses-list-summary" class="muted">Carga la configuracion operativa disponible para inventario.</p>
             </div>
             <div class="action-row compact-action-row">
               <button id="warehouses-refresh-button" class="secondary-button" type="button">Actualizar</button>
-              <button id="warehouses-open-create-button" type="button">Nueva bodega</button>
+              <button id="warehouses-open-create-button" type="button">Nueva ubicacion</button>
             </div>
           </div>
 
@@ -40,6 +40,7 @@
           </div>
 
           <div id="warehouses-list-region" aria-live="polite"></div>
+          <div id="warehouses-detail-region" aria-live="polite"></div>
         </article>
       </section>
 
@@ -47,8 +48,8 @@
         <form id="warehouses-create-form" class="root-form" method="dialog" novalidate>
           <div class="page-header">
             <div>
-              <h3>Nueva bodega</h3>
-              <p class="muted">Crea una bodega para organizar inventario por tipo y uso operativo.</p>
+              <h3>Nueva ubicacion</h3>
+              <p class="muted">Crea una ubicacion para organizar inventario fisico por tipo y uso operativo.</p>
             </div>
             <button id="warehouses-close-create-button" class="secondary-button" type="button">Cerrar</button>
           </div>
@@ -58,7 +59,7 @@
             <div class="root-form-grid">
               <label><span>Codigo *</span><input id="warehouses-create-code" name="code" type="text" required minlength="2" maxlength="40" /></label>
               <label><span>Nombre *</span><input name="name" type="text" required minlength="2" maxlength="120" /></label>
-              <label class="field-wide"><span>Tipo de bodega *</span><select id="warehouses-create-type" name="warehouseType" required></select></label>
+              <label class="field-wide"><span>Tipo de ubicacion *</span><select id="warehouses-create-type" name="warehouseType" required></select></label>
               <div class="field-wide" id="warehouses-type-helper"></div>
               <label><span>Fuente vendible</span><input id="warehouses-create-sellable" name="isSellableSource" type="checkbox" /></label>
               <label><span>Activa</span><input name="isActive" type="checkbox" checked /></label>
@@ -66,7 +67,7 @@
           </fieldset>
           <div id="warehouses-adjustment-message"></div>
           <div class="action-row">
-            <button id="warehouses-create-submit-button" type="submit">Crear bodega</button>
+            <button id="warehouses-create-submit-button" type="submit">Crear ubicacion</button>
             <button id="warehouses-create-cancel-button" class="secondary-button" type="button">Cancelar</button>
           </div>
         </form>
@@ -80,6 +81,7 @@
     const pageMessage = /** @type {HTMLElement | null} */ (container.querySelector('#warehouses-page-message'));
     const listSummary = /** @type {HTMLElement | null} */ (container.querySelector('#warehouses-list-summary'));
     const listRegion = /** @type {HTMLElement | null} */ (container.querySelector('#warehouses-list-region'));
+    const detailRegion = /** @type {HTMLElement | null} */ (container.querySelector('#warehouses-detail-region'));
     const searchInput = /** @type {HTMLInputElement | null} */ (container.querySelector('#warehouses-search-input'));
     const typeFilter = /** @type {HTMLSelectElement | null} */ (container.querySelector('#warehouses-type-filter'));
     const statusFilter = /** @type {HTMLSelectElement | null} */ (container.querySelector('#warehouses-status-filter'));
@@ -100,7 +102,7 @@
     const submitButton = /** @type {HTMLButtonElement | null} */ (container.querySelector('#warehouses-create-submit-button'));
     const codeInput = /** @type {HTMLInputElement | null} */ (container.querySelector('#warehouses-create-code'));
 
-    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !searchInput || !typeFilter || !statusFilter || !natureFilter || !sellableFilter || !clearFiltersButton || !refreshButton || !openCreateButton || !dialog || !form || !formMessage || !adjustmentMessage || !typeHelper || !typeInput || !sellableInput || !closeButton || !cancelButton || !submitButton || !codeInput) {
+    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !detailRegion || !searchInput || !typeFilter || !statusFilter || !natureFilter || !sellableFilter || !clearFiltersButton || !refreshButton || !openCreateButton || !dialog || !form || !formMessage || !adjustmentMessage || !typeHelper || !typeInput || !sellableInput || !closeButton || !cancelButton || !submitButton || !codeInput) {
       return;
     }
 
@@ -113,13 +115,14 @@
       warehouseTypes: [],
     };
     let filters = warehousesHelpers.createDefaultFilters();
+    let selectedWarehouseId = null;
     let loading = false;
 
     function syncCreateButtonVisibility() {
       openCreateButton.hidden = !canCreate;
       openCreateButton.disabled = !canCreate;
       if (!canCreate) {
-        openCreateButton.title = 'Necesitas permiso de gestion de inventario para crear bodegas.';
+        openCreateButton.title = 'Necesitas permiso de gestion de inventario para crear ubicaciones.';
       }
     }
 
@@ -150,23 +153,27 @@
 
       if (!dataset.items.length && !loading) {
         listRegion.innerHTML = warehousesRenderers.renderWarehouseState(
-          canCreate ? 'Todavia no hay bodegas registradas' : 'Todavia no hay bodegas registradas para esta empresa.',
+          canCreate ? 'Todavia no hay ubicaciones registradas' : 'Todavia no hay ubicaciones registradas para esta empresa.',
           canCreate
-            ? 'Crea la primera bodega de la empresa para empezar a organizar el inventario.'
-            : 'Todavia no hay bodegas registradas para esta empresa.'
+            ? 'Crea la primera ubicación de la empresa para empezar a organizar el inventario.'
+            : 'Todavia no hay ubicaciones registradas para esta empresa.'
         );
+        detailRegion.innerHTML = warehousesRenderers.renderWarehouseDetail(null, canCreate);
         return;
       }
 
       if (!visibleItems.length && !loading) {
         listRegion.innerHTML = warehousesRenderers.renderWarehouseState(
           'No hay resultados con los filtros actuales',
-          'Prueba con otro termino de busqueda o limpia los filtros para ver mas bodegas.'
+          'Prueba con otro termino de busqueda o limpia los filtros para ver mas ubicaciones.'
         );
+        detailRegion.innerHTML = warehousesRenderers.renderWarehouseDetail(null, canCreate);
         return;
       }
 
       listRegion.innerHTML = warehousesRenderers.renderWarehousesTable(visibleItems);
+      const selectedWarehouse = visibleItems.find((item) => String(item.id) === String(selectedWarehouseId)) || null;
+      detailRegion.innerHTML = warehousesRenderers.renderWarehouseDetail(selectedWarehouse, canCreate);
     }
 
     function renderForbiddenState() {
@@ -176,6 +183,7 @@
         'No tienes acceso a esta vista',
         'Necesitas permisos de inventario para consultar las bodegas de la empresa.'
       );
+      detailRegion.innerHTML = '';
     }
 
     function resetCreateForm() {
@@ -297,7 +305,58 @@
     });
 
     refreshButton.addEventListener('click', async () => {
-      await loadWarehouses({ loadingMessage: 'Actualizando bodegas...' });
+      await loadWarehouses({ loadingMessage: 'Actualizando ubicaciones...' });
+    });
+
+    listRegion.addEventListener('click', async (event) => {
+      const trigger = event.target instanceof globalScope.HTMLElement ? event.target.closest('[data-warehouse-detail]') : null;
+      if (!(trigger instanceof globalScope.HTMLElement)) return;
+      selectedWarehouseId = trigger.getAttribute('data-warehouse-detail');
+      try {
+        const detail = await warehousesApi.getCompanyWarehouse(session, selectedWarehouseId);
+        const index = dataset.items.findIndex((item) => String(item.id) === String(selectedWarehouseId));
+        if (index >= 0) dataset.items[index] = { ...dataset.items[index], ...detail };
+      } catch (_error) {
+        // Degrade to list snapshot if detail endpoint fails; backend validation still protects edits.
+      }
+      renderCurrentState();
+    });
+
+    detailRegion.addEventListener('click', async (event) => {
+      const trigger = event.target instanceof globalScope.HTMLElement ? event.target.closest('[data-warehouse-toggle-status]') : null;
+      if (!(trigger instanceof globalScope.HTMLElement) || !canCreate) return;
+      const warehouseId = trigger.getAttribute('data-warehouse-toggle-status');
+      const isActive = trigger.getAttribute('data-next-active') === 'true';
+      try {
+        await warehousesApi.updateCompanyWarehouseStatus(session, warehouseId, { isActive });
+        await loadWarehouses({ loadingMessage: 'Actualizando ubicación...' });
+        pageMessage.innerHTML = rootShellUi.renderInlineMessage(isActive ? 'Ubicación activada correctamente.' : 'Ubicación desactivada correctamente.');
+      } catch (error) {
+        pageMessage.innerHTML = rootShellUi.renderInlineMessage(error.message || 'No se pudo actualizar el estado de la ubicación.', 'error');
+      }
+    });
+
+    detailRegion.addEventListener('submit', async (event) => {
+      const editForm = event.target;
+      if (!(editForm instanceof globalScope.HTMLFormElement) || editForm.id !== 'warehouses-edit-form' || !canCreate) return;
+      event.preventDefault();
+      if (!editForm.reportValidity()) return;
+      const warehouseId = editForm.getAttribute('data-warehouse-id');
+      const formData = new globalScope.FormData(editForm);
+      const current = dataset.items.find((item) => String(item.id) === String(warehouseId));
+      try {
+        await warehousesApi.updateCompanyWarehouse(session, warehouseId, {
+          code: String(formData.get('code') || '').trim(),
+          name: String(formData.get('name') || '').trim(),
+          warehouseType: current?.warehouseType,
+          isSellableSource: current?.isVirtual ? false : formData.get('isSellableSource') === 'on',
+          isActive: formData.get('isActive') === 'on',
+        });
+        await loadWarehouses({ loadingMessage: 'Actualizando ubicación...' });
+        pageMessage.innerHTML = rootShellUi.renderInlineMessage('Ubicación actualizada correctamente.');
+      } catch (error) {
+        pageMessage.innerHTML = rootShellUi.renderInlineMessage(error.message || 'No se pudo actualizar la ubicación.', 'error');
+      }
     });
 
     openCreateButton.addEventListener('click', openCreateDialog);

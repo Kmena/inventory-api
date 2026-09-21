@@ -103,7 +103,11 @@ test('listProducts preserves permission-aware serialization inside paginated res
   );
 
   assert.deepEqual(result, {
-    items: [{ id: 1n, name: 'Producto A' }],
+    // MASTER-002 (Product capability foundation) — the paginated list now
+    // exposes the derived inventoryApplicability so the frontend can render
+    // "No aplica" for non-inventory Products. See
+    // specs/non-physical-products-mvp/api-contracts.md §1.
+    items: [{ id: 1n, name: 'Producto A', inventoryApplicability: 'APPLIES' }],
     pagination: {
       page: 1,
       pageSize: 25,

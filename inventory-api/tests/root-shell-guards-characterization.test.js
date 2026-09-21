@@ -149,6 +149,7 @@ function createRouterHarness() {
   browserWindow.RootShell.register('views.routesAdmin', createView('routes-view'));
   browserWindow.RootShell.register('views.warehousesAdmin', createView('warehouses-view'));
   browserWindow.RootShell.register('views.productsAdmin', createView('products-view'));
+  browserWindow.RootShell.register('views.inventoryAdmin', createView('inventory-view'));
   browserWindow.RootShell.register('views.lotsAdmin', createView('lots-view'));
   browserWindow.RootShell.register('views.movementsAdmin', createView('movements-view'));
   browserWindow.RootShell.register('views.recipesAdmin', createView('recipes-view'));

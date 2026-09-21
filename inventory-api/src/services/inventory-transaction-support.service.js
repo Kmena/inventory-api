@@ -16,6 +16,20 @@ function number(value) {
   return Number(value || 0);
 }
 
+function isInventoryControlledProduct(product) {
+  return product?.controlsInventory !== false;
+}
+
+function usesSystemLotStrategy(product) {
+  return isInventoryControlledProduct(product) && product?.lotStrategy === 'SYSTEM';
+}
+
+function assertInventoryApplies(product) {
+  if (!isInventoryControlledProduct(product)) {
+    throw createHttpError(409, 'Inventario no aplica para este producto', 'inventory_not_applicable');
+  }
+}
+
 async function getInventoryContext(tx, auth, warehouseId, productId, options = {}) {
   const { companyId, userId } = authScope(auth);
   const { inventory, warehouse, product } = await inventoryRepository.loadInventoryContext(
@@ -32,8 +46,51 @@ async function getInventoryContext(tx, auth, warehouseId, productId, options = {
     throw createHttpError(409, 'La bodega no esta habilitada como fuente de venta', 'conflict');
   }
   if (!product) throw createHttpError(404, 'Producto no encontrado para la empresa', 'not_found');
+  if (options.requireInventory !== false) {
+    assertInventoryApplies(product);
+  }
+  if (options.enforceAllowedWarehouse !== false) {
+    assertProductAllowedAtWarehouse(product, warehouse);
+  }
 
   return { companyId, userId, inventory, warehouse, product };
+}
+
+function assertProductAllowedAtWarehouse(product, warehouse) {
+  const allowedWarehouses = product?.allowedWarehouses || [];
+  if (!Array.isArray(allowedWarehouses) || allowedWarehouses.length === 0) {
+    return;
+  }
+
+  const warehouseId = warehouse?.id?.toString();
+  const isAllowed = allowedWarehouses.some((allowed) => allowed.warehouseId?.toString() === warehouseId);
+  if (!isAllowed) {
+    throw createHttpError(409, 'El producto no esta autorizado para operar en esta ubicacion', 'location_not_allowed');
+  }
+}
+
+async function getOrCreateSystemLot(tx, context, quantity = 0) {
+  if (!usesSystemLotStrategy(context.product)) {
+    throw createHttpError(400, 'El producto no usa lote de sistema', 'validation_error');
+  }
+
+  const existing = await inventoryRepository.findSystemLot(
+    context.companyId,
+    context.product.id,
+    context.warehouse.id,
+    tx,
+  );
+  if (existing) {
+    return existing;
+  }
+
+  return inventoryRepository.createSystemLot(
+    context.companyId,
+    context.product.id,
+    context.warehouse.id,
+    quantity,
+    tx,
+  );
 }
 
 async function changeWarehouseStock(tx, context, quantityDelta = 0, reservedDelta = 0) {
@@ -187,6 +244,12 @@ function sortLotsByFefo(items) {
 }
 
 async function reserveLots(tx, context, quantity) {
+  if (usesSystemLotStrategy(context.product)) {
+    const lot = await getOrCreateSystemLot(tx, context, 0);
+    const changed = await changeLotStock(tx, context, lot, 0, quantity);
+    return [{ lot, quantity, lotStock: changed.record }];
+  }
+
   const rawCandidates = await inventoryRepository.findReservableLotStocks(
     context.warehouse.id,
     context.product.id,
@@ -249,7 +312,12 @@ async function getActiveAllocations(tx, order) {
 module.exports = {
   authScope,
   number,
+  isInventoryControlledProduct,
+  usesSystemLotStrategy,
+  assertInventoryApplies,
   getInventoryContext,
+  assertProductAllowedAtWarehouse,
+  getOrCreateSystemLot,
   changeWarehouseStock,
   changeLotStock,
   createMovement,

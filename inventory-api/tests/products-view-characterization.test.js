@@ -93,16 +93,27 @@ test('products state/renderers expose summary, responsive markup and category li
   ], [{ id: 3, name: 'Bebidas', categoryType: 'PT', subcategories: [{ id: 10, name: 'Shampoo' }] }]);
   assert.match(metricsMarkup, /Bajo stock en pagina/);
 
+  // renderProductsTable now renders a compact selector list (no horizontal-scrolling table).
   const tableMarkup = renderers.renderProductsTable([
     { id: 1, code: 'PT-01', name: 'Producto demo', category: { name: 'Bebidas' }, price: 1000, currency: 'CRC', isActive: true, quantity: 4, reservedQuantity: 1 },
   ], '1');
-  assert.match(tableMarkup, /data-label="Producto"/);
-  assert.match(tableMarkup, /Detalle abierto/);
+  // Product name must appear in the selector
+  assert.match(tableMarkup, /Producto demo/);
+  // Product code must appear in the selector
+  assert.match(tableMarkup, /PT-01/);
+  // Selected item uses aria-current="true" and is-selected class for accessibility
+  assert.match(tableMarkup, /aria-current="true"/);
+  assert.match(tableMarkup, /is-selected/);
+  // data-product-detail attribute drives selection click handler
+  assert.match(tableMarkup, /data-product-detail/);
+  // Compact list uses <ul> not a wide table
+  assert.match(tableMarkup, /<ul/);
+  assert.doesNotMatch(tableMarkup, /<table/);
 
   const categoryMarkup = renderers.renderCategoriesList([{ id: 3, name: 'Bebidas', categoryType: 'PT' }]);
   assert.match(categoryMarkup, /Bebidas/);
   assert.equal(state.resolveSelectedProductId([{ id: 10 }, { id: 11 }], '11'), 11);
-  assert.match(state.buildDetailSubtitle({ code: 'PT-01', category: { name: 'Bebidas' } }), /Codigo PT-01/);
+  // buildDetailSubtitle was removed (subtitle element no longer exists in DOM)
 
   // renderDetail: Contenido neto replaces Categoria; order is Contenido neto → Unidad → Precio.
   const detailWithPresentation = renderers.renderDetail(
@@ -338,6 +349,133 @@ test('products-admin render() contiene las correcciones UX de labels, botón y f
     btnContext.includes('type="button"'),
     'El botón #products-form-add-subcategory-button debe tener type="button" para no disparar el form submit',
   );
+});
+
+// ─── UX Refactor: master/detail layout characterization ─────────────────────
+
+test('products render() reflects master/detail UX refactor: narrow selector + wide detail', () => {
+  const rootShell = createHarnessWithView();
+  const productsAdmin = rootShell.require('views.productsAdmin');
+  const html = productsAdmin.render();
+
+  // Detail panel no longer uses "Detalle contextual" as primary h3 heading
+  assert.doesNotMatch(
+    html,
+    /<h3[^>]*>\s*Detalle contextual\s*<\/h3>/,
+    'El h3 "Detalle contextual" no debe ser el título principal del panel de detalle',
+  );
+
+  // Selector panel must exist with aria-label
+  assert.ok(
+    html.includes('products-selector-panel'),
+    'El panel de selección de productos debe tener clase products-selector-panel',
+  );
+
+  // #products-detail-subtitle was intentionally removed — redundant with product header in detail panel
+  assert.ok(
+    !html.includes('id="products-detail-subtitle"'),
+    '#products-detail-subtitle debe estar removido (redundante con el encabezado del producto en el detalle)',
+  );
+
+  // Detail panel must have aria-label instead of aria-labelledby pointing to removed h3
+  assert.ok(
+    html.includes('aria-label="Detalle del producto seleccionado"'),
+    'El panel de detalle debe tener aria-label descriptivo',
+  );
+
+  // products-detail-region must still be present
+  assert.ok(
+    html.includes('id="products-detail-region"'),
+    '#products-detail-region debe existir',
+  );
+});
+
+test('renderDetail renders product name as primary heading, not as sidebar label', () => {
+  const rootShell = createHarness();
+  const renderers = rootShell.require('views.productsAdminRenderers');
+
+  const detail = renderers.renderDetail(
+    {
+      id: 5, name: 'Shampoo Lavanda', code: 'SH-LAV-01',
+      price: 2500, currency: 'CRC',
+      netContent: 350, netContentUnit: 'ML',
+      subcategory: { name: 'Shampoo' },
+      controlsInventory: true, quantity: 180, reservedQuantity: 0, minStock: 120, maxStock: 250,
+    },
+    { canManageProducts: true, detailState: 'ready' },
+  );
+
+  // Product name must appear as h3 heading inside detail workspace
+  assert.match(detail, /<h3[^>]*class="products-detail-name"[^>]*>Shampoo Lavanda/);
+  // Product code must appear in detail code element
+  assert.match(detail, /products-detail-code/);
+  assert.match(detail, /SH-LAV-01/);
+
+  // Información general section must exist
+  assert.match(detail, /Información general/);
+  // Inventory section must exist with controla inventario badge
+  assert.match(detail, /Controla inventario/);
+  // Inventory grid must show all four stock values
+  assert.match(detail, /Disponible/);
+  assert.match(detail, /Reservado/);
+  assert.match(detail, /Minimo/);
+  assert.match(detail, /Maximo/);
+
+  // Inventory links must still be present
+  assert.match(detail, /Ver existencias/);
+  assert.match(detail, /Ver lotes/);
+  assert.match(detail, /Ver historial/);
+  // Initial inventory button must be hidden when product already has stock (quantity: 180)
+  assert.doesNotMatch(detail, /Registrar inventario inicial/,
+    'Initial inventory button must be hidden when product already has existing stock');
+  // Edit/deactivate buttons must be in the header actions area
+  assert.match(detail, /id="products-open-edit-button"/);
+  assert.match(detail, /id="products-open-deactivate-button"/);
+
+  // No duplicate "Producto" label (old sidebar-style card label)
+  assert.doesNotMatch(detail, /<span>Producto<\/span>/);
+});
+
+test('renderDetail shows initial inventory button for product with no existing stock', () => {
+  const rootShell = createHarness();
+  const renderers = rootShell.require('views.productsAdminRenderers');
+
+  const detail = renderers.renderDetail(
+    {
+      id: 7, name: 'Producto Nuevo', code: 'NEW-001',
+      price: 1000, currency: 'CRC',
+      controlsInventory: true, quantity: 0, reservedQuantity: 0,
+    },
+    { canManageProducts: true, detailState: 'ready' },
+  );
+
+  // Initial inventory button must be visible when product has no stock
+  assert.match(detail, /Registrar inventario inicial/,
+    'Initial inventory button must be shown when product has no existing stock');
+});
+
+test('renderDetail non-inventory product shows No aplica section without stock cards', () => {
+  const rootShell = createHarness();
+  const renderers = rootShell.require('views.productsAdminRenderers');
+
+  const detail = renderers.renderDetail(
+    {
+      id: 6, name: 'Servicio de Instalacion', code: 'SRV-001',
+      price: 15000, currency: 'CRC',
+      controlsInventory: false,
+      productNature: 'SERVICE',
+      commercialBehavior: 'ONE_TIME',
+    },
+    { canManageProducts: false, detailState: 'ready' },
+  );
+
+  // Non-inventory section must say No aplica
+  assert.match(detail, /No aplica/);
+  // Must NOT show inventory deep links (no inventory control)
+  assert.doesNotMatch(detail, /Ver existencias/);
+  assert.doesNotMatch(detail, /Ver lotes/);
+  // Must NOT show zero-filled stock cards
+  assert.doesNotMatch(detail, /Disponible.*Reservado/s);
 });
 
 // ─── Regressions: existing tests must still pass ──────────────────────────────

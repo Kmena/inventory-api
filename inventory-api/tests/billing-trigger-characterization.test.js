@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const billingTriggerService = require('../src/services/billing-trigger.service');
 const invoiceRepository = require('../src/repositories/invoice.repository');
 const paymentRepository = require('../src/repositories/payment.repository');
+const entitlementService = require('../src/services/entitlement.service');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -288,6 +289,9 @@ test('executeBillingLogic creates Invoice but NO Payment for CREDIT orders', asy
       [paymentRepository, {
         createPayment: async () => { throw new Error('should not be called'); },
       }],
+      [entitlementService, {
+        activateEntitlementsForApprovedCreditInvoice: async () => [],
+      }],
     ],
     async () => {
       const fakeDb = {
@@ -302,6 +306,42 @@ test('executeBillingLogic creates Invoice but NO Payment for CREDIT orders', asy
       );
       assert.ok(result.invoice, 'invoice must be created for CREDIT');
       assert.equal(result.payment, null, 'payment must be null for CREDIT');
+    },
+  );
+});
+
+test('executeBillingLogic activates CREDIT entitlement lines without creating a payment', async () => {
+  let activationCall = null;
+  await withRepositoryStubs(
+    [
+      [invoiceRepository, {
+        createInvoice: async ({ clientId, orderId, number, amount, dueAt }, _db) => ({ id: 100n, clientId, orderId, number, amount, dueAt }),
+      }],
+      [paymentRepository, {
+        createPayment: async () => { throw new Error('should not be called'); },
+      }],
+      [entitlementService, {
+        activateEntitlementsForApprovedCreditInvoice: async (invoice, auth, req, db) => {
+          activationCall = { invoice, auth, req, db };
+          return [{ id: '900' }];
+        },
+      }],
+    ],
+    async () => {
+      const fakeDb = {
+        invoice: { findFirst: async () => null },
+        payment: { findFirst: async () => null },
+      };
+      const result = await billingTriggerService.executeBillingLogic(
+        makeOrder({ paymentCondition: 'CREDIT' }),
+        makeClient({ paymentDays: 30 }),
+        makeAuth(),
+        fakeDb,
+      );
+      assert.equal(result.payment, null);
+      assert.equal(activationCall.invoice.id, 100n);
+      assert.equal(activationCall.auth.companyId, '7');
+      assert.equal(activationCall.db, fakeDb);
     },
   );
 });

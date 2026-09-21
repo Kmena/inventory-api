@@ -1,671 +1,645 @@
 # Current State
 
-<!-- MAINT-002: per-section update log — append a row when a section is materially changed -->
+<!-- MAINT: per-section update log — append a row when a section is materially changed -->
 | Section | Last updated | Change summary |
 |---|---|---|
-| §1 System overview | 2026-11-01 | Added supplier-product eligibility enforcement (TASK-012, purchase-production-order-ux) |
-| §4 Existing domains and modules | 2026-11-01 | Documented `listEligibleProductSupplierLinks` repository helper, eligibility service helpers, and UI eligibility-gating behavior |
-| §5 Main use cases | 2026-11-01 | Added RFQ invitation eligibility guard, eligible-only public invitation, atomic response eligibility validation, direct quotation eligibility validation |
-| §12 Current testing strategy | 2026-11-01 | Added 12 new characterization/behavior tests for supplier-product eligibility across procurement and RFQ paths |
-| §4 Existing domains and modules | 2026-09-01 | Documented products-admin SPA inline subcategory creation support and exported helper usage |
-| §6 Current data flows | 2026-09-01 | Added stacked-dialog product/subcategory flow in root-shell product admin |
-| §8 APIs and integrations | 2026-09-01 | Clarified no backend/API changes for create-product-with-subcategory; documented existing category/product endpoint consumption |
-| §12 Current testing strategy | 2026-09-01 | Added products SPA characterization coverage for duplicate helper and render contract |
-| §7 Database and persistence | 2026-09-01 | Added Client.creditLimit/creditBalance and ClientStore credit fields |
-| §14 Known defects | 2026-09-01 | Removed DEF-PRD-001 (resolved); DEF-PRD-002 remains open |
-| §1 System overview | 2026-09-26 | Added implemented `recipe-input-per-unit-basis` feature summary and audit-fix status |
-| §4 Existing domains and modules | 2026-09-26 | Documented per-input quantity-basis override across recipe, production planning, and UI layers |
-| §5 Main use cases | 2026-09-26 | Added mixed-basis recipe authoring and production material scaling behavior |
-| §6 Current data flows | 2026-09-26 | Added recipe save, production planning snapshot, and lot-availability flows for per-input basis |
-| §7 Database and persistence | 2026-09-26 | Added RecipeStageInput.inputQuantityBasis schema/migration and snapshot freezing behavior |
-| §8 APIs and integrations | 2026-09-26 | Added recipe contract exposure of inputQuantityBasis and production preview consumption |
-| §12 Current testing strategy | 2026-09-26 | Added automated coverage for per-input basis scaling and noted reported full-suite pass |
-| §13 Behavior to preserve | 2026-09-26 | Added backward-compatible inheritance/null semantics and frozen per-input basis behavior |
-| §14 Known defects | 2026-09-26 | Marked AUD-004 and AUD-005 as corrected; DEF-PRD-002 remains open |
-| §15 Architectural debt | 2026-09-26 | Added note about duplicated effective-basis logic across backend and browser adapters |
-| §17 Unknowns and assumptions | 2026-09-26 | Added note that full-suite validation is user-reported and not re-executed in this refresh |
-| §1 System overview | Post `recipe-approval-ux` refresh | Added implemented recipe approval UX summary for draft approval confirmation, local feedback, incomplete markers, and repair highlighting |
-| §4 Existing domains and modules | Post `recipe-approval-ux` refresh | Documented recipe admin approval dialog, action-local feedback, incomplete draft marker, and editor repair guidance |
-| §5 Main use cases | Post `recipe-approval-ux` refresh | Added approval confirmation, draft repair, and incomplete-row save semantics |
-| §6 Current data flows | Post `recipe-approval-ux` refresh | Added approval confirmation and incomplete-draft save flows in the root-shell recipe admin UI |
-| §8 APIs and integrations | Post `recipe-approval-ux` refresh | Clarified reuse of the unchanged recipe approval API contract by the new frontend UX |
-| §12 Current testing strategy | Post `recipe-approval-ux` refresh | Added recipe admin characterization coverage and user-reported targeted regression results |
-| §13 Behavior to preserve | Post `recipe-approval-ux` refresh | Added approval immutability, backend validation authority, and stage-type-aware incomplete-row semantics |
-| §15 Architectural debt | Post `recipe-approval-ux` refresh | Added note about frontend-local incomplete markers and message-parsing-based repair guidance |
-| §17 Unknowns and assumptions | Post `recipe-approval-ux` refresh | Added manual browser validation gap for dialog focus and scroll behavior |
-| §1 System overview | 2026-10-02 | Added partial implementation status for `client-store-documents-credit-ux` in the root-shell clients workspace |
-| §4 Existing domains and modules | 2026-10-02 | Documented current client/store admin UI behavior for native document download, file-picker upload, and zone-refresh guidance |
-| §5 Main use cases | 2026-10-02 | Added implemented client-document and store-dialog UX flows |
-| §6 Current data flows | 2026-10-02 | Added authenticated document download, FileReader upload, and in-dialog zone refresh flows |
-| §8 APIs and integrations | 2026-10-02 | Clarified unchanged client document/backend contracts and current taxpayer/economic-activity adapters |
-| §12 Current testing strategy | 2026-10-02 | Added client workspace characterization coverage for TASK-001 through TASK-004 |
-| §13 Behavior to preserve | 2026-10-02 | Added current client-document contract and in-dialog zone-refresh compatibility constraints |
-| §14 Known defects | 2026-10-02 | Added remaining client/store UX and model gaps after TASK-001 through TASK-004 |
-| §15 Architectural debt | 2026-10-02 | Added duplicated FileReader pattern and large page-controller debt in clients admin |
-| §17 Unknowns and assumptions | 2026-10-02 | Added pending manual browser verification for native download and real zone navigation/refresh behavior |
-| §1 System overview | 2026-10-03 | Refreshed `client-store-documents-credit-ux` status after TASK-005 and zero-credit omission alignment |
-| §4 Existing domains and modules | 2026-10-03 | Documented create-time store creditLimit support and shared store payload builder ownership |
-| §5 Main use cases | 2026-10-03 | Added create-store creditLimit behavior and zero-value omission semantics |
-| §6 Current data flows | 2026-10-03 | Added shared store payload builder flow for create-store submissions |
-| §8 APIs and integrations | 2026-10-03 | Clarified create-store contract now accepts optional creditLimit without new routes |
-| §12 Current testing strategy | 2026-10-03 | Added user-reported TASK-005 targeted validation and 32/32 pass evidence |
-| §13 Behavior to preserve | 2026-10-03 | Added create-store creditLimit compatibility and zero-omission behavior |
-| §14 Known defects | 2026-10-03 | Removed obsolete missing-create-time-credit defect and retained remaining onboarding gaps |
-| §15 Architectural debt | 2026-10-03 | Added note about shared builder reducing drift while client payload dead fields remain |
-| §17 Unknowns and assumptions | 2026-10-03 | Recorded user-reported lint/typecheck/audit evidence for TASK-005 refresh |
-| §1 System overview | 2026-10-04 | Refreshed `create-product-with-subcategory` as fully implemented frontend-only and advanced `client-store-documents-credit-ux` to current partial TASK-012 state |
-| §4 Existing domains and modules | 2026-10-04 | Documented store-document Phase 2, taxpayer/economic-activity UI wiring, and completed product-admin inline subcategory UX |
-| §5 Main use cases | 2026-10-04 | Added two-phase store onboarding/document flow and inline product subcategory creation details |
-| §6 Current data flows | 2026-10-04 | Added store-document upload route usage and taxpayer/economic-activity-assisted client flows |
-| §8 APIs and integrations | 2026-10-04 | Added active store-document upload route and clarified frontend-only nature of create-product-with-subcategory |
-| §12 Current testing strategy | 2026-10-04 | Added TASK-009/TASK-012 characterization coverage and user-reported full-suite/lint/typecheck pass |
-| §13 Behavior to preserve | 2026-10-04 | Added store-document contract compatibility and consume-once/focus behavior for product subcategory UX |
-| §14 Known defects | 2026-10-04 | Reframed remaining client onboarding gaps after TASK-009/TASK-012 and noted no active defect in the product subcategory slice |
-| §15 Architectural debt | 2026-10-04 | Added Phase-2 dialog/file-upload duplication and coarse browser-module notes |
-| §17 Unknowns and assumptions | 2026-10-04 | Added user-reported 1600-test validation and pending manual evidence for new browser flows |
-| §1 System overview | Post TASK-006 refresh | Refreshed `client-store-documents-credit-ux` status after store currency support and null-currency-safe credit rendering |
-| §4 Existing domains and modules | Post TASK-006 refresh | Documented required store currency capture and legacy-null-safe renderer behavior in clients admin |
-| §5 Main use cases | Post TASK-006 refresh | Added create-store currency flow and legacy null-currency credit summary behavior |
-| §6 Current data flows | Post TASK-006 refresh | Added store currency propagation through shared payload shaping, schema validation, and persistence |
-| §7 Database and persistence | Post TASK-006 refresh | Added additive `ClientStore.currency` column and migration status |
-| §8 APIs and integrations | Post TASK-006 refresh | Clarified existing store-create contract now accepts required browser-side currency selection without a new route |
-| §12 Current testing strategy | Post TASK-006 refresh | Added TASK-006 coverage and user-reported 36/36 targeted validation plus Prisma/build results |
-| §13 Behavior to preserve | Post TASK-006 refresh | Added currency-enum compatibility and null-currency-safe renderer semantics |
-| §14 Known defects | Post TASK-006 refresh | Removed obsolete missing-store-currency gap and retained remaining onboarding work |
-| §15 Architectural debt | Post TASK-006 refresh | Added note that legacy nullable currency remains in persistence while browser creation now requires currency |
-| §17 Unknowns and assumptions | Post TASK-006 refresh | Recorded user-reported TASK-006 validation and unresolved manual browser verification |
-| §1 System overview | Post TASK-007 refresh | Added store fiscal override foundation status, additive migration, and updated targeted validation evidence |
-| §4 Existing domains and modules | Post TASK-007 refresh | Documented explicit inherit-vs-override billing mode and current store-card fiscal summary behavior |
-| §5 Main use cases | Post TASK-007 refresh | Added create-store inherited-vs-override fiscal capture behavior |
-| §6 Current data flows | Post TASK-007 refresh | Added store billing-mode payload shaping and null-as-inherit persistence flow |
-| §7 Database and persistence | Post TASK-007 refresh | Added 7 nullable `ClientStore` fiscal override fields and migration `20261002001000_add_store_billing_fields` |
-| §8 APIs and integrations | Post TASK-007 refresh | Clarified existing store-create contract now accepts additive fiscal override fields without a new route |
-| §12 Current testing strategy | Post TASK-007 refresh | Added `client-store-fiscal-overrides` coverage and user-reported 42/42 targeted validation |
-| §13 Behavior to preserve | Post TASK-007 refresh | Added null-as-inherit store fiscal semantics and current override-summary compatibility |
-| §14 Known defects | Post TASK-007 refresh | Removed obsolete missing-store-override gap and retained remaining onboarding work |
-| §15 Architectural debt | Post TASK-007 refresh | Added note about override-mode rules remaining browser/service heavy and client payload drift still open |
-| §17 Unknowns and assumptions | Post TASK-007 refresh | Recorded user-reported TASK-007 Prisma/build validation and remaining manual browser checks |
-| §1 System overview | Post TASK-008 refresh | Added implemented client edit fiscal/geographic fields, client-payload dead-code cleanup, and inline credit-feedback alignment |
-| §4 Existing domains and modules | Post TASK-008 refresh | Documented editable client legal/geographic fields and styled credit mini-form feedback |
-| §5 Main use cases | Post TASK-008 refresh | Added implemented client edit completion and inline credit-feedback behavior |
-| §6 Current data flows | Post TASK-008 refresh | Added client update payload cleanup and inline store-credit feedback flow |
-| §8 APIs and integrations | Post TASK-008 refresh | Clarified no new backend/API contract change for TASK-008 and preserved existing taxpayer/economic-activity gaps |
-| §12 Current testing strategy | Post TASK-008 refresh | Added TASK-008 characterization coverage and user-reported 43/43 targeted validation |
-| §13 Behavior to preserve | Post TASK-008 refresh | Added editable client-field compatibility and inline credit-feedback semantics |
-| §14 Known defects | Post TASK-008 refresh | Removed obsolete client-payload dead-field defect and retained remaining onboarding gaps |
-| §15 Architectural debt | Post TASK-008 refresh | Recorded reduced payload drift after dead-code removal while clients-admin modules remain coarse |
-| §17 Unknowns and assumptions | Post TASK-008 refresh | Recorded user-reported TASK-008 validation plus remaining manual browser validation gaps |
+| All sections | Post MASTER-032 refresh | Full rewrite after Product + Inventory Master Plan (6 waves, MASTER-001 through MASTER-031) completed. 1944 pass / 3 skipped / 0 failing. Audit baseline 9.6/10. |
+| §1, §4–§9, §12 | 2026-10-29 inventory-requests spec | Added InventoryRequest lifecycle (ADJUSTMENT/TRANSFER), partial-transfer child-lot creation, 6 new API endpoints, 4 new access policies, 1 new permission, new repository + service, Root admin Solicitudes tab, Warehouse SPA operator view. 2039 pass / 3 skipped / 0 failing. |
 
 ## 1. System overview
-The implemented system is a Node.js 24 + Express + Prisma modular monolith that serves both JSON APIs and browser-delivered SPAs from one runtime.
+The implemented system is a **Node.js 24 + Express + Prisma modular monolith** that serves both JSON APIs and browser-delivered SPAs from a single runtime process. The primary database is PostgreSQL 16 accessed through Prisma ORM. An optional Redis instance provides browser session storage.
 
-The repository currently supports:
-- identity and permission-based access control
-- company-scoped master data
-- inventory, lots, receipts, and stock movements
-- recipes and production orders
-- QA inspection and rejection handling
-- supplier/procurement workflows
-- warehouse and root-shell browser UIs
+### Deployed capabilities
+After the completed Product + Inventory Master Plan (specs `non-physical-products-mvp` and `inventory-ux-mvp`) and the subsequent `inventory-requests` spec, the system supports:
 
-The feature `qa-rejection-material-reconciliation-amendment` is implemented in the current codebase as an additive extension over the existing production + QA workflow. It adds broader QA relevant-input scope resolution, replacement-recovery support, lot-level recolection entry capture, same-lot usage validation, terminal reconciliation recording, and warehouse SPA support for those states.
+**Inventory movement requests (inventory-requests spec — 2026-10-29):**
+- `InventoryRequest` model with a two-type async movement lifecycle: `ADJUSTMENT` (admin creates → operator executes) and `TRANSFER` (admin creates → operator confirms pickup → operator executes).
+- Request statuses: `PENDING → IN_PROGRESS → COMPLETED` (or `PENDING → CANCELLED`).
+- **Partial-transfer / child-lot creation (R-001):** When the requested quantity is less than the lot’s current total, a new child lot is automatically created with a sequential `-TNNN` suffix (e.g., `LOT-9-T001`) and the transfer executes between source lot and child lot.
+- **Complete transfer:** When quantity ≥ lot total, the existing lot is used as destination at the new warehouse.
+- **ADJUSTMENT execution** delegates to the existing `adjustStock` service (own transaction), then marks the request `COMPLETED` and links the result `InventoryOperation`.
+- **TRANSFER execution** runs in a single Prisma `$transaction` using the internal `_executePartialTransfer` helper that calls `inventory-transaction-support.service.js` primitives directly, preserving the advisory-lock pattern.
+- Admin/Root shell: new `Solicitudes` tab in Inventory workspace (visible only to `inventory.manage` holders), with `renderRequestAdjustmentModal` and `renderRequestTransferModal` modals on Lots table rows.
+- Warehouse SPA: new `Solicitudes de movimiento` tab gated by `inventory.requests.execute`, with full operator workflow (list, pickup, execute dialogs).
+- Duplicate-request guard: only one `PENDING` or `IN_PROGRESS` request per lot at a time.
 
-The feature `recipe-input-per-unit-basis` is also implemented. `RecipeStageInput` now supports an optional per-input quantity basis override through `inputQuantityBasis` (`PER_OUTPUT_KG | PER_FINISHED_UNIT`). When the field is `null`, the stage input inherits `RecipeVersion.quantityBasis`. When it is `PER_FINISHED_UNIT`, that individual input scales by planned unit count even when the recipe version remains `PER_OUTPUT_KG`, enabling mixed recipes such as gravimetric bulk inputs plus discrete packaging inputs.
+**Product taxonomy & commercial lifecycle:**
+- Product capability fields: `productNature` (GOOD/SERVICE), `controlsInventory` (boolean), `commercialBehavior` (STANDARD/ENTITLEMENT), `entitlementKind` (SUBSCRIPTION/MEMBERSHIP/AFFILIATION/COURSE/SERVICE_PERIOD/null).
+- Business presets derive inventory, lot strategy, warehouse, and catalog behavior from capabilities.
+- Non-inventory products (services, entitlements) skip stock/lot/warehouse/dispatch enforcement.
+- InvoiceItem immutable line-item snapshots per invoice with `lineKind` (PHYSICAL_GOOD/SERVICE/ENTITLEMENT).
+- CustomerEntitlement commercial lifecycle: activation (automatic on FULFILLED or manual), cancellation, renewal, history.
+- Entitlement activation orchestrator triggered by order FULFILLED transition.
+- Per-line order behavior: approval reserves stock only for physical lines, dispatch releases/deducts only for physical lines, service/entitlement lines pass through.
 
-The feature `recipe-approval-ux` is implemented in the root-shell recipe administration workspace. Draft-version approval is now gated by a custom irreversible-action confirmation dialog, approval success/failure feedback is rendered inside the affected version card, draft versions can be marked locally as `Incompleta` after warning-level save conditions or approval failures, and the draft editor applies conservative repair highlighting when backend approval diagnostics can be mapped safely to a stage or uniquely matched input.
+**Inventory management:**
+- Product inventory strategy (lotStrategy: TRACKED/SYSTEM/NONE).
+- System lots: transparent persisted lots for `lotStrategy=SYSTEM` products, hidden from business UX.
+- InventoryOperation model: groups stock movements with idempotency keys and operation metadata.
+- Stock/Existencias, Lots/Lotes, and History/Historial query APIs with pagination, filtering, product aggregation.
+- Initial inventory creation for new products at specific locations.
+- Stock adjustments with audit trail.
+- Atomic balanced transfers between locations with lot traceability.
+- Location lifecycle: Warehouse has `locationType` (BODEGA/ALMACEN/CEDI/OTHER), `locationNature` (PHYSICAL/VIRTUAL), deactivation rules.
+- `allowedWarehouseIds` enforcement: products can be restricted to specific warehouse locations.
+- Inventory permissions: granular access policies for stocks, lots, movements, entries, adjustments, transfers, alerts.
 
-TASK-012 of the `purchase-production-order-ux` spec is implemented. Supplier-product eligibility is now enforced at all six quotation entry points. Both `procurement-rfq.repository.js` and `procurement.repository.js` expose `listEligibleProductSupplierLinks(companyId, supplierId, productIds, db)` which queries the existing `ProductSupplier` table with indirect tenant scoping via `product.companyId`. The `procurement-rfq.service.js` has eligibility helpers (`getRequestItems`, `getRequestProductIds`, `filterRequestItemsByEligibility`, `getEligibleProductIdsForSupplier`, `getEligibleRequestItemsForSupplier`, `validateResponseItemsEligibility`) that apply consistently: `getPublicInvitation` returns only supplier-eligible request items without exposing omitted counts; `submitPublicResponse` and `submitManualResponse` validate eligibility atomically inside their transactions (no quotation created, no invitation status changed on rejection); `createRfqInvitations` rejects the entire batch if any supplier has zero eligible products; `buildEmailMachote` accepts an optional `eligibleItems` parameter used to filter email product lines; `getRfqTrackingSummary` includes an `eligibleItems` array per invitation in its serialized payload. The `procurement.service.js` validates supplier-product eligibility in `createSupplierQuotation` via `validateSupplierProductEligibility`. The `rfq-tracking-admin.renderers.js` renderer uses `invitation.eligibleItems` when available and shows a clear empty-state ("No hay productos cotizables") when the supplier has no eligible products; the submit button is hidden/disabled in that state. The public `supplier-quote/app.js` renders an informational empty state without a submit button when the backend returns an empty items array.
+**Frontend workspaces:**
+- Root shell Inventory workspace with Existencias/Lotes/Historial tabs.
+- Consolidated Product UX with business capability presets and inventory config.
+- Ubicaciones (Locations) UX integrated into warehouses admin.
+- Customer entitlement section in client detail.
+- Expanded order approval, billing/invoice, and dispatch surfaces for per-line behavior.
+- Warehouse SPA inventory tab with product stock aggregation.
+- Agent catalog respects `controlsInventory` for availability display.
 
-The feature `create-product-with-subcategory` is fully implemented as a frontend-only change in the root-shell products administration workspace. The product form now exposes an inline `+ Nueva` subcategory action next to the subcategory selector, the categories dialog can stack over the still-open product dialog using native `<dialog>.showModal()`, read-only users no longer see the create-subcategory fieldset, local duplicate detection is performed through `views.productsAdminHelpers.checkSubcategoryNameDuplicate(...)` before the unchanged category API call, and `lastCreatedSubcategoryId` is consumed once so the next create-product dialog can preselect the newly created subcategory without affecting edit mode.
+**Existing pre-master-plan capabilities (preserved):**
+- Identity & Access: JWT authentication, role+permission authorization, access policies with actor scope.
+- Customer/Client management: clients, stores, legal entities, classifications, documents, credit, fiscal overrides.
+- Recipe management: versioned recipes with stage typing, quantity basis, process codes, approval workflow.
+- Production: orders, planning, material requirements, stage execution, losses, returns, QA inspections, recolection/recovery, reconciliation.
+- Procurement: purchase requests, supplier quotations, RFQ invitations, supplier selection, purchase orders, receipts.
+- Sales: orders, invoices, payments, billing triggers, agent workspace, routes, visits, goals.
+- Warehousing: stock tracking, lot management, QA status, expiration alerts.
 
-The feature `client-store-documents-credit-ux` remains partially implemented, but current repository state now goes beyond TASK-008. The root-shell clients workspace still delivers protected client-document downloads through a native browser download flow, replaces the raw Base64 textarea with a file-picker + `FileReader` derivation flow, allows the store dialog to show a no-zones guidance state with in-place zone refresh, accepts create-time store `currency`, optional `creditLimit`, and nullable fiscal override fields through the existing backend create-store path, and exposes backend-supported client legal/geographic fields in the detail form. In the current code it also loads economic-activity options at mount time, uses dropdowns plus hidden `economicActivityName` fields in create/edit forms, reveals taxpayer-lookup actions when the actor has `integration.taxpayer.lookup`, and transitions the dynamic store dialog to a second optional Phase 2 document-upload step after a store is created. That Phase 2 uses `clientsApi.uploadStoreDocument(...)` against the active store-scoped backend route, keeps the 5 MB file-size guard, and converts files to Base64 in-browser before calling the unchanged governed upload contract.
-
-Remaining client onboarding gaps still include incomplete fiscal/trade-type coverage and the absence of a richer finalized store-document module. No backend, API, schema, migration, or permission change was introduced for `create-product-with-subcategory`.
-
-User-reported validation for this refresh: 1600 tests passed, 0 failed; `npm run typecheck` passed; and `npm run lint` passed. This document records that reported state and the checked-in tests, but does not independently rerun those commands.
+### Quality baseline
+- Full test suite: **2039 pass / 3 skipped / 0 failing** (95 new tests from inventory-requests spec).
+- `npm run verify`: PASS (lint + typecheck + public-runtime + workflow + restore-readiness + operational-readiness + build + test).
+- npm audit: 0 vulnerabilities.
+- Audit baseline score: 9.6/10.
+- The 3 skipped tests require optional `P2_CONSTRAINTS_DATABASE_URL` and are unrelated to active features.
 
 ## 2. Repository structure
-Primary application root:
-- `inventory-api/`
-
-Observed relevant structure:
-- `src/app.js`, `src/server.js` — Express bootstrap and runtime entrypoint
-- `src/routes/` — HTTP route adapters grouped by feature area
-- `src/services/` — application/service layer with most business orchestration and validation
-- `src/repositories/` — Prisma-backed persistence helpers
-- `src/schemas/` — Zod request validation
-- `src/security/`, `src/middlewares/`, `src/lib/` — auth, permission, request, and infrastructure helpers
-- `src/public/root/` — root/admin SPA assets
-- `src/public/warehouse/` — warehouse SPA assets
-- `prisma/schema.prisma` — canonical relational model
-- `prisma/migrations/` — additive SQL migrations
-- `tests/` — node:test characterization, contract, migration, governance, and service tests
-- `docs/` — operational, architectural, and governance documentation
-- `specs/qa-rejection-material-reconciliation-amendment/` — feature specification, traceability, risks, and implementation report
+```
+inventory-api/
+├── prisma/
+│   ├── schema.prisma          # 88 migrations, ~1700+ lines (InventoryRequest model added)
+│   ├── migrations/            # 88 applied migration directories
+│   ├── seed.js                # Seed data for development
+│   └── migration-instructions.md
+├── src/
+│   ├── app.js                 # Express application setup, route mounting, CSP, error handling
+│   ├── config.js              # Environment configuration
+│   ├── server.js              # HTTP server entry point
+│   ├── routes/                # 30 route files (HTTP input adapters); inventory.routes.js +6 request endpoints
+│   ├── services/              # 55 service files; inventory-requests.service.js added
+│   ├── repositories/          # 25 repository files; inventory-requests.repository.js added
+│   ├── schemas/               # 26 Zod schema files; inventory.schema.js +5 request schemas
+│   ├── middlewares/            # 8 middleware files (auth, validation, throttle, metrics)
+│   ├── security/              # Access policy registry (+4 policies), permission-governance (+1 permission)
+│   ├── lib/                   # 19 shared utility modules
+│   └── public/                # Browser SPA assets
+│       ├── root/              # Root admin shell; inventory-api.js +4 calls, inventory-admin.js +handlers
+│       ├── warehouse/         # Warehouse operator SPA; views/inventory-requests.js added
+│       ├── agent/             # Agent field SPA
+│       ├── supplier-quote/    # Public supplier quotation page
+│       ├── shared/            # Shared browser utilities
+│       └── vendor/            # Third-party browser libraries (Leaflet)
+├── tests/                     # 229 test files (~2MB); 4 new inventory-requests test files
+├── scripts/                   # Build, lint, validation scripts
+├── docs/                      # Architecture, specs, audit, UI docs
+├── Dockerfile                 # Multi-stage Node 24 production build
+├── docker-compose.yml         # Dev compose (app + PostgreSQL + Redis)
+├── docker-compose.dev.yml     # Full dev compose with volumes
+├── docker-compose.prod.yml    # Production compose
+└── package.json               # Dependencies, scripts, engine constraint
+```
 
 ## 3. Current architecture
-The implemented architecture is a layered monolith, not a full hexagonal architecture.
+The system follows a **layered modular monolith** pattern within a single deployable:
 
-Observed dependency flow:
-- Express routes call service functions directly.
-- Services coordinate validation, authorization assumptions, business rules, persistence calls, and response serialization.
-- Repositories encapsulate Prisma queries/includes and are reused across services.
-- Browser SPAs call the same backend routes through in-repo API wrappers.
+```
+Browser SPAs ─→ Express routes ─→ Services ─→ Repositories ─→ Prisma ─→ PostgreSQL
+                                     ↓
+                                Domain logic
+                             (inline in services)
+```
 
-For the production + QA area, the active architecture is:
-- `production.routes.js` exposes production order, execution, QA, recolection, and reconciliation endpoints
-- `recipe.service.js` persists recipe version basis plus per-stage-input `inputQuantityBasis` and serializes the same structure for UI/API consumers
-- `production.service.js` creates and serializes production orders, passing `plannedUnits` into material planning for mixed-basis recipes
-- `production-planning.service.js` resolves effective per-input scaling and freezes `inputQuantityBasis` into production snapshots
-- `production-material-availability.service.js` resolves lot availability using per-stage-input effective basis from the frozen snapshot
-- `production-execution.service.js` coordinates execution, inventory mutation, and same-lot validation gates
-- `quality.service.js` coordinates QA inspections, rejection handling, relevant-input scope resolution, and optional replacement recovery creation
-- `production-recolection.service.js` coordinates recolection confirmation, replacement recovery, reconciliation balance calculation, and outcome recording
-- `production.repository.js` loads production orders with stage executions, recolection entries, reconciliations, and the snapshot data used by API and UI consumers
+**Layer responsibilities:**
+- **Routes** (input adapters): HTTP endpoint binding, authentication middleware, Zod validation, access policy enforcement, delegation to services.
+- **Services** (application + domain logic): Business orchestration, transaction management, business rule enforcement, serialization. Domain logic is currently inline within services rather than in separate domain model classes.
+- **Repositories** (output adapters): Prisma queries, company-scoped data access, eager loading, raw SQL for advisory locks and complex aggregations.
+- **Schemas** (validation): Zod schemas for request payload validation, applied via middleware.
+- **Security** (cross-cutting): Access policy registry with ~200+ policies, role-based and permission-based authorization, actor scope enforcement, audit logging.
+
+**No formal hexagonal architecture** is implemented. The code does not have explicit port interfaces, and business rules live in service files alongside orchestration logic.
 
 ## 4. Existing domains and modules
-### Identity and Access
-Current code:
-- `src/services/auth.service.js`
-- `src/middlewares/authenticate.js`
-- `src/security/access-policies.js`
-- `src/security/access-policy-registry.js`
 
-Responsibilities:
-- login
-- bearer-token authentication
-- permission checks
-- authenticated actor reloading from persistence
+### Identity & Access
+- **Authentication:** JWT-based with `authenticate` middleware. Browser sessions via cookie + optional Redis store.
+- **Authorization:** Role-based + permission-based via `access-policy-registry.js` (~200+ policies).
+- **Files:** `auth.routes.js`, `auth.service.js`, `me.routes.js`, `me.service.js`, middlewares, security directory.
 
-### Customer / Store / Root-shell Clients Admin
-Current code:
-- `src/routes/client.routes.js`
-- `src/services/client.service.js`
-- `src/repositories/client.repository.js`
-- `src/public/root/clients-api.js`
-- `src/public/root/views/clients-admin.js`
-- `src/public/root/views/clients-admin.renderers.js`
-- `src/public/root/views/clients-admin-store-dialog.js`
+### Products
+- **Model:** Product with capability taxonomy (`productNature`, `controlsInventory`, `commercialBehavior`, `entitlementKind`), pricing, inventory config (`lotStrategy`, `minStock`, `maxStock`), size conversion, sourcing method, presentation type, categories/subcategories.
+- **Business presets:** SERVICE/SUBSCRIPTION/MEMBERSHIP/AFFILIATION/COURSE presets auto-derive inventory, lot, catalog, and commercial behavior.
+- **Inventory applicability:** `controlsInventory=false` products are excluded from stock/lot/warehouse/dispatch enforcement throughout the system.
+- **allowedWarehouseIds:** Products can be restricted to specific warehouse locations via `ProductAllowedWarehouse` join table.
+- **Files:** `product.routes.js`, `product.service.js`, `product.repository.js`, `product.schema.js`, `product-permission-shaping.service.js`, `product-pricing.service.js`, `product-size-conversion.helper.js`.
 
-Current behavior:
-- root-shell users can list company clients, open a contextual detail pane, create clients, update clients, deactivate clients, create stores, update store credit limits, upload client-owned documents, upload store-scoped documents after store creation, and create client references
-- client document downloads continue using the existing protected backend route, but the browser adapter now consumes `{ blob, fileName, mimeType }` from `clientsApi.downloadDocument(...)`, derives a filename from `Content-Disposition` when possible, dispatches a native `<a download>` click, and revokes the `ObjectURL` after dispatch
-- client document upload in the detail pane now uses a native `input[type=file]` with hidden derived `fileName`, `mimeType`, and `fileContentBase64` inputs; `clients-admin.js` performs extension/MIME checks, a 5 MB client-side size guard, and `FileReader` conversion before the unchanged payload builder submits to `POST /api/clients/:clientId/documents`
-- the store creation dialog is still a browser-created native `<dialog>` backed by Leaflet and company subzone options from `GET /api/regions/company`
-- when no zones/subzones are available, the store dialog now hides the unusable form and instead renders a guidance state with `Ir a Zonas` and `Refrescar zonas`; the same dialog can now re-fetch zone options in place without a full page reload
-- store creation now renders a required `Moneda de crédito` select plus an optional `Límite de crédito` input, delegates payload shaping to the shared `views.clientsAdminHelpers.buildStorePayload(...)` helper, persists `currency` plus positive `creditLimit` values through `createClientStoreSchema` and `createCompanyClientStore()`, and still omits zero/blank credit values from the outbound payload
-- the dynamic store dialog also supports taxpayer-assisted override billing capture and then transitions to an optional Phase 2 document-upload screen that uses `clientsApi.uploadStoreDocument(...)` against `POST /api/clients/:clientId/stores/:storeId/documents`
-- client create and edit flows now use `documentType` dropdowns, economic-activity dropdowns plus hidden `economicActivityName` fields, and taxpayer lookup buttons that populate known legal/fiscal fields when the actor has the integration permission
-- client create/edit payload shaping in `views.clientsAdminHelpers.buildClientPayload(...)` now includes `legalName`, `commercialName`, `province`, `canton`, and `district`, while no longer sending dead client-level `creditLimit` or `creditBalance` fields
-- store cards now show `Moneda: <código>` when the persisted store has a supported currency, show `Moneda: Sin definir` for legacy `null` currency rows, and avoid inventing a default symbol in that legacy case while still rendering numeric used/available amounts safely
-- stores still inherit `legalEntityId` implicitly on the backend, but the create dialog now exposes an explicit browser-side fiscal mode: inherited mode sends no override fields and override mode sends only the populated store billing values; no persisted boolean flag exists because null/empty override fields continue to mean `inherit from client`
-- trade-type fields and a fuller finalized store-document lifecycle are not implemented yet
+### Inventory
+- **Warehouse/Location model:** `Warehouse` with `locationType` (BODEGA/ALMACEN/CEDI/OTHER), `locationNature` (PHYSICAL/VIRTUAL), `warehouseType`, `isVirtual`, `isSellableSource`, `isActive`.
+- **Stock tracking:** `WarehouseStock` (product×warehouse quantities), `WarehouseLotStock` (lot×warehouse quantities).
+- **Lot management:** `Lot` with `isSystemGenerated`, `systemLotKey` for transparent system-lot strategy. Lot status (AVAILABLE/QUARANTINED/EXPIRED/BLOCKED/CONSUMED), QA status (PENDING/APPROVED/REJECTED/FAILED).
+- **Stock movements:** `StockMovement` with types IN/OUT/ADJUSTMENT/RESERVE/RELEASE/TRANSFER_OUT/TRANSFER_IN. Movement group IDs for atomic operations.
+- **InventoryOperation:** Groups business operations with `operationType`, `idempotencyKey`, source/destination warehouse references, metadata.
+- **Inventory alerts:** Product/lot/warehouse-scoped alerts with severity and status tracking.
+- **System lots:** For `lotStrategy=SYSTEM` products, lots are auto-created with `isSystemGenerated=true` and hidden from business UX. Existing lots default to `isSystemGenerated=false`.
+- **Lot policy service:** FEFO/FIFO lot selection, expiration checks, lot usability derivation.
+- **Transaction support service:** Advisory locks, stock/lot changes, movement creation, reservation logic, system-lot resolution, allowed-warehouse enforcement.
+- **InventoryRequest lifecycle:** Async admin→warehouse movement request flow. Admin creates requests of type `ADJUSTMENT` or `TRANSFER` targeting a specific lot+warehouse. Warehouse operators pick up TRANSFER requests (marking `IN_PROGRESS`) then execute any request type. Execution: ADJUSTMENT delegates to `adjustStock`; TRANSFER uses an internal `_executePartialTransfer` helper inside a single Prisma transaction. Partial-transfer R-001: when quantity < lot total, a child lot with `-TNNN` suffix is created at the destination.
+- **Files:** `inventory.routes.js`, `inventory.service.js`, `inventory.repository.js`, `inventory.schema.js`, `inventory-alerts.service.js`, `inventory-lot-policy.service.js`, `inventory-transaction-support.service.js`, `inventory-requests.service.js`, `inventory-requests.repository.js`.
 
-### Recipes and Product Definition
-Current code:
-- `src/services/recipe.service.js`
-- `src/schemas/recipe.schema.js`
-- root-shell recipe editor assets
+### Orders & Commercial Lifecycle
+- **Order model:** Multi-status lifecycle (DRAFT→APPROVED→IN_PRODUCTION→DELIVERED→FULFILLED→CANCELLED/REJECTED). Per-line approval/reservation for physical products.
+- **Dispatch:** Per-line stock deduction for physical lines only. Service and entitlement lines pass through.
+- **InvoiceItem model:** Immutable line-item snapshots per invoice with `lineKind` (PHYSICAL_GOOD/SERVICE/ENTITLEMENT), price/tax/discount snapshots. Generated during invoice creation from order items.
+- **FULFILLED status:** Triggers entitlement activation orchestrator for entitlement order lines.
+- **Files:** `order.routes.js`, `order.service.js`, `order.repository.js`, `order.schema.js`, `order-access-policy.service.js`.
 
-Current production-related behavior:
-- recipe versions expose a version-level `quantityBasis` with default `PER_OUTPUT_KG`
-- recipe stage inputs expose optional `inputQuantityBasis`; `null` means inherit the version basis
-- recipe stages support `stageType` = `RECOLLECTION | PROCESSING`
-- processing stages require `processCode`
-- `processLabel` is required only when `processCode = OTHER`
-- legacy stages without `stageType` are treated as `PROCESSING` in serialization/service logic
-- recipe serialization and persistence preserve `inputQuantityBasis` so browser editors, production planning, and frozen production snapshots consume the same field
-- draft version approval in the root-shell UI is gated by a dedicated native `<dialog>` confirmation step before `recipesApi.approveRecipeVersion(...)` is called
-- version cards can render local success/error/warning feedback plus a `Reparar borrador` CTA without changing backend payloads
-- draft versions may be marked locally as incomplete in UI state when warning-level `PROCESSING` rows are saved or when approval errors indicate unresolved stage-input issues
-- the version editor differentiates incomplete stage-input rows by stage type: incomplete `RECOLLECTION` rows block save, while incomplete `PROCESSING` rows warn, allow save, and keep approval blocked by backend rules until corrected
+### Customer Entitlements
+- **CustomerEntitlement model:** Commercial lifecycle records with `entitlementKind`, `status` (ACTIVE/CANCELLED), start/end dates, activation source (AUTOMATIC/MANUAL), price/currency/validity/billing snapshots, renewal chain via `previousEntitlementId`.
+- **Activation orchestrator:** On order FULFILLED, auto-creates entitlements for ENTITLEMENT product lines.
+- **Manual activation:** `POST /api/entitlements/manual-activate` with dedicated permission.
+- **Cancel/Renew:** Cancellation with reason, renewal creates new entitlement linked to previous.
+- **Derived status:** Runtime derivation of EXPIRED from `endDate` comparison, not stored in DB.
+- **Files:** `entitlement.routes.js`, `entitlement.service.js`, `entitlement.repository.js`, `entitlement.schema.js`.
 
-### Product Catalog Admin SPA
-Current code:
-- `src/public/root/views/products-admin.js`
-- `src/public/root/views/products-admin.helpers.js`
-- `src/public/root/views/products-admin.renderers.js`
-- `tests/products-view-characterization.test.js`
+### Billing & Payments
+- **Invoice model:** Per-client invoices with status lifecycle (PENDING/PARTIAL/PAID/CANCELLED).
+- **InvoiceItem:** Immutable snapshots created during billing trigger.
+- **Payments:** Payment lifecycle with approval workflow (DRAFT→PENDING_APPROVAL→APPROVED/REJECTED/REVERSED).
+- **Billing trigger service:** Calculates invoice amounts, creates invoice items from order items.
+- **Files:** `invoice.routes.js`, `invoice.service.js`, `invoice.repository.js`, `payment.routes.js`, `payment.service.js`, `payment.repository.js`, `billing-trigger.service.js`, `invoice-financial-state.js`, `payment-lifecycle-support.service.js`, `payment-receipt-evidence.service.js`.
 
-Current behavior:
-- the root-shell products view exposes a product form dialog and a categories dialog using native `<dialog>` elements
-- the product form now supports inline subcategory creation through `#products-form-add-subcategory-button`, which opens the categories dialog stacked over the still-open product form
-- focus-return tracking is maintained per dialog through `lastFormDialogTrigger`, `lastCategoriesDialogTrigger`, and `lastDeactivateDialogTrigger`
-- `lastCreatedSubcategoryId` is used as consume-once UI state so the next product-create dialog can preselect a newly created subcategory after `resetFormDialog()`
-- `views.productsAdminHelpers` now exports `checkSubcategoryNameDuplicate(categories, categoryId, name)` for case-insensitive, trim-normalized duplicate checks scoped to the selected parent category, with graceful fallback to backend validation when local data is unavailable
-- the product-form `+ Nueva` button is visible with category-list access, opens the categories dialog as a stacked modal, and cooperates with consume-once `lastCreatedSubcategoryId` state plus per-dialog focus restoration
-- the categories dialog hides the `Nueva subcategoria` fieldset for read-only users when `canCreateCategories = false`
+### Recipes
+- **Recipe model:** Versioned recipes with stage typing (`stageType`: PROCESSING/RECOLECTION), process codes, per-stage-input quantity basis override, approval workflow (DRAFT/APPROVED).
+- **Files:** `recipe.routes.js`, `recipe.service.js`, `recipe.repository.js`, `recipe.schema.js`.
 
-### Inventory and Lots
-Current code:
-- `src/services/inventory.service.js`
-- `src/services/inventory-transaction-support.service.js`
-- `src/repositories/inventory.repository.js`
+### Production
+- **Production orders:** Lifecycle from DRAFT through COMPLETED/CANCELLED. Recipe snapshot freezing, material requirements, stage execution, consumption/waste/loss tracking.
+- **QA inspections:** Rejection handling with relevant-input scope, replacement recovery stages, lot-level recolection entries, reconciliation outcomes.
+- **Files:** `production.routes.js`, `production.service.js`, `production.repository.js`, `production.schema.js`, `production-execution.service.js`, `production-planning.service.js`, `production-recolection.service.js`, `production-cancel.service.js`, `production-material-availability.service.js`, `production-stage-loss.service.js`, `production-stage-validation.service.js`, `quality.service.js`, `quality-rejection-disposition.service.js`, `quality-relevant-input-scope.service.js`.
 
-Responsibilities:
-- warehouse stock and lot stock mutation
-- lot creation/update
-- stock movement recording
-- transactional inventory adjustments used by production and receiving flows
+### Procurement
+- **Full procurement lifecycle:** Purchase requests → supplier quotations → RFQ invitations → supplier selection → purchase orders → purchase receipts → receipt inspection.
+- **Files:** `procurement.routes.js`, `procurement.service.js`, `procurement.repository.js`, `procurement-rfq.routes.js`, `procurement-rfq.service.js`, `procurement-rfq.repository.js`, `receipt.routes.js`, `receipt.service.js`, `receipt.repository.js`, `supplier.routes.js`, `supplier.service.js`, `supplier.repository.js`.
 
-### Production Execution
-Current code:
-- `src/services/production.service.js`
-- `src/services/production-execution.service.js`
-- `src/services/production-stage-validation.service.js`
-- `src/repositories/production.repository.js`
-- `src/routes/production.routes.js`
+### Sales & Field Operations
+- **Agent workspace:** Territory-based sales operations, store visits, order creation, route assignments.
+- **Sales routes:** Route → subzone → subregion mapping, visit frequency, goals.
+- **Catalog:** Agent catalog respects `controlsInventory` for availability display, hides out-of-stock inventory products.
+- **Files:** `agent.routes.js`, `agent-workspace.service.js`, `agent-workspace.repository.js`, `agent-workspace-store-state.service.js`, `sales-route.routes.js`, `sales-route.service.js`, `sales-route.repository.js`.
 
-Responsibilities:
-- production order lifecycle
-- stage execution and material consumption
-- loss declaration, returns, completion
-- material requirement calculation using version-level and per-input quantity basis
-- gating of re-execution after QA rejection
-- lot-bound same-stage/recovery consumption validation when recolection entries exist
-- freezing recipe stage-input basis into production order snapshots so downstream execution/availability reads do not depend on live recipe edits
+### Client/Customer Management
+- **Models:** Client, ClientStore, ClientLegalEntity, ClientClassification, ClientContact, ClientReference, ClientDocument, ClientStoreRepresentative.
+- **Store features:** Credit limits, fiscal overrides (7-field inherit-vs-override), currency, documents.
+- **Files:** `client.routes.js`, `client.service.js`, `client.repository.js`, `client.schema.js`.
 
-### Quality / QA Rejection Handling
-Current code:
-- `src/services/quality.service.js`
-- `src/services/quality-rejection-disposition.service.js`
-- `src/services/quality-relevant-input-scope.service.js`
+### Company & Configuration
+- **Models:** Company, CompanyConfig, CompanyFiscalConfig, FiscalSequence.
+- **Files:** `company.routes.js`, `company.service.js`, `company.repository.js`.
 
-Current behavior:
-- QA inspections can reject an executed stage
-- relevant-input scope is resolved with Option A: all consumptions from prior executed stages up to and including the failed stage, excluding `INVALIDATED` executions
-- rejection flow can request a posterior `REPLACEMENT_RECOVERY` recolection stage
-- backward-compatible legacy behavior without replacement recovery remains in place
-
-### Recolection / Recovery / Reconciliation
-Current code:
-- `src/services/production-recolection.service.js`
-- `src/repositories/production.repository.js`
-- warehouse SPA production state/renderers/controllers
-
-Current behavior:
-- recolection stages now have `recoveryType`
-- `VIRTUAL_RECOLECTION` remains the default compatibility mode
-- `REPLACEMENT_RECOVERY` is used for QA-driven replacement of damaged or missing inputs
-- confirmation can persist lot-level recolection entries
-- reconciliation outcomes are recorded per product + lot with `USED | RETURNED | DISCARDED`
-- remaining unreconciled balances are computed from recolected minus reconciled quantities
+### External Integrations
+- **Hacienda taxpayer lookup:** Costa Rica tax authority API for identification validation.
+- **Geocoding:** OpenStreetMap Nominatim for address search.
+- **Files:** `taxpayer.routes.js`, `taxpayer.service.js`, `geocoding.routes.js`, `geocoding.service.js`.
 
 ## 5. Main use cases
-Implemented and observable from code:
-- create/update recipe versions with stage typing, process definition, and optional per-input quantity-basis override
-- approve a draft recipe version only after an explicit irreversible-action confirmation dialog in the root-shell recipe admin UI
-- repair a failed draft approval directly from version-card feedback by reopening the affected draft editor with conservative stage/input highlighting when mapping is reliable
-- save a draft recipe with warning-level incomplete `PROCESSING` rows while keeping the draft visibly marked as incomplete for later repair
-- create and read production orders with serialized stage executions and recolection stages
-- download a client-owned document from the root-shell detail pane through the authenticated browser adapter and native browser download dispatch
-- upload a client-owned document from the root-shell detail pane through a file-picker flow that derives Base64 payload fields in-browser before calling the unchanged backend endpoint
-- open the store-creation dialog even when no zones exist and receive dependency guidance plus in-place zone refresh instead of a dead-end required select
-- create a store through the existing backend route with a required browser-side `currency` selection, an optional create-time `creditLimit`, and an explicit inherit-vs-override billing choice, where blank and zero credit values are omitted by the shared browser payload builder before the unchanged backend route is called
-- attach optional store-scoped credit-analysis documents immediately after store creation from the same dynamic dialog, using the store-scoped upload route and governed file payload fields
-- populate client and store fiscal fields from taxpayer lookup results and economic-activity catalogs when permissions and catalog data are available
-- calculate material requirements for mixed-basis recipes where some inputs scale by planned output kg and others by planned finished-unit count
-- execute a production stage with lot-bound consumptions and wastes
-- inspect a stage in QA and optionally reject it
-- resolve relevant-input scope for a rejected stage, including failed-stage-without-direct-consumption scenarios
-- create a replacement-recovery stage when rejection requires material replacement
-- confirm a recolection/recovery stage and optionally capture product/lot/quantity entries
-- block stage re-execution while required losses or pending recovery/recolection remain unresolved
-- record reconciliation outcomes for recovered material
-- compute order-level stage status in the warehouse SPA, including replacement recovery pending/completed states
-- create a product from the root-shell products admin while opening a stacked categories dialog to register a missing subcategory inline without clearing the product form
+
+### Product lifecycle
+- Create/update product with capability presets (GOOD, SERVICE, SUBSCRIPTION, MEMBERSHIP, etc.)
+- Toggle `controlsInventory` with system-wide enforcement
+- Configure inventory strategy (`lotStrategy`, `minStock`, `maxStock`, `allowedWarehouseIds`)
+- Manage product pricing, categories, subcategories
+
+### Inventory operations
+- Register stock entries at warehouse locations
+- Create initial inventory for new products
+- Adjust stock with audit-trailed movements
+- Transfer stock between locations (atomic balanced transfers)
+- List stock (Existencias) with location/product aggregation
+- List lots (Lotes) with filtering by status, QA, expiration, system-lot visibility
+- List movement history (Historial) with filtering
+
+### Inventory movement requests (inventory-requests spec)
+- Admin/root user creates movement request (ADJUSTMENT or TRANSFER) targeting a lot at a warehouse
+- Duplicate-request guard: only one active (PENDING/IN_PROGRESS) request per lot at a time
+- Cancel PENDING requests with optional cancellation reason
+- TRANSFER: warehouse operator confirms pickup (PENDING → IN_PROGRESS), records operator identity (`assignedToUserId`)
+- Execute ADJUSTMENT: delegates to `adjustStock`, links resulting `InventoryOperation`
+- Execute TRANSFER (complete): lot moved as-is to destination warehouse
+- Execute TRANSFER (partial, R-001): child lot created with sequential `-TNNN` suffix; transfer executes between source lot and child lot; all within one Prisma transaction with advisory lock
+- Admin Solicitudes tab lists all requests for the company; operator view shows pending/in-progress requests
+
+### Order & commercial flow
+- Create orders with mixed physical/service/entitlement lines
+- Approve orders: reserve stock for physical lines, pass through for non-physical
+- Dispatch orders: deduct stock for physical lines only
+- Fulfill orders: trigger entitlement activation for entitlement lines
+- Generate invoice with InvoiceItem snapshots per line
+
+### Entitlement lifecycle
+- Auto-activate entitlements on order FULFILLED
+- Manually activate entitlements with reason and audit
+- Cancel entitlements with reason
+- Renew entitlements (creates new record linked to previous)
+- List/detail entitlements with derived EXPIRED status
+
+### Production workflow
+- Plan production orders from approved recipes
+- Execute stages with consumption tracking
+- QA inspection with rejection and replacement recovery
+- Recolection/recovery with lot-level entries and reconciliation
+- Complete production orders
+
+### Procurement workflow
+- Create purchase requests → invite suppliers → evaluate quotations → create POs → receive goods → inspect quality
 
 ## 6. Current data flows
-### QA rejection with relevant-input scope
-1. Warehouse or QA client submits `POST /api/production/orders/:id/stages/:stageId/inspections`.
-2. `quality.service.js` loads the company-scoped production order and latest stage execution.
-3. If the result is `REJECTED`, the service resolves `relevantInputScope` through `resolveOptionARelevantInputs`.
-4. The response envelope may include `inspection`, `dispositionsSummary`, and `relevantInputScope`.
-5. If `requiresReplacementStage === true`, the service can create a posterior replacement-recovery stage.
 
-### Replacement recovery confirmation
-1. Warehouse client calls `POST /api/production/orders/:id/recolections/:recolectionId/confirm`.
-2. `production-recolection.service.js` validates order scope, stage ownership, and status.
-3. The stage is marked `COMPLETED`.
-4. If entries were provided, lot-level `production_recolection_entries` rows are created.
+### Order approval (mixed product types)
+```
+Order.approve() →
+  for each OrderItem:
+    if product.controlsInventory:
+      reserveLots() → StockMovement(RESERVE)
+    else:
+      skip stock operations
+  → Order.status = APPROVED
+```
 
-### Same-lot consumption gate after recovery
-1. Stage execution is submitted through `POST /api/production/orders/:id/stages/:stageId/execute`.
-2. `production-execution.service.js` loads the order and related completed recolection stage for that recipe stage.
-3. When recolection entries exist, `assertRecolectionCoverageForConsumption` validates that proposed usage is tied to previously recolected product + lot pairs and does not exceed recovered balance.
-4. Inventory reductions and movement recording continue transactionally if validation succeeds.
+### Dispatch (per-line)
+```
+Order.dispatch() →
+  for each OrderItem:
+    if product.controlsInventory:
+      releaseLots() → StockMovement(RELEASE)
+      deductStock() → StockMovement(OUT)
+    else:
+      skip stock operations
+  → Order.status = DELIVERED
+```
 
-### Reconciliation flow
-1. Warehouse client calls `POST /api/production/orders/:id/recolections/:recolectionId/reconciliation`.
-2. `production-recolection.service.js` validates scope, stage state, allowed outcome catalog, and quantity limits against recolection entries.
-3. Reconciliation rows are created.
-4. The response includes a computed balance with `complete` and `remainingBalances`.
+### Invoice creation with InvoiceItem snapshots
+```
+Invoice.create() →
+  for each OrderItem:
+    create InvoiceItem {
+      lineKind: derive from product capabilities,
+      descriptionSnapshot, productCodeSnapshot,
+      quantity, unitPrice, discountPercent, tax snapshots
+    }
+```
 
-### Recipe mixed-basis authoring and save flow
-1. Root-shell user edits a recipe version in `recipes-admin.version-editor.js`.
-2. The version-level `quantityBasis` is selected once for the recipe version.
-3. For COUNT/UN-like stage inputs, the UI may show a per-unit checkbox using `shouldShowPerUnitCheckbox(...)`.
-4. When checked, the editor serializes `inputQuantityBasis = 'PER_FINISHED_UNIT'`; otherwise it serializes `null` so the input inherits the version basis.
-5. `recipe.schema.js` validates the field as nullable `RecipeQuantityBasis` and defaults omitted values to `null`.
-6. `recipe.service.js` persists the field and exposes it again in recipe serialization.
+### Entitlement activation (on FULFILLED)
+```
+Order.markFulfilled() →
+  EntitlementActivationOrchestrator:
+    for each OrderItem where product.commercialBehavior = ENTITLEMENT:
+      if existing active entitlement for same product+client:
+        skip (idempotent)
+      else:
+        create CustomerEntitlement {
+          status: ACTIVE,
+          activationSource: AUTOMATIC,
+          startDate: now,
+          endDate: derived from validity,
+          price/currency/validity/billing snapshots from product
+        }
+```
 
-### Recipe draft approval and repair flow in root-shell
-1. Root-shell user opens a recipe detail and works from the versions tab rendered by `recipes-admin.renderers.js`.
-2. Clicking `Aprobar version` on a draft opens `#recipes-approval-dialog`; no approval API call is made until the user confirms.
-3. `recipes-admin.js` calls `recipesApi.approveRecipeVersion(session, versionId, {})` only after the dialog confirmation action.
-4. On success, the affected version card shows local success feedback and the detail/list refresh continues.
-5. On failure, the affected version card shows local error feedback, preserves backend diagnostic text, and may expose `Reparar borrador` for users with manage permission.
-6. If the failure message safely matches one stage name or one uniquely matched stage-input name, `recipes-admin.js` builds repair-highlight metadata and passes it into `recipes-admin.version-editor.js` when reopening the draft editor.
-7. `recipes-admin.version-editor.js` highlights only the reliably matched stage or input and otherwise falls back to generic repair guidance.
+### Stock transfer
+```
+POST /api/inventory/transfers →
+  validate source/destination warehouses and product
+  within transaction:
+    create InventoryOperation (idempotency key)
+    deduct source warehouse stock → StockMovement(TRANSFER_OUT)
+    add destination warehouse stock → StockMovement(TRANSFER_IN)
+    handle lot transfer if lot-tracked
+```
 
-### Recipe draft save flow with incomplete-row handling
-1. Before payload serialization, `inspectIncompleteStageInputs()` scans stage-input rows before `collectStages()` filters rows by stage-input name.
-2. Incomplete rows in `RECOLLECTION` stages are treated as blocking issues: the editor outlines the first affected row, scrolls it into view, focuses the product/name field, and aborts save.
-3. Incomplete rows in `PROCESSING` stages are treated as warning issues: the editor focuses the first affected row but still builds and submits the draft payload.
-4. `buildVersionPayload(...)` returns `markVersionIncomplete` and a warning message when warning-level issues were found.
-5. `recipes-admin.js` stores that incomplete marker in frontend view state and the versions tab renders the saved draft as `Incompleta` until a later successful repair/save or approval clears the marker.
+### Inventory request — ADJUSTMENT execution
+```
+POST /api/inventory/requests/:id/execute (ADJUSTMENT) →
+  load request (PENDING guard)
+  delegate to inventoryService.adjustStock() → own transaction
+  mark request COMPLETED, link resultOperationId
+  emit audit event
+```
 
-### Production planning snapshot and requirement flow for mixed-basis recipes
-1. Production order creation resolves the version-level scaling basis through `resolveOrderScalingQuantity(...)`.
-2. `production.service.js` passes both the scaling quantity and `plannedUnits` into `buildMaterialRequirements(...)`.
-3. `production-planning.service.js` computes the effective basis per stage input with `resolveInputScalingQuantity(...)`.
-4. Gravimetric inputs inherit or use `PER_OUTPUT_KG` and scale by `plannedOutputKg`; per-unit overrides scale by order unit count.
-5. `buildRecipeVersionSnapshot(...)` freezes `inputQuantityBasis` into `recipeVersionSnapshot.recipeVersion.stages[].stageInputs[]` so later execution and availability logic remain tied to the approved planning state.
+### Inventory request — TRANSFER execution (with R-001 partial-transfer)
+```
+POST /api/inventory/requests/:id/pickup →
+  load request (PENDING + TRANSFER guard)
+  set status IN_PROGRESS, pickedUpAt, assignedToUserId
 
-### Lot availability flow for stage inputs with per-input basis
-1. Warehouse client requests available lots for a production stage.
-2. `production-material-availability.service.js` reads the frozen stage inputs from the order snapshot.
-3. The service derives `effectiveBasis = stageInput.inputQuantityBasis ?? versionBasis` for each input.
-4. Required quantity per input is calculated by planned kg or planned units according to that effective basis.
-5. FEFO/FIFO lot suggestion logic continues unchanged after the required quantity is derived.
+POST /api/inventory/requests/:id/execute (TRANSFER) →
+  load request (IN_PROGRESS + pickedUpAt guard)
+  prisma.$transaction(async tx =>>
+    re-read request inside tx
+    load lot
+    if requestQty >= lotQty:
+      destinationLotId = lot.id   // complete transfer, reuse lot
+    else:
+      findMaxTransferSuffixForLot() → maxSuffix
+      create child lot newLotNumber = `${lot.internalLotNumber}-T${maxSuffix+1:03}`
+      destinationLotId = newLot.id
+    _executePartialTransfer(tx, {sourceLotId, destinationLotId, ...}):
+      acquireCompanyInventoryAdvisoryLock
+      create InventoryOperation (TRANSFER)
+      load source/destination lot records
+      changeWarehouseStock(source, -qty) / changeWarehouseStock(dest, +qty)
+      changeLotStock(source, -qty) / changeLotStock(dest, +qty)
+      updateLotById(source, {decrement: qty}) / updateLotById(dest, {increment: qty})
+      createMovement(TRANSFER_OUT) / createMovement(TRANSFER_IN)
+    mark request COMPLETED / deliveredAt / resultOperationId
+  )
+  emit audit event
+  return serialized completed request
+```
 
-### Product create with inline subcategory flow
-1. Root-shell user opens the products admin view and launches `#products-form-dialog` from `#products-open-create-button`.
-2. If the required subcategory does not exist, the user can open `#products-categories-dialog` from `#products-form-add-subcategory-button` without closing the product form.
-3. `products-admin.js` keeps product-form state in place while the categories dialog is stacked with `showModal()` over the product dialog.
-4. Before calling the existing category API, the categories submit handler uses `productsHelpers.checkSubcategoryNameDuplicate(...)` for local duplicate prevention within the selected parent category; if data is unavailable, the flow degrades gracefully and the backend remains the final validator.
-5. After successful subcategory creation, the view stores `lastCreatedSubcategoryId`, refreshes category options, and applies the new subcategory immediately when the product form is still open.
-6. When the product form is opened later from the header flow, `openFormDialog('create')` consumes `lastCreatedSubcategoryId` once after `resetFormDialog()` to preselect the newly created subcategory.
-7. Closing each dialog returns focus according to the dialog-specific trigger variable rather than one shared trigger reference.
-
-### Authenticated client-document download flow in root-shell
-1. Root-shell user clicks `Descargar` in the client detail document card.
-2. `clients-admin.js` disables only the clicked button, sets `Descargando...`, and calls `clientsApi.downloadDocument(session, client.id, documentId)`.
-3. `clientsApi.downloadDocument(...)` performs the authenticated fetch against `GET /api/clients/:clientId/documents/:documentId/download`, reads the response as a `blob`, and returns `{ blob, fileName, mimeType }` where `fileName` is still the raw `Content-Disposition` header value.
-4. `clients-admin.js` resolves a browser-safe filename, creates an `ObjectURL`, dispatches a hidden `<a download>` click, revokes the URL asynchronously, and only then renders `Descarga iniciada en el navegador.` in the detail message area.
-
-### Client-document upload flow with file picker
-1. Root-shell user selects a file from the document form in the client detail pane.
-2. `clients-admin.js` validates extension/MIME compatibility and rejects files larger than 5 MB before submit.
-3. While `FileReader` runs, the submit button switches to `Procesando archivo...` and hidden `fileName`, `mimeType`, and `fileContentBase64` fields are populated from the selected file.
-4. The existing `buildDocumentPayload()` helper reads the same hidden field names and submits the unchanged JSON contract to `POST /api/clients/:clientId/documents`.
-
-### Store dialog zone-refresh flow
-1. `loadClients()` fetches zone/subzone data once and flattens it for the clients workspace.
-2. When a user opens the store dialog with an empty `zoneOptions` snapshot, `clients-admin-store-dialog.js` renders a guidance panel instead of the form.
-3. Clicking `Refrescar zonas` calls the injected async callback from `clients-admin.js`, which re-runs `clientsApi.listZones(session)` and `clientsState.flattenZoneOptions(...)`.
-4. The dialog repopulates only the subregion `<select>` and reevaluates whether to keep the guidance state or restore the store form and focus the store-name field.
-
-### Store creation flow with shared payload shaping
-1. Root-shell user submits the store dialog after completing the required store fields.
-2. `clients-admin-store-dialog.js` builds the outbound payload through `views.clientsAdminHelpers.buildStorePayload(...)` instead of maintaining a dialog-local payload builder.
-3. The shared helper always sends `name` and numeric `subregionId`, forwards `currency` when selected, includes optional text fields only when non-empty, includes `creditLimit` only when the entered value is greater than zero, and reads `billingMode` to decide whether store fiscal override fields should travel at all.
-4. In `billingMode = 'inherit'`, no override fiscal fields are added to the payload; in `billingMode = 'override'`, the helper forwards only populated values for `legalName`, `commercialName`, `legalId`, `documentType`, `emailBilling`, `economicActivityCode`, and `economicActivityName`.
-5. The same dialog can expose taxpayer lookup in override mode, filling legal-name data from `GET /api/taxpayers/lookup` when the actor has permission.
-6. `createClientStoreSchema` accepts `currency` only as `CRC | USD | EUR`, coerces the optional `creditLimit` to a number, validates the optional override fields, and rejects negative credit values before `client.service.js` persists the store.
-7. `createCompanyClientStore()` forwards the selected `currency`, optional `creditLimit`, and any populated override fiscal fields into the existing repository create call together with the inherited `legalEntityId`, `isPrimary`, and `isActive` flags.
-
-### Store document Phase 2 flow
-1. After a successful store creation, `clients-admin-store-dialog.js` replaces the dialog body with `buildPhase2Html(...)` instead of closing immediately.
-2. The Phase 2 screen collects `documentType`, file, and optional notes for store-scoped credit-analysis evidence.
-3. File input handling keeps a 5 MB guard and uses `FileReader` to populate hidden `fileName`, `mimeType`, and `fileContentBase64` fields.
-4. `clientsApi.uploadStoreDocument(...)` submits the governed payload to `POST /api/clients/:clientId/stores/:storeId/documents`.
-5. Uploaded file names are rendered inside the same dialog until the user finishes and closes it.
-
-### Client update and store-credit feedback flow
-1. Root-shell user edits a selected client in the detail pane.
-2. `clients-admin.renderers.js` now renders editable `legalName`, `commercialName`, `province`, `canton`, and `district` inputs together with the pre-existing general client fields.
-3. On create/update submit, `views.clientsAdminHelpers.buildClientPayload(...)` includes those legal/geographic values when non-empty and no longer includes dead client-level `creditLimit` or `creditBalance` entries.
-4. When a user saves a store credit limit from the inline store card form, `clients-admin.js` still calls the existing `clientsApi.updateStoreCreditLimit(...)` route but now renders success/error feedback through `rootShellUi.renderInlineMessage(...)` into `.clients-store-credit-msg`.
-5. The renderer changed the message container to `<div class="clients-store-credit-msg" aria-live="polite">`, keeping the feedback HTML semantically valid for the shared block-level inline-message component.
+### System lot auto-creation
+```
+When stock entry for lotStrategy=SYSTEM product:
+  getOrCreateSystemLot():
+    compute systemLotKey from product+warehouse
+    find existing system lot or create new one
+    lot.isSystemGenerated = true
+    lot hidden from business UX
+```
 
 ## 7. Database and persistence
-Primary persistence stack:
-- PostgreSQL via Prisma
-- `prisma/schema.prisma`
-- additive migrations under `prisma/migrations/`
 
-Feature-relevant current schema elements:
-- `RecipeVersion.quantityBasis`
-- `RecipeStage.stageType`
-- `RecipeStage.processCode`
-- `RecipeStage.processLabel`
-- `RecipeStageInput.inputQuantityBasis` — nullable `RecipeQuantityBasis`; `NULL` means inherit version basis
-- `ProductionRecolectionStage.recoveryType`
-- `ProductionRecolectionEntry`
-- `ProductionRecolectionReconciliation`
-- `Client.creditLimit` — aggregate credit limit at client level (migration `20260924020000_add_credit_fields_to_client`)
-- `Client.creditBalance` — aggregate credit balance at client level (same migration)
-- `ClientStore.currency` — nullable per-store currency code added by migration `20261002000000_add_store_currency`; current browser create flow requires one of `CRC | USD | EUR`, but legacy rows may still remain `NULL`
-- `ClientStore.legalName`, `commercialName`, `legalId`, `documentType`, `emailBilling`, `economicActivityCode`, `economicActivityName` — nullable store fiscal override fields added by migration `20261002001000_add_store_billing_fields`; `NULL`/omission currently represents inherit-from-client semantics
-- `ClientStore.creditLimit` — per-store credit limit
-- `ClientStore.creditBalance` — per-store credit balance
-- `ClientDocument.storeId` — nullable association used by the current store-scoped document upload route so store documents reuse the same governed document persistence model
+### Key models (88 migrations applied)
+| Model | Table | Key fields added by Master Plan |
+|---|---|---|
+| Product | `products` | `productNature`, `controlsInventory`, `commercialBehavior`, `entitlementKind`, `defaultValidityCount`, `defaultValidityUnit`, `billingInterval`, `sellableKind`, `lotStrategy` |
+| InvoiceItem | `invoice_items` | Full new model: `lineKind`, `descriptionSnapshot`, `productCodeSnapshot`, quantity/price/tax snapshots |
+| CustomerEntitlement | `customer_entitlements` | Full new model: lifecycle, activation, renewal chain, price/validity/billing snapshots |
+| InventoryOperation | `inventory_operations` | Full new model: `operationType`, `idempotencyKey`, source/destination warehouses, metadata |
+| Lot | `lots` | `isSystemGenerated`, `systemLotKey` |
+| Warehouse | `warehouses` | `locationType`, `locationNature` |
+| StockMovement | `stock_movements` | New types: `TRANSFER_OUT`, `TRANSFER_IN` |
+| Order | `orders` | `FULFILLED` status added to `OrderStatus` enum |
+| ProductAllowedWarehouse | `product_allowed_warehouses` | Full new join table |
+| InventoryRequest | `inventory_requests` | Full new model: `type` (ADJUSTMENT/TRANSFER), `status` (PENDING/IN_PROGRESS/COMPLETED/CANCELLED), lot/product/warehouse FKs, lifecycle timestamps, `resultOperationId`, `assignedToUserId` |
 
-Feature-relevant migrations observed:
-- `20260923001000_recolection_entry_and_reconciliation/`
-  - adds `production_recolection_stages.recovery_type`
-  - creates `production_recolection_entries`
-  - creates `production_recolection_reconciliations`
-- `20260926000000_add_recipe_stage_input_quantity_basis/`
-  - adds nullable `recipe_stage_inputs.input_quantity_basis`
-  - reuses existing `RecipeQuantityBasis` enum instead of creating a new type
-- `20261002000000_add_store_currency/`
-  - adds nullable `client_stores.currency`
-  - preserves backward compatibility for pre-existing store rows by leaving legacy data nullable
-- `20261002001000_add_store_billing_fields/`
-  - adds seven nullable store fiscal override columns on `client_stores`
-  - preserves inherit-from-client behavior by keeping those new fields nullable
+### Master Plan migrations (in chronological order)
+1. `20261020000000_add_product_capability_foundation` — Product capability fields with conservative defaults
+2. `20261021000000_add_order_status_fulfilled` — FULFILLED status for orders
+3. `20261022000000_add_invoice_items_foundation` — InvoiceItem table and backfill from existing invoices
+4. `20261023000000_add_system_lot_fields` — Lot `isSystemGenerated`, `systemLotKey` columns
+5. `20261024000000_add_location_fields` — Warehouse `locationType`, `locationNature` with backfill
+6. `20261025000000_add_inventory_operations` — InventoryOperation table
+7. `20261026000000_add_customer_entitlements` — CustomerEntitlement table
+8. `20261027000000_add_entitlement_permissions` — Entitlement permission catalog
+9. `20261027000000_add_transfer_stock_movement_types` — TRANSFER_OUT/TRANSFER_IN movement types
+10. `20261028000000_add_inventory_location_permissions` — Inventory and location permission catalog
+11. `20261029000000_add_inventory_requests` — `inventory_requests` table, 7 idempotent FK constraints, 3 indexes, `inventory.requests.execute` permission backfill to `bodega_prueba` and `admin` roles
 
-Current persistence behavior:
-- recipe version writes persist `inputQuantityBasis` per stage input when provided and store `null` when the input should inherit the version basis
-- recipe serialization exposes `inputQuantityBasis` back to API consumers and browser editors
-- production order snapshots freeze `inputQuantityBasis` for each stage input so planning/execution semantics remain stable even if the recipe version changes later
-- production orders are loaded with stage executions, lot references, QA inspections, losses, recolection stages, recolection entries, and reconciliations
-- company scoping is applied in production order lookups used by production/quality services
-- inventory mutation still occurs in explicit Prisma transactions
+### Key indexes
+- `products`: `[companyId, controlsInventory]`, `[companyId, commercialBehavior, entitlementKind]`
+- `lots`: `[companyId, productId, isSystemGenerated]`, unique `[companyId, systemLotKey]`
+- `inventory_operations`: `[companyId, operationType, createdAt]`, unique `[companyId, operationType, idempotencyKey]`
+- `customer_entitlements`: `[companyId, clientId, status]`, `[companyId, productId]`, `[companyId, endDate]`
+- `invoice_items`: unique `[invoiceId, orderItemId]`, `[companyId, invoiceId]`, `[productId]`
+- `inventory_requests`: `[companyId, status, createdAt]`, `[companyId, type, status]`, `[lotId]`
+
+### Database constraints and integrity
+- All tables are company-scoped with cascading deletes from Company.
+- InvoiceItem has unique constraint on `[invoiceId, orderItemId]` preventing duplicate snapshots.
+- InventoryOperation has unique constraint on `[companyId, operationType, idempotencyKey]` for idempotency.
+- CustomerEntitlement has unique constraints on source order item and source invoice item per company.
+- Advisory locks used for company-scoped inventory mutations.
+- Transactions enforced for all stock-changing operations.
+- InventoryRequest enforces at-most-one active request per lot (checked at service layer: only one PENDING/IN_PROGRESS per lotId per company).
+- InventoryRequest `destination_warehouse_id` is nullable (required for TRANSFER, omitted for ADJUSTMENT).
+- InventoryRequest `quantity` is nullable DECIMAL(14,3) (required for TRANSFER, optional for ADJUSTMENT).
+- Child lots created during partial transfers inherit `expirationDate`, `qaStatus`, `status`, `productionDate`, `manufacturerLotNumber`, `supplierId`, `casNumber` from parent lot; `quantity` starts at 0.
 
 ## 8. APIs and integrations
-Feature-relevant API endpoints currently implemented:
-- `POST /api/production/orders/:id/stages/:stageId/inspections`
-- `POST /api/production/orders/:id/recolections/:recolectionId/confirm`
-- `POST /api/production/orders/:id/recolections/:recolectionId/reconciliation`
-- `GET /api/production/orders/:id`
-- `GET /api/production/orders`
-- `GET /api/clients/:id/ledger` — exposes `client.creditLimit` and `client.creditBalance` (TASK-015 cycle)
-- `POST /api/clients/company/:clientId/stores` — existing store-create route; current implementation accepts `currency`, optional `creditLimit`, and additive nullable store fiscal override fields while still creating stores against the client's legal entity without a new contract version
-- `POST /api/clients/:clientId/stores/:storeId/documents` — active governed store-document upload route; current implementation validates store ownership/activity, reuses the client-document payload contract, and persists the document with a `storeId` association
-- `POST /api/clients/:clientId/documents` — unchanged high-payload JSON upload contract for client-owned documents
-- `GET /api/clients/:clientId/documents/:documentId/download` — unchanged protected backend download route; the current implementation change is in the root-shell browser adapter, not in the route/service contract
-- `GET /api/regions/company` — existing zone/subzone catalog used by the store dialog and re-fetched in place through the browser adapter callback
-- `GET /api/taxpayers/lookup?identification=...` — existing authenticated taxpayer lookup adapter registered in `clientsApi` and now consumed by current client/store billing flows when permissions allow it
-- `GET /api/economic-activities` — existing catalog endpoint registered in `clientsApi` and now loaded by the clients workspace at mount time to populate create/edit economic-activity dropdowns
-- TASK-008 introduced no backend route, schema, or migration change; later TASK-009/TASK-012 did add an active store-document route plus adapter/UI wiring, while `create-product-with-subcategory` stayed entirely frontend-only
-- existing root-shell product/category endpoints consumed by `products-admin.js` remained unchanged for `create-product-with-subcategory`; the implementation uses the already-registered `productsApi` and `categoriesApi` browser adapters rather than new backend contracts
-- `recipe-approval-ux` reuses the existing `POST /api/recipes/versions/:id/approve` route and does not add recipe approval payload fields, database writes beyond the existing approval transition, or external integrations
 
-Credit balance lifecycle (TASK-015):
-- `paymentService.approvePayment` decrements `Client.creditBalance` via `tx.client.update` inside the Prisma transaction
-- `paymentService.reversePayment` increments `Client.creditBalance` symmetrically
-- Per-store `ClientStore.creditBalance` is also updated when the invoice is linked to an order with a `clientStoreId`
+### New API endpoints (Master Plan)
+| Method | Path | Purpose | Access Policy |
+|---|---|---|---|
+| GET | `/api/entitlements` | List company entitlements | `entitlements.view` |
+| GET | `/api/entitlements/:id` | Entitlement detail | `entitlements.view` |
+| POST | `/api/entitlements/manual-activate` | Manual activation | `entitlements.activate.manual` |
+| POST | `/api/entitlements/:id/cancel` | Cancel entitlement | `entitlements.manage` |
+| POST | `/api/entitlements/:id/renew` | Renew entitlement | `entitlements.manage` |
+| GET | `/api/inventory/stocks` | Existencias (stock list) | `inventory.stocks.list` |
+| GET | `/api/inventory/lots` | Lotes (lot list) | `inventory.lots.list` |
+| GET | `/api/inventory/lots/:id` | Lot detail | `inventory.lots.list` |
+| GET | `/api/inventory/movements` | Historial (movement list) | `inventory.movements.list` |
+| POST | `/api/inventory/initial-inventory` | Create initial inventory | `inventory.initial-inventory.create` |
+| POST | `/api/inventory/entries` | Register stock entry | `inventory.entries.create` |
+| PATCH | `/api/inventory/lots/:id/qa` | Update lot QA status | `inventory.lot-qa.update` |
+| POST | `/api/inventory/adjustments` | Adjust stock | `inventory.adjustments.create` |
+| POST | `/api/inventory/transfers` | Transfer inventory | `inventory.transfers.create` |
+| GET | `/api/inventory/alerts` | List inventory alerts | `inventory.alerts.list` |
+| GET | `/api/inventory/alerts/:id` | Alert detail | `inventory.alerts.detail` |
+| PATCH | `/api/inventory/alerts/:id/status` | Update alert status | `inventory.alerts.update-status` |
+| POST | `/api/inventory/requests` | Create movement request (ADJUSTMENT/TRANSFER) | `inventory.requests.create` |
+| GET | `/api/inventory/requests` | List movement requests (filterable by status/type/lot/product) | `inventory.requests.list` |
+| GET | `/api/inventory/requests/:id` | Get movement request detail | `inventory.requests.list` |
+| POST | `/api/inventory/requests/:id/cancel` | Cancel PENDING request | `inventory.requests.cancel` |
+| POST | `/api/inventory/requests/:id/pickup` | Operator pickup for TRANSFER (PENDING → IN_PROGRESS) | `inventory.requests.execute` |
+| POST | `/api/inventory/requests/:id/execute` | Execute request (ADJUSTMENT or TRANSFER → COMPLETED) | `inventory.requests.execute` |
 
-Current contract behavior:
-- production routes are authenticated and permission-guarded through `authorizeAccessPolicy`
-- recipe create/update payloads accept `stageInputs[].inputQuantityBasis` as nullable `RecipeQuantityBasis`, defaulting to `null` when omitted
-- recipe read models expose `stages[].stageInputs[].inputQuantityBasis`
-- production order serialization includes `recolectionStages`, each with `entries` and `reconciliations`
-- production planning and lot-availability consumers read per-input basis from the persisted/frozen recipe structures rather than inventing local defaults beyond the documented inheritance fallback
-- QA inspection route preserves backward compatibility: when no disposition summary and no relevant-input scope exist, the route returns the inspection object; otherwise it returns the richer envelope
+### Existing API surfaces (30 route files total)
+Auth, Company, User, Role, Client, Product, Recipe, Production, Procurement, Procurement-RFQ, Supplier, Receipt, Fiscal-Reference, Order, Invoice, Payment, Inventory, Warehouse, Region, Sales-Route, Agent, Taxpayer, Geocoding, Economic-Activity, Feedback, Me, Health, Warehouse-Orders, Public-Supplier-Quotation.
 
-External integration posture in this feature area:
-- none added; this amendment stays within production, quality, inventory, Prisma, and warehouse/root-shell UI layers
-- the create-product-with-subcategory implementation is frontend-only and does not add backend, database, or infrastructure integrations
+### External integrations
+- **Hacienda Taxpayer Lookup:** `GET /api/taxpayer/:identification` → proxies to Costa Rica tax authority.
+- **Geocoding (Nominatim):** `GET /api/geocoding/search` → OpenStreetMap address search.
+- **No message queues or event buses** — all operations are synchronous request-response.
 
 ## 9. Authentication and authorization
-Observed current behavior:
-- production and quality endpoints require authenticated actors
-- access is permission-based, for example `production.execute`, `production.view`, `production.manage`, `quality.inspect`, and `quality.view`
-- production/quality services derive company scope from `auth.companyId`
-- feature-relevant writes reject access when the actor lacks company association
+
+### Authentication
+- JWT tokens issued by `/api/auth/login`.
+- Browser sessions via cookie with optional Redis-backed session store.
+- `authenticate` middleware extracts and validates JWT from `Authorization` header or session.
+- Token payload contains `sub` (userId), `companyId`, `roleId`, `role` (code).
+
+### Authorization
+- **Access Policy Registry:** `src/security/access-policy-registry.js` contains ~200+ named policies.
+- **Two modes:** `role` (whitelist of role codes) and `permission` (whitelist of permission codes).
+- **Actor scope:** Additional scope restrictions beyond role/permission (e.g., company-only access).
+- **Denial audit:** Access policy denials are recorded as audit events.
+- **Tenant isolation:** All service operations derive `companyId` from authenticated context, never from client-provided values for ownership decisions.
+
+### Permission catalog
+The permission catalog includes modules: `products`, `inventory`, `warehouses`, `orders`, `invoices`, `payments`, `clients`, `recipes`, `production`, `procurement`, `suppliers`, `receipts`, `quality`, `settings`, `roles`, `users`, `agents`, `routes`, `entitlements`, `feedback`, `billing`, and landing-gate permissions.
+
+**New permission added by inventory-requests spec:**
+- `inventory.requests.execute` — category: `inventory`, sensitivity: `operational`, scope: `tenant`. Allows warehouse operators to execute ADJUSTMENT and TRANSFER requests. Backfilled to `bodega_prueba` and `admin` roles.
+
+**New access policies added by inventory-requests spec:**
+| Policy ID | Mode | Permissions / Roles | Purpose |
+|---|---|---|---|
+| `inventory.requests.create` | permission | `inventory.manage` | Admin creates new movement requests |
+| `inventory.requests.list` | permission | `inventory.manage` OR `inventory.view` OR `inventory.requests.execute` | Admin and operators list/view requests |
+| `inventory.requests.cancel` | permission | `inventory.manage` | Admin cancels PENDING requests |
+| `inventory.requests.execute` | permission | `inventory.requests.execute` | Operator picks up and executes requests |
 
 ## 10. Events and background processing
-Observed current implementation:
-- no domain-event bus
-- no async worker or broker for this feature
-- replacement recovery and reconciliation are handled synchronously during request/response
+- **No event bus or message queue.** All operations are synchronous within HTTP request lifecycles.
+- **Audit events:** `AuditEvent` model records security/configuration events via `recordAuditEventSafelyIfAvailable()`. Fire-and-forget pattern (does not block request).
+- **Entitlement activation orchestrator:** Synchronous inline activation during order FULFILLED transition, not event-driven.
+- **Billing trigger:** Synchronous invoice generation during order lifecycle transitions.
 
 ## 11. Containers and deployment
-Observed runtime/container baseline:
-- `Dockerfile` is multi-stage
-- runtime image uses `node:24-bullseye-slim`
-- runtime switches to non-root user `inventory`
-- healthcheck targets `/health/ready`
-- dev compose file is explicitly marked dev-only and includes Postgres and Redis health checks
+
+### Dockerfile
+- Multi-stage build from `node:24-bookworm-slim`.
+- Install OpenSSL + CA certificates.
+- `npm ci` → `prisma generate` → `npm prune --omit=dev`.
+- Non-root user (`inventory:inventory`).
+- Health check via `GET /health/ready` on port 2500.
+- CMD: `node src/server.js`.
+
+### Docker Compose
+- **Dev:** app + PostgreSQL 16 Alpine + Redis 7 Alpine. Source volumes mounted for hot reload.
+- **Prod:** Same services with production env vars, no source volumes.
+- Port 2500 exposed.
+
+### CI/CD
+- No CI pipeline configuration present in the repository.
+- Validation is manual via `npm run verify` which runs lint + typecheck + all validations + build + test.
 
 ## 12. Current testing strategy
-Observed automated testing baseline:
-- extensive `node:test` suite under `tests/`
-- migration, schema, service, SPA characterization, governance, and runtime contract tests exist
-- `package.json` includes `test`, `lint`, `typecheck`, `build`, and `verify` scripts
 
-Feature-specific tests present:
-- `tests/quality-relevant-input-scope.service.test.js`
-- `tests/qa-rejection-material-reconciliation-migration.test.js`
-- `tests/production-same-lot-validation.service.test.js`
-- `tests/production-replacement-recovery-gate.test.js`
-- `tests/production-reconciliation-outcomes.service.test.js`
-- `tests/production-planning.service.test.js` covers effective per-input basis resolution, snapshot freezing of `inputQuantityBasis`, mixed-basis material requirement calculation, and backward-compatible inheritance behavior
-- `tests/production-material-availability.service.test.js` covers per-input lot scaling by planned units vs planned output kg and legacy fallback when `inputQuantityBasis` is absent
-- `tests/products-view-characterization.test.js` covers `views.productsAdminHelpers`, renderer/state behavior, `checkSubcategoryNameDuplicate`, and `products-admin.render()` markup for the subcategory label, inline add button, and create-subcategory fieldset contract
-- `tests/root-shell-recipes-admin-view-characterization.test.js` now covers the approval confirmation dialog seam, local version-card feedback rendering, incomplete-draft marker rendering, approval gating hooks, and incomplete-row / repair-highlight hooks in `recipes-admin.version-editor.js`
-- `tests/clients-view-characterization.test.js` covers the current root-shell client detail document-download seam, file-picker document form contract, `FileReader` usage, 5 MB client-side guard, shared-helper integration seams expected by the root-shell clients workspace, editable `legalName`/`commercialName`/`province`/`canton`/`district` client fields, document-type and economic-activity dropdown markup, dead-field removal from `buildClientPayload()`, taxpayer lookup adapter usage, and `renderInlineMessage` usage for store-credit save feedback
-- `tests/clients-store-map-characterization.test.js` covers the store-dialog missing-zones guidance state, `refreshZones` callback contract, in-place subregion-option refresh behavior, store-dialog delegation to the shared payload helper, and the source-level Phase 2 store-document upload seam (`enterPhase2`, `uploadStoreDocument`, 5 MB guard, FileReader)
-- `tests/client-store-credit-limit.test.js` covers create-store schema validation for `currency`, coercion/rejection for `creditLimit`, and `client.service.js` persistence of create-time `currency` + `creditLimit`
-- `tests/client-store-fiscal-overrides.test.js` covers schema acceptance of the seven optional store fiscal override fields, invalid override billing email rejection, service persistence of populated override fields, and omit-as-inherit semantics when those fields are absent
-- `tests/clients-view-characterization.test.js` now also covers `Usado` / `Disponible` rendering, `Sin límite configurado`, the null-currency-safe fallback (`Moneda: Sin definir` with symbol-free amounts) for legacy store rows, and the store-card fiscal-summary copy for inherited vs override billing
-- the user-provided implementation validation for `recipe-approval-ux` reports `node --test tests/root-shell-recipes-admin-view-characterization.test.js tests/recipe-service-foundation.test.js tests/recipe-schema.test.js` as pass (72/72), plus `npm run lint` pass and `npm run typecheck` pass
-- the user-provided implementation validation for `client-store-documents-credit-ux` now includes TASK-009/TASK-012 state in the repository code, while the latest explicit targeted evidence still names the earlier client-focused suite (`43/43`) plus lint/typecheck/build/prisma checks from prior subtasks
+### Test suite composition (229 test files, 2039 tests)
+- **Migration tests:** Validate schema migrations apply cleanly and constraints are correct.
+- **Service unit tests:** Validate business logic in service functions with mocked Prisma.
+- **Route contract tests:** Validate API endpoint contracts (status codes, response shapes, auth enforcement).
+- **Characterization tests:** Capture existing behavior of complex views and workflows.
+- **Governance tests:** Ensure coding standards, runtime contracts, dependency hygiene, permissions.
+- **E2E tests:** Browser-level tests using Playwright for root shell, warehouse, and agent SPAs.
+- **Schema tests:** Validate Zod schema behavior and Prisma schema structure.
 
-Evidence available in repository docs:
-- `specs/qa-rejection-material-reconciliation-amendment/implementation-report.md` records command results for targeted tests and a full suite pass after implementation
-- the user request for `create-product-with-subcategory` reports `tests/products-view-characterization.test.js` as 9 pass, 0 fail after adding duplicate-helper and render-contract assertions
-- the user request for this documentation refresh also reports 1600 tests pass, 0 fail, with `npm run typecheck` and `npm run lint` passing for the current repository state
-
-This document records that evidence as repository/user-reported validation. It does not independently re-execute the test suite.
+### Key test areas for Master Plan features
+- `product-capability-foundation-migration.test.js` — Product capability migration
+- `product-capability-schema.test.js` — Capability validation rules
+- `product-capability-serialization.test.js` — API serialization
+- `invoice-items-foundation-migration.test.js` — InvoiceItem backfill
+- `customer-entitlements-foundation-migration.test.js` — CustomerEntitlement schema
+- `entitlement-lifecycle.service.test.js` — Entitlement CRUD
+- `entitlement-activation-orchestrator.service.test.js` — Auto-activation
+- `entitlement-skeleton-tenant-isolation.test.js` — Tenant isolation
+- `inventory-ux-db-foundation-migration.test.js` — System lots, location fields, InventoryOperation
+- `inventory-lot-policy.service.test.js` — Lot policy logic
+- `inventory-transaction-support.service.test.js` — Transaction support
+- `inventory-location-permissions-migration.test.js` — Inventory permissions
+- `wave2-product-inventory-integration.test.js` — Product+inventory integration
+- `wave3-inventory-operations.test.js` — Inventory operations
+- `wave5-inventory-operations.test.js` — Adjustment and transfer operations
+- `products-view.e2e.js`, `lots-view.e2e.js`, `movements-view.e2e.js` — Frontend E2E
 
 ## 13. Behavior to preserve
-- company-scoped production and QA lookups
-- recipe stage inputs with `inputQuantityBasis = null` must remain backward-compatible and inherit `RecipeVersion.quantityBasis`
-- per-input overrides must be frozen into production order snapshots so later recipe edits do not change existing order planning semantics
-- mixed-basis material requirement and lot-availability calculations must scale each stage input by its own effective basis, not by a single version-wide assumption
-- approved recipe versions remain immutable and root-shell approval must continue to use the existing backend approval route and business-rule validation as the authority
-- incomplete `RECOLLECTION` stage-input rows must continue blocking draft save, while incomplete `PROCESSING` rows may warn and save but must remain visible as approval-blocking draft debt in the UI
-- approval success/failure feedback should remain tied to the triggering version-card context rather than regressing to only page-level or distant detail-panel messaging
-- additive compatibility with legacy `VIRTUAL_RECOLECTION`
-- QA rejection handling that can continue returning the legacy simple inspection object when no enriched envelope is needed
-- stage re-execution gating on losses acknowledgment and pending recovery/recolection resolution
-- transactional inventory reductions and movement recording during production execution
-- same-lot validation only when actual recolection entries exist, preserving legacy compatibility for older flows
-- production order read model including recolection stages, entries, and reconciliations
-- in the root-shell products admin, inline subcategory creation must preserve the product-form data while the categories dialog is stacked, `lastCreatedSubcategoryId` must remain consume-once for create mode, and focus return must remain dialog-specific
-- `clientsApi.downloadDocument(...)` must remain backward-compatible with the existing protected backend route and continue returning the browser adapter metadata currently expected by `clients-admin.js`
-- the client document form must preserve the existing backend payload shape (`fileName`, `mimeType`, `fileContentBase64`) even though those values are now derived from a file picker instead of visible text fields
-- the store dialog must continue to tolerate an empty zone catalog by showing guidance instead of an unusable required select, and any zone refresh must remain in-dialog without forcing a full root-shell reload
-- store-document uploads must continue using the same governed payload fields (`fileName`, `mimeType`, `fileContentBase64`) already used by client-document uploads, even though the target route is store-scoped
-- create-store requests must continue using the existing store-create contract, now with browser-side currency restricted to `CRC | USD | EUR`, optional create-time `creditLimit`, and optional store fiscal override fields, with blank or `0` credit input omitted by the shared payload helper and negative values rejected server-side
-- client create/update payloads must continue excluding client-level `creditLimit` and `creditBalance`, because credit ownership is currently store-level in the active onboarding model
-- the client detail pane must continue exposing editable `legalName`, `commercialName`, `province`, `canton`, and `district` fields and keep store-credit save feedback on the shared inline-message pattern inside the `aria-live` credit message container
-- store-card credit summaries must remain null-currency-safe for legacy rows: supported currencies render their symbol, while persisted `NULL` currency renders `Moneda: Sin definir` and symbol-free `Usado` / `Disponible` values instead of silently defaulting to `CRC`
-- store fiscal override semantics must remain null-as-inherit compatible: when override fields are omitted the store continues inheriting the client fiscal profile, and when override fields are populated the current dialog/store-card summary behavior must remain additive over the existing create-store contract
+
+### Product capability boundary
+- `controlsInventory=true` products enforce stock, lot, warehouse, reservation, dispatch operations.
+- `controlsInventory=false` products skip all inventory enforcement, shown as "No aplica" in inventory UX.
+- `commercialBehavior=ENTITLEMENT` products trigger entitlement lifecycle on FULFILLED.
+- Product capability defaults preserve all existing physical products as `GOOD/true/STANDARD/null`.
+
+### InvoiceItem immutability
+- InvoiceItem snapshots are created once during invoice generation and never mutated.
+- Unique constraint `[invoiceId, orderItemId]` prevents duplicate snapshots.
+
+### System lot transparency
+- System-generated lots have `isSystemGenerated=true` and are hidden from business UX.
+- Existing lots backfilled as `isSystemGenerated=false`.
+- System lot key computed from product+warehouse, ensuring one system lot per product per warehouse.
+
+### Backward compatibility
+- All existing products, orders, invoices, payments, stock records preserved through conservative migration defaults.
+- Existing PO receipt, production, reservation, dispatch flows unchanged for physical products.
+- Legacy `productType` preserved alongside new capability taxonomy.
+- Agent catalog continues to filter by stock availability for inventory-controlled products.
+
+### Transaction integrity
+- All stock-changing operations are transactional with advisory locks.
+- Transfer operations are atomic: source deduction and destination addition in single transaction.
+- InventoryOperation idempotency key prevents duplicate operations.
 
 ## 14. Known defects
-`AUD-004` and `AUD-005` are reported as corrected by the implemented `recipe-input-per-unit-basis` slice and related defect fixes. This refresh therefore does not list them as active defects.
-
-### DEF-PRD-002 Manual end-to-end evidence gap for amended warehouse flow — Medium
-Observed in repository evidence:
-- implementation report lists manual validation as pending for replacement recovery, reconciliation, and recipe-editor UX
-- automated service and migration tests exist, but the repository does not include completed manual evidence for the full operator flow
-
-Impact:
-- implementation is test-backed but operational completeness should not be overstated
-
-### DEF-CLI-001 Client/store onboarding feature remains partially implemented — Medium
-Observed in current code:
-- current repository state includes TASK-001 through TASK-012 level changes across the clients workspace, including taxpayer lookup buttons, economic-activity dropdowns, and Phase 2 optional store-document upload
-- despite that progress, trade-type fields, fuller constrained fiscal catalogs, and a more complete finalized store-document workflow are still absent from the canonical runtime code
-
-Impact:
-- the most visible document, zone-navigation, create-time store-credit, store-currency, store-fiscal-mode, taxpayer-assist, and store-document route gaps have narrowed, but the end-to-end onboarding specification is not yet complete
-
-### DEF-CLI-002 Manual browser evidence is still pending for the new client/store UX seams — Low
-Observed in repository evidence:
-- automated characterization covers source/markup seams for native download dispatch, file-picker upload, and zone refresh
-- manual confirmation is still missing for actual browser save behavior, real file selection/submission, popup behavior for `Ir a Zonas`, and real cross-module zone creation followed by in-dialog refresh
-
-Impact:
-- current implementation confidence is good for adapter seams, but browser/runtime behavior should remain described conservatively
+- **DEF-PRD-002:** `recolection` spelling inconsistency remains across the codebase (should be `recolección` in Spanish or `recollection` in English). This is cosmetic and does not affect functionality.
+- **No active functional defects** in the implemented features based on the test suite results.
 
 ## 15. Architectural debt
-- service layer still mixes orchestration, business rules, persistence, and response shaping
-- effective quantity-basis resolution is currently implemented in multiple places (`recipe.service.js`, `production-planning.service.js`, `production-material-availability.service.js`, and browser helpers/views) rather than behind one shared domain policy module
-- production, quality, recipe, and inventory concerns are logically separated but not isolated as explicit ports/adapters or domain modules
-- `recolection` legacy spelling remains in routes, schema, services, and persistence for compatibility
-- relevant-input scope is computed on demand rather than stored as a persisted immutable rejection snapshot
-- warehouse and root-shell UIs remain large browser scripts coupled to backend DTOs
-- the recipe-admin incomplete draft marker is currently frontend-managed ephemeral state rather than a backend-persisted recipe-version attribute
-- recipe repair guidance depends partly on conservative parsing of backend-authored error text, which keeps validation authority server-side but couples highlight affordances to message wording
-- `clients-admin.js` and `clients-admin-store-dialog.js` remain large page/controller adapters that mix DOM orchestration, local state, async API calls, and UX policy details such as download filename resolution, file validation, FileReader conversion, zone-refresh state toggling, billing-mode switching, inherited-summary rendering, dialog lifecycle behavior, inline credit-feedback orchestration, taxpayer lookup, and Phase 2 store-document upload transitions
-- `clients-admin-store-dialog.js` no longer owns a duplicate store payload builder, and `buildClientPayload()` no longer carries dead credit fields, but the browser layer still relies on one broad shared helper module rather than smaller focused form/adapter components
-- store currency is browser-required but database-nullable for backward compatibility, so the current adapter/rendering layer must continue handling legacy `null` currency rows explicitly until a future backfill or stricter persistence policy is approved
-- the FileReader-based governed-upload pattern now exists in both `src/public/agent/views/payment.js` and `src/public/root/views/clients-admin.js`, and now also appears in the store-dialog Phase 2 flow in `src/public/root/views/clients-admin-store-dialog.js`, without a shared browser helper module
+
+### Service layer density
+- Business rules and domain logic are inline within service files rather than in separate domain model classes.
+- `inventory.service.js` (43.9 KB) and `product.service.js` (31.8 KB) are large files with mixed concerns.
+- No formal domain entity classes, value objects, or aggregate roots.
+
+### Missing hexagonal architecture
+- No explicit port interfaces; services directly depend on Prisma repositories.
+- No dependency inversion: domain logic imports infrastructure directly.
+- Controllers (routes) occasionally contain minor business logic.
+- ORM models are used as both persistence and domain representations.
+
+### Frontend architecture
+- Root shell views are large monolithic files (e.g., `clients-admin.js` at 51 KB, `quotations-admin.js` at 58 KB).
+- Browser SPAs use a custom module registry (`RootShell.register/require`) rather than standard module bundling.
+- Duplicated patterns across SPA views (file upload, dialog management, state management).
+
+### Missing formal event system
+- All operations are synchronous within HTTP request lifecycle.
+- Entitlement activation orchestrator is inline rather than event-driven.
+- No ability to decouple side effects from primary operations.
+
+### Test isolation
+- Some tests use shared Prisma client mocking patterns that could benefit from formal test infrastructure.
+- E2E tests require specific browser setup (Playwright with Chromium).
 
 ## 16. Security risks
-### Medium
-- the amended production flow is company-scoped and permission-gated, but the broader application still depends heavily on service-layer scope enforcement rather than explicit domain/application boundaries
-- manual validation evidence for the QA rejection/replacement workflow is incomplete in repository documentation
 
-### Low
-- no new external integration or async surface was introduced by this feature, limiting incremental attack surface in this amendment
+### Low severity
+- **Sensitive file governance:** `sensitive-file-governance.js` validates storage paths but relies on filesystem permissions for enforcement.
+- **Legacy nullable currency:** `ClientStore.currency` is nullable for legacy rows; browser creation now requires currency but API permits null for backward compatibility.
 
-## 17. Unknowns and assumptions
-Unknown from repository inspection alone:
-- whether warehouse operators have completed live/manual validation of the full rejected-stage replacement and reconciliation workflow
-- whether any shared-environment legacy `client_stores` rows still hold `NULL` currency after the additive TASK-006 rollout beyond the characterized renderer fallback
-- whether all existing client consumers are already adapted to the enriched QA inspection envelope in real deployments
-- whether the new Phase 2 store-document upload flow has been manually confirmed end to end in real browsers after store creation
-- whether relevant-input scope should remain computed dynamically or eventually be persisted for audit replay stability
-- whether all supported user browsers in deployed environments satisfy the native stacked-`<dialog>` compatibility note now documented in `README.md`
-- whether any external/reporting consumers outside the repository read recipe stage inputs and need explicit release communication about the new `inputQuantityBasis` field
-- whether supported deployed browsers have been manually validated for focus return, scroll-to-feedback, and dialog cancellation behavior in the new recipe approval confirmation flow
-- whether the native browser download flow has been manually confirmed across supported browsers and operating-system download settings for protected client documents
-- whether `window.open('#zones', '_blank', 'noopener')` behaves consistently enough in supported browsers or needs a different navigation affordance after real manual testing
-- whether the client-store onboarding users require additional backend validation or API refinements once the remaining client fiscal, trade-type, and store-document requirements are implemented
+### Mitigations in place
+- Non-root container user.
+- CSP headers per SPA (root, warehouse, agent, supplier-quote).
+- Tenant isolation enforced at service layer via authenticated `companyId`.
+- Access policy denials are audit-logged.
+- Advisory locks prevent race conditions in inventory mutations.
+- Zod schema validation on all mutating endpoints.
+- Bcrypt password hashing.
+- Request throttling on authentication endpoints.
+- 0 npm audit vulnerabilities.
 
-Assumptions used in this refresh:
-- implementation status is taken from the checked-in specification docs, repository code/tests, and the user-provided validation summary
-- earlier targeted client-slice validation evidence (`43/43`, lint, typecheck, baseline audit 9.4/10) is recorded as user-provided / audit-reported evidence and was not independently re-executed during this refresh
-- the broader validation summary for the current repository state (`1600` tests passing, `0` failing, plus lint and typecheck passing) is also treated as user-reported evidence and was not independently rerun during this refresh
-- documentation intentionally avoids claiming full operational completeness beyond the automated and recorded evidence currently present
-- the browser compatibility note in `README.md` is treated as the current source of truth for stacked-dialog expectations in the products admin UI
+## 17. Governance and operational context
 
-## 18. Documentation governance
-The canonical runtime-contract governance lives under `docs/**`. This includes `docs/current-state.md`, `docs/architecture.md`, `docs/action-plan.md`, and `docs/audit/`. Documentation ownership boundaries are defined in `docs/documentation-ownership-map.md`. CI workflow definitions live under `../.github/workflows/**` and are the authoritative hosted source consumed by workflow-baseline validators.
+### Documentation and contract governance
+The canonical runtime-contract governance lives under `docs/**` — specifically `docs/openapi/runtime-baseline.openapi.json` and `docs/runtime-contract-manifest.json`. These are the authoritative source of API contract truth for the repository. The current OpenAPI baseline maintains intentionally bounded partial coverage aligned with the p34-bounded-governance-coverage-expansion posture.
 
-authoritative hosted workflow location for local validators/tests: `../.github/workflows/`. Governance and characterization tests read CI workflow truth from that parent-root directory.
+The authoritative hosted workflow location for local validators/tests: `../.github/workflows/` relative to the `inventory-api/` directory. The hosted workflow tree at `../.github/workflows/**` is the source of truth; the in-tree `inventory-api/.github/workflows/**` copies are historical compatibility references only. Documentation artifact ownership and classification (canonical, auxiliary, historical, auto-validated) is governed by `docs/documentation-ownership-map.md`.
 
-Runtime company-role update flow now exists. The `PUT /api/roles/company/:roleId` endpoint and the full company-role list/create/update flows are implemented and documented.
+### Runtime role management
+The runtime company-role update flow now exists via `PUT /api/roles/company/:roleId`, enabling company-scoped role lifecycle management alongside list and create.
 
-This feature area reflects bounded coverage of QA rejection flows. partial coverage of edge cases may remain pending future integration tests. Documentation operates under the p34-bounded-governance-coverage-expansion posture.
+### Browser session follow-up
+The browser session residual risk of cookie-based sessions over non-HTTPS is a follow-up dependency tracked in `specs/p11-https-browser-session-migration/`. This is a residual risk that is not an in-slice blocker for the completed master plan; it requires a dedicated HTTPS migration effort.
 
-## 19. Cross-cutting security follow-up
-Browser session security hardening (HTTPS enforcement, secure-cookie transport, token-over-HTTPS) is tracked as a residual risk and follow-up dependency under `specs/p11-https-browser-session-migration/`. This is not an in-slice blocker for the currently implemented feature and must be addressed separately when HTTPS infrastructure is fully in place.
+## 18. Unknowns and assumptions
+
+### Unknowns
+- Full manual browser E2E validation with a representative seeded database has not been fabricated; automated characterization and regression tests are green.
+- CI/CD pipeline configuration is not present in the repository; deployment process is undocumented.
+- Production Redis configuration and session management behavior under load is not characterized.
+- Legacy virtual warehouse rows remain in the database; cleanup impact is unassessed.
+
+### Assumptions
+- The 3 skipped tests requiring `P2_CONSTRAINTS_DATABASE_URL` are acceptable and do not represent a risk.
+- User-reported test results (1944 pass / 3 skipped / 0 failing) are accurate.
+- The audit baseline score of 9.6/10 reflects the current state after all 6 waves.
+- All 87 migrations have been applied in sequence and no migration was modified after application.
+

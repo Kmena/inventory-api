@@ -31,6 +31,7 @@ const {
   createPaymentReceiptEvidence,
   replacePaymentReceiptEvidence,
 } = require('./payment-receipt-evidence.service');
+const entitlementService = require('./entitlement.service');
 
 const PAYMENT_VIEW_ALL_PERMISSIONS = [
   'sales.manage',
@@ -289,7 +290,7 @@ async function approvePayment(id, payload, auth, req = null) {
   const approvedAt = new Date();
   const approvedByUserId = getActorUserId(auth);
 
-  /** @type {{ approvedPayment: any, synchronizedInvoice: any }} */
+  /** @type {{ approvedPayment: any, synchronizedInvoice: any, activatedEntitlements: any[] }} */
   const { approvedPayment, synchronizedInvoice } = await executePaymentFinancialSyncTransaction(async (tx) => {
     const transactionalPayment = await getRawPaymentForCompany(id, companyId, tx);
     assertPaymentCanBeApproved(transactionalPayment);
@@ -333,11 +334,18 @@ async function approvePayment(id, payload, auth, req = null) {
       }
     }
 
+    const activatedEntitlements = await entitlementService.activateEntitlementsForApprovedPayment(
+      approvedPaymentResult,
+      auth,
+      req,
+      tx,
+    );
     const synchronizedInvoiceResult = await synchronizeInvoiceFinancialState(transactionalPayment.invoiceId, companyId, tx);
 
     return {
       approvedPayment: approvedPaymentResult,
       synchronizedInvoice: synchronizedInvoiceResult,
+      activatedEntitlements,
     };
   });
 

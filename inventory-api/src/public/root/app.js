@@ -312,8 +312,9 @@ async function renderCurrentRoute() {
   const routeKey = routeResolution.routeKey;
   activeSidebarEntryId = routeResolution.item?.id || null;
 
-  if (`#${routeKey}` !== window.location.hash) {
-    window.history.replaceState(null, '', `/root/#${routeKey}`);
+  const normalizedHashTarget = routeResolution.normalizedHashTarget || routeKey;
+  if (`#${normalizedHashTarget}` !== window.location.hash) {
+    window.history.replaceState(null, '', `/root/#${normalizedHashTarget}`);
   }
 
   viewElement.dataset.routeKey = routeKey;

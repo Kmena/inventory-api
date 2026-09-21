@@ -26,6 +26,8 @@ const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   orderRouter: 'src/routes/order.routes.js',
   invoiceRouter: 'src/routes/invoice.routes.js',
   paymentRouter: 'src/routes/payment.routes.js',
+  // MASTER-007 / NPP-TASK-009 — CustomerEntitlement Wave 1 skeleton
+  entitlementRouter: 'src/routes/entitlement.routes.js',
   inventoryRouter: 'src/routes/inventory.routes.js',
   warehouseRouter: 'src/routes/warehouse.routes.js',
   regionRouter: 'src/routes/region.routes.js',
@@ -133,6 +135,42 @@ test('runtime contract manifest exhaustively classifies mounted router operation
     surface.surface === 'express.static(src/public)'
     && surface.contractStatus === 'intentionally-excluded'
   )));
+});
+
+test('master plan production API endpoints have final OpenAPI disposition', () => {
+  const openApi = JSON.parse(read(openApiPath));
+  const manifest = JSON.parse(read(manifestPath));
+  const excludedReasonCodes = new Set((manifest.excludedOperations || []).map((operation) => operation.reasonCode));
+
+  const finalizedPaths = [
+    '/api/inventory/lots',
+    '/api/inventory/lots/{id}',
+    '/api/inventory/initial-inventory',
+    '/api/inventory/transfers',
+    '/api/products/{id}/inventory-summary',
+    '/api/products/{id}/inventory-config',
+    '/api/warehouses/company/{id}',
+    '/api/warehouses/company/{id}/status',
+    '/api/clients/{clientId}/entitlements',
+  ];
+
+  for (const pathName of finalizedPaths) {
+    assert.ok(openApi.paths[pathName], `${pathName} must be covered by the final OpenAPI baseline`);
+  }
+
+  const temporaryMasterPlanReasonCodes = [
+    'wave3-location-lifecycle-openapi-followup',
+    'wave3-initial-inventory-openapi-followup',
+    'wave5-transfer-openapi-followup',
+    'wave3-product-inventory-config-openapi-followup',
+    'wave3-product-inventory-summary-openapi-followup',
+    'inventory-wave2-lots-api-outside-current-openapi-baseline',
+    'entitlements-wave3-client-list-outside-current-openapi-baseline',
+  ];
+
+  for (const reasonCode of temporaryMasterPlanReasonCodes) {
+    assert.equal(excludedReasonCodes.has(reasonCode), false, `${reasonCode} must not survive final master-plan closeout`);
+  }
 });
 
 test('runtime contract companion artifacts stay cross-linked and human-readable', () => {

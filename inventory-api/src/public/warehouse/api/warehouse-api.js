@@ -258,6 +258,40 @@ function previewMaterialAvailability(session, payload) {
   });
 }
 
+// ── Inventory Requests ────────────────────────────────────────────────────────
+
+function listInventoryRequests(session, query = {}) {
+  const params = new URLSearchParams(
+    Object.entries(query).filter(([, v]) => v !== null && v !== undefined && v !== ''),
+  ).toString();
+  return safeFetch(session, `/api/inventory/requests${params ? '?' + params : ''}`);
+}
+
+function getInventoryRequest(session, id) {
+  return safeFetch(session, `/api/inventory/requests/${encodeURIComponent(id)}`);
+}
+
+function pickupInventoryRequest(session, id, payload = {}) {
+  return safeFetch(session, `/api/inventory/requests/${encodeURIComponent(id)}/pickup`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+function confirmDeliveryInventoryRequest(session, id, payload = {}) {
+  return safeFetch(session, `/api/inventory/requests/${encodeURIComponent(id)}/confirm-delivery`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+function executeInventoryRequest(session, id, payload = {}) {
+  return safeFetch(session, `/api/inventory/requests/${encodeURIComponent(id)}/execute`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 WarehouseShell.register('warehouseApi', {
   listPendingReceipts,
   getReceipt,
@@ -293,5 +327,11 @@ WarehouseShell.register('warehouseApi', {
   reconcileRecolection,
   // TASK-006 (purchase-production-order-ux): pre-order material availability
   previewMaterialAvailability,
+  // inventory-requests spec — operator workflow
+  listInventoryRequests,
+  getInventoryRequest,
+  pickupInventoryRequest,
+  confirmDeliveryInventoryRequest,
+  executeInventoryRequest,
 });
 })();

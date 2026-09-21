@@ -32,12 +32,13 @@ test('root shell manifest keeps actor-aware companies and roles routes', () => {
   assert.match(manifestSource, /dependencyTag: 'zones-view'/);
   assert.match(manifestSource, /routeKey: 'warehouses'/);
   assert.match(manifestSource, /routeKey: 'products'/);
+  assert.match(manifestSource, /routeKey: 'inventory'/);
   assert.match(manifestSource, /routeKey: 'lots'/);
   assert.match(manifestSource, /routeKey: 'movements'/);
-  assert.match(manifestSource, /dependencyTag: 'inventory-admin-views'/);
-  assert.match(manifestSource, /items: \[\s*\{ type: 'item', \.\.\.warehousesItem \},\s*\{ type: 'item', \.\.\.productsItem \},\s*\{ type: 'item', \.\.\.lotsItem \},\s*\{ type: 'item', \.\.\.movementsItem \},/s);
+  assert.match(manifestSource, /dependencyTag: 'inventory-ux-mvp'/);
+  assert.match(manifestSource, /items: \[\s*\{ type: 'item', \.\.\.productsItem \},\s*\{ type: 'item', \.\.\.inventoryItem \},/s);
+  assert.match(manifestSource, /id: 'administration'[\s\S]*warehousesItem/);
   assert.match(manifestSource, /id: 'control'[\s\S]*entries: \[[\s\S]*approvalsItem[\s\S]*reportsItem[\s\S]*\]/);
-  assert.doesNotMatch(manifestSource, /id: 'control'[\s\S]*warehousesItem/);
   assert.match(manifestSource, /includeInRootNav: false/);
   assert.doesNotMatch(manifestSource, /client-detail|client_detail/);
 });
@@ -60,6 +61,7 @@ test('root shell guards and router keep actor-scoped route fallback behavior', (
   assert.match(routerSource, /const routesAdminView = rootShell\.require\('views\.routesAdmin'\)/);
   assert.match(routerSource, /const warehousesAdminView = rootShell\.require\('views\.warehousesAdmin'\)/);
   assert.match(routerSource, /const productsAdminView = rootShell\.require\('views\.productsAdmin'\)/);
+  assert.match(routerSource, /const inventoryAdminView = rootShell\.require\('views\.inventoryAdmin'\)/);
   assert.match(routerSource, /const lotsAdminView = rootShell\.require\('views\.lotsAdmin'\)/);
   assert.match(routerSource, /const movementsAdminView = rootShell\.require\('views\.movementsAdmin'\)/);
   assert.match(routerSource, /const recipesAdminView = rootShell\.require\('views\.recipesAdmin'\)/);
@@ -71,6 +73,7 @@ test('root shell guards and router keep actor-scoped route fallback behavior', (
   assert.match(routerSource, /item\.routeKey === 'routes'/);
   assert.match(routerSource, /item\.routeKey === 'warehouses'/);
   assert.match(routerSource, /item\.routeKey === 'products'/);
+  assert.match(routerSource, /item\.routeKey === 'inventory'/);
   assert.match(routerSource, /item\.routeKey === 'lots'/);
   assert.match(routerSource, /item\.routeKey === 'movements'/);
   assert.match(routerSource, /item\.routeKey === 'recetas'/);

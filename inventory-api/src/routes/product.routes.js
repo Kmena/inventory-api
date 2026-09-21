@@ -5,7 +5,7 @@ const { authorizeAccessPolicy } = require('../security/access-policies');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
 const { parsePaginationQuery } = require('../lib/pagination');
-const { createProductSchema, updateProductSchema, createSubcategorySchema, importProductsSchema } = require('../schemas/product.schema');
+const { createProductSchema, updateProductSchema, updateProductInventoryConfigSchema, createSubcategorySchema, importProductsSchema } = require('../schemas/product.schema');
 const productService = require('../services/product.service');
 const { highPayloadParsers } = require('../middlewares/request-payload');
 
@@ -24,6 +24,10 @@ router.post('/categories/company', authorizeAccessPolicy('product.category.creat
   try { return res.status(201).json(await productService.createSubcategory(req.body, req.auth)); } catch (error) { return next(error); }
 });
 
+router.get('/:id/inventory-summary', authorizeAccessPolicy('inventory.stocks.list'), async (req, res, next) => {
+  try { return res.json(await productService.getProductInventorySummary(parseBigIntId(req.params.id), req.auth)); } catch (error) { return next(error); }
+});
+
 router.get('/:id', authorizeAccessPolicy('product.detail'), async (req, res, next) => {
   try { return res.json(await productService.getProduct(parseBigIntId(req.params.id), req.auth)); } catch (error) { return next(error); }
 });
@@ -38,6 +42,10 @@ router.post('/import', ...highPayloadParsers, authorizeAccessPolicy('product.imp
   } catch (error) {
     return next(error);
   }
+});
+
+router.put('/:id/inventory-config', authorizeAccessPolicy('product.update'), validate(updateProductInventoryConfigSchema), async (req, res, next) => {
+  try { return res.json(await productService.updateProductInventoryConfig(parseBigIntId(req.params.id), req.body, req.auth)); } catch (error) { return next(error); }
 });
 
 router.put('/:id', authorizeAccessPolicy('product.update'), validate(updateProductSchema), async (req, res, next) => {

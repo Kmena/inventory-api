@@ -1,6 +1,7 @@
 (function attachRootShellProductsAdminView(globalScope) {
   const rootShell = /** @type {any} */ (globalScope).RootShell;
   const productsApi = rootShell.require('productsApi');
+  const inventoryApi = rootShell.has('inventoryApi') ? rootShell.require('inventoryApi') : null;
   const categoriesApi = rootShell.require('categoriesApi');
   const rootShellUi = rootShell.require('ui');
   const sessionAdapter = rootShell.require('sessionAdapter');
@@ -40,20 +41,14 @@
           </div>
 
           <div class="products-workspace-grid">
-            <div>
+            <div class="products-selector-panel">
               <div id="products-list-region" aria-live="polite"></div>
               <div id="products-pagination-region"></div>
             </div>
-            <aside class="card root-card products-detail-card" aria-labelledby="products-detail-title">
-              <div class="page-header">
-                <div>
-                  <h3 id="products-detail-title">Detalle contextual</h3>
-                  <p id="products-detail-subtitle" class="muted">Selecciona un producto del listado para revisar su detalle contextual.</p>
-                </div>
-              </div>
+            <div class="card root-card products-detail-card" aria-label="Detalle del producto seleccionado">
               <div id="products-detail-message"></div>
               <div id="products-detail-region"></div>
-            </aside>
+            </div>
           </div>
         </article>
       </section>
@@ -82,6 +77,13 @@
               </label>
               <label><span>Moneda</span><select name="currency"><option value="">— Seleccionar —</option><option value="CRC">CRC — Colón</option><option value="USD">USD — Dólar</option><option value="EUR">EUR — Euro</option></select></label>
               <label><span>Precio</span><input name="price" type="number" min="0" step="0.01" /></label>
+              <label class="products-field-wide">
+                <span>Preset de negocio *</span>
+                <select id="products-form-business-preset" name="businessPreset" required>
+                  ${productsHelpers.getBusinessPresetOptions().map((preset) => `<option value="${rootShellUi.escapeHtml(preset.value)}">${rootShellUi.escapeHtml(preset.label)}</option>`).join('')}
+                </select>
+                <span id="products-form-business-preset-help" class="products-field-hint">Selecciona cómo se comporta este producto comercialmente y frente a inventario.</span>
+              </label>
               <label><span>Stock minimo</span><input name="minStock" type="number" min="0" step="0.01" /></label>
               <label><span>Stock maximo</span><input name="maxStock" type="number" min="0" step="0.01" /></label>
               <label class="products-field-full products-checkbox-label">
@@ -191,7 +193,6 @@
     const listSummary = container.querySelector('#products-list-summary');
     const listRegion = container.querySelector('#products-list-region');
     const paginationRegion = container.querySelector('#products-pagination-region');
-    const detailSubtitle = container.querySelector('#products-detail-subtitle');
     const detailMessage = container.querySelector('#products-detail-message');
     const detailRegion = container.querySelector('#products-detail-region');
     const searchInput = container.querySelector('#products-search-input');
@@ -238,8 +239,10 @@
     const kgFactorInput = container.querySelector('#products-form-kg-factor');
     const kgFactorLabel = container.querySelector('#products-form-kg-factor-label');
     const kgFactorHint = container.querySelector('#products-form-kg-factor-hint');
+    const businessPresetSelect = container.querySelector('#products-form-business-preset');
+    const businessPresetHelp = container.querySelector('#products-form-business-preset-help');
 
-    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !paginationRegion || !detailSubtitle || !detailMessage || !detailRegion || !searchInput || !categoryFilter || !clearFiltersButton || !refreshButton || !openCreateButton || !openCategoriesButton || !formDialog || !form || !formTitle || !formMessage || !formSubcategoryInput || !formNameInput || !closeFormButton || !cancelFormButton || !formSubmitButton || !deactivateDialog || !deactivateMessage || !deactivateSummary || !closeDeactivateButton || !cancelDeactivateButton || !confirmDeactivateButton || !categoriesDialog || !categoriesForm || !categoriesMessage || !categoriesListRegion || !categoryNameInput || !createCategoryButton || !closeCategoriesButton || !cancelCategoriesButton) {
+    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !paginationRegion || !detailMessage || !detailRegion || !searchInput || !categoryFilter || !clearFiltersButton || !refreshButton || !openCreateButton || !openCategoriesButton || !formDialog || !form || !formTitle || !formMessage || !formSubcategoryInput || !formNameInput || !closeFormButton || !cancelFormButton || !formSubmitButton || !deactivateDialog || !deactivateMessage || !deactivateSummary || !closeDeactivateButton || !cancelDeactivateButton || !confirmDeactivateButton || !categoriesDialog || !categoriesForm || !categoriesMessage || !categoriesListRegion || !categoryNameInput || !createCategoryButton || !closeCategoriesButton || !cancelCategoriesButton) {
       return;
     }
 
@@ -290,6 +293,23 @@
         { value: 'UN', label: 'UN — Unidades' },
       ],
     };
+
+    function syncBusinessPresetFields() {
+      if (!businessPresetSelect || !form) return;
+      const preset = productsHelpers.getBusinessPresetDefinition(businessPresetSelect.value);
+      const isInventoryControlled = Boolean(preset.controlsInventory);
+      if (businessPresetHelp) {
+        businessPresetHelp.textContent = isInventoryControlled
+          ? `${preset.description} Inventario: requiere inventario.`
+          : `${preset.description} Inventario: No aplica.`;
+      }
+      ['minStock', 'maxStock'].forEach((fieldName) => {
+        const input = form.elements[fieldName];
+        if (!input) return;
+        input.disabled = !isInventoryControlled;
+        if (!isInventoryControlled) input.value = '0';
+      });
+    }
 
     /**
      * Muestra u oculta los campos condicionales de presentación comercial.
@@ -443,7 +463,6 @@
     }
 
     function renderDetailState() {
-      detailSubtitle.textContent = productsStateHelpers.buildDetailSubtitle(getSelectedProduct());
       detailRegion.innerHTML = productsRenderers.renderDetail(getSelectedProduct(), {
         canManageProducts,
         detailState,
@@ -500,6 +519,10 @@
       formTitle.textContent = 'Nuevo producto';
       formSubmitButton.textContent = 'Guardar producto';
       if (formSubcategoryInput) formSubcategoryInput.value = '';
+      if (businessPresetSelect) {
+        businessPresetSelect.value = 'PHYSICAL_GOOD';
+        syncBusinessPresetFields();
+      }
       // TASK-006: ocultar campos de presentación al resetear
       // form.reset() ya devuelve el select a su estado vacío,
       // pero los grupos condicionales deben ocultarse visualmente.
@@ -532,8 +555,12 @@
         }
         form.elements.currency.value = product.currency || '';
         form.elements.price.value = product.price ?? '';
-        form.elements.minStock.value = product.minStock ?? '';
-        form.elements.maxStock.value = product.maxStock ?? '';
+        if (businessPresetSelect) {
+          businessPresetSelect.value = productsHelpers.getBusinessPreset(product);
+          syncBusinessPresetFields();
+        }
+        form.elements.minStock.value = product.controlsInventory === false ? 0 : (product.minStock ?? '');
+        form.elements.maxStock.value = product.controlsInventory === false ? 0 : (product.maxStock ?? '');
         if (form.elements.inCatalog) {
           form.elements.inCatalog.checked = product.inCatalog !== false;
         }
@@ -779,10 +806,40 @@
       }
     });
 
+    detailRegion.addEventListener('submit', async (event) => {
+      const initialInventoryForm = event.target;
+      if (!(initialInventoryForm instanceof globalScope.HTMLFormElement) || initialInventoryForm.id !== 'products-initial-inventory-form') return;
+      event.preventDefault();
+      if (!inventoryApi || !initialInventoryForm.reportValidity()) return;
+      const formData = new globalScope.FormData(initialInventoryForm);
+      const productId = String(formData.get('productId') || '');
+      try {
+        await inventoryApi.createInitialInventory(session, {
+          productId: Number(productId),
+          idempotencyKey: `product-ui-${productId}-${Date.now()}`,
+          note: String(formData.get('note') || '').trim() || 'Inventario inicial desde ficha de producto',
+          rows: [{
+            warehouseId: Number(formData.get('warehouseId')),
+            quantity: Number(formData.get('quantity')),
+            lotNumber: String(formData.get('lotNumber') || '').trim() || undefined,
+          }],
+        });
+        detailMessage.innerHTML = rootShellUi.renderInlineMessage('Inventario inicial registrado correctamente.');
+        await loadProductDetail(productId, { silent: true });
+      } catch (error) {
+        detailMessage.innerHTML = rootShellUi.renderInlineMessage(error.message || 'No se pudo registrar el inventario inicial.', 'error');
+      }
+    });
+
     detailRegion.addEventListener('click', (event) => {
       const target = event.target instanceof globalScope.HTMLElement ? event.target : null;
       if (!target) {
         return;
+      }
+
+      if (target.id === 'products-open-initial-inventory-button') {
+        const wizard = detailRegion.querySelector('#products-initial-inventory-panel');
+        if (wizard) wizard.hidden = !wizard.hidden;
       }
 
       if (target.id === 'products-open-edit-button') {
@@ -801,6 +858,10 @@
     openCategoriesButton.addEventListener('click', (event) => {
       openCategoriesDialog(event.currentTarget);
     });
+
+    if (businessPresetSelect) {
+      businessPresetSelect.addEventListener('change', syncBusinessPresetFields);
+    }
 
     closeFormButton.addEventListener('click', closeFormDialog);
     cancelFormButton.addEventListener('click', closeFormDialog);
