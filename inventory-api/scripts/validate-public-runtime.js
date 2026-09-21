@@ -139,6 +139,7 @@ const expectedJavaScriptFiles = [
   'warehouse/state.js',
   'warehouse/views/dispatching.js',
   'warehouse/views/inspections.js',
+  'warehouse/views/inventory-requests.js',
   'warehouse/views/inventory.js',
   'warehouse/views/production-new.js',
   'warehouse/views/production.controllers.js',
