@@ -713,6 +713,15 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "inventory-requests-outside-current-openapi-baseline",
       "reason": "inventory-requests spec: Ejecución de solicitud (ADJUSTMENT/TRANSFER → COMPLETED). Ruta activa protegida por inventory.requests.execute. Excluida del contrato OpenAPI parcial."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/inventory",
+      "expressPath": "/requests/:id/confirm-delivery",
+      "routeFile": "src/routes/inventory.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventory-requests-outside-current-openapi-baseline",
+      "reason": "inventory-requests spec: Confirmación de entrega física (TRANSFER: IN_PROGRESS→DELIVERED). Ruta activa protegida por inventory.requests.execute. Excluida del contrato OpenAPI parcial."
     }
   ]
 }

@@ -14,6 +14,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const prisma = require('../src/lib/prisma');
+const inventoryRepository = require('../src/repositories/inventory.repository');
 const inventoryRequestsRepository = require('../src/repositories/inventory-requests.repository');
 const inventoryRequestsService = require('../src/services/inventory-requests.service');
 
@@ -236,11 +238,12 @@ test('createInventoryRequest rejects when an active request already exists for t
 
 // ── cancelInventoryRequest ────────────────────────────────────────────────────
 
-test('cancelInventoryRequest rejects when request is not PENDING', async () => {
-  const inProgressRequest = buildRequest({ status: 'IN_PROGRESS' });
+test('cancelInventoryRequest rejects when request is already COMPLETED', async () => {
+  // COMPLETED cannot be cancelled; IN_PROGRESS/DELIVERED can (reservation cleanup)
+  const completedRequest = buildRequest({ status: 'COMPLETED' });
 
   return withRepositoryStubs({
-    findRequestById: async () => inProgressRequest,
+    findRequestById: async () => completedRequest,
     updateRequestStatus: async () => ({}),
   }, async () => {
     await assert.rejects(
@@ -305,9 +308,50 @@ test('pickupTransferRequest rejects when status is not PENDING', async () => {
 });
 
 test('pickupTransferRequest sets assignedToUserId from authenticated operator', async () => {
-  const transferRequest = buildRequest({ type: 'TRANSFER', status: 'PENDING' });
+  const transferRequest = buildRequest({ type: 'TRANSFER', status: 'PENDING', quantity: 5n });
   let capturedPatch = null;
   let capturedCompanyId = null;
+
+  // Save originals
+  const origTransaction                     = prisma.$transaction;
+  const origAcquireLock                     = inventoryRepository.acquireCompanyInventoryAdvisoryLock;
+  const origLoadCtx                         = inventoryRepository.loadInventoryContext;
+  const origFindWhStock                     = inventoryRepository.findWarehouseStockRecord;
+  const origUpdateWhStock                   = inventoryRepository.updateWarehouseStockRecord;
+  const origFindWhStockById                 = inventoryRepository.findWarehouseStockRecordById;
+  const origFindLotStock                    = inventoryRepository.findWarehouseLotStockRecord;
+  const origUpdateLotStock                  = inventoryRepository.updateWarehouseLotStockRecord;
+  const origFindLotStockById                = inventoryRepository.findWarehouseLotStockRecordById;
+  const origPrismaLotFindFirst              = prisma.lot.findFirst.bind(prisma.lot);
+
+  // Mock the transaction to run the callback with prisma itself as the tx
+  prisma.$transaction = async (fn) => fn(prisma);
+  inventoryRepository.acquireCompanyInventoryAdvisoryLock = async () => {};
+  inventoryRepository.loadInventoryContext = async () => ({
+    inventory: { id: 1n },
+    warehouse: { id: 3n, isActive: true, allowedWarehouses: [] },
+    product:   { id: 5n, name: 'Producto A', code: 'P-A', inventoryType: 'LOT', allowedWarehouses: [] },
+  });
+  inventoryRepository.findWarehouseStockRecord      = async () => ({ id: 1n, quantity: 100n, reservedQuantity: 0n, productId: 5n });
+  inventoryRepository.updateWarehouseStockRecord    = async () => ({ count: 1 });
+  inventoryRepository.findWarehouseStockRecordById  = async () => ({ id: 1n, quantity: 100n, reservedQuantity: 5n });
+  inventoryRepository.findWarehouseLotStockRecord   = async () => ({ id: 2n, quantity: 100n, reservedQuantity: 0n, productId: 5n });
+  inventoryRepository.updateWarehouseLotStockRecord = async () => ({ count: 1 });
+  inventoryRepository.findWarehouseLotStockRecordById = async () => ({ id: 2n, quantity: 100n, reservedQuantity: 5n });
+  prisma.lot.findFirst = async () => transferRequest.lot;
+
+  const restore = () => {
+    prisma.$transaction                                      = origTransaction;
+    inventoryRepository.acquireCompanyInventoryAdvisoryLock  = origAcquireLock;
+    inventoryRepository.loadInventoryContext                 = origLoadCtx;
+    inventoryRepository.findWarehouseStockRecord             = origFindWhStock;
+    inventoryRepository.updateWarehouseStockRecord           = origUpdateWhStock;
+    inventoryRepository.findWarehouseStockRecordById         = origFindWhStockById;
+    inventoryRepository.findWarehouseLotStockRecord          = origFindLotStock;
+    inventoryRepository.updateWarehouseLotStockRecord        = origUpdateLotStock;
+    inventoryRepository.findWarehouseLotStockRecordById      = origFindLotStockById;
+    prisma.lot.findFirst                                     = origPrismaLotFindFirst;
+  };
 
   return withRepositoryStubs({
     findRequestById: async () => transferRequest,
@@ -317,17 +361,21 @@ test('pickupTransferRequest sets assignedToUserId from authenticated operator', 
       return { ...transferRequest, ...patch, status: 'IN_PROGRESS' };
     },
   }, async () => {
-    // auth.sub is the userId
-    const auth = buildAuth({ sub: '42', companyId: '7' });
-    await inventoryRequestsService.pickupTransferRequest('1', {}, auth);
+    try {
+      // auth.sub is the userId
+      const auth = buildAuth({ sub: '42', companyId: '7' });
+      await inventoryRequestsService.pickupTransferRequest('1', {}, auth);
 
-    assert.ok(capturedPatch, 'updateRequestStatus must have been called');
-    assert.equal(capturedPatch.status, 'IN_PROGRESS');
-    // assignedToUserId must be derived from the authenticated operator's userId (not client input)
-    assert.equal(String(capturedPatch.assignedToUserId), '42',
-      'assignedToUserId must be set from authenticated operator sub (OI-002)');
-    // Tenant scope enforced
-    assert.equal(String(capturedCompanyId), '7');
+      assert.ok(capturedPatch, 'updateRequestStatus must have been called');
+      assert.equal(capturedPatch.status, 'IN_PROGRESS');
+      // assignedToUserId must be derived from the authenticated operator's userId (not client input)
+      assert.equal(String(capturedPatch.assignedToUserId), '42',
+        'assignedToUserId must be set from authenticated operator sub (OI-002)');
+      // Tenant scope enforced
+      assert.equal(String(capturedCompanyId), '7');
+    } finally {
+      restore();
+    }
   });
 });
 

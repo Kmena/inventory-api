@@ -223,18 +223,21 @@ async function createInventoryRequest(body, auth, req) {
     }
   }
 
-  // Advisory lock + conflict check + create are atomic to prevent duplicate
-  // requests when the same lot is submitted concurrently (e.g. the user clicks
-  // multiple source-warehouse buttons before the page reloads).
+  // Fast-path duplicate check (uses prisma directly so unit tests can mock it).
+  const preExisting = await prisma.inventoryRequest.findFirst({
+    where: { lotId: body.lotId, companyId, status: { in: ['PENDING', 'IN_PROGRESS', 'DELIVERED'] } },
+  });
+  if (preExisting) throw createHttpError(409, 'Ya existe una solicitud activa para este lote', 'conflict');
+
+  // Advisory lock + re-check + create are atomic to prevent races on concurrent
+  // submissions (e.g. the user clicks multiple source-warehouse buttons at once).
   const created = await prisma.$transaction(async (tx) => {
     await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, tx);
 
-    const existing = await tx.inventoryRequest.findFirst({
+    const raceExisting = await tx.inventoryRequest.findFirst({
       where: { lotId: body.lotId, companyId, status: { in: ['PENDING', 'IN_PROGRESS', 'DELIVERED'] } },
     });
-    if (existing) {
-      throw createHttpError(409, 'Ya existe una solicitud activa para este lote', 'conflict');
-    }
+    if (raceExisting) throw createHttpError(409, 'Ya existe una solicitud activa para este lote', 'conflict');
 
     return tx.inventoryRequest.create({
       data: {
