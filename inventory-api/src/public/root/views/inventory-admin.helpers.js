@@ -54,8 +54,10 @@
     if (record?.warehouse?.name) return record.warehouse.name;
     if (record?.location?.name) return record.location.name;
     // Lot shape (from /lots): warehouse is nested inside warehouseLotStocks[]
+    // Only show warehouses where the lot actually has stock (quantity > 0).
     if (Array.isArray(record?.warehouseLotStocks)) {
       const names = record.warehouseLotStocks
+        .filter((s) => Number(s?.quantity ?? 0) > 0)
         .map((s) => s?.warehouse?.name)
         .filter(Boolean);
       if (names.length === 1) return names[0];
