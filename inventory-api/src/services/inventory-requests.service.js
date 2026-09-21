@@ -83,7 +83,7 @@ function serializeRequest(request) {
  * Prisma transaction (`tx`). This is the R-001 internal helper: the public
  * `transferInventory` service does not accept a separate destinationLotId.
  *
- * @param {import('@prisma/client').PrismaClient} tx  - Prisma transaction client
+ * @param {any} tx  - Prisma transaction client (typed as any to satisfy transaction callback constraint)
  * @param {{
  *   sourceLotId: bigint,
  *   destinationLotId: bigint,
@@ -232,14 +232,15 @@ async function createInventoryRequest(body, auth, req) {
   // Advisory lock + re-check + create are atomic to prevent races on concurrent
   // submissions (e.g. the user clicks multiple source-warehouse buttons at once).
   const created = await prisma.$transaction(async (tx) => {
-    await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, tx);
+    const db = /** @type {any} */ (tx);
+    await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, db);
 
-    const raceExisting = await tx.inventoryRequest.findFirst({
+    const raceExisting = await db.inventoryRequest.findFirst({
       where: { lotId: body.lotId, companyId, status: { in: ['PENDING', 'IN_PROGRESS', 'DELIVERED'] } },
     });
     if (raceExisting) throw createHttpError(409, 'Ya existe una solicitud activa para este lote', 'conflict');
 
-    return tx.inventoryRequest.create({
+    return db.inventoryRequest.create({
       data: {
         companyId,
         type: body.type,
@@ -274,7 +275,7 @@ async function createInventoryRequest(body, auth, req) {
 async function listInventoryRequests(auth, filters = {}, pagination = null) {
   const { companyId } = authScope(auth);
 
-  const result = await inventoryRequestsRepository.findAllRequests(companyId, filters, pagination);
+  const result = /** @type {any} */ (await inventoryRequestsRepository.findAllRequests(companyId, filters, pagination));
 
   if (pagination && result.total !== undefined) {
     const serialized = (result.items || []).map(serializeRequest);
@@ -311,21 +312,22 @@ async function cancelInventoryRequest(id, body, auth, req) {
   // If pickup was already confirmed (stock reserved), release the reservation
   // before cancelling so the stock becomes available again.
   const updated = await prisma.$transaction(async (tx) => {
+    const db = /** @type {any} */ (tx);
     if (request.type === 'TRANSFER' && (request.status === 'IN_PROGRESS' || request.status === 'DELIVERED')) {
-      await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, tx);
-      const sourceCtx = await getInventoryContext(tx, auth, request.sourceWarehouseId, request.productId);
-      const sourceLot = await tx.lot.findFirst({ where: { id: request.lotId, companyId } });
+      await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, db);
+      const sourceCtx = await getInventoryContext(db, auth, request.sourceWarehouseId, request.productId);
+      const sourceLot = await db.lot.findFirst({ where: { id: request.lotId, companyId } });
       if (sourceLot) {
         const qty = Number(request.quantity);
-        await changeWarehouseStock(tx, sourceCtx, 0, -qty);
-        await changeLotStock(tx, sourceCtx, sourceLot, 0, -qty);
+        await changeWarehouseStock(db, sourceCtx, 0, -qty);
+        await changeLotStock(db, sourceCtx, sourceLot, 0, -qty);
       }
     }
     return inventoryRequestsRepository.updateRequestStatus(BigInt(id), companyId, {
       status: 'CANCELLED',
       cancelledAt: new Date(),
       cancelledReason: body.cancelledReason ?? null,
-    }, tx);
+    }, db);
   });
 
   await audit.recordAuditEventIfAvailable({
@@ -361,22 +363,23 @@ async function pickupTransferRequest(id, body, auth, req) {
   const requestQty = Number(request.quantity);
 
   const updated = await prisma.$transaction(async (tx) => {
-    await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, tx);
+    const db = /** @type {any} */ (tx);
+    await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, db);
 
     // Reserve stock in source warehouse so it cannot be consumed elsewhere.
-    const sourceCtx = await getInventoryContext(tx, auth, request.sourceWarehouseId, request.productId);
-    const sourceLot  = await tx.lot.findFirst({ where: { id: request.lotId, companyId } });
+    const sourceCtx = await getInventoryContext(db, auth, request.sourceWarehouseId, request.productId);
+    const sourceLot  = await db.lot.findFirst({ where: { id: request.lotId, companyId } });
     if (!sourceLot) throw createHttpError(404, 'Lote origen no encontrado', 'not_found');
 
-    await changeWarehouseStock(tx, sourceCtx, 0, requestQty);
-    await changeLotStock(tx, sourceCtx, sourceLot, 0, requestQty);
+    await changeWarehouseStock(db, sourceCtx, 0, requestQty);
+    await changeLotStock(db, sourceCtx, sourceLot, 0, requestQty);
 
     return inventoryRequestsRepository.updateRequestStatus(BigInt(id), companyId, {
       status: 'IN_PROGRESS',
       pickedUpAt: new Date(),
       assignedToUserId: userId,
       operatorNote: body.operatorNote ?? null,
-    }, tx);
+    }, db);
   });
 
   await audit.recordAuditEventIfAvailable({
@@ -490,14 +493,15 @@ async function executeInventoryRequest(id, body, auth, req) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    const db = /** @type {any} */ (tx);
     // Re-read inside transaction for consistency
-    const reqTx = await inventoryRequestsRepository.findRequestById(requestId, companyId, tx);
+    const reqTx = await inventoryRequestsRepository.findRequestById(requestId, companyId, db);
     if (!reqTx) throw createHttpError(404, 'Solicitud no encontrada', 'not_found');
     if (reqTx.status !== 'DELIVERED' || !reqTx.deliveredAt) {
       throw createHttpError(409, 'El traslado ya fue procesado o cancelado', 'conflict');
     }
 
-    const lot = await tx.lot.findFirst({ where: { id: reqTx.lotId, companyId } });
+    const lot = await db.lot.findFirst({ where: { id: reqTx.lotId, companyId } });
     if (!lot) throw createHttpError(404, 'Lote no encontrado', 'not_found');
 
     const requestQty = Number(reqTx.quantity);
@@ -513,11 +517,11 @@ async function executeInventoryRequest(id, body, auth, req) {
       const maxSuffix = await inventoryRequestsRepository.findMaxTransferSuffixForLot(
         companyId,
         lot.internalLotNumber,
-        tx,
+        db,
       );
       const newLotNumber = `${lot.internalLotNumber}-T${String(maxSuffix + 1).padStart(3, '0')}`;
 
-      const newLot = await tx.lot.create({
+      const newLot = await db.lot.create({
         data: {
           companyId,
           productId: lot.productId,
@@ -538,7 +542,7 @@ async function executeInventoryRequest(id, body, auth, req) {
       destinationLotId = newLot.id;
     }
 
-    const transferResult = await _executePartialTransfer(tx, {
+    const transferResult = await _executePartialTransfer(db, {
       sourceLotId: reqTx.lotId,
       destinationLotId,
       sourceWarehouseId: reqTx.sourceWarehouseId,
@@ -556,7 +560,7 @@ async function executeInventoryRequest(id, body, auth, req) {
       deliveredAt: new Date(),
       resultOperationId: transferResult.operation.id,
       operatorNote: body.operatorNote ?? null,
-    }, tx);
+    }, db);
 
     return transferResult;
   });

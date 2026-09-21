@@ -50,7 +50,7 @@ async function findAllRequests(companyId, filters = {}, pagination = null, db = 
 
   const queryOptions = {
     where,
-    orderBy: { createdAt: 'desc' },
+    orderBy: /** @type {any} */ ({ createdAt: 'desc' }),
     include: {
       lot: { select: { id: true, lotNumber: true, internalLotNumber: true, warehouseLotStocks: { select: { warehouseId: true, quantity: true, reservedQuantity: true } } } },
       product: { select: { id: true, name: true, code: true } },

@@ -77,7 +77,7 @@ const updateInventoryAlertStatusSchema = z.object({
   note: z.string().trim().min(3).max(500).optional(),
 });
 
-const INVENTORY_REQUEST_TYPES = ['ADJUSTMENT', 'TRANSFER'];
+const INVENTORY_REQUEST_TYPES = /** @type {['ADJUSTMENT', 'TRANSFER']} */ (['ADJUSTMENT', 'TRANSFER']);
 
 const createInventoryRequestSchema = z.object({
   type: z.enum(INVENTORY_REQUEST_TYPES),
