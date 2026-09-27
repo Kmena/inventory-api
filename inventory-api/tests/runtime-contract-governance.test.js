@@ -25,6 +25,7 @@ const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   receiptRouter: 'src/routes/receipt.routes.js',
   orderRouter: 'src/routes/order.routes.js',
   invoiceRouter: 'src/routes/invoice.routes.js',
+  fiscalIntentRouter: 'src/routes/fiscal-intent.routes.js',
   paymentRouter: 'src/routes/payment.routes.js',
   // MASTER-007 / NPP-TASK-009 — CustomerEntitlement Wave 1 skeleton
   entitlementRouter: 'src/routes/entitlement.routes.js',
