@@ -74,4 +74,18 @@ module.exports = {
     process.env.HACIENDA_TAXPAYER_LOOKUP_URL || 'https://api.hacienda.go.cr/fe/ae?identificacion={identification}',
   geocodingSearchUrl: process.env.GEOCODING_SEARCH_URL || 'https://nominatim.openstreetmap.org/search',
   parseTrustProxy,
+  // TASK-015B: Billing HTTP client timeout (shared by scheduler and artifact proxy)
+  billingTimeoutMs: getNumber(process.env.BILLING_TIMEOUT_MS, 10_000),
+  // TASK-015B: Fiscal scheduler configuration
+  // Disabled by default — must set FISCAL_SCHEDULER_ENABLED=true in production deployment.
+  // Tests inject FakeBillingServer directly into FiscalScheduler; they do not use the
+  // application singleton and do not require this to be enabled.
+  fiscalScheduler: {
+    enabled: process.env.FISCAL_SCHEDULER_ENABLED === 'true',
+    pollIntervalMs: getNumber(process.env.FISCAL_POLL_INTERVAL_MS, 15_000),
+    workerBatchSize: getNumber(process.env.FISCAL_WORKER_BATCH_SIZE, 10),
+    reconcilerBatchSize: getNumber(process.env.FISCAL_RECONCILER_BATCH_SIZE, 10),
+    maxConcurrency: getNumber(process.env.FISCAL_MAX_CONCURRENCY, 3),
+    staleThresholdMs: getNumber(process.env.FISCAL_STALE_THRESHOLD_MS, 15 * 60 * 1000),
+  },
 };

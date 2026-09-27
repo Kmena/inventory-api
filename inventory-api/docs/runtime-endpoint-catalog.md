@@ -25,9 +25,9 @@ No se aceptan rutas montadas sin clasificar.
 
 ### Current contract summary
 Option B satisfied for the minimum critical contract surface.
-- Operaciones montadas en routers descubiertas desde `src/app.js` + `src/routes/*.routes.js`: `156`
+- Operaciones montadas en routers descubiertas desde `src/app.js` + `src/routes/*.routes.js`: `157`
 - Operaciones cubiertas por OpenAPI parcial: `113`
-- Operaciones excluidas explícitamente del OpenAPI parcial: `43`
+- Operaciones excluidas explícitamente del OpenAPI parcial: `44`
 - Superficie runtime adicional intencionalmente fuera de OpenAPI: `express.static(src/public)`
 
 ### Intentionally excluded OpenAPI operations
@@ -35,7 +35,8 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 - aliases o formas legacy compatibles preservadas;
 - superficies root/global fuera del recorte contractual actual;
 - mutaciones o subrecursos profundos de lifecycle aún no formalizados en OpenAPI parcial;
-- integraciones auxiliares o superficies runtime gobernadas por otras pruebas/documentos.
+- integraciones auxiliares o superficies runtime gobernadas por otras pruebas/documentos;
+- operaciones fiscal-operator gobernadas por specs/inventori-billing-integration.
 
 ## Scope and evidence rules
 - Solo se documentan endpoints verificables en `src/routes/` y montados en `src/app.js`.

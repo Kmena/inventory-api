@@ -21,6 +21,33 @@
   ],
   "excludedOperations": [
     {
+      "method": "GET",
+      "mountPath": "/api/companies",
+      "expressPath": "/company/billing-integration",
+      "routeFile": "src/routes/company.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-billing-foundation-config-outside-current-openapi-baseline",
+      "reason": "La configuracion fundacional Inventori->Billing queda gobernada por la especificacion inventori-billing-integration y pruebas de aislamiento/no exposicion de secretos; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/companies",
+      "expressPath": "/company/billing-integration",
+      "routeFile": "src/routes/company.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-billing-foundation-config-outside-current-openapi-baseline",
+      "reason": "La configuracion fundacional Inventori->Billing queda gobernada por la especificacion inventori-billing-integration y pruebas de aislamiento/no exposicion de secretos; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/fiscal-intents",
+      "expressPath": "/:id/recover-after-operator-repair",
+      "routeFile": "src/routes/fiscal-intent.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-billing-operator-recovery-outside-current-openapi-baseline",
+      "reason": "La recuperacion operator-only de intents fiscales ERROR_FINAL allowlisted esta gobernada por specs/inventori-billing-integration TASK-017 y pruebas de seguridad/idempotencia; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
       "method": "DELETE",
       "mountPath": "/api/invoices",
       "expressPath": "/:id",
@@ -128,6 +155,24 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "invoice-detail-lifecycle-outside-current-openapi-baseline",
       "reason": "El OpenAPI parcial cubre listado, creación e inconsistencias de facturas, pero no promete todavía el detalle completo ni sus mutaciones posteriores."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/invoices",
+      "expressPath": "/:id/fiscal-artifacts",
+      "routeFile": "src/routes/invoice.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-billing-fiscal-artifact-proxy-outside-current-openapi-baseline",
+      "reason": "El listado de metadatos de artefactos fiscales Billing (PDF, SIGNED_XML, HACIENDA_RESPONSE_XML) está gobernado por la especificación inventori-billing-integration (TASK-014/TASK-016) y sus pruebas de aislamiento, invariante de solo lectura y no exposición de secretos. El contrato OpenAPI parcial se actualizará en una tarea contractual posterior."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/invoices",
+      "expressPath": "/:id/fiscal-artifacts/:artifactType",
+      "routeFile": "src/routes/invoice.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-billing-fiscal-artifact-proxy-outside-current-openapi-baseline",
+      "reason": "El proxy de artefactos fiscales Billing (PDF, SIGNED_XML, HACIENDA_RESPONSE_XML) está gobernado por la especificación inventori-billing-integration (TASK-014) y sus pruebas de aislamiento, invariante de solo lectura y no exposición de secretos. El contrato OpenAPI parcial se actualizará en una tarea contractual posterior."
     },
     {
       "method": "GET",

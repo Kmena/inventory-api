@@ -222,6 +222,18 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'tenant-admin-legacy',
     transition: 'documented-legacy-role',
   },
+  /**
+   * TASK-014: Fiscal artifact proxy.
+   * Intentionally separate from invoice.detail to allow future granular control
+   * (e.g., restricting fiscal PDF/XML download to a narrower role set without
+   * changing invoice detail visibility). For P0, same roles as invoice.detail.
+   */
+  'invoice.fiscal-artifact': {
+    mode: 'role',
+    roles: ['admin', 'sales'],
+    boundary: 'tenant-operational',
+    transition: 'documented-legacy-role',
+  },
   'payment.list': {
     mode: 'permission',
     permissions: ['sales.manage', 'collections.view.all', 'collections.manage.own', 'collections.payments.approve', 'collections.payments.reverse'],

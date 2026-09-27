@@ -69,14 +69,17 @@ function resolveInvoiceItemKind(product) {
   return 'PHYSICAL_GOOD';
 }
 
+function roundMoney(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
 function buildInvoiceItemSnapshots(invoice, order) {
   return (order.items || []).map((item) => {
     const quantity = Number(item.quantity || 0);
     const unitPrice = Number(item.unitPrice || 0);
     const totalDiscount = Number(item.totalDiscount || 0);
-    const subtotal = Math.max(0, quantity * unitPrice - totalDiscount);
+    const subtotal = roundMoney(Math.max(0, quantity * unitPrice - totalDiscount));
     const product = item.product || null;
-
     return {
       invoiceId: invoice.id,
       orderItemId: item.id ?? null,

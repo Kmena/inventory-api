@@ -33,6 +33,13 @@ const {
 } = require('./inventory-transaction-support.service');
 const billingTriggerService = require('./billing-trigger.service');
 const { calculateInvoiceAmount } = require('./billing-trigger.service');
+const { assertOrderFiscalReadiness } = require('./fiscal-readiness.service');
+const {
+  buildFiscalSnapshotData,
+  buildIdempotencyKey,
+  createInvoiceFiscalIntent,
+  createInvoiceFiscalSnapshot,
+} = require('./fiscal-snapshot.service');
 
 async function acquireCompanyInventoryAdvisoryLock(tx, companyId) {
   await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, tx);
@@ -822,11 +829,6 @@ async function reserveStockForOrder(orderId, auth, req = null) {
     },
   });
 
-  // Best-effort billing trigger on approval — creates invoice and pending payment
-  // so the office can track and verify agent payments from the moment the order is approved.
-  // Idempotent: generateBillingOnDispatch checks for existing invoices before creating.
-  await billingTriggerService.generateBillingOnDispatch(updatedOrder, updatedOrder.client, auth);
-
   return updatedOrder;
 }
 
@@ -837,7 +839,11 @@ async function releaseStockReservation(orderId, cancel, auth, req = null) {
     const order = /** @type {any} */ (await inventoryRepository.findOrderForCompany(
       orderId,
       scope.companyId,
-      { items: { include: { product: true } } },
+      {
+        client: { include: { legalEntity: true } },
+        clientStore: { include: { legalEntity: true } },
+        items: { include: { product: true } },
+      },
       tx,
     ));
 
@@ -948,7 +954,11 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
     const order = /** @type {any} */ (await inventoryRepository.findOrderForCompany(
       orderId,
       scope.companyId,
-      { items: { include: { product: true } } },
+      {
+        client: { include: { legalEntity: true } },
+        clientStore: { include: { legalEntity: true } },
+        items: { include: { product: true } },
+      },
       tx,
     ));
 
@@ -956,6 +966,8 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
     if (!order.approved || order.status !== 'APPROVED') {
       throw createHttpError(409, 'El pedido debe estar aprobado antes de despacharse', 'conflict');
     }
+
+    const fiscalReadiness = await assertOrderFiscalReadiness(order, tx);
 
     const { inventoryItems } = splitOrderItemsByInventoryApplicability(order);
     if (inventoryItems.length > 0) {
@@ -1075,7 +1087,7 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
     }
 
     const dispatchUserId = auth?.sub ? BigInt(auth.sub) : null;
-    return inventoryRepository.updateOrderById(
+    const dispatchedOrder = /** @type {any} */ (await inventoryRepository.updateOrderById(
       orderId,
       {
         status: inventoryItems.length > 0 ? 'DELIVERED' : 'FULFILLED',
@@ -1085,9 +1097,35 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
         ...(transportPayload?.trackingNumber     ? { trackingNumber:       transportPayload.trackingNumber }     : {}),
         ...(transportPayload?.transportResponsible ? { transportResponsible: transportPayload.transportResponsible } : {}),
       },
-      { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } },
+      {
+        client: { include: { legalEntity: true } },
+        clientStore: { include: { legalEntity: true } },
+        user: true,
+        approvedBy: true,
+        warehouse: true,
+        items: { include: { product: true } },
+      },
       tx,
-    );
+    ));
+
+    const billingResult = await billingTriggerService.executeBillingLogic(dispatchedOrder, dispatchedOrder.client, auth, tx);
+    if (fiscalReadiness.enabled && billingResult?.invoice) {
+      const snapshotData = buildFiscalSnapshotData({
+        order: dispatchedOrder,
+        invoice: billingResult.invoice,
+        receiver: fiscalReadiness.receiver,
+        config: fiscalReadiness.config,
+      });
+      await createInvoiceFiscalSnapshot(snapshotData, tx);
+      await createInvoiceFiscalIntent({
+        companyId: dispatchedOrder.companyId,
+        invoiceId: billingResult.invoice.id,
+        config: fiscalReadiness.config,
+        idempotencyKey: buildIdempotencyKey(dispatchedOrder.companyId, billingResult.invoice.id),
+      }, tx);
+    }
+
+    return dispatchedOrder;
   }));
 
   await audit.recordAuditEventIfAvailable({
@@ -1103,10 +1141,6 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
       warehouseId: updatedOrder.warehouseId,
     },
   });
-
-  // Best-effort billing trigger — OUTSIDE the dispatch transaction.
-  // Errors are caught and logged inside generateBillingOnDispatch; the dispatch never fails due to billing.
-  await billingTriggerService.generateBillingOnDispatch(updatedOrder, updatedOrder.client, auth);
 
   return updatedOrder;
 }

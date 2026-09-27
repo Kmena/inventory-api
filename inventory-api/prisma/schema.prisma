@@ -269,6 +269,20 @@ enum PaymentConditionType {
   CREDIT
 }
 
+enum BillingEnvironment {
+  SANDBOX
+  PRODUCTION
+}
+
+enum FiscalIssuanceStatus {
+  PENDING
+  PROCESSING
+  ACCEPTED
+  REJECTED
+  ERROR_RETRYABLE
+  ERROR_FINAL
+}
+
 model Role {
   id              BigInt           @id @default(autoincrement())
   code            String           @unique
@@ -335,6 +349,9 @@ model Company {
   inventoryOperations      InventoryOperation[]
   customerEntitlements     CustomerEntitlement[]
   inventoryRequests        InventoryRequest[]
+  billingIntegrationConfig CompanyBillingIntegrationConfig?
+  invoiceFiscalSnapshots   InvoiceFiscalSnapshot[]
+  invoiceFiscalIntents     InvoiceFiscalIntent[]
 
   @@map("companies")
 }
@@ -1690,10 +1707,88 @@ model Invoice {
   payments  Payment[]
   items     InvoiceItem[]
   entitlements CustomerEntitlement[]
+  fiscalSnapshot InvoiceFiscalSnapshot?
+  fiscalIntent   InvoiceFiscalIntent?
 
   @@index([clientId])
   @@index([orderId])
   @@map("invoices")
+}
+
+model CompanyBillingIntegrationConfig {
+  id                         BigInt             @id @default(autoincrement())
+  companyId                  BigInt             @unique @map("company_id")
+  billingTenantId            String             @map("billing_tenant_id")
+  billingCompanyId           String             @map("billing_company_id")
+  billingEnvironment         BillingEnvironment @default(SANDBOX) @map("billing_environment")
+  billingCredentialSecretRef String             @map("billing_credential_secret_ref")
+  enabled                    Boolean            @default(false)
+  readinessStatus            String             @default("UNKNOWN") @map("readiness_status")
+  readinessCheckedAt         DateTime?          @map("readiness_checked_at")
+  lastErrorCode              String?            @map("last_error_code")
+  lastErrorMessage           String?            @map("last_error_message")
+  createdAt                  DateTime           @default(now()) @map("created_at")
+  updatedAt                  DateTime           @updatedAt @map("updated_at")
+
+  company                    Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalIntents              InvoiceFiscalIntent[]
+
+  @@index([companyId, enabled])
+  @@map("company_billing_integration_configs")
+}
+
+model InvoiceFiscalSnapshot {
+  id                 BigInt   @id @default(autoincrement())
+  companyId          BigInt   @map("company_id")
+  orderId            BigInt   @map("order_id")
+  invoiceId          BigInt   @unique @map("invoice_id")
+  receiverSourceType String   @map("receiver_source_type")
+  receiverSourceId   BigInt?  @map("receiver_source_id")
+  currency           String
+  saleCondition      String   @map("sale_condition")
+  paymentMethod      String?  @map("payment_method")
+  creditTermDays     Int?     @map("credit_term_days")
+  headerSnapshot     Json     @map("header_snapshot")
+  receiverSnapshot   Json     @map("receiver_snapshot")
+  linesSnapshot      Json     @map("lines_snapshot")
+  totalsSnapshot     Json     @map("totals_snapshot")
+  mappingVersion     String   @map("mapping_version")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoice            Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, orderId])
+  @@map("invoice_fiscal_snapshots")
+}
+
+model InvoiceFiscalIntent {
+  id                         BigInt               @id @default(autoincrement())
+  companyId                  BigInt               @map("company_id")
+  invoiceId                  BigInt               @unique @map("invoice_id")
+  billingIntegrationConfigId BigInt               @map("billing_integration_config_id")
+  status                     FiscalIssuanceStatus @default(PENDING)
+  idempotencyKey             String               @unique @map("idempotency_key")
+  billingFiscalDocumentId    String?              @map("billing_fiscal_document_id")
+  clave                      String?
+  consecutive                String?
+  billingStatus              String?              @map("billing_status")
+  failureCode                String?              @map("failure_code")
+  failureMessage             String?              @map("failure_message")
+  attemptCount               Int                  @default(0) @map("attempt_count")
+  lastAttemptAt              DateTime?            @map("last_attempt_at")
+  nextAttemptAt              DateTime?            @map("next_attempt_at")
+  lastSyncAt                 DateTime?            @map("last_sync_at")
+  metadata                   Json?
+  createdAt                  DateTime             @default(now()) @map("created_at")
+  updatedAt                  DateTime             @updatedAt @map("updated_at")
+
+  company                    Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoice                    Invoice              @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  integrationConfig          CompanyBillingIntegrationConfig @relation(fields: [billingIntegrationConfigId], references: [id])
+
+  @@index([companyId, status, nextAttemptAt])
+  @@map("invoice_fiscal_intents")
 }
 
 model Payment {
