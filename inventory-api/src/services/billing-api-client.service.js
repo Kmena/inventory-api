@@ -71,6 +71,143 @@ function sanitizeBillingErrorBody(body) {
   return { code, message };
 }
 
+function redactSensitiveValue(value, sensitiveValue) {
+  if (!sensitiveValue || typeof value !== 'string') return value;
+  return value.split(sensitiveValue).join('[REDACTED]');
+}
+
+function redactBillingErrorBody(sanitizedBody, apiKey) {
+  if (!sanitizedBody) return null;
+  return {
+    code: redactSensitiveValue(sanitizedBody.code, apiKey),
+    message: redactSensitiveValue(sanitizedBody.message, apiKey),
+  };
+}
+
+function hasOwnProperty(value, propertyName) {
+  return Object.prototype.hasOwnProperty.call(value, propertyName);
+}
+
+function isString(value) {
+  return typeof value === 'string';
+}
+
+function validateFiscalOnboardingActivity(activity, correlationId) {
+  if (!activity || typeof activity !== 'object') {
+    throw new BillingClientError('Billing returned malformed fiscal onboarding activity', {
+      code: 'BILLING_MALFORMED_FISCAL_ONBOARDING_ACTIVITY',
+      retryable: false,
+      correlationId,
+    });
+  }
+
+  const hasRequiredShape = isString(activity.id)
+    && isString(activity.code)
+    && isString(activity.description)
+    && isString(activity.haciendaStatus)
+    && typeof activity.billingEnabled === 'boolean';
+
+  if (!hasRequiredShape) {
+    throw new BillingClientError('Billing returned malformed fiscal onboarding activity', {
+      code: 'BILLING_MALFORMED_FISCAL_ONBOARDING_ACTIVITY',
+      retryable: false,
+      correlationId,
+    });
+  }
+
+  return activity;
+}
+
+function validateFiscalOnboardingActivitiesResponse(response, correlationId) {
+  if (!Array.isArray(response)) {
+    throw new BillingClientError('Billing returned malformed fiscal onboarding activities', {
+      code: 'BILLING_MALFORMED_FISCAL_ONBOARDING_ACTIVITIES',
+      retryable: false,
+      correlationId,
+    });
+  }
+  return response.map((activity) => validateFiscalOnboardingActivity(activity, correlationId));
+}
+
+function validateFiscalOnboardingStatusResponse(response, correlationId) {
+  const hasRequiredShape = response
+    && typeof response === 'object'
+    && isString(response.companyId)
+    && hasOwnProperty(response, 'defaultEconomicActivityId')
+    && (response.defaultEconomicActivityId === null || isString(response.defaultEconomicActivityId));
+
+  if (!hasRequiredShape) {
+    throw new BillingClientError('Billing returned malformed fiscal onboarding status', {
+      code: 'BILLING_MALFORMED_FISCAL_ONBOARDING_STATUS',
+      retryable: false,
+      correlationId,
+    });
+  }
+
+  validateFiscalOnboardingActivitiesResponse(response.activities, correlationId);
+  return response;
+}
+
+function validateFiscalOnboardingVerificationResponse(response, correlationId) {
+  const hasRequiredShape = response
+    && typeof response === 'object'
+    && isString(response.companyId)
+    && isString(response.haciendaVerificationStatus);
+
+  if (!hasRequiredShape) {
+    throw new BillingClientError('Billing returned malformed fiscal onboarding verification', {
+      code: 'BILLING_MALFORMED_FISCAL_ONBOARDING_VERIFICATION',
+      retryable: false,
+      correlationId,
+    });
+  }
+
+  validateFiscalOnboardingActivitiesResponse(response.activities, correlationId);
+  return response;
+}
+
+function validateSetDefaultFiscalOnboardingActivityResponse(response, correlationId) {
+  const hasRequiredShape = response
+    && typeof response === 'object'
+    && isString(response.companyId)
+    && isString(response.defaultEconomicActivityId)
+    && isString(response.code);
+
+  if (!hasRequiredShape) {
+    throw new BillingClientError('Billing returned malformed fiscal onboarding default activity response', {
+      code: 'BILLING_MALFORMED_FISCAL_ONBOARDING_DEFAULT_ACTIVITY',
+      retryable: false,
+      correlationId,
+    });
+  }
+
+  return response;
+}
+
+function validateFiscalReadinessResponse(response, correlationId) {
+  const isValidDateString = (v) => typeof v === 'string' && v.trim().length > 0 && !isNaN(Date.parse(v));
+  const isStringArray = (v) => Array.isArray(v) && v.every((item) => typeof item === 'string');
+
+  const hasRequiredShape = response
+    && typeof response === 'object'
+    && isString(response.companyId)
+    && isString(response.environment)
+    && typeof response.readyToIssue === 'boolean'
+    && isStringArray(response.reasonCodes)
+    && isStringArray(response.warnings)
+    && isValidDateString(response.checkedAt);
+
+  if (!hasRequiredShape) {
+    throw new BillingClientError('Billing returned malformed fiscal readiness response', {
+      code: 'BILLING_MALFORMED_FISCAL_READINESS',
+      retryable: false,
+      correlationId,
+    });
+  }
+
+  return response;
+}
+
 async function parseJsonSafely(response) {
   const text = await response.text();
   if (!text) return null;
@@ -111,7 +248,7 @@ class BillingApiClient {
 
       const parsedBody = await parseJsonSafely(response);
       if (!response.ok) {
-        const sanitized = sanitizeBillingErrorBody(parsedBody);
+        const sanitized = redactBillingErrorBody(sanitizeBillingErrorBody(parsedBody), apiKey);
         throw new BillingClientError(sanitized?.message || 'Billing request failed', {
           code: sanitized?.code || 'BILLING_HTTP_ERROR',
           statusCode: response.status,
@@ -139,6 +276,68 @@ class BillingApiClient {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  async getFiscalOnboardingStatus({ billingCompanyId, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/status`,
+      secretReference,
+      correlationId,
+    });
+    return validateFiscalOnboardingStatusResponse(response, correlationId);
+  }
+
+  async getFiscalOnboardingActivities({ billingCompanyId, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/activities`,
+      secretReference,
+      correlationId,
+    });
+    return validateFiscalOnboardingActivitiesResponse(response, correlationId);
+  }
+
+  async verifyFiscalOnboarding({ billingCompanyId, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'POST',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/verify`,
+      secretReference,
+      correlationId,
+    });
+    return validateFiscalOnboardingVerificationResponse(response, correlationId);
+  }
+
+  async updateFiscalOnboardingActivity({ billingCompanyId, code, billingEnabled, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'PATCH',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/activities/${encodeURIComponent(code)}`,
+      secretReference,
+      correlationId,
+      body: { billingEnabled },
+    });
+    return validateFiscalOnboardingActivity(response, correlationId);
+  }
+
+  async setDefaultFiscalOnboardingActivity({ billingCompanyId, code, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'PUT',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/default-activity`,
+      secretReference,
+      correlationId,
+      body: { code },
+    });
+    return validateSetDefaultFiscalOnboardingActivityResponse(response, correlationId);
+  }
+
+  async getFiscalReadiness({ billingCompanyId, environment, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/${encodeURIComponent(environment)}/readiness`,
+      secretReference,
+      correlationId,
+    });
+    return validateFiscalReadinessResponse(response, correlationId);
   }
 
   createFiscalDocument({ billingCompanyId, environment, secretReference, idempotencyKey, correlationId, payload }) {
@@ -324,7 +523,7 @@ class BillingApiClient {
         const errText = await response.text().catch(() => '');
         let errBody = null;
         try { errBody = JSON.parse(errText); } catch (_) { /* non-JSON error */ }
-        const sanitized = sanitizeBillingErrorBody(errBody);
+        const sanitized = redactBillingErrorBody(sanitizeBillingErrorBody(errBody), apiKey);
         throw new BillingClientError(sanitized?.message || 'Billing artifact request failed', {
           code: sanitized?.code || 'BILLING_HTTP_ERROR',
           statusCode: response.status,

@@ -21,6 +21,7 @@ const publicSupplierQuotationRouter = require('./routes/public-supplier-quotatio
 const supplierRouter = require('./routes/supplier.routes');
 const receiptRouter = require('./routes/receipt.routes');
 const fiscalReferenceRouter = require('./routes/fiscal-reference.routes');
+const fiscalSettingsRouter = require('./routes/fiscal-settings.routes');
 const orderRouter = require('./routes/order.routes');
 const invoiceRouter = require('./routes/invoice.routes');
 const fiscalIntentRouter = require('./routes/fiscal-intent.routes');
@@ -246,6 +247,7 @@ app.use('/api/public/supplier-quotations', ...mediumPayloadParsers, publicSuppli
 app.use('/api/suppliers', ...mediumPayloadParsers, supplierRouter);
 app.use('/api/receipts', ...mediumPayloadParsers, receiptRouter);
 app.use('/api/fiscal-references', ...mediumPayloadParsers, fiscalReferenceRouter);
+app.use('/api/company', ...mediumPayloadParsers, fiscalSettingsRouter);
 app.use('/api/orders', ...mediumPayloadParsers, orderRouter);
 app.use('/api/invoices', ...mediumPayloadParsers, invoiceRouter);
 app.use('/api/fiscal-intents', ...mediumPayloadParsers, fiscalIntentRouter);

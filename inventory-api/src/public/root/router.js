@@ -29,6 +29,7 @@
   // recepciones-fiscales-workspace views
   const receiptsAdminView = rootShell.require('views.receiptsAdmin');
   const fiscalRefsAdminView = rootShell.require('views.fiscalRefsAdmin');
+  const fiscalSettingsAdminView = rootShell.require('views.fiscalSettingsAdmin');
   // users-admin-view feature
   const usersAdminView = rootShell.require('views.usersAdmin');
   // in-app-feedback feature
@@ -180,6 +181,10 @@
 
     if (item.routeKey === 'referencias_fiscales') {
       return fiscalRefsAdminView;
+    }
+
+    if (item.routeKey === 'configuracion_fiscal') {
+      return fiscalSettingsAdminView;
     }
 
     if (item.routeKey === 'users') {

@@ -75,6 +75,11 @@ const permissionDefinitions = [
   ['inventory.intake.override', 'inventory', 'intake_override', 'Sobrescribir validaciones de entrada'],
   ['billing.handoff.view', 'billing', 'view_handoff', 'Ver referencias y estado de handoff fiscal'],
   ['billing.handoff.create', 'billing', 'create_handoff', 'Crear referencias de handoff fiscal'],
+  ['fiscal.settings.view', 'fiscal_settings', 'view', 'Ver configuracion fiscal y actividades economicas registradas'],
+  ['fiscal.activities.refresh', 'fiscal_settings', 'refresh_activities', 'Actualizar actividades fiscales desde Billing'],
+  ['fiscal.activities.manage', 'fiscal_settings', 'manage_activities', 'Habilitar o deshabilitar actividades fiscales'],
+  ['fiscal.activities.default.update', 'fiscal_settings', 'update_default_activity', 'Cambiar actividad fiscal predeterminada'],
+  ['fiscal.readiness.view', 'fiscal_settings', 'view_readiness', 'Ver preparacion fiscal cuando exista contrato M2M confirmado'],
   ['integration.taxpayer.lookup', 'integration', 'taxpayer_lookup', 'Consultar datos fiscales de contribuyentes en Hacienda'],
   ['integration.economic-activities.list', 'integration', 'economic_activities_list', 'Listar actividades economicas del catalogo de Hacienda'],
 ];

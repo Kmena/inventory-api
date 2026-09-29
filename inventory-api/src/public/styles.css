@@ -5371,3 +5371,101 @@ dialog.root-dialog::backdrop {
   color: var(--muted);
   font-size: 0.8rem;
 }
+
+/* ── Fiscal Settings Wave 8 — layout / responsive / accessibility ── */
+.fiscal-settings-page { display: grid; gap: 20px; }
+
+.fiscal-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* Left accent border distinguishes the readiness verdict at a glance */
+.fiscal-readiness-card {
+  border-left: 4px solid var(--border);
+}
+.fiscal-readiness-card--ready    { border-left-color: var(--success, #2d7d46); }
+.fiscal-readiness-card--not-ready { border-left-color: #d97706; }
+
+/* Activity list: full-width vertical stack — never side-by-side columns */
+.fiscal-activities-stack { display: grid; gap: 12px; }
+
+/* Compact activity row internals */
+.fiscal-activity-item { display: grid; gap: 10px; }
+
+.fiscal-activity-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fiscal-activity-info { min-width: 0; flex: 1 1 0; }
+.fiscal-activity-info h4 { margin: 2px 0 0; }
+
+.fiscal-activity-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.fiscal-activity-meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+/* Controls row: checkbox + radio inline, touch-target sized */
+.fiscal-activity-controls {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.fiscal-activity-control-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px; /* WCAG 2.5.5 minimum touch target */
+  cursor: pointer;
+}
+
+.fiscal-activity-control-item input { flex-shrink: 0; }
+
+.fiscal-activity-control-item label {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* Accessibility hint text: rendered inline below controls, one per control */
+.fiscal-activity-hints {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ── Responsive overrides ── */
+@media (max-width: 767px) {
+  .fiscal-summary-grid { grid-template-columns: 1fr; }
+  .fiscal-activity-controls {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .fiscal-activity-hints { flex-direction: column; gap: 6px; }
+}
+
+@media (max-width: 480px) {
+  .fiscal-activity-head { flex-direction: column; }
+  .fiscal-activity-badges { margin-top: 4px; }
+}

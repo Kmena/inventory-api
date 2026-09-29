@@ -40,6 +40,8 @@ const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   supplierRouter: 'src/routes/supplier.routes.js',
   // recepciones-fiscales-workspace: global fiscal references listing endpoint
   fiscalReferenceRouter: 'src/routes/fiscal-reference.routes.js',
+  // inventori-fiscal-settings-and-ux Wave 2 backend API
+  fiscalSettingsRouter: 'src/routes/fiscal-settings.routes.js',
   // in-app-feedback feature
   feedbackRouter: 'src/routes/feedback.routes.js',
   // users-account-self-service: PATCH /api/me/password

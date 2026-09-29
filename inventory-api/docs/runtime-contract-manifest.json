@@ -767,6 +767,51 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "inventory-requests-outside-current-openapi-baseline",
       "reason": "inventory-requests spec: Confirmación de entrega física (TRANSFER: IN_PROGRESS→DELIVERED). Ruta activa protegida por inventory.requests.execute. Excluida del contrato OpenAPI parcial."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/readiness",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-wave6b-readiness-outside-current-openapi-baseline",
+      "reason": "Wave 6B: Consulta de preparación fiscal M2M Billing gobernada por specs/inventori-fiscal-settings-and-ux; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-wave2-outside-current-openapi-baseline",
+      "reason": "La API backend Wave 2 de Fiscal Settings esta gobernada por specs/inventori-fiscal-settings-and-ux y pruebas de servicio/ruta; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/activities/refresh",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-wave2-outside-current-openapi-baseline",
+      "reason": "La API backend Wave 2 de Fiscal Settings esta gobernada por specs/inventori-fiscal-settings-and-ux y pruebas de servicio/ruta; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "PATCH",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/activities/:code",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-wave2-outside-current-openapi-baseline",
+      "reason": "La API backend Wave 2 de Fiscal Settings esta gobernada por specs/inventori-fiscal-settings-and-ux y pruebas de servicio/ruta; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/activities/default",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-wave2-outside-current-openapi-baseline",
+      "reason": "La API backend Wave 2 de Fiscal Settings esta gobernada por specs/inventori-fiscal-settings-and-ux y pruebas de servicio/ruta; el OpenAPI parcial se actualizara en una tarea contractual posterior."
     }
   ]
 }

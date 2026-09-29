@@ -420,6 +420,20 @@
     dependencyTag: 'p37-root-roles-admin',
   });
 
+  const fiscalSettingsItem = createRouteItem({
+    id: 'fiscal-settings',
+    label: 'Configuración fiscal',
+    routeKey: 'configuracion_fiscal',
+    href: '/root/#configuracion_fiscal',
+    implemented: true,
+    activeMatchers: ['configuracion_fiscal'],
+    visibilityRule: (session) => guards.hasPermission(session, 'fiscal.settings.view'),
+    actorScope: 'permission:fiscal.settings.view',
+    icon: 'landmark',
+    includeInRootNav: false,
+    dependencyTag: 'inventori-fiscal-settings-and-ux-wave-4',
+  });
+
   const genericInProcessItem = createRouteItem({
     id: 'in-process',
     label: 'Pendientes',
@@ -467,6 +481,7 @@
     reportsItem,
     usersItem,
     rolesPermissionsItem,
+    fiscalSettingsItem,
     settingsItem,
     genericInProcessItem,
   ];
@@ -563,10 +578,11 @@
     {
       id: 'administration',
       title: 'Administracion',
-      visibilityRule: guards.isCompanyAdmin,
+      visibilityRule: (session) => guards.isCompanyAdmin(session) || guards.hasPermission(session, 'fiscal.settings.view'),
       entries: [
         { type: 'item', ...usersItem },
         { type: 'item', ...rolesPermissionsItem },
+        { type: 'item', ...fiscalSettingsItem },
         { type: 'item', ...warehousesItem },
         { type: 'item', ...settingsItem },
       ],

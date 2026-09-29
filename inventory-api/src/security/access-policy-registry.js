@@ -39,6 +39,36 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'tenant-admin-legacy',
     transition: 'documented-legacy-role',
   },
+  'fiscal-settings.view': {
+    mode: 'permission',
+    permissions: ['fiscal.settings.view'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.activities.refresh': {
+    mode: 'permission',
+    permissions: ['fiscal.activities.refresh'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.readiness': {
+    mode: 'permission',
+    permissions: ['fiscal.readiness.view'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.activities.manage': {
+    mode: 'permission',
+    permissions: ['fiscal.activities.manage'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.activities.default.update': {
+    mode: 'permission',
+    permissions: ['fiscal.activities.default.update'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
   'user.list-global': {
     mode: 'role',
     roles: ['root'],
