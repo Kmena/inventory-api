@@ -384,6 +384,53 @@ test('clients admin creation form has economic activity select and hidden name i
   assert.match(source, /id="clients-create-economic-activity-name".*name="economicActivityName"/, 'create form must have hidden economicActivityName input');
 });
 
+test('clients admin edit form renderer populates legalName and commercialName from legalEntity, not from flat client fields', () => {
+  // Bug: renderer was reading client.legalName / client.commercialName (flat fields that no longer
+  // exist on Client since they moved to ClientLegalEntity). Fields always showed empty in the edit form.
+  const rootShell = createHarness();
+  const renderers = rootShell.require('views.clientsAdminRenderers');
+
+  const html = renderers.renderClientDetail(
+    {
+      id: 401,
+      name: 'Empresa Test',
+      code: 'ET-01',
+      phone: '555-0401',
+      clientClassificationId: 1,
+      classification: { id: 1, name: 'Preferente' },
+      documentType: '02',
+      documents: [],
+      stores: [],
+      references: [],
+      isActive: true,
+      // Flat fields deliberately absent to prove the renderer does NOT rely on them:
+      // legalName: undefined, commercialName: undefined
+      legalEntity: {
+        id: 10,
+        identificationNumber: '3-101-888888',
+        legalName: 'Empresa Test Sociedad Anónima',
+        commercialName: 'Empresa Test Comercial',
+        verificationStatus: 'VERIFIED',
+      },
+    },
+    [{ id: 1, name: 'Preferente' }],
+    [{ value: '02', label: '02 — Cédula Jurídica' }],
+    [],
+    true,
+  );
+
+  assert.match(
+    html,
+    /name="legalName"[^>]*value="Empresa Test Sociedad An\u00F3nima"/,
+    'edit form legalName input must be pre-filled from client.legalEntity.legalName',
+  );
+  assert.match(
+    html,
+    /name="commercialName"[^>]*value="Empresa Test Comercial"/,
+    'edit form commercialName input must be pre-filled from client.legalEntity.commercialName',
+  );
+});
+
 test('clients admin edit form renderer uses documentType dropdown and updated emailBilling label (TASK-012)', () => {
   const renderersSource = fs.readFileSync(path.join(rootPublicPath, 'views', 'clients-admin.renderers.js'), 'utf8');
   assert.match(renderersSource, /01 — Cédula Física/, 'edit form renderer must include 01 option');
@@ -406,5 +453,34 @@ test('clients admin loadClients calls listEconomicActivities in Promise.all (TAS
     source,
     /listEconomicActivities\(session\)\.catch\(\(\) => \[\]\)/,
     'listEconomicActivities must degrade gracefully with .catch(() => []) so mount never fails',
+  );
+});
+
+test('clients admin mount bootstraps fiscal section for the auto-selected first client (Wave 6 fix)', () => {
+  // Bug: on initial page load, loadClients() auto-selects the first client and renders its form
+  // (including #client-fiscal-body), but loadClientDetail was never called. The fiscal section
+  // stayed at "Cargando datos de facturación…" until the user manually clicked the client.
+  //
+  // Fix: after the initial await loadClients(), fire-and-forget loadClientDetail(selectedClientId)
+  // when clientDetailsById has no cached entry for that client (avoids double-loading on save).
+  const source = fs.readFileSync(path.join(rootPublicPath, 'views', 'clients-admin.js'), 'utf8');
+
+  // The pattern must appear in the mount function body, after await loadClients()
+  assert.match(
+    source,
+    /await loadClients\(\)[^}]*loadClientDetail\(selectedClientId\)/s,
+    'mount must call loadClientDetail(selectedClientId) after the initial await loadClients()',
+  );
+  // Must be guarded: only fire when the detail is not yet cached
+  assert.match(
+    source,
+    /!clientDetailsById\[String\(selectedClientId\)\]/,
+    'bootstrap must be guarded by !clientDetailsById[...] to prevent double-loading after save',
+  );
+  // Must degrade gracefully (fire-and-forget)
+  assert.match(
+    source,
+    /loadClientDetail\(selectedClientId\)\.catch\(\(\) => \{\}\)/,
+    'bootstrap must use .catch(() => {}) to avoid unhandled rejection on network errors',
   );
 });

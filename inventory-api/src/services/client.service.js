@@ -427,7 +427,75 @@ async function updateClient(id, payload, auth) {
     throw createHttpError(404, 'Cliente no encontrado', 'not_found');
   }
 
-  const { companyId: _ignoredCompanyId, ...safePayload } = payload;
+  // legalName / commercialName belong to ClientLegalEntity, not the Client model —
+  // keep them out of the Prisma client.updateMany() call but use them for entity sync.
+  const {
+    companyId: _ignoredCompanyId,
+    legalName,
+    commercialName,
+    ...safePayload
+  } = payload;
+
+  if (safePayload.clientClassificationId) {
+    const classification = await clientRepository.findCompanyClassificationById(
+      safePayload.clientClassificationId,
+      companyId,
+    );
+    if (!classification) {
+      throw createHttpError(400, 'Seleccione una clasificacion de cliente valida', 'validation_error');
+    }
+  }
+
+  // Sync ClientLegalEntity whenever any fiscal-identification field changes.
+  //
+  // Strategy:
+  //   - legalId unchanged + existing entity → update entity IN PLACE by ID
+  //     (preserves verificationStatus / lastVerifiedAt / taxpayerName).
+  //   - legalId changed OR no existing entity → findOrCreateLegalEntity by
+  //     identificationNumber (may find different entity or create fresh UNVERIFIED one).
+  //
+  // This prevents a verified entity from being silently replaced by a new UNVERIFIED
+  // one when the user edits unrelated fields (address, phone, name…).
+  const LEGAL_ENTITY_FIELDS = ['legalId', 'documentType', 'economicActivityCode',
+    'economicActivityName', 'address', 'emailBilling', 'phone'];
+  const hasFiscalChanges = legalName !== undefined
+    || commercialName !== undefined
+    || LEGAL_ENTITY_FIELDS.some((f) => safePayload[f] !== undefined);
+  const resolvedLegalId = safePayload.legalId ?? existingClient.legalId;
+
+  if (hasFiscalChanges) {
+    // Detect whether the identification number itself is being changed.
+    const legalIdChanged = safePayload.legalId !== undefined
+      && safePayload.legalId !== existingClient.legalId;
+    const existingEntityId = existingClient.legalEntityId;
+
+    const entityPayload = {
+      legalName: legalName ?? existingClient.legalEntity?.legalName ?? existingClient.name,
+      commercialName: commercialName ?? existingClient.legalEntity?.commercialName,
+      identificationType: safePayload.documentType ?? existingClient.documentType,
+      economicActivityCode: safePayload.economicActivityCode ?? existingClient.economicActivityCode,
+      economicActivityName: safePayload.economicActivityName ?? existingClient.economicActivityName,
+      address: safePayload.address ?? existingClient.address,
+      email: safePayload.emailBilling ?? existingClient.emailBilling,
+      phone: safePayload.phone ?? existingClient.phone,
+    };
+
+    if (!legalIdChanged && existingEntityId) {
+      // legalId unchanged → update existing entity directly (preserves verificationStatus).
+      await clientRepository.updateLegalEntityInPlace(existingEntityId, companyId, entityPayload);
+      // legalEntityId on the client record stays the same — no update needed.
+    } else if (resolvedLegalId) {
+      // legalId changed OR no existing entity → find/create by identificationNumber.
+      const legalEntity = await clientRepository.findOrCreateLegalEntity(companyId, {
+        ...entityPayload,
+        identificationNumber: resolvedLegalId,
+      });
+      if (legalEntity) {
+        safePayload.legalEntityId = legalEntity.id;
+      }
+    }
+  }
+
   return clientRepository.updateCompanyClient(id, companyId, safePayload);
 }
 

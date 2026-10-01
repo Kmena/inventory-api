@@ -204,8 +204,8 @@
                 <option value="04" ${client.documentType === '04' ? 'selected' : ''}>04 — NITE</option>
               </select>
             </label>
-            <label><span>Razon social</span><input name="legalName" type="text" maxlength="255" value="${rootShellUi.escapeHtml(client.legalName || '')}" /></label>
-            <label><span>Nombre comercial</span><input name="commercialName" type="text" maxlength="255" value="${rootShellUi.escapeHtml(client.commercialName || '')}" /></label>
+            <label><span>Razon social</span><input name="legalName" type="text" maxlength="255" value="${rootShellUi.escapeHtml(client.legalEntity?.legalName || '')}" /></label>
+            <label><span>Nombre comercial</span><input name="commercialName" type="text" maxlength="255" value="${rootShellUi.escapeHtml(client.legalEntity?.commercialName || '')}" /></label>
             <label><span>Telefono</span><input name="phone" type="text" maxlength="50" value="${rootShellUi.escapeHtml(client.phone || '')}" /></label>
             <label><span>Correo electrónico para facturas (PDF y XML)</span><input name="emailBilling" type="email" maxlength="255" value="${rootShellUi.escapeHtml(client.emailBilling || '')}" /></label>
             <label><span>Tipo de pago</span><select name="paymentType"><option value="">Selecciona</option><option value="CASH" ${client.paymentType === 'CASH' ? 'selected' : ''}>Contado</option><option value="CREDIT" ${client.paymentType === 'CREDIT' ? 'selected' : ''}>Credito</option><option value="TRANSFER" ${client.paymentType === 'TRANSFER' ? 'selected' : ''}>Transferencia</option><option value="CARD" ${client.paymentType === 'CARD' ? 'selected' : ''}>Tarjeta</option></select></label>
@@ -240,6 +240,15 @@
         </form>
         <datalist id="clients-document-types-list">${(documentTypes || []).map((item) => `<option value="${rootShellUi.escapeHtml(item.value || item.code || item.name || '')}"></option>`).join('')}</datalist>
       </section>
+
+      ${client.legalEntity && client.legalEntity.id ? `
+      <section class="stack-section" aria-labelledby="client-fiscal-heading">
+        <div class="page-header"><h4 id="client-fiscal-heading">Datos de facturación</h4></div>
+        <div id="client-fiscal-body" data-rfr-entity-id="${rootShellUi.escapeHtml(String(client.legalEntity.id))}" aria-live="polite">
+          <p class="muted" style="font-size:0.85rem;">Cargando datos de facturación…</p>
+        </div>
+      </section>
+      ` : ''}
 
       <section class="stack-section">
         <div class="page-header">
