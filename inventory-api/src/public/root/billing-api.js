@@ -50,6 +50,19 @@
   }
 
   /**
+   * Fetch a single invoice by ID (Wave 2 — prepares the API boundary for Wave 3 detail panel).
+   * Returns the full DETAIL_FISCAL_DTO including fiscal.clave, fiscal.consecutive, fiscal.acceptedAt.
+   * @param {any} session
+   * @param {string|number} invoiceId
+   * @returns {Promise<any>}
+   */
+  async function fetchInvoiceDetail(session, invoiceId) {
+    return inventoryAuth.fetchJson(session, `${BASE_INVOICES}/${encodeURIComponent(invoiceId)}`, {
+      fallbackMessage: 'No se pudo cargar el detalle de la factura.',
+    });
+  }
+
+  /**
    * Fetch invoices with PENDING or PARTIAL status (accounts receivable).
    * @param {any} session
    * @returns {Promise<any>}
@@ -129,7 +142,7 @@
    * Office-registered payments (FR-016, DEC-010) are created and then immediately approved.
    * @param {any} session
    * @param {string|number} invoiceId
-   * @param {{ paymentMethod: string, amount: number, reference?: string, note?: string }} paymentData
+   * @param {{ paymentMethod: string, amount: number, reference?: string|null, bankName?: string|null, cardType?: string|null, note?: string|null }} paymentData
    * @returns {Promise<any>}
    */
   async function createPayment(session, invoiceId, paymentData) {
@@ -140,7 +153,9 @@
         paymentMethod: paymentData.paymentMethod,
         amount:        paymentData.amount,
         reference:     paymentData.reference || null,
-        note:          paymentData.note || null,
+        bankName:      paymentData.bankName  || null,
+        cardType:      paymentData.cardType  || null,
+        note:          paymentData.note      || null,
       }),
       fallbackMessage: 'No se pudo registrar el pago.',
     });
@@ -151,6 +166,7 @@
     createPayment,
     fetchClientLedger,
     fetchClientsForLedger,
+    fetchInvoiceDetail,
     fetchPendingPayments,
     fetchReceivables,
     rejectPayment,

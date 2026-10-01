@@ -11,6 +11,27 @@
     return `<p class="muted" style="padding:24px;text-align:center;">${h.helpers.escapeHtml(message || 'Sin datos.')}</p>`;
   }
 
+  /**
+   * Builds the detail cell for a payment row.
+   * TRANSFER → shows reference (required) + bank name (if present)
+   * CARD     → shows card type (if present)
+   * CASH     → '—'
+   * @param {ReturnType<typeof h.helpers>} bh
+   * @param {{ paymentMethod?: string, reference?: string|null, bankName?: string|null, cardType?: string|null }} pmt
+   * @returns {string}
+   */
+  function buildPaymentDetailCell(bh, pmt) {
+    if (pmt.paymentMethod === 'TRANSFER') {
+      const ref  = pmt.reference ? `<span class="billing-ref">${bh.escapeHtml(pmt.reference)}</span>` : '—';
+      const bank = pmt.bankName  ? `<br><span class="muted" style="font-size:0.78rem;">Banco: ${bh.escapeHtml(pmt.bankName)}</span>` : '';
+      return ref + bank;
+    }
+    if (pmt.paymentMethod === 'CARD') {
+      return pmt.cardType ? bh.escapeHtml(bh.cardTypeLabel(pmt.cardType)) : '—';
+    }
+    return '—';
+  }
+
   function renderLoadingSkeleton() {
     return `
       <div style="display:grid;gap:12px;padding:16px;">
@@ -51,6 +72,12 @@
              Registrar pago
            </button>`;
 
+      // Wave 2: fiscal status cell — consume inv.fiscal from the backend DTO.
+      // NEVER infer fiscal state from inv.status, payments, or presence of clave.
+      const fiscalCell = inv.fiscal
+        ? `<span class="${bh.escapeHtml(bh.fiscalStatusListBadgeClass(inv.fiscal.status))}">${bh.escapeHtml(bh.fiscalStatusListLabel(inv.fiscal.status))}</span>`
+        : '<span aria-label="Sin emisión fiscal">—</span>';
+
       return `
         <tr${rowStyle}>
           <td>${bh.escapeHtml(inv.client?.name || inv.clientName || '—')}</td>
@@ -59,6 +86,7 @@
           <td class="numeric-cell" style="font-weight:700;">${bh.formatCurrency(pending)}</td>
           <td>${bh.formatDate(inv.dueAt)}</td>
           <td><span class="${bh.invoiceStatusBadgeClass(inv.status)}">${bh.escapeHtml(bh.invoiceStatusLabel(inv.status))}</span></td>
+          <td>${fiscalCell}</td>
           <td>${actionCell}</td>
         </tr>`;
     });
@@ -74,6 +102,7 @@
               <th class="numeric-cell">Pendiente</th>
               <th>Vencimiento</th>
               <th>Estado</th>
+              <th>Estado Fiscal</th>
               <th>Acción</th>
             </tr>
           </thead>
@@ -95,9 +124,7 @@
 
     const bh = h.helpers;
     const rows = payments.map((pmt) => {
-      const referenceCell = pmt.paymentMethod === 'TRANSFER' && pmt.reference
-        ? `<span class="billing-ref">${bh.escapeHtml(pmt.reference)}</span>`
-        : (pmt.reference ? bh.escapeHtml(pmt.reference) : '—');
+      const referenceCell = buildPaymentDetailCell(bh, pmt);
 
       return `
         <tr>
@@ -226,7 +253,7 @@
             <tbody>${payments.map((p) => `
               <tr>
                 <td>${bh.escapeHtml(bh.paymentMethodLabel(p.paymentMethod))}</td>
-                <td>${p.reference ? bh.escapeHtml(p.reference) : '—'}</td>
+                <td>${buildPaymentDetailCell(bh, p)}</td>
                 <td class="numeric-cell">${bh.formatCurrency(p.amount)}</td>
                 <td><span class="badge">${bh.escapeHtml(bh.paymentStatusLabel(p.status))}</span></td>
                 <td>${bh.formatDate(p.approvedAt || p.createdAt)}</td>
