@@ -44,15 +44,33 @@ const paymentReceiptFileSchema = z.object({
   }
 });
 
+// Card network types accepted on payment registration
+const CARD_TYPES = /** @type {const} */ (['VISA', 'MASTERCARD', 'AMEX', 'DINERS', 'OTHER']);
+
+// Base object — used for update (partial) and as foundation for create refinement
 const paymentBaseSchema = z.object({
   invoiceId: z.coerce.bigint(),
   amount: z.number().positive(),
   paymentMethod: z.enum(['CASH', 'CREDIT', 'TRANSFER', 'CARD']),
-  reference: z.string().trim().min(1).max(255),
+  // reference is required only for TRANSFER — enforced by superRefine in createPaymentSchema
+  reference: z.string().trim().min(1).max(255).optional().nullable(),
+  // TRANSFER: originating bank (free text, optional)
+  bankName: z.string().trim().min(1).max(100).optional().nullable(),
+  // CARD: card network
+  cardType: z.enum(/** @type {[string, ...string[]]} */ ([...CARD_TYPES])).optional().nullable(),
   receiptFile: paymentReceiptFileSchema.optional(),
 });
 
-const createPaymentSchema = paymentBaseSchema;
+// Create adds the cross-field rule: TRANSFER requires reference
+const createPaymentSchema = paymentBaseSchema.superRefine((data, ctx) => {
+  if (data.paymentMethod === 'TRANSFER' && !data.reference?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['reference'],
+      message: 'La referencia es requerida para transferencias',
+    });
+  }
+});
 
 const updatePaymentSchema = paymentBaseSchema.partial();
 
@@ -75,6 +93,7 @@ const reversePaymentSchema = z.object({
 module.exports = {
   MAX_PAYMENT_RECEIPT_FILE_SIZE_BYTES,
   PAYMENT_RECEIPT_MIME_TYPES,
+  CARD_TYPES,
   createPaymentSchema,
   updatePaymentSchema,
   approvePaymentSchema,

@@ -70,6 +70,20 @@ function countCompanyProducts(ids, companyId) {
   return prisma.product.count({ where: { id: { in: ids }, companyId } });
 }
 
+function findSellableLotStocksByProductIds(companyId, productIds) {
+  if (!productIds.length) return Promise.resolve([]);
+  return prisma.warehouseLotStock.findMany({
+    where: {
+      productId: { in: productIds },
+      warehouse: { companyId, isActive: true, isSellableSource: true },
+      lot: { companyId, status: 'AVAILABLE', qaStatus: 'APPROVED' },
+    },
+    include: {
+      lot: true,
+    },
+  });
+}
+
 function createOrder(data) {
   return prisma.order.create({ data, include: includeOrder() });
 }
@@ -236,6 +250,7 @@ module.exports = {
   findWarehouse,
   findCompanyClientStore,
   countCompanyProducts,
+  findSellableLotStocksByProductIds,
   createOrder,
   updateOrder,
   updateOrderWithRelations,

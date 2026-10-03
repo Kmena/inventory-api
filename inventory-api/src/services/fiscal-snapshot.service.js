@@ -75,6 +75,18 @@ function buildFiscalSnapshotData({ order, invoice, receiver, config }) {
     billingEnvironment: config?.billingEnvironment || null,
   };
 
+  // ── RFR-TASK-401: Immutable receiver activity selection ────────────────────────────
+  // Source of truth for the selected receiver economic activity:
+  //   NEW-FLOW  (order.fiscalApproval != null): frozen value from OrderFiscalApproval.
+  //             MUST NOT be re-resolved from live Client/ClientStore/ClientLegalEntity data.
+  //   LEGACY    (order.fiscalApproval == null): P0 fallback — receiver.economicActivityCode.
+  //             This covers orders approved before Wave 3 OR when Billing was disabled at approval.
+  // Once this snapshot is created, selectedEconomicActivityCode is immutable.
+  const fiscalApproval = order.fiscalApproval ?? null;
+  const selectedEconomicActivityCode = fiscalApproval
+    ? fiscalApproval.receiverEconomicActivityCode   // new-flow: frozen at approval
+    : (receiver.economicActivityCode ?? null);       // legacy: P0 fallback
+
   return {
     companyId: order.companyId,
     orderId: order.id,
@@ -89,6 +101,15 @@ function buildFiscalSnapshotData({ order, invoice, receiver, config }) {
     receiverSnapshot: {
       ...receiver,
       sourceId: receiver.sourceId == null ? null : receiver.sourceId.toString(),
+      // P0 compat fields preserved — existing snapshots and Billing contract unchanged.
+      economicActivityCode: receiver.economicActivityCode || null,
+      economicActivityName: receiver.economicActivityName || null,
+      // P1 field: authoritative activity for this invoice (Wave 4).
+      // New-flow: equals fiscalApproval.receiverEconomicActivityCode (frozen at approval).
+      // Legacy: receiver.economicActivityCode or null (P0 behavior).
+      selectedEconomicActivityCode,
+      // Audit flag: distinguishes new-flow (Wave 3+) from legacy/billing-disabled orders.
+      isNewFlowOrder: fiscalApproval != null,
     },
     linesSnapshot: lines,
     totalsSnapshot: totals,

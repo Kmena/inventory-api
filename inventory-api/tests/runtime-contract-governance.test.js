@@ -35,6 +35,7 @@ const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   salesRouteRouter: 'src/routes/sales-route.routes.js',
   agentRouter: 'src/routes/agent.routes.js',
   taxpayerRouter: 'src/routes/taxpayer.routes.js',
+  cabysRouter: 'src/routes/cabys.routes.js',
   geocodingRouter: 'src/routes/geocoding.routes.js',
   economicActivityRouter: 'src/routes/economic-activity.routes.js',
   supplierRouter: 'src/routes/supplier.routes.js',
@@ -46,6 +47,8 @@ const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   feedbackRouter: 'src/routes/feedback.routes.js',
   // users-account-self-service: PATCH /api/me/password
   meRouter: 'src/routes/me.routes.js',
+  // RFR-TASK-203/204: receiver fiscal verification + activities endpoints
+  clientLegalEntityRouter: 'src/routes/client-legal-entity.routes.js',
 });
 
 function read(filePath) {

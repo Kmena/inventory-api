@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const prisma = require('../lib/prisma');
 const { BillingClientError } = require('./billing-api-client.service');
+const { reconcileClaimedIntent } = require('./fiscal-reconciliation.service');
 
 const ELIGIBLE_INTENT_STATUSES = Object.freeze(['PENDING', 'ERROR_RETRYABLE']);
 const DEFAULT_PROCESSING_STALE_MS = 15 * 60 * 1000;
@@ -89,7 +90,13 @@ function buildBillingFiscalDocumentPayload(snapshot) {
       canton: receiver.canton || null,
       district: receiver.district || null,
       address: receiver.address || null,
-      economicActivity: receiver.economicActivityCode || null,
+      // Wave 4: selectedEconomicActivityCode is the authoritative source.
+      // P0-era snapshots (pre-Wave 4, persisted before this field existed) fall back to economicActivityCode.
+      // Distinguishing via !== undefined rather than ??: if selectedEconomicActivityCode is explicitly
+      // null (new-flow corrupted state), we must NOT silently substitute economicActivityCode.
+      economicActivity: receiver.selectedEconomicActivityCode !== undefined
+        ? (receiver.selectedEconomicActivityCode ?? null)
+        : (receiver.economicActivityCode ?? null),
     },
     currency: snapshot.currency,
     exchangeRate: header.exchangeRate || '1.00000',
@@ -373,6 +380,10 @@ async function processClaimedFiscalIntent(intent, dependencies, options = {}) {
   const billingClient = dependencies?.billingClient;
   if (!billingClient?.createFiscalDocument || !billingClient?.submitFiscalDocument) {
     throw new Error('Fiscal Billing worker requires a typed Billing client with create and submit operations');
+  }
+
+  if (intent.billingFiscalDocumentId) {
+    return reconcileClaimedIntent(intent, billingClient, { ...options, db });
   }
 
   const integrationConfig = intent.integrationConfig;

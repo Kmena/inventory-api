@@ -80,6 +80,7 @@ const permissionDefinitions = [
   ['fiscal.activities.manage', 'fiscal_settings', 'manage_activities', 'Habilitar o deshabilitar actividades fiscales'],
   ['fiscal.activities.default.update', 'fiscal_settings', 'update_default_activity', 'Cambiar actividad fiscal predeterminada'],
   ['fiscal.readiness.view', 'fiscal_settings', 'view_readiness', 'Ver preparacion fiscal cuando exista contrato M2M confirmado'],
+  ['fiscal.credentials.manage', 'fiscal_settings', 'manage_credentials', 'Configurar y validar credenciales de Hacienda'],
   ['integration.taxpayer.lookup', 'integration', 'taxpayer_lookup', 'Consultar datos fiscales de contribuyentes en Hacienda'],
   ['integration.economic-activities.list', 'integration', 'economic_activities_list', 'Listar actividades economicas del catalogo de Hacienda'],
 ];

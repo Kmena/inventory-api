@@ -47,21 +47,20 @@
   }
 
   function renderStoreFiscalSummary(store) {
-    if (!storeUsesFiscalOverrides(store)) {
+    const legalEntity = store?.legalEntity || null;
+    if (!storeUsesFiscalOverrides(store) && !legalEntity) {
       return 'Facturación: hereda datos fiscales del cliente';
     }
 
-    const legalName = String(store?.legalName || '').trim();
-    const legalId = String(store?.legalId || '').trim();
-    const documentType = String(store?.documentType || '').trim();
+    const legalName = String(legalEntity?.legalName || store?.legalName || '').trim();
+    const legalId = String(legalEntity?.identificationNumber || store?.legalId || '').trim();
+    const documentType = String(legalEntity?.identificationType || store?.documentType || '').trim();
+    const status = String(legalEntity?.verificationStatus || '').trim();
     const summaryParts = ['Facturación: datos fiscales propios de la tienda'];
 
-    if (legalName) {
-      summaryParts.push(`Razón social: ${rootShellUi.escapeHtml(legalName)}`);
-    }
-    if (documentType || legalId) {
-      summaryParts.push(`Identificación: ${rootShellUi.escapeHtml(documentType || 'No registrada')} · ${rootShellUi.escapeHtml(legalId || 'No registrada')}`);
-    }
+    if (legalName) summaryParts.push(`Razón social: ${rootShellUi.escapeHtml(legalName)}`);
+    if (documentType || legalId) summaryParts.push(`Identificación: ${rootShellUi.escapeHtml(documentType || 'No registrada')} · ${rootShellUi.escapeHtml(legalId || 'No registrada')}`);
+    if (status) summaryParts.push(`Estado: ${rootShellUi.escapeHtml(status)}`);
 
     return summaryParts.join(' · ');
   }
@@ -193,10 +192,10 @@
             <label class="root-form-grid__full"><span>Nombre *</span><input name="name" type="text" required minlength="2" maxlength="255" value="${rootShellUi.escapeHtml(client.name || '')}" /></label>
             <label><span>Codigo</span><input name="code" type="text" maxlength="50" value="${rootShellUi.escapeHtml(client.code || '')}" /></label>
             <label><span>Clasificacion</span><select name="clientClassificationId"><option value="">Sin clasificacion</option>${(classifications || []).map((classification) => `<option value="${rootShellUi.escapeHtml(classification.id)}" ${String(classification.id) === String(client.clientClassificationId || client.classification?.id || '') ? 'selected' : ''}>${rootShellUi.escapeHtml(classification.name)}</option>`).join('')}</select></label>
-            <label><span>Identificacion</span><input name="legalId" type="text" maxlength="100" value="${rootShellUi.escapeHtml(client.legalId || '')}" /></label>
+            <label><span>Identificación *</span><input name="legalId" type="text" maxlength="100" required value="${rootShellUi.escapeHtml(client.legalId || '')}" /></label>
             <label>
-              <span>Tipo de identificación</span>
-              <select name="documentType">
+              <span>Tipo de identificación *</span>
+              <select name="documentType" required>
                 <option value="">Selecciona</option>
                 <option value="01" ${client.documentType === '01' ? 'selected' : ''}>01 — Cédula Física</option>
                 <option value="02" ${client.documentType === '02' ? 'selected' : ''}>02 — Cédula Jurídica</option>
@@ -204,10 +203,10 @@
                 <option value="04" ${client.documentType === '04' ? 'selected' : ''}>04 — NITE</option>
               </select>
             </label>
-            <label><span>Razon social</span><input name="legalName" type="text" maxlength="255" value="${rootShellUi.escapeHtml(client.legalEntity?.legalName || '')}" /></label>
+            <label><span>Razón social *</span><input name="legalName" type="text" maxlength="255" required value="${rootShellUi.escapeHtml(client.legalEntity?.legalName || '')}" /></label>
             <label><span>Nombre comercial</span><input name="commercialName" type="text" maxlength="255" value="${rootShellUi.escapeHtml(client.legalEntity?.commercialName || '')}" /></label>
             <label><span>Telefono</span><input name="phone" type="text" maxlength="50" value="${rootShellUi.escapeHtml(client.phone || '')}" /></label>
-            <label><span>Correo electrónico para facturas (PDF y XML)</span><input name="emailBilling" type="email" maxlength="255" value="${rootShellUi.escapeHtml(client.emailBilling || '')}" /></label>
+            <label><span>Correo electrónico para facturas (PDF y XML) *</span><input name="emailBilling" type="email" maxlength="255" required value="${rootShellUi.escapeHtml(client.emailBilling || client.legalEntity?.email || '')}" /></label>
             <label><span>Tipo de pago</span><select name="paymentType"><option value="">Selecciona</option><option value="CASH" ${client.paymentType === 'CASH' ? 'selected' : ''}>Contado</option><option value="CREDIT" ${client.paymentType === 'CREDIT' ? 'selected' : ''}>Credito</option><option value="TRANSFER" ${client.paymentType === 'TRANSFER' ? 'selected' : ''}>Transferencia</option><option value="CARD" ${client.paymentType === 'CARD' ? 'selected' : ''}>Tarjeta</option></select></label>
             <label><span>Dias de pago</span><input name="paymentDays" type="number" min="0" value="${rootShellUi.escapeHtml(client.paymentDays || '')}" /></label>
             <label class="root-form-grid__full">
@@ -268,6 +267,7 @@
               ${store.latitude && store.longitude ? `<p class="muted" style="font-size:0.78rem;">📍 ${rootShellUi.escapeHtml(String(store.latitude))}, ${rootShellUi.escapeHtml(String(store.longitude))}</p>` : '<p class="muted" style="font-size:0.78rem;">Sin coordenadas</p>'}
               ${renderStoreActiveOrdersBadges(store.orders || [])}
               <p class="muted" style="font-size:0.78rem;">${renderStoreFiscalSummary(store)}</p>
+              ${canEditClient ? `<button type="button" class="secondary-button" data-store-edit="${rootShellUi.escapeHtml(store.id)}" style="font-size:0.78rem;padding:4px 10px;">Editar tienda</button>` : ''}
               ${canManageCredit ? `<form class="clients-store-credit-form" data-client-id="${rootShellUi.escapeHtml(client.id)}" data-store-id="${rootShellUi.escapeHtml(store.id)}" style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <label style="font-size:0.8rem;display:flex;align-items:center;gap:4px;">
                   <span style="white-space:nowrap;">Límite crédito</span>

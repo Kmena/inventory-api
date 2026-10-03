@@ -2,6 +2,9 @@
 
 /**
  * TASK-013 — Billing fiscal status projection and reconciliation.
+ * TASK-013b (FIX-RECONCILER-STATUS-VOCAB) — Billing submission status vocabulary
+ *   update: added the 7 official Billing fiscal-submission-state-machine statuses
+ *   that were missing from BILLING_PROCESSING_STATUSES.
  *
  * Reconciles Inventori's local InvoiceFiscalIntent projection with Billing's
  * authoritative fiscal state by reading Billing's official fiscal submission
@@ -66,8 +69,29 @@ const BILLING_REJECTED_STATUSES = Object.freeze([
   'RECHAZADO', // Hacienda Spanish canonical value
 ]);
 
+// TASK-013b (FIX-RECONCILER-STATUS-VOCAB): Seven official Billing fiscal submission
+// statuses were previously missing from this list. All map to Inventori PROCESSING
+// (non-terminal, in-flight). Source of truth: Billing fiscal-submission-state-machine.ts
+// FISCAL_SUBMISSION_STATUSES.
+//
+// OPERATIONAL DEBT (TECH-DEBT-RECONCILE-MANUAL-REVIEW): MANUAL_REVIEW_REQUIRED is
+// intentionally mapped to PROCESSING here. If Billing remains in that state
+// indefinitely, Inventori will poll every RECONCILIATION_POLL_INTERVAL_MS with no
+// ceiling. The existing operator recovery path (fiscal-intent-operator-recovery.service.js)
+// only targets ERROR_FINAL intents, so PROCESSING intents cannot be manually escalated
+// through that path. Track escalation separately as TECH-DEBT-RECONCILE-MANUAL-REVIEW.
 const BILLING_PROCESSING_STATUSES = Object.freeze([
-  'PROCESSING',
+  // Official Billing fiscal-submission-state-machine non-terminal statuses
+  // (fiscal-submission-state-machine.ts — FISCAL_SUBMISSION_STATUSES)
+  'REQUESTED',              // Document registered; not yet in submission queue
+  'QUEUED',                 // In Billing's Hacienda queue; signed.xml ready; Hacienda not yet called
+  'SUBMITTING',             // Billing actively POSTing to Hacienda /recepcion
+  'POST_OUTCOME_UNKNOWN',   // Hacienda 5xx received; Billing reconciling via Hacienda status poll
+  'ACKNOWLEDGED',           // Hacienda HTTP 201 receipt; fiscal validation pending
+  'PROCESSING',             // Hacienda processing confirmed via Hacienda status poll
+  'TECHNICAL_RETRY_PENDING', // Billing internal technical retry; will re-enter QUEUED autonomously
+  'MANUAL_REVIEW_REQUIRED',  // Billing awaiting operator action before retrying (see debt note above)
+  // Legacy / anticipated aliases — retained for forward compatibility
   'PENDING',
   'SUBMITTED',
   'RECEIVED',
@@ -216,8 +240,10 @@ function sanitizeRejectionDiagnostics(response) {
  * backoff retry. They do NOT move to ERROR_RETRYABLE — that would cause the
  * TASK-012 create-worker to attempt re-creating the fiscal document.
  *
- * Only 401/403 (auth/permissions config broken) escalate to ERROR_FINAL
- * because they require manual configuration correction.
+ * 401/403 (auth/permissions config broken) and 404 (referenced Billing
+ * fiscal document missing) escalate to ERROR_FINAL because they require
+ * explicit operator investigation. The reconciler must never create a
+ * replacement fiscal identity automatically.
  */
 function classifyReconciliationQueryFailure(error, reconciliationAttemptCount = 0) {
   if (!(error instanceof BillingClientError)) {
@@ -245,6 +271,14 @@ function classifyReconciliationQueryFailure(error, reconciliationAttemptCount = 
       isFinal: true,
       nextAttemptDelayMs: null,
       code: 'RECONCILIATION_PERMISSIONS_FAILURE',
+      message: safeString(error.message, DIAG_MEDIUM_MAX),
+    };
+  }
+  if (statusCode === 404) {
+    return {
+      isFinal: true,
+      nextAttemptDelayMs: null,
+      code: 'RECONCILIATION_DOCUMENT_NOT_FOUND',
       message: safeString(error.message, DIAG_MEDIUM_MAX),
     };
   }

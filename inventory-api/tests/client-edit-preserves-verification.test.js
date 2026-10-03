@@ -123,7 +123,7 @@ test('updateClient calls findOrCreateLegalEntity when legalId changes', async ()
     documentType: '02',
     phone: null,
     address: null,
-    emailBilling: null,
+    emailBilling: 'demo@example.com',
     economicActivityCode: null,
     economicActivityName: null,
   };
@@ -176,7 +176,7 @@ test('updateClient creates entity via findOrCreateLegalEntity when client has no
     documentType: '02',
     phone: '88887777',
     address: null,
-    emailBilling: null,
+    emailBilling: 'demo@example.com',
     economicActivityCode: null,
     economicActivityName: null,
   };
@@ -230,7 +230,7 @@ test('updateClient uses updateLegalEntityInPlace when legalId in payload matches
     documentType: '02',
     phone: null,
     address: 'San José',
-    emailBilling: null,
+    emailBilling: 'demo@example.com',
     economicActivityCode: null,
     economicActivityName: null,
   };

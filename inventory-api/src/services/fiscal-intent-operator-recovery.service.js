@@ -6,6 +6,7 @@ const { createHttpError } = require('../lib/errors');
 
 const OPERATOR_RECOVERABLE_FAILURE_CODES = Object.freeze([
   'FISCAL_SIGNING_CERTIFICATE_INVALID_SECRET',
+  'RECONCILIATION_AUTH_FAILURE',
 ]);
 
 const NON_RECOVERABLE_FAILURE_EXAMPLES = Object.freeze([
@@ -20,6 +21,7 @@ const NON_RECOVERABLE_FAILURE_EXAMPLES = Object.freeze([
 ]);
 
 const RECOVERY_TARGET_STATUS = 'ERROR_RETRYABLE';
+const RECOVERY_RECONCILIATION_TARGET_STATUS = 'PROCESSING';
 const RECOVERY_REASON_MIN_LENGTH = 10;
 const RECOVERY_REASON_MAX_LENGTH = 500;
 
@@ -59,7 +61,11 @@ function assertCompanyScope(intent, auth) {
   }
 }
 
-function buildRecoveryMetadata(intent, reason, auth, now) {
+function resolveRecoveryTargetStatus(intent) {
+  return intent.billingFiscalDocumentId ? RECOVERY_RECONCILIATION_TARGET_STATUS : RECOVERY_TARGET_STATUS;
+}
+
+function buildRecoveryMetadata(intent, reason, auth, now, targetStatus) {
   const metadata = normalizeJsonObject(intent.metadata);
   const history = Array.isArray(metadata.operatorRecoveryHistory) ? metadata.operatorRecoveryHistory : [];
   return {
@@ -71,7 +77,7 @@ function buildRecoveryMetadata(intent, reason, auth, now) {
         byUserId: auth?.userId == null ? null : String(auth.userId),
         previousStatus: intent.status,
         previousFailureCode: intent.failureCode,
-        newStatus: RECOVERY_TARGET_STATUS,
+        newStatus: targetStatus,
         reason,
       },
     ],
@@ -83,7 +89,7 @@ function buildRecoveryMetadata(intent, reason, auth, now) {
   };
 }
 
-function serializeRecoveryResult(intent, reason, now) {
+function serializeRecoveryResult(intent, reason, now, targetStatus) {
   return {
     recovered: true,
     intentId: intent.id.toString(),
@@ -91,7 +97,7 @@ function serializeRecoveryResult(intent, reason, now) {
     companyId: intent.companyId.toString(),
     previousStatus: intent.status,
     previousFailureCode: intent.failureCode,
-    newStatus: RECOVERY_TARGET_STATUS,
+    newStatus: targetStatus,
     idempotencyKey: intent.idempotencyKey,
     billingFiscalDocumentId: intent.billingFiscalDocumentId || null,
     reason,
@@ -167,6 +173,7 @@ async function recoverFinalIntentAfterOperatorRepair(intentId, input = {}, optio
       throw createHttpError(409, 'Invoice must have exactly one FiscalIntent before operator recovery', 'fiscal_intent_duplicate_chain_detected');
     }
 
+    const targetStatus = resolveRecoveryTargetStatus(intent);
     const updated = await /** @type {any} */ (tx).invoiceFiscalIntent.updateMany({
       where: {
         id: intent.id,
@@ -175,13 +182,14 @@ async function recoverFinalIntentAfterOperatorRepair(intentId, input = {}, optio
         idempotencyKey: intent.idempotencyKey,
       },
       data: {
-        status: RECOVERY_TARGET_STATUS,
+        status: targetStatus,
         // Preserve evidence in metadata/audit; current failure columns describe the current retryable state.
-        failureCode: 'OPERATOR_RECOVERY_AFTER_REPAIR',
-        failureMessage: reason,
+        ...(targetStatus === RECOVERY_RECONCILIATION_TARGET_STATUS
+          ? { failureCode: null, failureMessage: null }
+          : { failureCode: 'OPERATOR_RECOVERY_AFTER_REPAIR', failureMessage: reason }),
         nextAttemptAt: now,
         lastSyncAt: now,
-        metadata: buildRecoveryMetadata(intent, reason, auth, now),
+        metadata: buildRecoveryMetadata(intent, reason, auth, now, targetStatus),
       },
     });
 
@@ -189,7 +197,7 @@ async function recoverFinalIntentAfterOperatorRepair(intentId, input = {}, optio
       throw createHttpError(409, 'FiscalIntent is no longer eligible for operator recovery', 'fiscal_intent_recovery_race_lost');
     }
 
-    return { intent, result: serializeRecoveryResult(intent, reason, now) };
+    return { intent, result: serializeRecoveryResult(intent, reason, now, targetStatus) };
   };
 
   const { intent, result } = typeof db.$transaction === 'function'
@@ -210,5 +218,7 @@ module.exports = {
   NON_RECOVERABLE_FAILURE_EXAMPLES,
   OPERATOR_RECOVERABLE_FAILURE_CODES,
   RECOVERY_TARGET_STATUS,
+  RECOVERY_RECONCILIATION_TARGET_STATUS,
+  resolveRecoveryTargetStatus,
   recoverFinalIntentAfterOperatorRepair,
 };

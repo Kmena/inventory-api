@@ -6,6 +6,7 @@ const { authorizeAccessPolicy } = require('../security/access-policies');
 const audit = require('../lib/audit');
 const fiscalSettingsService = require('../services/fiscal-settings.service');
 const {
+  haciendaCredentialsSchema,
   updateFiscalActivitySchema,
   setDefaultFiscalActivitySchema,
 } = require('../schemas/fiscal-settings.schema');
@@ -48,6 +49,55 @@ router.get('/fiscal-settings', authorizeAccessPolicy('fiscal-settings.view'), as
     return next(error);
   }
 });
+
+router.put(
+  '/fiscal-settings/hacienda-credentials',
+  authorizeAccessPolicy('fiscal-settings.credentials.manage'),
+  validate(haciendaCredentialsSchema),
+  async (req, res, next) => {
+    try {
+      const result = await fiscalSettingsService.configureHaciendaCredentials(req.auth, req.body, buildContext(req));
+      await audit.recordAuditEventSafelyIfAvailable({
+        req,
+        action: 'fiscal.hacienda-credentials.updated',
+        resourceType: 'fiscal-settings',
+        resourceId: null,
+        outcome: 'SUCCESS',
+        metadata: {
+          environment: result?.connection?.environment || null,
+          status: result?.connection?.status || null,
+        },
+      });
+      return res.json(result);
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+router.post(
+  '/fiscal-settings/hacienda-credentials/validate',
+  authorizeAccessPolicy('fiscal-settings.credentials.manage'),
+  async (req, res, next) => {
+    try {
+      const result = await fiscalSettingsService.validateHaciendaCredentials(req.auth, buildContext(req));
+      await audit.recordAuditEventSafelyIfAvailable({
+        req,
+        action: 'fiscal.hacienda-credentials.validation-result',
+        resourceType: 'fiscal-settings',
+        resourceId: null,
+        outcome: 'SUCCESS',
+        metadata: {
+          environment: result?.connection?.environment || null,
+          status: result?.connection?.status || null,
+        },
+      });
+      return res.json(result);
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 router.post('/fiscal-settings/activities/refresh', authorizeAccessPolicy('fiscal-settings.activities.refresh'), async (req, res, next) => {
   try {

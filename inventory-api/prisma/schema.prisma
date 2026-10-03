@@ -352,6 +352,8 @@ model Company {
   billingIntegrationConfig CompanyBillingIntegrationConfig?
   invoiceFiscalSnapshots   InvoiceFiscalSnapshot[]
   invoiceFiscalIntents     InvoiceFiscalIntent[]
+  clientEconomicActivities ClientEconomicActivity[]
+  orderFiscalApprovals     OrderFiscalApproval[]
 
   @@map("companies")
 }
@@ -484,6 +486,7 @@ model User {
   rfqInvitationsManualResponse SupplierQuotationInvitation[] @relation("rfq_invitation_manual_response_by_user")
   inventoryRequestsCreated  InventoryRequest[] @relation("inventory_request_requested_by")
   inventoryRequestsAssigned InventoryRequest[] @relation("inventory_request_assigned_to")
+  orderFiscalApprovals      OrderFiscalApproval[]
 
   @@index([companyId, id])
   @@map("users")
@@ -682,12 +685,45 @@ model ClientLegalEntity {
   isActive             Boolean  @default(true) @map("is_active")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
+  // RFR-TASK-102: verification fields (Wave 1 — receiver fiscal readiness)
+  verificationStatus   String   @default("UNVERIFIED") @map("verification_status")
+  // Persisted values: UNVERIFIED | VERIFIED | NOT_FOUND | INVALID | VERIFICATION_UNAVAILABLE
+  // VERIFYING is a transient UI state — NEVER persisted here.
+  // Non-nullable: PostgreSQL NOT NULL DEFAULT 'UNVERIFIED' guarantees every row has a value.
+  // NULL is not a valid or expected representation of UNVERIFIED — one canonical representation.
+  lastVerifiedAt       DateTime? @map("last_verified_at")
+  taxpayerName         String?   @map("taxpayer_name")
   company              Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   clients              Client[]
   stores               ClientStore[]
+  economicActivities   ClientEconomicActivity[]
+  orderFiscalApprovals OrderFiscalApproval[]
 
   @@unique([companyId, identificationNumber])
   @@map("client_legal_entities")
+}
+
+model ClientEconomicActivity {
+  id                  BigInt            @id @default(autoincrement())
+  companyId           BigInt            @map("company_id")
+  clientLegalEntityId BigInt            @map("client_legal_entity_id")
+  code                String
+  description         String?
+  haciendaStatus      String?           @map("hacienda_status")
+  // "A" = active | "I" = inactive | null = not returned by Hacienda
+  haciendaType        String?           @map("hacienda_type")
+  // "P" = principal | "S" = secondary | null = not returned by Hacienda
+  isCurrentlyReturned Boolean           @default(true) @map("is_currently_returned")
+  verifiedAt          DateTime          @map("verified_at")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  clientLegalEntity ClientLegalEntity @relation(fields: [clientLegalEntityId], references: [id], onDelete: Cascade)
+
+  @@unique([clientLegalEntityId, code], name: "client_economic_activities_entity_code_unique")
+  @@index([companyId, clientLegalEntityId])
+  @@map("client_economic_activities")
 }
 
 model ClientStore {
@@ -1551,11 +1587,34 @@ model Order {
   productionOrders ProductionOrder[]
   storeBackfillAudit OrderStoreBackfillAudit?
   entitlements  CustomerEntitlement[]
+  fiscalApproval OrderFiscalApproval?
 
   @@index([warehouseId])
   @@index([clientStoreId])
   @@index([paymentCondition])
   @@map("orders")
+}
+
+model OrderFiscalApproval {
+  id                           BigInt            @id @default(autoincrement())
+  companyId                    BigInt            @map("company_id")
+  orderId                      BigInt            @unique @map("order_id")
+  clientLegalEntityId          BigInt            @map("client_legal_entity_id")
+  receiverEconomicActivityCode String?           @map("receiver_economic_activity_code")
+  // Null when fiscal policy does not require an activity for this receiver.
+  // For READY receivers (has verified activities), MUST be non-null (enforced at app layer).
+  confirmedById                BigInt?           @map("confirmed_by_id")
+  createdAt                    DateTime          @default(now()) @map("created_at")
+  // createdAt IS the confirmation timestamp — creation and confirmation are the same event.
+  // No updatedAt: this record is immutable after creation.
+
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  order             Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  clientLegalEntity ClientLegalEntity @relation(fields: [clientLegalEntityId], references: [id])
+  confirmedBy       User?             @relation(fields: [confirmedById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, orderId])
+  @@map("order_fiscal_approvals")
 }
 
 model RouteVisitLog {
@@ -1798,6 +1857,8 @@ model Payment {
   paymentMethod     PaymentType            @map("payment_method")
   status            PaymentLifecycleStatus @default(APPROVED)
   reference         String?
+  bankName          String?                @map("bank_name")
+  cardType          String?                @map("card_type")
   submittedAt       DateTime               @default(now()) @map("submitted_at")
   submittedByUserId BigInt?                @map("submitted_by_user_id")
   underReviewAt     DateTime?              @map("under_review_at")

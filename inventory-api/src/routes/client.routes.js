@@ -9,6 +9,7 @@ const {
   updateClientSchema,
   createCompanyClientSchema,
   createClientStoreSchema,
+  updateClientStoreSchema,
   uploadClientDocumentSchema,
   uploadClientStoreDocumentSchema,
   createClientReferenceSchema,
@@ -45,6 +46,19 @@ router.post('/company/:clientId/stores', authorizeAccessPolicy('client.store.cre
   try {
     return res.status(201).json(
       await clientService.createCompanyClientStore(parseBigIntId(req.params.clientId, 'clientId'), req.body, req.auth),
+    );
+  } catch (error) { return next(error); }
+});
+
+router.patch('/company/:clientId/stores/:storeId', authorizeAccessPolicy('client.update'), validate(updateClientStoreSchema), async (req, res, next) => {
+  try {
+    return res.json(
+      await clientService.updateCompanyClientStore(
+        parseBigIntId(req.params.clientId, 'clientId'),
+        parseBigIntId(req.params.storeId, 'storeId'),
+        req.body,
+        req.auth,
+      ),
     );
   } catch (error) { return next(error); }
 });

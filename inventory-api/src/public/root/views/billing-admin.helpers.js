@@ -132,15 +132,64 @@
     return FISCAL_STATUS_LIST_BADGE_CLASSES[status] || 'badge';
   }
 
+  // ─── Fiscal status helpers (Wave 4) ───────────────────────────────────────────
+  // Full labels, badge classes and descriptions for the invoice detail panel.
+  // Distinct from the compact Wave 2 list helpers above.
+
+  const FISCAL_STATUS_LABELS = {
+    PENDING:         'Pendiente de emisi\u00F3n',
+    PROCESSING:      'Enviando a Hacienda',
+    ACCEPTED:        'Aceptada por Hacienda',
+    REJECTED:        'Rechazada por Hacienda',
+    ERROR_RETRYABLE: 'Error temporal',
+    ERROR_FINAL:     'Error de emisi\u00F3n',
+  };
+
+  const FISCAL_STATUS_BADGE_CLASSES = {
+    PENDING:         'badge',
+    PROCESSING:      'badge badge-info',
+    ACCEPTED:        'badge badge-success',
+    REJECTED:        'badge badge-danger',
+    ERROR_RETRYABLE: 'badge badge-warning',
+    ERROR_FINAL:     'badge badge-danger',
+  };
+
+  const FISCAL_STATUS_DESCRIPTIONS = {
+    PENDING:         'El documento fiscal est\u00E1 en cola de emisi\u00F3n.',
+    PROCESSING:      'El documento fue enviado a Hacienda. Esperando respuesta.',
+    ACCEPTED:        'Hacienda acept\u00F3 el comprobante electr\u00F3nico.',
+    REJECTED:        'Hacienda rechaz\u00F3 el comprobante. Contacte soporte.',
+    ERROR_RETRYABLE: 'Se produjo un error temporal. El sistema reintentar\u00E1 autom\u00E1ticamente.',
+    ERROR_FINAL:     'Error permanente en la emisi\u00F3n. Contacte soporte.',
+  };
+
+  /** Full label for the invoice detail fiscal section badge. Degrades to raw status for unknown values. */
+  function fiscalStatusLabel(status) {
+    return FISCAL_STATUS_LABELS[status] || status || '\u2014';
+  }
+
+  /** Badge CSS class for the invoice detail fiscal section. Falls back to plain 'badge'. */
+  function fiscalStatusBadgeClass(status) {
+    return FISCAL_STATUS_BADGE_CLASSES[status] || 'badge';
+  }
+
+  /** User-facing description for each fiscal status. Unknown status gets a safe fallback. */
+  function fiscalStatusDescription(status) {
+    return FISCAL_STATUS_DESCRIPTIONS[status] || 'Estado fiscal no reconocido.';
+  }
+
   rootShell.register('views.billingAdminHelpers', {
     escapeHtml,
+    fiscalStatusBadgeClass,
+    fiscalStatusDescription,
+    fiscalStatusLabel,
+    fiscalStatusListBadgeClass,
+    fiscalStatusListLabel,
     formatCurrency,
     formatDate,
     formatDateTime,
     invoiceStatusBadgeClass,
     invoiceStatusLabel,
-    fiscalStatusListBadgeClass,
-    fiscalStatusListLabel,
     isOverdue,
     cardTypeLabel,
     paymentMethodLabel,

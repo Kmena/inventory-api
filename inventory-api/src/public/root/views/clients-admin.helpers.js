@@ -100,7 +100,8 @@
     }
 
     const billingMode = String(formData.get('billingMode') || 'inherit').trim();
-    if (billingMode === 'override') {
+    payload.billingMode = billingMode === 'override' ? 'override' : 'inherit';
+    if (payload.billingMode === 'override') {
       for (const fieldName of ['legalName', 'commercialName', 'legalId', 'documentType', 'emailBilling', 'economicActivityCode', 'economicActivityName']) {
         const value = String(formData.get(fieldName) || '').trim();
         if (value) {

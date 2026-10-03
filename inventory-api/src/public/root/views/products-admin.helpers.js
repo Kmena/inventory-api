@@ -150,9 +150,9 @@
     PHYSICAL_GOOD: {
       label: 'Producto físico inventariable',
       description: 'Requiere stock, lotes o ubicación según su configuración.',
-      productNature: 'PHYSICAL',
+      productNature: 'GOOD',
       controlsInventory: true,
-      commercialBehavior: 'ONE_TIME',
+      commercialBehavior: 'STANDARD',
       entitlementKind: null,
     },
     SERVICE: {
@@ -160,13 +160,13 @@
       description: 'Se vende sin stock, lote, ubicación, reserva ni despacho de inventario.',
       productNature: 'SERVICE',
       controlsInventory: false,
-      commercialBehavior: 'ONE_TIME',
+      commercialBehavior: 'STANDARD',
       entitlementKind: null,
     },
     SUBSCRIPTION: {
       label: 'Suscripción',
       description: 'Activa derechos comerciales sin efectos de inventario.',
-      productNature: 'SUBSCRIPTION',
+      productNature: 'SERVICE',
       controlsInventory: false,
       commercialBehavior: 'ENTITLEMENT',
       entitlementKind: 'SUBSCRIPTION',
@@ -174,7 +174,7 @@
     MEMBERSHIP: {
       label: 'Membresía',
       description: 'Activa membresía del cliente sin inventario físico.',
-      productNature: 'MEMBERSHIP',
+      productNature: 'SERVICE',
       controlsInventory: false,
       commercialBehavior: 'ENTITLEMENT',
       entitlementKind: 'MEMBERSHIP',
@@ -182,25 +182,25 @@
     DIGITAL_ACCESS: {
       label: 'Acceso digital',
       description: 'Entrega acceso digital sin stock ni lote.',
-      productNature: 'DIGITAL',
+      productNature: 'SERVICE',
       controlsInventory: false,
       commercialBehavior: 'ENTITLEMENT',
-      entitlementKind: 'DIGITAL_ACCESS',
+      entitlementKind: 'SERVICE_PERIOD',
     },
     DIGITAL_LICENSE: {
       label: 'Licencia digital',
       description: 'Entrega licencia digital sin inventario físico.',
-      productNature: 'DIGITAL',
+      productNature: 'SERVICE',
       controlsInventory: false,
       commercialBehavior: 'ENTITLEMENT',
-      entitlementKind: 'LICENSE',
+      entitlementKind: 'COURSE',
     },
   });
 
   function getBusinessPreset(product) {
-    const productNature = product?.productNature || 'PHYSICAL';
+    const productNature = product?.productNature || 'GOOD';
     const controlsInventory = typeof product?.controlsInventory === 'boolean' ? product.controlsInventory : true;
-    const commercialBehavior = product?.commercialBehavior || 'ONE_TIME';
+    const commercialBehavior = product?.commercialBehavior || 'STANDARD';
     const entitlementKind = product?.entitlementKind || null;
     const match = Object.entries(BUSINESS_PRESETS).find(([_key, preset]) => (
       preset.productNature === productNature
@@ -221,19 +221,15 @@
 
   function getProductNatureLabel(product) {
     const labels = {
-      PHYSICAL: 'Producto físico',
+      GOOD: 'Producto físico',
       SERVICE: 'Servicio',
-      SUBSCRIPTION: 'Suscripción',
-      MEMBERSHIP: 'Membresía',
-      DIGITAL: 'Digital',
     };
     return labels[product?.productNature] || 'Producto físico';
   }
 
   function getCommercialBehaviorLabel(product) {
     const labels = {
-      ONE_TIME: 'Venta única',
-      RECURRING: 'Recurrente',
+      STANDARD: 'Venta única',
       ENTITLEMENT: 'Derecho / acceso',
     };
     return labels[product?.commercialBehavior] || 'Venta única';
@@ -270,6 +266,7 @@
     const subcategoryId = String(formData.get('subcategoryId') || '').trim();
     const description = String(formData.get('description') || '').trim();
     const code = String(formData.get('code') || '').trim();
+    const cabysCode = String(formData.get('cabysCode') || '').trim();
     const currency = String(formData.get('currency') || '').trim();
     // Los checkboxes HTML solo aparecen en FormData cuando estan marcados ('on').
     // Desmarcado o ausente => null/undefined => false.
@@ -285,6 +282,7 @@
     const payload = {
       name: String(formData.get('name') || '').trim(),
       code: code || undefined,
+      cabysCode: cabysCode || null,
       description: description || undefined,
       subcategoryId: subcategoryId ? Number(subcategoryId) : null,
       unit: rawNetContentUnit || undefined,

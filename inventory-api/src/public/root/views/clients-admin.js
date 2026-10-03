@@ -94,10 +94,10 @@
               <label class="root-form-grid__full"><span>Nombre *</span><input name="name" type="text" required minlength="2" maxlength="255" /></label>
               <label><span>Codigo</span><input name="code" type="text" maxlength="50" /></label>
               <label><span>Clasificacion</span><select id="clients-create-classification" name="clientClassificationId"></select></label>
-              <label><span>Identificacion</span><input name="legalId" type="text" maxlength="100" /></label>
+              <label><span>Identificación *</span><input name="legalId" type="text" maxlength="100" required /></label>
               <label>
-                <span>Tipo de identificación</span>
-                <select name="documentType">
+                <span>Tipo de identificación *</span>
+                <select name="documentType" required>
                   <option value="">Selecciona</option>
                   <option value="01">01 — Cédula Física</option>
                   <option value="02">02 — Cédula Jurídica</option>
@@ -106,7 +106,7 @@
                 </select>
               </label>
               <label><span>Telefono</span><input name="phone" type="text" maxlength="50" /></label>
-              <label><span>Correo electrónico para facturas (PDF y XML)</span><input name="emailBilling" type="email" maxlength="255" /></label>
+              <label><span>Correo electrónico para facturas (PDF y XML) *</span><input name="emailBilling" type="email" maxlength="255" required /></label>
               <label><span>Tipo de pago</span><select name="paymentType"><option value="">Selecciona</option><option value="CASH">Contado</option><option value="CREDIT">Credito</option><option value="TRANSFER">Transferencia</option><option value="CARD">Tarjeta</option></select></label>
               <label><span>Dias de pago</span><input name="paymentDays" type="number" min="0" /></label>
               <label class="root-form-grid__full">
@@ -658,6 +658,36 @@
         return;
       }
 
+      const editStoreButton = target.closest('[data-store-edit]');
+      if (editStoreButton instanceof globalScope.HTMLElement) {
+        if (!canEditClient) return;
+        const client = getSelectedClient();
+        const storeId = editStoreButton.getAttribute('data-store-edit') || '';
+        const store = (client?.stores || []).find((item) => String(item.id) === String(storeId));
+        if (!client || !store) return;
+        clientsAdminStoreDialog.open(
+          client.id,
+          client.name || '',
+          session,
+          zoneOptions,
+          async () => {
+            await loadClientDetail(client.id);
+            detailMessage.innerHTML = rootShellUi.renderInlineMessage('Tienda actualizada correctamente.');
+            setShellStatus('Tienda actualizada correctamente.');
+          },
+          async () => {
+            const zonesResponse = await clientsApi.listZones(session);
+            zoneOptions = clientsState.flattenZoneOptions(zonesResponse);
+            return zoneOptions;
+          },
+          client,
+          documentTypes,
+          canLookupTaxpayer,
+          store,
+        );
+        return;
+      }
+
       // Botón [+ Agregar tienda] — abre el dialog con mapa Leaflet
       if (target.id === 'clients-add-store-button') {
         if (!canCreateClient) return;
@@ -952,6 +982,10 @@
 
         if (form.id === 'clients-update-form') {
           if (!canEditClient) return;
+          if (!form.reportValidity()) {
+            detailMessage.innerHTML = rootShellUi.renderInlineMessage('Complete los datos fiscales obligatorios antes de guardar.', 'error');
+            return;
+          }
           await clientsApi.updateClient(session, clientId, clientsHelpers.buildClientPayload(formData));
           await loadClients();
           await loadClientDetail(clientId);

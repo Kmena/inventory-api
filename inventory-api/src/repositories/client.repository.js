@@ -191,6 +191,14 @@ function softDeleteCompanyClient(id, companyId, deletedAt = new Date()) {
   });
 }
 
+function clientStoreInclude() {
+  return /** @type {import('@prisma/client').Prisma.ClientStoreInclude} */ ({
+    subregion: { include: { region: true } },
+    legalEntity: true,
+    representatives: { where: { isActive: true }, orderBy: clientRepresentativeOrderBy },
+  });
+}
+
 function createClientStore(data) {
   const { representatives, ...storeData } = data;
   const primaryRepresentativeIndex = representatives?.findIndex((representative) => representative.isPrimaryContact) ?? -1;
@@ -207,11 +215,24 @@ function createClientStore(data) {
           }
         : undefined,
     },
-    include: /** @type {import('@prisma/client').Prisma.ClientStoreInclude} */ ({
-      subregion: { include: { region: true } },
-      legalEntity: true,
-      representatives: { where: { isActive: true }, orderBy: clientRepresentativeOrderBy },
-    }),
+    include: clientStoreInclude(),
+  });
+}
+
+async function updateCompanyClientStore(clientId, storeId, companyId, data) {
+  const existing = await prisma.clientStore.findFirst({
+    where: { id: storeId, clientId, client: { companyId, deletedAt: null } },
+  });
+  if (!existing) return null;
+
+  await prisma.clientStore.update({
+    where: { id: storeId },
+    data,
+  });
+
+  return prisma.clientStore.findFirst({
+    where: { id: storeId, clientId, client: { companyId, deletedAt: null } },
+    include: clientStoreInclude(),
   });
 }
 
@@ -305,6 +326,36 @@ function createClientReference(data) {
   });
 }
 
+/**
+ * Updates a ClientLegalEntity directly by its ID.
+ * Does NOT touch verificationStatus, lastVerifiedAt, or taxpayerName —
+ * those are only written by the verification service.
+ * Use this when the identification number has NOT changed so that a verified
+ * entity is never silently replaced by a new UNVERIFIED one.
+ */
+async function updateLegalEntityInPlace(entityId, companyId, payload) {
+  const result = await prisma.clientLegalEntity.updateMany({
+    where: { id: entityId, companyId },
+    data: {
+      legalName: payload.legalName || undefined,
+      commercialName: payload.commercialName ?? undefined,
+      identificationType: payload.identificationType ?? undefined,
+      economicActivityCode: payload.economicActivityCode ?? undefined,
+      economicActivityName: payload.economicActivityName ?? undefined,
+      address: payload.address ?? undefined,
+      email: payload.email ?? undefined,
+      phone: payload.phone ?? undefined,
+      isActive: true,
+    },
+  });
+
+  if (result.count === 0) return null;
+
+  return prisma.clientLegalEntity.findFirst({
+    where: { id: entityId, companyId },
+  });
+}
+
 async function findOrCreateLegalEntity(companyId, payload) {
   const identificationNumber = payload.identificationNumber || payload.taxIdentifier;
   if (identificationNumber) {
@@ -395,10 +446,12 @@ module.exports = {
   findCompanyClassifications,
   countClientStores,
   createClient,
-  findOrCreateLegalEntity,
+  updateLegalEntityInPlace,
+findOrCreateLegalEntity,
   updateCompanyClient,
   softDeleteCompanyClient,
   createClientStore,
+  updateCompanyClientStore,
   reserveClientDocumentId,
   createClientDocument,
   updateClientDocument,

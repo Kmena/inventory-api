@@ -63,6 +63,37 @@
   }
 
   /**
+   * Lists available fiscal artifacts for an invoice (Wave 5).
+   * Returns an array of ArtifactListItem from Inventori's ownership boundary.
+   * Each item: { id, type, inventoriType, contentType, sha256, sizeBytes, createdAt }.
+   * Authorization: invoice.fiscal-artifact policy enforced by backend.
+   * The browser NEVER calls Billing directly — Inventori proxies the artifact metadata.
+   * @param {any} session
+   * @param {string|number} invoiceId
+   * @returns {Promise<Array<{ id: string, type: string, inventoriType: string, contentType: string|null, sha256: string|null, sizeBytes: number|null, createdAt: string|null }>>}
+   */
+  async function listFiscalArtifacts(session, invoiceId) {
+    return inventoryAuth.fetchJson(
+      session,
+      `${BASE_INVOICES}/${encodeURIComponent(String(invoiceId))}/fiscal-artifacts`,
+      { fallbackMessage: 'No se pudieron cargar los documentos fiscales.' },
+    );
+  }
+
+  /**
+   * Returns the Inventori proxy URL for a fiscal artifact download (Wave 5).
+   * The browser navigates to this same-origin URL — no M2M token or Billing URL is exposed.
+   * Artifact type MUST be one of: 'pdf' | 'signed-xml' | 'hacienda-response'
+   * The backend allowlist rejects unknown types before any Billing call.
+   * @param {string|number} invoiceId
+   * @param {string} artifactType  Inventori URL-safe artifact type
+   * @returns {string}
+   */
+  function downloadFiscalArtifact(invoiceId, artifactType) {
+    return `${BASE_INVOICES}/${encodeURIComponent(String(invoiceId))}/fiscal-artifacts/${encodeURIComponent(String(artifactType))}`;
+  }
+
+  /**
    * Fetch invoices with PENDING or PARTIAL status (accounts receivable).
    * @param {any} session
    * @returns {Promise<any>}
@@ -164,11 +195,13 @@
   rootShell.register('billingApi', {
     approvePayment,
     createPayment,
+    downloadFiscalArtifact,
     fetchClientLedger,
     fetchClientsForLedger,
     fetchInvoiceDetail,
     fetchPendingPayments,
     fetchReceivables,
+    listFiscalArtifacts,
     rejectPayment,
   });
 }(window));

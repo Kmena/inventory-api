@@ -423,6 +423,161 @@ describe('TASK-015 status semantics: HTTP transport ≠ fiscal ACCEPTED', () => 
 });
 
 // ---------------------------------------------------------------------------
+// SUITE 4b: TASK-013b — Official Billing submission status vocabulary
+// Verifies all official fiscal-submission-state-machine.ts statuses are
+// correctly classified by Inventori's reconciler.
+// ---------------------------------------------------------------------------
+
+describe('TASK-013b official Billing submission status vocabulary', () => {
+
+  // ── All official non-terminal Billing statuses map to PROCESSING ──────
+
+  const OFFICIAL_BILLING_NON_TERMINAL_STATUSES = [
+    'REQUESTED',
+    'QUEUED',
+    'SUBMITTING',
+    'POST_OUTCOME_UNKNOWN',
+    'ACKNOWLEDGED',
+    'PROCESSING',
+    'TECHNICAL_RETRY_PENDING',
+    'MANUAL_REVIEW_REQUIRED',
+  ];
+
+  for (const billingStatus of OFFICIAL_BILLING_NON_TERMINAL_STATUSES) {
+    test(`fiscalStatus=${billingStatus} → intentStatus=PROCESSING (non-terminal, in-flight)`, () => {
+      const result = classifyBillingReconciliationResult({ fiscalStatus: billingStatus });
+      assert.equal(
+        result.intentStatus,
+        'PROCESSING',
+        `${billingStatus} must map to PROCESSING, not ${String(result.intentStatus)}`,
+      );
+      assert.notEqual(result.intentStatus, 'ACCEPTED',
+        `${billingStatus} must NEVER map to ACCEPTED`);
+      assert.notEqual(result.intentStatus, 'REJECTED',
+        `${billingStatus} must NEVER map to REJECTED`);
+    });
+  }
+
+  // ── Pre-Hacienda states must not produce ACCEPTED ─────────────────────
+
+  test('QUEUED (signed.xml ready, Hacienda not yet called) does NOT produce ACCEPTED', () => {
+    // QUEUED is the state just after document signing, before Billing has sent
+    // anything to Hacienda. Accepting the invoice as fiscally valid at this point
+    // would be incorrect — Hacienda has not even received the document yet.
+    const result = classifyBillingReconciliationResult({
+      fiscalStatus: 'QUEUED',
+      haciendaStatus: null,      // no Hacienda response yet
+      status: 'QUEUED',
+    });
+    assert.notEqual(result.intentStatus, 'ACCEPTED', 'QUEUED must never produce ACCEPTED');
+    assert.equal(result.intentStatus, 'PROCESSING', 'QUEUED must map to PROCESSING (in-flight)');
+  });
+
+  test('SUBMITTING (actively POSTing to Hacienda) does NOT produce ACCEPTED', () => {
+    const result = classifyBillingReconciliationResult({ fiscalStatus: 'SUBMITTING' });
+    assert.notEqual(result.intentStatus, 'ACCEPTED');
+    assert.equal(result.intentStatus, 'PROCESSING');
+  });
+
+  test('ACKNOWLEDGED (Hacienda HTTP 201 receipt) does NOT produce ACCEPTED', () => {
+    // HTTP 201 from Hacienda means "received for validation", NOT "fiscally accepted".
+    // The investigation proved this invariant; ACKNOWLEDGED must remain non-terminal.
+    const result = classifyBillingReconciliationResult({
+      fiscalStatus: 'ACKNOWLEDGED',
+      haciendaStatus: 'ACKNOWLEDGED',
+    });
+    assert.notEqual(result.intentStatus, 'ACCEPTED', 'Hacienda receipt != Hacienda acceptance');
+    assert.equal(result.intentStatus, 'PROCESSING');
+  });
+
+  // ── Official terminal statuses still work correctly ───────────────────
+
+  test('fiscalStatus=ACCEPTED → intentStatus=ACCEPTED', () => {
+    const result = classifyBillingReconciliationResult({ fiscalStatus: 'ACCEPTED' });
+    assert.equal(result.intentStatus, 'ACCEPTED');
+  });
+
+  test('fiscalStatus=HACIENDA_ACCEPTED → intentStatus=ACCEPTED', () => {
+    const result = classifyBillingReconciliationResult({ fiscalStatus: 'HACIENDA_ACCEPTED' });
+    assert.equal(result.intentStatus, 'ACCEPTED');
+  });
+
+  test('haciendaStatus=ACEPTADO → intentStatus=ACCEPTED (Spanish canonical)', () => {
+    const result = classifyBillingReconciliationResult({ haciendaStatus: 'ACEPTADO' });
+    assert.equal(result.intentStatus, 'ACCEPTED');
+  });
+
+  test('fiscalStatus=REJECTED → intentStatus=REJECTED', () => {
+    const result = classifyBillingReconciliationResult({ fiscalStatus: 'REJECTED' });
+    assert.equal(result.intentStatus, 'REJECTED');
+  });
+
+  test('fiscalStatus=HACIENDA_REJECTED → intentStatus=REJECTED', () => {
+    const result = classifyBillingReconciliationResult({ fiscalStatus: 'HACIENDA_REJECTED' });
+    assert.equal(result.intentStatus, 'REJECTED');
+  });
+
+  test('haciendaStatus=RECHAZADO → intentStatus=REJECTED (Spanish canonical)', () => {
+    const result = classifyBillingReconciliationResult({ haciendaStatus: 'RECHAZADO' });
+    assert.equal(result.intentStatus, 'REJECTED');
+  });
+
+  // ── Fail-closed preserved for genuinely unknown future statuses ───────
+
+  test('unknown future status still produces BILLING_UNKNOWN_STATUS (fail closed)', () => {
+    const futureStatuses = [
+      'SOME_FUTURE_UNKNOWN_STATUS',
+      'HACIENDA_PAUSED',
+      'COMPLIANCE_HOLD',
+      'NEW_STATE_NOT_YET_IN_INVENTORI',
+    ];
+    for (const status of futureStatuses) {
+      const result = classifyBillingReconciliationResult({ fiscalStatus: status });
+      assert.equal(
+        result.intentStatus,
+        null,
+        `Unknown status ${status} must fail closed to null (not ACCEPTED, not REJECTED)`,
+      );
+      assert.equal(result.code, 'BILLING_UNKNOWN_STATUS',
+        `Unknown status ${status} must produce BILLING_UNKNOWN_STATUS code`);
+      assert.notEqual(result.intentStatus, 'ACCEPTED',
+        `Unknown status ${status} must NOT produce ACCEPTED`);
+      assert.notEqual(result.intentStatus, 'REJECTED',
+        `Unknown status ${status} must NOT produce REJECTED`);
+    }
+  });
+
+  // ── Acceptance is never inferred from document/signing artifacts ──────
+
+  test('signed.xml artifact signals do NOT produce ACCEPTED', () => {
+    // Billing QUEUED = signed.xml exists in storage. That alone is not Hacienda acceptance.
+    const signedArtifactSignals = [
+      { fiscalStatus: 'QUEUED', signedXmlExists: true },
+      { fiscalStatus: 'QUEUED', signedXmlSha256: 'abc123' },
+      { fiscalStatus: 'SUBMITTING', signedXmlExists: true },
+    ];
+    for (const response of signedArtifactSignals) {
+      const result = classifyBillingReconciliationResult(response);
+      assert.notEqual(result.intentStatus, 'ACCEPTED',
+        `signed.xml artifact signal must not produce ACCEPTED: ${JSON.stringify(response)}`);
+    }
+  });
+
+  test('clave/consecutive present in QUEUED state does NOT produce ACCEPTED', () => {
+    // clave and consecutive are assigned at document creation time, before Hacienda
+    // submission. Their presence proves nothing about Hacienda acceptance.
+    const result = classifyBillingReconciliationResult({
+      fiscalStatus: 'QUEUED',
+      clave: '50601011800310270930000100001010000000011999999999',
+      consecutive: '00100001010000000011',
+    });
+    assert.notEqual(result.intentStatus, 'ACCEPTED',
+      'clave + consecutive present in QUEUED state must not produce ACCEPTED');
+    assert.equal(result.intentStatus, 'PROCESSING');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // SUITE 5: Error classification matrix
 // ---------------------------------------------------------------------------
 

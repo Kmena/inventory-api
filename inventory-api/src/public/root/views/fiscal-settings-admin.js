@@ -10,6 +10,7 @@
   const updateDefaultPermission = 'fiscal.activities.default.update';
   const refreshActivitiesPermission = 'fiscal.activities.refresh';
   const readinessViewPermission = 'fiscal.readiness.view';
+  const credentialsManagePermission = 'fiscal.credentials.manage';
 
   const BLOCKER_MESSAGES = Object.freeze({
     FISCAL_PROFILE_MISSING: 'Falta configurar el perfil fiscal de la empresa.',
@@ -34,6 +35,52 @@
     TAXPAYER_OMISO: 'Hacienda reporta al contribuyente como omiso.',
     ECONOMIC_ACTIVITY_VERIFICATION_STALE: 'La información fiscal fue verificada hace más de 30 días. Se recomienda actualizarla desde Hacienda.',
   });
+
+  function getConnectionStatus(readiness, connection) {
+    if (connection?.status) return String(connection.status).toUpperCase();
+    const reasons = readiness?.reasonCodes || [];
+    if (reasons.includes('HACIENDA_CREDENTIALS_MISSING') || reasons.includes('HACIENDA_CONNECTION_MISSING')) return 'NOT_CONFIGURED';
+    if (reasons.includes('HACIENDA_INVALID_CREDENTIALS')) return 'INVALID_CREDENTIALS';
+    return readiness?.readyToIssue ? 'CONNECTED' : 'UNKNOWN';
+  }
+
+  function connectionLabel(status) {
+    const map = {
+      CONNECTED: ['✓ Credenciales válidas', 'badge-success'],
+      VALID: ['✓ Credenciales válidas', 'badge-success'],
+      INVALID_CREDENTIALS: ['⚠ Credenciales inválidas', 'badge-warning'],
+      UNAVAILABLE: ['⚠ No fue posible validar con Hacienda', 'badge-warning'],
+      NOT_CONFIGURED: ['— Sin configurar', ''],
+      DISABLED: ['— Deshabilitada', ''],
+    };
+    return map[status] || ['Estado pendiente de validar', ''];
+  }
+
+  function renderHaciendaConnectionCard(readiness, connection, options) {
+    const environment = connection?.environment || readiness?.environment || 'SANDBOX';
+    const status = getConnectionStatus(readiness, connection);
+    const [label, tone] = connectionLabel(status);
+    const configured = status !== 'NOT_CONFIGURED';
+    const disabled = options.credentialsPending || !options.canManageCredentials;
+    return `
+      <section class="card root-card fiscal-hacienda-connection-card" aria-labelledby="fiscal-hacienda-title">
+        <h3 id="fiscal-hacienda-title">Conexión con Hacienda</h3>
+        <dl class="detail-grid">
+          ${renderDetail('Ambiente', environment === 'SANDBOX' ? 'Pruebas (Sandbox)' : asText(environment))}
+          <div class="detail-item"><dt>Estado</dt><dd><span class="${tone ? `badge ${tone}` : 'badge'}" role="status">${ui.escapeHtml(label)}</span></dd></div>
+          ${configured ? renderDetail('Credenciales', 'Credenciales configuradas') : renderDetail('Credenciales', 'Sin configurar')}
+          ${connection?.lastValidatedAt ? renderDetail('Última validación', formatDate(connection.lastValidatedAt)) : ''}
+        </dl>
+        <form data-hacienda-credentials-form class="fiscal-credentials-form" autocomplete="off">
+          <label>Usuario de Hacienda<input name="username" type="text" maxlength="100" autocomplete="username" required ${disabled ? 'disabled' : ''}></label>
+          <label>Contraseña<input name="password" type="password" maxlength="200" autocomplete="new-password" required ${disabled ? 'disabled' : ''}></label>
+          <p class="muted">Para reemplazar credenciales ingresa usuario y contraseña. Inventori no guarda ni muestra el secreto actual.</p>
+          <button type="submit" ${disabled ? 'disabled' : ''} aria-busy="${options.credentialsPending ? 'true' : 'false'}">${options.credentialsPending ? 'Guardando y validando credenciales…' : 'Guardar y validar'}</button>
+          ${!options.canManageCredentials ? '<p class="muted">Tu usuario puede ver esta sección, pero no modificar credenciales.</p>' : ''}
+        </form>
+      </section>
+    `;
+  }
 
   function renderReadinessPanel(readiness) {
     if (!readiness) {
@@ -309,6 +356,7 @@
           ${renderTaxpayerCard(data)}
           ${renderActivitiesSummaryCard(data)}
         </div>
+        ${renderHaciendaConnectionCard(options.readiness, options.connection, options)}
         ${renderActivitiesChecklist(data, options)}
       </div>
     `;
@@ -358,6 +406,8 @@
     let currentReadiness = null;
     let defaultPending = false;
     let refreshPending = false;
+    let credentialsPending = false;
+    let currentConnection = null;
 
     if (!contentElement) return;
 
@@ -374,9 +424,14 @@
         defaultPending,
         pendingCodes,
         refreshPending,
+        credentialsPending,
+        canManageCredentials: hasPermission(session, credentialsManagePermission),
+        readiness: currentReadiness,
+        connection: currentConnection,
       });
       bindActivityToggles();
       bindDefaultToggles();
+      bindCredentialsForm();
     }
 
     async function loadReadiness() {
@@ -502,6 +557,47 @@
         : [];
       for (const control of controls) {
         control.addEventListener('change', handleToggleChange);
+      }
+    }
+
+    function bindCredentialsForm() {
+      const form = contentElement.querySelector ? contentElement.querySelector('[data-hacienda-credentials-form]') : null;
+      if (!form) return;
+      form.addEventListener('submit', handleCredentialsSubmit);
+    }
+
+    async function handleCredentialsSubmit(event) {
+      event.preventDefault();
+      if (credentialsPending) return;
+      const form = event.target;
+      const usernameInput = form.elements.username;
+      const passwordInput = form.elements.password;
+      const username = String(usernameInput?.value || '').trim();
+      const password = String(passwordInput?.value || '');
+      if (!username || !password) {
+        setStatus('Ingresa usuario y contraseña de Hacienda.', 'error');
+        return;
+      }
+      credentialsPending = true;
+      setStatus('Guardando y validando credenciales…');
+      renderLoadedContent();
+      try {
+        const result = await fiscalSettingsApi.configureHaciendaCredentials(session, { username, password });
+        currentConnection = result?.connection || null;
+        const status = getConnectionStatus(currentReadiness, currentConnection);
+        setStatus(status === 'INVALID_CREDENTIALS'
+          ? 'Credenciales actualizadas, pero Hacienda indica que no son válidas.'
+          : 'Credenciales guardadas y validadas.', status === 'INVALID_CREDENTIALS' ? 'error' : 'success');
+        if (hasPermission(session, readinessViewPermission) && readinessElement) await loadReadiness();
+      } catch (error) {
+        const message = typeof error?.message === 'string' && error.message.trim()
+          ? error.message
+          : 'No se pudo guardar y validar la conexión con Hacienda.';
+        setStatus(message, 'error');
+      } finally {
+        if (passwordInput) passwordInput.value = '';
+        credentialsPending = false;
+        renderLoadedContent();
       }
     }
 

@@ -263,10 +263,9 @@ describe('TASK-013 Billing reconciliation — status mapping (no database)', () 
     assert.equal(result.code, 'RECONCILIATION_PERMISSIONS_FAILURE');
   });
 
-  test('timeout, 404, 429, 500, 503 keep PROCESSING with retry delay', () => {
+  test('timeout, 429, 500, 503 keep PROCESSING with retry delay', () => {
     const retryableCases = [
       new BillingClientError('timeout', { code: 'BILLING_TIMEOUT', retryable: true }),
-      new BillingClientError('not found', { code: 'BILLING_404', statusCode: 404 }),
       new BillingClientError('rate limited', { code: 'BILLING_429', statusCode: 429 }),
       new BillingClientError('server error', { code: 'BILLING_500', statusCode: 500 }),
       new BillingClientError('unavailable', { code: 'BILLING_503', statusCode: 503 }),
@@ -276,6 +275,14 @@ describe('TASK-013 Billing reconciliation — status mapping (no database)', () 
       assert.equal(result.isFinal, false, `Expected non-final for ${error.code}`);
       assert.ok(result.nextAttemptDelayMs > 0, `Expected positive delay for ${error.code}`);
     }
+  });
+
+  test('404 referenced Billing document missing is ERROR_FINAL (fail closed)', () => {
+    const error = new BillingClientError('not found', { code: 'BILLING_404', statusCode: 404 });
+    const result = classifyReconciliationQueryFailure(error, 0);
+    assert.equal(result.isFinal, true);
+    assert.equal(result.code, 'RECONCILIATION_DOCUMENT_NOT_FOUND');
+    assert.equal(result.nextAttemptDelayMs, null);
   });
 
   test('non-BillingClientError keeps PROCESSING with retry delay', () => {
@@ -473,6 +480,92 @@ describe('TASK-013 Billing reconciliation — status mapping (no database)', () 
     assert.equal(checkBillingChainConsistency(intent, { companyId: 'other-company' }, config).code, 'BILLING_COMPANY_MISMATCH');
     assert.equal(checkBillingChainConsistency(intent, { environment: 'PRODUCTION' }, config).code, 'BILLING_ENVIRONMENT_MISMATCH');
     assert.equal(checkBillingChainConsistency(intent, { idempotencyKey: 'inventori:1698:invoice:9999' }, config).code, 'BILLING_IDEMPOTENCY_KEY_MISMATCH');
+  });
+
+  // ── TASK-013b: Official Billing submission status vocabulary ──────────
+  // Parameterized: every official non-terminal Billing status maps to PROCESSING.
+  // Source of truth: Billing fiscal-submission-state-machine.ts FISCAL_SUBMISSION_STATUSES.
+
+  const OFFICIAL_BILLING_NON_TERMINAL_STATUSES = [
+    'REQUESTED',
+    'QUEUED',
+    'SUBMITTING',
+    'POST_OUTCOME_UNKNOWN',
+    'ACKNOWLEDGED',
+    'PROCESSING',
+    'TECHNICAL_RETRY_PENDING',
+    'MANUAL_REVIEW_REQUIRED',
+  ];
+
+  for (const billingStatus of OFFICIAL_BILLING_NON_TERMINAL_STATUSES) {
+    test(`TASK-013b: Billing fiscalStatus=${billingStatus} → intentStatus=PROCESSING`, () => {
+      const result = classifyBillingReconciliationResult({
+        id: `doc-013b-${billingStatus.toLowerCase()}`,
+        fiscalStatus: billingStatus,
+      });
+      assert.equal(
+        result.intentStatus,
+        'PROCESSING',
+        `${billingStatus} must map to PROCESSING. Got: ${String(result.intentStatus)} (${result.code})`,
+      );
+      // Must NOT produce ACCEPTED (critical safety invariant)
+      assert.notEqual(
+        result.intentStatus, 'ACCEPTED',
+        `${billingStatus} must never produce ACCEPTED (Hacienda has not confirmed acceptance)`,
+      );
+      // Must NOT produce BILLING_UNKNOWN_STATUS (that was the bug this task fixes)
+      assert.notEqual(
+        result.code, 'BILLING_UNKNOWN_STATUS',
+        `${billingStatus} must no longer produce BILLING_UNKNOWN_STATUS after TASK-013b fix`,
+      );
+    });
+  }
+
+  test('TASK-013b: QUEUED with null haciendaStatus (pre-Hacienda state) maps to PROCESSING', () => {
+    // Reproduce the exact response shape that caused BILLING_UNKNOWN_STATUS in production.
+    // Billing submission is QUEUED: signed.xml ready, lastProviderStatus = null,
+    // Hacienda has not yet been contacted.
+    const result = classifyBillingReconciliationResult({
+      id: 'doc-queued-exact',
+      fiscalStatus: 'QUEUED',
+      haciendaStatus: null,
+      status: 'QUEUED',
+      clave: '50601011800310270930000100001010000000011999999999',
+      consecutive: null,
+    });
+    assert.equal(result.intentStatus, 'PROCESSING', 'QUEUED with null haciendaStatus must map to PROCESSING');
+    assert.notEqual(result.code, 'BILLING_UNKNOWN_STATUS', 'QUEUED must no longer trigger BILLING_UNKNOWN_STATUS');
+  });
+
+  test('TASK-013b: unknown future Billing status still fails closed (fail-closed preserved)', () => {
+    // The fix must not break the fail-closed guarantee.
+    // Unknown statuses that are not in the official state machine still produce BILLING_UNKNOWN_STATUS.
+    const futureStatuses = ['SOME_FUTURE_STATUS', 'HACIENDA_PAUSED', 'COMPLIANCE_HOLD'];
+    for (const status of futureStatuses) {
+      const result = classifyBillingReconciliationResult({ id: 'doc-future', fiscalStatus: status });
+      assert.equal(result.intentStatus, null,
+        `Unknown status ${status} must fail closed to null`);
+      assert.equal(result.code, 'BILLING_UNKNOWN_STATUS',
+        `Unknown status ${status} must produce BILLING_UNKNOWN_STATUS`);
+    }
+  });
+
+  test('TASK-013b: acceptance aliases still resolve correctly after vocabulary update', () => {
+    for (const [field, value, expectAccepted] of [
+      ['fiscalStatus', 'ACCEPTED', true],
+      ['fiscalStatus', 'HACIENDA_ACCEPTED', true],
+      ['haciendaStatus', 'ACEPTADO', true],
+      ['fiscalStatus', 'REJECTED', false],
+      ['fiscalStatus', 'HACIENDA_REJECTED', false],
+      ['haciendaStatus', 'RECHAZADO', false],
+    ]) {
+      const result = classifyBillingReconciliationResult({ [field]: value });
+      if (expectAccepted) {
+        assert.equal(result.intentStatus, 'ACCEPTED', `${field}=${value} should produce ACCEPTED`);
+      } else {
+        assert.equal(result.intentStatus, 'REJECTED', `${field}=${value} should produce REJECTED`);
+      }
+    }
   });
 });
 
@@ -772,6 +865,54 @@ describe('TASK-013 Billing reconciliation — PostgreSQL integration', runOption
     const persisted = await prisma.invoiceFiscalIntent.findUnique({ where: { id: fixture.intent.id } });
     assert.equal(persisted.status, 'PROCESSING');
     assert.ok(persisted.nextAttemptAt, 'must have a scheduled next attempt after unknown status');
+  });
+
+  // ── TASK-013b: Billing QUEUED → intent stays PROCESSING (DB proof) ────
+  test('TASK-013b: Billing QUEUED → FiscalIntent stays PROCESSING with normal poll scheduled', async () => {
+    // Reproduces the exact scenario from the BILLING_QUEUED_RECONCILIATION_INVESTIGATION:
+    // Billing submission is in QUEUED state (signed.xml ready, Hacienda not yet called).
+    // Before TASK-013b, this produced BILLING_UNKNOWN_STATUS and the intent was kept
+    // in PROCESSING via the fail-closed path. The fix makes QUEUED map directly to
+    // PROCESSING, which must produce identical persistence behavior (intent stays
+    // PROCESSING, next poll scheduled at now + RECONCILIATION_POLL_INTERVAL_MS).
+    const fixture = await createReconciliationFixture('task-013b-queued-proof');
+    const fakeBilling = new FakeReconciliationBillingClient();
+    fakeBilling.setStatus(fixture.billingFiscalDocumentId, {
+      id: fixture.billingFiscalDocumentId,
+      fiscalStatus: 'QUEUED',
+      haciendaStatus: null,    // pre-Hacienda: Hacienda never contacted yet
+      status: 'QUEUED',
+      clave: null,
+      consecutive: null,
+    });
+
+    const reconcileNow = new Date('2026-10-01T21:01:11.954Z'); // timestamp from production evidence
+    const result = await reconcileFiscalIntentById(fixture.intent.id, fakeBilling, { now: reconcileNow });
+
+    // Intent must stay PROCESSING (never ACCEPTED, never ERROR_FINAL)
+    assert.equal(result.status, 'PROCESSING', 'QUEUED must keep intent in PROCESSING state');
+    assert.notEqual(result.status, 'ACCEPTED', 'QUEUED must never transition intent to ACCEPTED');
+
+    const persisted = await prisma.invoiceFiscalIntent.findUnique({ where: { id: fixture.intent.id } });
+    assert.equal(persisted.status, 'PROCESSING', 'DB state must be PROCESSING');
+
+    // Normal poll schedule preserved (now + 5 min, same as for an explicit PROCESSING status)
+    const expectedNext = new Date(reconcileNow.getTime() + RECONCILIATION_POLL_INTERVAL_MS);
+    assert.ok(persisted.nextAttemptAt, 'must schedule next reconciliation attempt');
+    assert.equal(
+      persisted.nextAttemptAt.getTime(),
+      expectedNext.getTime(),
+      'QUEUED must schedule next poll at reconcileNow + RECONCILIATION_POLL_INTERVAL_MS',
+    );
+
+    // Identifiers must not have been mutated (clave/consecutive from QUEUED response are null)
+    assert.equal(persisted.billingFiscalDocumentId, fixture.billingFiscalDocumentId,
+      'billingFiscalDocumentId must not change during QUEUED reconciliation');
+    assert.equal(persisted.idempotencyKey, fixture.idempotencyKey,
+      'idempotencyKey must remain stable');
+
+    // Billing was queried exactly once
+    assert.equal(fakeBilling.callCount, 1, 'exactly one status query must have been made');
   });
 
   // ── 401 query failure → ERROR_FINAL ──────────────────────────────────
@@ -1075,10 +1216,14 @@ describe('TASK-013 Billing reconciliation — PostgreSQL integration', runOption
       delete process.env.IBRC_SENTINEL_KEY;
     }
 
-    // Verify the key was injected into the HTTP header (correct behavior)
-    assert.equal(fetchCalls.length, 1);
-    assert.equal(fetchCalls[0].headers['X-API-Key'], sentinelKey);
-    assert.equal(fetchCalls[0].headers.Authorization, undefined); // no JWT
+    // Verify the key was injected into the HTTP headers (correct behavior).
+    // getFiscalStatus makes 2 requests: GET /fiscal-documents/{id} + GET .../submission
+    // (per TASK-016 official contract). Both must carry the sentinel key.
+    assert.equal(fetchCalls.length, 2, 'getFiscalStatus must make exactly 2 READ requests (document + submission)');
+    for (const call of fetchCalls) {
+      assert.equal(call.headers['X-API-Key'], sentinelKey, 'Every request must carry the resolved API key');
+      assert.equal(call.headers.Authorization, undefined, 'No JWT authorization header'); // no JWT
+    }
 
     // Verify the key does NOT appear in persisted state
     const persisted = await prisma.invoiceFiscalIntent.findUnique({ where: { id: fixture.intent.id } });

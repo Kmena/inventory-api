@@ -31,14 +31,24 @@ function redactSensitiveText(value, sensitiveValue) {
   return value.split(sensitiveValue).join('[REDACTED]');
 }
 
+function mapBillingClientStatus(error) {
+  if (error.statusCode === 401 || error.statusCode === 403) {
+    return 502;
+  }
+
+  if (error.statusCode && error.statusCode >= 400 && error.statusCode < 600) {
+    return error.statusCode;
+  }
+
+  return error.retryable ? 503 : 502;
+}
+
 function sanitizeBillingFailure(error, secretReference = null) {
   if (error instanceof BillingClientError) {
-    const statusCode = error.statusCode && error.statusCode >= 400 && error.statusCode < 600
-      ? error.statusCode
-      : error.retryable ? 503 : 502;
+    const statusCode = mapBillingClientStatus(error);
     const message = redactSensitiveText(error.message || 'Billing request failed', secretReference);
     const code = redactSensitiveText(error.code || 'BILLING_CLIENT_ERROR', secretReference);
-    throw createHttpError(statusCode, message, code); 
+    throw createHttpError(statusCode, message, code);
   }
   if (error?.statusCode && error?.code) {
     throw error;
@@ -86,6 +96,20 @@ function mapActivity(activity, defaultEconomicActivityId) {
     verifiedAt: activity.verifiedAt ?? null,
     lastSeenAt: activity.lastSeenAt ?? null,
     verificationSource: activity.verificationSource ?? null,
+  };
+}
+
+function mapHaciendaConnection(connection) {
+  if (!connection || typeof connection !== 'object') return null;
+  return {
+    environment: typeof connection.environment === 'string' ? connection.environment : null,
+    status: typeof connection.status === 'string' ? connection.status : null,
+    configured: typeof connection.status === 'string' && connection.status !== 'NOT_CONFIGURED',
+    lastValidatedAt: connection.lastValidatedAt ?? null,
+    lastSuccessfulAuthAt: connection.lastSuccessfulAuthAt ?? null,
+    lastValidationErrorCode: typeof connection.lastValidationErrorCode === 'string'
+      ? connection.lastValidationErrorCode
+      : null,
   };
 }
 
@@ -178,6 +202,52 @@ async function setDefaultFiscalActivity(auth, code, context = {}, options = {}) 
   return loadCanonicalSettings(config, correlationId, { ...options, billingClient });
 }
 
+async function configureHaciendaCredentials(auth, credentials, context = {}, options = {}) {
+  const { config } = await resolveBillingIntegration(auth, options);
+  const correlationId = getCorrelationId(context);
+  const environment = String(config.billingEnvironment || '').trim().toUpperCase();
+  const billingClient = options.billingClient || buildBillingClient();
+  try {
+    await billingClient.configureHaciendaCredentials({
+      billingCompanyId: config.billingCompanyId,
+      environment,
+      username: credentials.username,
+      password: credentials.password,
+      secretReference: config.billingCredentialSecretRef,
+      correlationId,
+    });
+    const validation = await billingClient.validateHaciendaCredentials({
+      billingCompanyId: config.billingCompanyId,
+      environment,
+      secretReference: config.billingCredentialSecretRef,
+      correlationId,
+    });
+    return { connection: mapHaciendaConnection(validation) };
+  } catch (error) {
+    sanitizeBillingFailure(error, config.billingCredentialSecretRef);
+  }
+  return null;
+}
+
+async function validateHaciendaCredentials(auth, context = {}, options = {}) {
+  const { config } = await resolveBillingIntegration(auth, options);
+  const correlationId = getCorrelationId(context);
+  const environment = String(config.billingEnvironment || '').trim().toUpperCase();
+  const billingClient = options.billingClient || buildBillingClient();
+  try {
+    const validation = await billingClient.validateHaciendaCredentials({
+      billingCompanyId: config.billingCompanyId,
+      environment,
+      secretReference: config.billingCredentialSecretRef,
+      correlationId,
+    });
+    return { connection: mapHaciendaConnection(validation) };
+  } catch (error) {
+    sanitizeBillingFailure(error, config.billingCredentialSecretRef);
+  }
+  return null;
+}
+
 async function getFiscalReadiness(auth, context = {}, options = {}) {
   const { config } = await resolveBillingIntegration(auth, options);
   const correlationId = getCorrelationId(context);
@@ -209,7 +279,10 @@ module.exports = {
   refreshFiscalActivities,
   updateFiscalActivity,
   setDefaultFiscalActivity,
+  configureHaciendaCredentials,
+  validateHaciendaCredentials,
   getFiscalReadiness,
   mapFiscalSettingsFromStatus,
+  mapHaciendaConnection,
   resolveBillingIntegration,
 };

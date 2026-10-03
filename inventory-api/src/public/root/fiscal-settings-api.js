@@ -39,6 +39,21 @@
     });
   }
 
+  async function configureHaciendaCredentials(session, payload) {
+    return inventoryAuth.fetchJson(session, `${FISCAL_SETTINGS_ENDPOINT}/hacienda-credentials`, {
+      method: 'PUT',
+      body: JSON.stringify({ username: payload.username, password: payload.password }),
+      fallbackMessage: 'No se pudo guardar y validar la conexión con Hacienda.',
+    });
+  }
+
+  async function validateHaciendaCredentials(session) {
+    return inventoryAuth.fetchJson(session, `${FISCAL_SETTINGS_ENDPOINT}/hacienda-credentials/validate`, {
+      method: 'POST',
+      fallbackMessage: 'No se pudo validar la conexión con Hacienda.',
+    });
+  }
+
   async function getFiscalReadiness(session) {
     return inventoryAuth.fetchJson(session, `${FISCAL_SETTINGS_ENDPOINT}/readiness`, {
       fallbackMessage: 'No se pudo comprobar la preparación fiscal.',
@@ -50,6 +65,8 @@
     refreshActivities,
     setDefaultActivity,
     updateActivityBillingEnabled,
+    configureHaciendaCredentials,
+    validateHaciendaCredentials,
     getFiscalReadiness,
   });
 }(window));

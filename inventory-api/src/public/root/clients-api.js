@@ -96,6 +96,14 @@
     });
   }
 
+  async function updateStore(session, clientId, storeId, payload) {
+    return sendJson(session, `/api/clients/company/${encodeURIComponent(clientId)}/stores/${encodeURIComponent(storeId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      fallbackMessage: 'No se pudo actualizar la tienda.',
+    });
+  }
+
   async function updateStoreCreditLimit(session, clientId, storeId, payload) {
     return sendJson(session, `/api/clients/company/${encodeURIComponent(clientId)}/stores/${encodeURIComponent(storeId)}/credit-limit`, {
       method: 'PATCH',
@@ -169,6 +177,43 @@
     });
   }
 
+  /**
+   * Wave 6 — RFR-TASK-601
+   * Trigger Hacienda fiscal verification for a ClientLegalEntity via Inventori backend.
+   * The browser NEVER calls Hacienda directly; all Hacienda contact is server-side.
+   * Returns the updated entity DTO with activities.
+   * On 502 (VERIFICATION_UNAVAILABLE), attaches responseBody to the thrown error
+   * so callers can preserve previously-known data.
+   */
+  async function verifyClientLegalEntity(session, entityId) {
+    const url = `/api/client-legal-entities/${encodeURIComponent(entityId)}/verify`;
+    const response = await globalScope.fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: inventoryAuth.buildHeaders(session),
+    });
+    const data = response.status === 204 ? null : await parseJsonSafely(response);
+    if (response.status === 401) {
+      inventoryAuth.handleUnauthorized();
+    }
+    if (!response.ok) {
+      const error = buildApiError(data, 'No se pudo verificar la identidad fiscal.', response.status);
+      // Attach 502 body so UI can display VERIFICATION_UNAVAILABLE while preserving previous data
+      if (response.status === 502 && data) {
+        /** @type {any} */ (error).responseBody = data;
+      }
+      throw error;
+    }
+    return data;
+  }
+
+  /** Wave 6 — RFR-TASK-601: fetch persisted economic activities for a ClientLegalEntity (no Hacienda call). */
+  async function getClientLegalEntityActivities(session, entityId) {
+    return inventoryAuth.fetchJson(session, `/api/client-legal-entities/${encodeURIComponent(entityId)}/activities`, {
+      fallbackMessage: 'No se pudieron cargar las actividades económicas.',
+    });
+  }
+
   async function downloadDocument(session, clientId, documentId) {
     const response = await globalScope.fetch(`/api/clients/${encodeURIComponent(clientId)}/documents/${encodeURIComponent(documentId)}/download`, {
       method: 'GET',
@@ -199,6 +244,7 @@
     deactivateClient,
     downloadDocument,
     getClientDetail,
+    getClientLegalEntityActivities,
     listClassifications,
     listClients,
     listDocumentTypes,
@@ -208,8 +254,10 @@
     reverseGeocode,
     searchPlaces,
     updateClient,
+    updateStore,
     updateStoreCreditLimit,
     uploadDocument,
     uploadStoreDocument,
+    verifyClientLegalEntity,
   });
 }(window));

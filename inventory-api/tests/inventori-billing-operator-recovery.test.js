@@ -2,14 +2,19 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const {
   ELIGIBLE_INTENT_STATUSES,
   processFiscalIntentById,
 } = require('../src/services/fiscal-billing-worker.service');
+const { BillingClientError } = require('../src/services/billing-api-client.service');
+const { reconcileFiscalIntentById } = require('../src/services/fiscal-reconciliation.service');
 const {
   OPERATOR_RECOVERABLE_FAILURE_CODES,
   NON_RECOVERABLE_FAILURE_EXAMPLES,
   RECOVERY_TARGET_STATUS,
+  RECOVERY_RECONCILIATION_TARGET_STATUS,
   recoverFinalIntentAfterOperatorRepair,
 } = require('../src/services/fiscal-intent-operator-recovery.service');
 const { getAccessPolicy } = require('../src/security/access-policies');
@@ -140,6 +145,8 @@ class InMemoryDb {
     }
     if (where.failureCode != null && this.intent.failureCode !== where.failureCode) return false;
     if (where.idempotencyKey != null && this.intent.idempotencyKey !== where.idempotencyKey) return false;
+    if (where.billingFiscalDocumentId === null && this.intent.billingFiscalDocumentId !== null) return false;
+    if (where.billingFiscalDocumentId?.not === null && this.intent.billingFiscalDocumentId === null) return false;
     return true;
   }
 
@@ -177,7 +184,10 @@ async function assertRejectsWithCode(fn, code) {
 }
 
 test('operator recovery policy is explicit and fail-closed', () => {
-  assert.deepEqual(OPERATOR_RECOVERABLE_FAILURE_CODES, ['FISCAL_SIGNING_CERTIFICATE_INVALID_SECRET']);
+  assert.deepEqual(OPERATOR_RECOVERABLE_FAILURE_CODES, [
+    'FISCAL_SIGNING_CERTIFICATE_INVALID_SECRET',
+    'RECONCILIATION_AUTH_FAILURE',
+  ]);
   assert.ok(NON_RECOVERABLE_FAILURE_EXAMPLES.includes('FISCAL_RECEIVER_MISSING'));
   assert.ok(!OPERATOR_RECOVERABLE_FAILURE_CODES.includes('FISCAL_RECEIVER_MISSING'));
 });
@@ -205,6 +215,205 @@ test('ERROR_FINAL + allowlisted certificate failure recovers to scheduler-eligib
   assert.equal(audits[0].metadata.previousFailureCode, 'FISCAL_SIGNING_CERTIFICATE_INVALID_SECRET');
   assert.equal(audits[0].metadata.idempotencyKey, beforeKey);
   assert.equal(db.intent.metadata.operatorRecoveryHistory[0].previousFailureCode, 'FISCAL_SIGNING_CERTIFICATE_INVALID_SECRET');
+});
+
+test('ERROR_FINAL + reconciliation auth failure recovers through canonical operator path', async () => {
+  const existingBillingDocumentId = 'baa33057-e998-4739-82f3-c213d0a1f4bd';
+  const db = new InMemoryDb(makeIntent({
+    failureCode: 'RECONCILIATION_AUTH_FAILURE',
+    failureMessage: 'The API key has been revoked.',
+    billingFiscalDocumentId: existingBillingDocumentId,
+    billingStatus: 'QUEUED',
+    clave: '50602102600020753025100100001010000000004141249280',
+    consecutive: '00100001010000000004',
+    metadata: { lastReconciliationCode: 'RECONCILIATION_AUTH_FAILURE' },
+  }));
+  const originalIntentId = db.intent.id;
+  const originalInvoiceId = db.intent.invoiceId;
+  const originalSnapshot = db.intent.invoice.fiscalSnapshot;
+  const originalIdempotencyKey = db.intent.idempotencyKey;
+
+  const result = await recoverFinalIntentAfterOperatorRepair(1453n, {
+    reason: 'Billing M2M authentication was repaired and read-only reconciliation was verified.',
+    auth: makeAuth(),
+  }, { db, now: new Date('2026-10-03T05:00:00.000Z') });
+
+  assert.equal(result.intentId, originalIntentId.toString());
+  assert.equal(result.invoiceId, originalInvoiceId.toString());
+  assert.equal(result.previousFailureCode, 'RECONCILIATION_AUTH_FAILURE');
+  assert.equal(result.billingFiscalDocumentId, existingBillingDocumentId);
+  assert.equal(result.newStatus, RECOVERY_RECONCILIATION_TARGET_STATUS);
+  assert.equal(db.intent.status, RECOVERY_RECONCILIATION_TARGET_STATUS);
+  assert.equal(db.intent.failureCode, null);
+  assert.equal(db.intent.billingFiscalDocumentId, existingBillingDocumentId);
+  assert.equal(db.intent.invoiceId, originalInvoiceId);
+  assert.equal(db.intent.idempotencyKey, originalIdempotencyKey);
+  assert.equal(db.intent.invoice.fiscalSnapshot, originalSnapshot);
+  assert.equal(db.invoiceCreates, 0);
+  assert.equal(db.snapshotCreates, 0);
+  assert.equal(db.intentCreates, 0);
+  assert.equal(db.inventoryMutations, 0);
+  assert.equal(db.orderDispatches, 0);
+  assert.equal(db.intent.metadata.operatorRecoveryHistory[0].previousFailureCode, 'RECONCILIATION_AUTH_FAILURE');
+  assert.equal(db.intent.metadata.operatorRecoveryHistory[0].newStatus, 'PROCESSING');
+});
+
+test('recovered intent with existing Billing document reconciles without duplicate creation', async () => {
+  const existingBillingDocumentId = 'baa33057-e998-4739-82f3-c213d0a1f4bd';
+  const existingClave = '50602102600020753025100100001010000000004141249280';
+  const existingConsecutive = '00100001010000000004';
+  const db = new InMemoryDb(makeIntent({
+    failureCode: 'RECONCILIATION_AUTH_FAILURE',
+    failureMessage: 'The API key has been revoked.',
+    billingFiscalDocumentId: existingBillingDocumentId,
+    billingStatus: 'QUEUED',
+    clave: existingClave,
+    consecutive: existingConsecutive,
+    metadata: { lastReconciliationCode: 'RECONCILIATION_AUTH_FAILURE' },
+  }));
+
+  await recoverFinalIntentAfterOperatorRepair(1453n, {
+    reason: 'Billing M2M authentication was repaired and read-only reconciliation was verified.',
+    auth: makeAuth(),
+  }, { db, now: new Date('2026-10-03T05:00:00.000Z') });
+
+  const seen = { createCalls: 0, submitCalls: 0, statusCalls: [] };
+  const billingClient = {
+    async createFiscalDocument() { seen.createCalls += 1; throw new Error('create forbidden'); },
+    async submitFiscalDocument() { seen.submitCalls += 1; throw new Error('submit forbidden'); },
+    async getFiscalStatus(request) {
+      seen.statusCalls.push(request);
+      return {
+        id: existingBillingDocumentId,
+        billingFiscalDocumentId: existingBillingDocumentId,
+        fiscalStatus: 'QUEUED',
+        clave: existingClave,
+        consecutive: existingConsecutive,
+        idempotencyKey: 'inventori:1698:invoice:1623',
+        companyId: 'dde91f44-6ceb-4eb7-b322-0139919cc34d',
+        environment: 'SANDBOX',
+      };
+    },
+  };
+
+  const result = await reconcileFiscalIntentById(1453n, billingClient, {
+    db,
+    now: new Date('2026-10-03T05:00:01.000Z'),
+  });
+
+  assert.equal(result.processed, true);
+  assert.equal(result.status, 'PROCESSING');
+  assert.equal(seen.createCalls, 0);
+  assert.equal(seen.submitCalls, 0);
+  assert.equal(seen.statusCalls.length, 1);
+  assert.equal(seen.statusCalls[0].billingFiscalDocumentId, existingBillingDocumentId);
+  assert.equal(db.intent.id, 1453n);
+  assert.equal(db.intent.billingFiscalDocumentId, existingBillingDocumentId);
+  assert.equal(db.intent.clave, existingClave);
+  assert.equal(db.intent.consecutive, existingConsecutive);
+  assert.equal(db.intent.status, 'PROCESSING');
+});
+
+test('worker fail-safe routes retry with existing Billing document to reconciliation, not create', async () => {
+  const existingBillingDocumentId = 'existing-doc-id';
+  const db = new InMemoryDb(makeIntent({
+    status: 'ERROR_RETRYABLE',
+    failureCode: 'OPERATOR_RECOVERY_AFTER_REPAIR',
+    failureMessage: 'Recovered by operator.',
+    billingFiscalDocumentId: existingBillingDocumentId,
+    billingStatus: 'QUEUED',
+    clave: '50602102600020753025100100001010000000004141249280',
+    consecutive: '00100001010000000004',
+  }));
+  const seen = { createCalls: 0, submitCalls: 0, statusCalls: [] };
+  const billingClient = {
+    async createFiscalDocument() { seen.createCalls += 1; throw new Error('create forbidden'); },
+    async submitFiscalDocument() { seen.submitCalls += 1; throw new Error('submit forbidden'); },
+    async getFiscalStatus(request) {
+      seen.statusCalls.push(request);
+      return {
+        id: existingBillingDocumentId,
+        billingFiscalDocumentId: existingBillingDocumentId,
+        fiscalStatus: 'PROCESSING',
+        clave: '50602102600020753025100100001010000000004141249280',
+        consecutive: '00100001010000000004',
+        idempotencyKey: 'inventori:1698:invoice:1623',
+        companyId: 'dde91f44-6ceb-4eb7-b322-0139919cc34d',
+        environment: 'SANDBOX',
+      };
+    },
+  };
+
+  const result = await processFiscalIntentById(1453n, { billingClient }, {
+    db,
+    now: new Date('2026-10-03T05:05:00.000Z'),
+  });
+
+  assert.equal(result.processed, true);
+  assert.equal(result.status, 'PROCESSING');
+  assert.equal(seen.createCalls, 0);
+  assert.equal(seen.submitCalls, 0);
+  assert.equal(seen.statusCalls.length, 1);
+  assert.equal(seen.statusCalls[0].billingFiscalDocumentId, existingBillingDocumentId);
+  assert.equal(db.intent.billingFiscalDocumentId, existingBillingDocumentId);
+  assert.equal(db.intent.clave, '50602102600020753025100100001010000000004141249280');
+  assert.equal(db.intent.consecutive, '00100001010000000004');
+});
+
+test('missing referenced Billing document fails closed and does not create replacement', async () => {
+  const missingBillingDocumentId = 'missing-doc-id';
+  const db = new InMemoryDb(makeIntent({
+    status: 'ERROR_RETRYABLE',
+    failureCode: 'OPERATOR_RECOVERY_AFTER_REPAIR',
+    billingFiscalDocumentId: missingBillingDocumentId,
+    billingStatus: 'QUEUED',
+    clave: '50602102600020753025100100001010000000004141249280',
+    consecutive: '00100001010000000004',
+  }));
+  const seen = { createCalls: 0, submitCalls: 0, statusCalls: 0 };
+  const billingClient = {
+    async createFiscalDocument() { seen.createCalls += 1; throw new Error('create forbidden'); },
+    async submitFiscalDocument() { seen.submitCalls += 1; throw new Error('submit forbidden'); },
+    async getFiscalStatus() {
+      seen.statusCalls += 1;
+      throw new BillingClientError('Fiscal document not found', {
+        code: 'FISCAL_DOCUMENT_NOT_FOUND',
+        statusCode: 404,
+        retryable: false,
+      });
+    },
+  };
+
+  const result = await processFiscalIntentById(1453n, { billingClient }, {
+    db,
+    now: new Date('2026-10-03T05:10:00.000Z'),
+  });
+
+  assert.equal(result.processed, true);
+  assert.equal(result.status, 'ERROR_FINAL');
+  assert.equal(result.code, 'RECONCILIATION_DOCUMENT_NOT_FOUND');
+  assert.equal(seen.createCalls, 0);
+  assert.equal(seen.submitCalls, 0);
+  assert.equal(seen.statusCalls, 1);
+  assert.equal(db.intent.billingFiscalDocumentId, missingBillingDocumentId);
+  assert.equal(db.intent.failureCode, 'RECONCILIATION_DOCUMENT_NOT_FOUND');
+});
+
+test('non-ERROR_FINAL reconciliation auth failure remains denied', async () => {
+  await assertRejectsWithCode(
+    () => recoverFinalIntentAfterOperatorRepair(1453n, {
+      reason: 'Billing M2M authentication was repaired and read-only reconciliation was verified.',
+      auth: makeAuth(),
+    }, { db: new InMemoryDb(makeIntent({ status: 'PROCESSING', failureCode: 'RECONCILIATION_AUTH_FAILURE' })) }),
+    'fiscal_intent_not_error_final',
+  );
+});
+
+test('operator recovery route keeps authentication and billing handoff permission gate', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/routes/fiscal-intent.routes.js'), 'utf8');
+  assert.match(source, /router\.use\(authenticate\)/);
+  assert.match(source, /authorizeAccessPolicy\('billing\.handoff\.create'\)/);
+  assert.doesNotMatch(source, /BILLING_SANDBOX_M2M_API_KEY|billingCredentialSecretRef|X-API-Key/);
 });
 
 test('recovery rejects unknown and non-allowlisted terminal failure codes', async () => {

@@ -184,6 +184,24 @@ function validateSetDefaultFiscalOnboardingActivityResponse(response, correlatio
   return response;
 }
 
+function validateHaciendaConnectionResponse(response, correlationId) {
+  const hasRequiredShape = response
+    && typeof response === 'object'
+    && isString(response.companyId)
+    && isString(response.environment)
+    && isString(response.status);
+
+  if (!hasRequiredShape) {
+    throw new BillingClientError('Billing returned malformed Hacienda connection response', {
+      code: 'BILLING_MALFORMED_HACIENDA_CONNECTION',
+      retryable: false,
+      correlationId,
+    });
+  }
+
+  return response;
+}
+
 function validateFiscalReadinessResponse(response, correlationId) {
   const isValidDateString = (v) => typeof v === 'string' && v.trim().length > 0 && !isNaN(Date.parse(v));
   const isStringArray = (v) => Array.isArray(v) && v.every((item) => typeof item === 'string');
@@ -328,6 +346,27 @@ class BillingApiClient {
       body: { code },
     });
     return validateSetDefaultFiscalOnboardingActivityResponse(response, correlationId);
+  }
+
+  async configureHaciendaCredentials({ billingCompanyId, environment, username, password, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'PUT',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/${encodeURIComponent(environment)}/hacienda-credentials`,
+      secretReference,
+      correlationId,
+      body: { username, password },
+    });
+    return validateHaciendaConnectionResponse(response, correlationId);
+  }
+
+  async validateHaciendaCredentials({ billingCompanyId, environment, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'POST',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/${encodeURIComponent(environment)}/hacienda-credentials/validate`,
+      secretReference,
+      correlationId,
+    });
+    return validateHaciendaConnectionResponse(response, correlationId);
   }
 
   async getFiscalReadiness({ billingCompanyId, environment, secretReference, correlationId }) {

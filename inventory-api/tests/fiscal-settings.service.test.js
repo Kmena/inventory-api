@@ -156,6 +156,52 @@ test('single enabled activity without explicit default does not trigger set-defa
   assert.equal(billingClient.calls.some(([method]) => method === 'setDefaultFiscalOnboardingActivity'), false);
 });
 
+test('Billing upstream 401 does not invalidate browser session semantics', async () => {
+  const secretReference = 'env:BILLING_TEST_API_KEY';
+  const billingClient = {
+    async getFiscalOnboardingStatus() {
+      throw new BillingClientError('Billing API key rejected for env:BILLING_TEST_API_KEY', {
+        code: 'BILLING_UNAUTHORIZED',
+        statusCode: 401,
+      });
+    },
+  };
+
+  await assert.rejects(
+    () => fiscalSettingsService.getFiscalSettings(
+      auth,
+      {},
+      options({ config: buildConfig({ billingCredentialSecretRef: secretReference }), billingClient }),
+    ),
+    (error) => {
+      assert.equal(error.statusCode, 502);
+      assert.equal(error.code, 'BILLING_UNAUTHORIZED');
+      assert.doesNotMatch(error.message, /BILLING_TEST_API_KEY/);
+      return true;
+    },
+  );
+});
+
+test('Billing upstream 403 does not invalidate browser session semantics', async () => {
+  const billingClient = {
+    async getFiscalOnboardingStatus() {
+      throw new BillingClientError('Missing fiscal-onboarding:read scope', {
+        code: 'BILLING_FORBIDDEN',
+        statusCode: 403,
+      });
+    },
+  };
+
+  await assert.rejects(
+    () => fiscalSettingsService.getFiscalSettings(auth, {}, options({ billingClient })),
+    (error) => {
+      assert.equal(error.statusCode, 502);
+      assert.equal(error.code, 'BILLING_FORBIDDEN');
+      return true;
+    },
+  );
+});
+
 test('refresh calls verifyFiscalOnboarding and returns canonical refreshed state', async () => {
   const billingClient = buildBillingClient();
   const result = await fiscalSettingsService.refreshFiscalActivities(auth, { correlationId: 'refresh-1' }, options({ billingClient }));

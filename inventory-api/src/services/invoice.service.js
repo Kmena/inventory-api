@@ -6,6 +6,125 @@ const { buildPaginatedResponse } = require('../lib/pagination');
 const audit = require('../lib/audit');
 const { getPendingAmount, getPendingAmountDecimal } = require('./invoice-financial-state');
 
+// ─── Fiscal DTO — browser-safe serialization layer ───────────────────────────
+// These functions construct EXPLICIT plain objects containing only approved
+// fields. They MUST NOT spread the raw InvoiceFiscalIntent Prisma record.
+// Any new field added to the Prisma model will NOT appear in responses unless
+// explicitly added here. See specs/inventori-fiscal-invoice-history-and-detail/
+
+/**
+ * Extracts and validates `acceptedAt` from the fiscal intent metadata blob.
+ * Returns a normalized ISO timestamp string, or null if absent/invalid.
+ * ONLY called when intent.status === 'ACCEPTED' (enforced by buildFiscalDtoDetail).
+ * @param {any} intent
+ * @returns {string | null}
+ */
+function resolveAcceptedAt(intent) {
+  const raw = intent?.metadata?.billingAcceptedAt;
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
+}
+
+/**
+ * Builds the browser-safe fiscal sub-object for LIST responses.
+ * Contains only `status`. Returns null when no intent exists.
+ * Fields excluded by construction — intent is never spread.
+ * @param {any | null} intent
+ * @returns {{ status: string } | null}
+ */
+function buildFiscalDto(intent) {
+  if (!intent) return null;
+  return {
+    status: intent.status,
+  };
+}
+
+/**
+ * Builds the browser-safe fiscal sub-object for DETAIL responses.
+ * Contains status, clave, consecutive, acceptedAt.
+ * `acceptedAt` is ONLY populated when status === 'ACCEPTED'; null for all others.
+ * Fields excluded by construction — intent is never spread.
+ * @param {any | null} intent
+ * @returns {{ status: string, clave: string | null, consecutive: string | null, acceptedAt: string | null } | null}
+ */
+function buildFiscalDtoDetail(intent) {
+  if (!intent) return null;
+  return {
+    status: intent.status,
+    clave: intent.clave || null,
+    consecutive: intent.consecutive || null,
+    acceptedAt: intent.status === 'ACCEPTED' ? resolveAcceptedAt(intent) : null,
+  };
+}
+
+/**
+ * Serializes a payment record for inclusion in invoice DTOs.
+ * Explicit field list — never spreads the Prisma payment object.
+ * @param {any} payment
+ * @returns {object}
+ */
+function serializePaymentForDto(payment) {
+  return {
+    id: payment.id,
+    paymentMethod: payment.paymentMethod ?? null,
+    amount: payment.amount ?? null,
+    status: payment.status ?? null,
+    reference: payment.reference ?? null,
+    approvedAt: payment.approvedAt ?? null,
+    createdAt: payment.createdAt ?? null,
+  };
+}
+
+/**
+ * Serializes a raw Invoice Prisma record to the browser-safe LIST DTO.
+ * Adds `invoiceNumber` (from invoice.number) and a minimal `fiscal` sub-object.
+ * All InvoiceFiscalIntent internal fields are excluded by construction.
+ * @param {any} invoice
+ * @returns {object}
+ */
+function serializeInvoiceForList(invoice) {
+  return {
+    id: invoice.id,
+    invoiceNumber: invoice.number ?? null,
+    clientId: invoice.clientId ?? null,
+    clientName: invoice.client?.name ?? null,
+    client: invoice.client ? { id: invoice.client.id, name: invoice.client.name } : null,
+    orderId: invoice.orderId ?? null,
+    amount: invoice.amount ?? null,
+    pendingAmount: getPendingAmount(invoice),
+    status: invoice.status ?? null,
+    issuedAt: invoice.issuedAt ?? null,
+    dueAt: invoice.dueAt ?? null,
+    payments: (invoice.payments || []).map(serializePaymentForDto),
+    fiscal: buildFiscalDto(invoice.fiscalIntent ?? null),
+  };
+}
+
+/**
+ * Serializes a raw Invoice Prisma record to the browser-safe DETAIL DTO.
+ * Extends the list shape with paidAt, structured order, and full fiscal detail.
+ * @param {any} invoice
+ * @returns {object}
+ */
+function serializeInvoiceForDetail(invoice) {
+  const base = serializeInvoiceForList(invoice);
+  return {
+    ...base,
+    paidAt: invoice.paidAt ?? null,
+    order: invoice.order
+      ? {
+          id: invoice.order.id,
+          clientStoreId: invoice.order.clientStoreId ?? null,
+          clientStoreName: invoice.order.clientStore?.name ?? null,
+        }
+      : null,
+    fiscal: buildFiscalDtoDetail(invoice.fiscalIntent ?? null),
+  };
+}
+
+// ─── End fiscal DTO ───────────────────────────────────────────────────────────
+
 function normalizeInvoicePayload(payload) {
   const { status: _ignoredStatus, paidAt: _ignoredPaidAt, ...safePayload } = payload;
   return {
@@ -95,17 +214,18 @@ async function listInvoices(auth, pagination = null, filters = {}) {
   const companyId = assertCompanyScope(auth);
   const invoices = await invoiceRepository.findCompanyInvoices(companyId, pagination, filters);
   if (!pagination) {
-    return invoices;
+    return /** @type {any[]} */ (invoices).map(serializeInvoiceForList);
   }
   const paginatedInvoices = /** @type {{ items: Array<any>, totalItems: number }} */ (invoices);
-  return buildPaginatedResponse(paginatedInvoices.items, pagination, paginatedInvoices.totalItems);
+  const serializedItems = paginatedInvoices.items.map(serializeInvoiceForList);
+  return buildPaginatedResponse(serializedItems, pagination, paginatedInvoices.totalItems);
 }
 
 async function getInvoice(id, auth) {
   const companyId = assertCompanyScope(auth);
   const invoice = await invoiceRepository.findCompanyInvoiceById(id, companyId);
   if (!invoice) throw createHttpError(404, 'Factura no encontrada', 'not_found');
-  return invoice;
+  return serializeInvoiceForDetail(invoice);
 }
 
 async function listInvoiceDebtInconsistencies(auth) {
@@ -231,10 +351,16 @@ async function removeInvoice(id, auth, req = null) {
 }
 
 module.exports = {
+  // Public service API
   listInvoices,
   getInvoice,
   listInvoiceDebtInconsistencies,
   createInvoice,
   updateInvoice,
   removeInvoice,
+  // Exported for unit testing (Wave 1 fiscal DTO)
+  buildFiscalDto,
+  buildFiscalDtoDetail,
+  serializeInvoiceForList,
+  serializeInvoiceForDetail,
 };

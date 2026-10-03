@@ -40,6 +40,9 @@ const {
   createInvoiceFiscalIntent,
   createInvoiceFiscalSnapshot,
 } = require('./fiscal-snapshot.service');
+// OQ-010: import canonical active-status constant so the in-transaction re-validation
+// uses the same predicate as the preview resolver (single source of truth, DRY).
+const { HACIENDA_ACTIVE_STATUS } = require('./receiver-fiscal-readiness.service');
 
 async function acquireCompanyInventoryAdvisoryLock(tx, companyId) {
   await inventoryRepository.acquireCompanyInventoryAdvisoryLock(companyId, tx);
@@ -726,8 +729,21 @@ function splitOrderItemsByInventoryApplicability(order) {
   return { inventoryItems, nonInventoryItems };
 }
 
-async function reserveStockForOrder(orderId, auth, req = null) {
-  const updatedOrder = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
+/**
+ * Reserve stock for an order and transition it to APPROVED.
+ *
+ * When options.fiscalApprovalData is present (Billing integration enabled):
+ *   1. Re-validates the selected activity inside the TX (race-condition protection)
+ *   2. Creates OrderFiscalApproval atomically with the stock reservation
+ * When absent (Billing disabled): preserves existing commercial-approval behavior.
+ *
+ * @param {bigint} orderId
+ * @param {object} auth
+ * @param {object|null} [req]
+ * @param {{ fiscalApprovalData?: { companyId: bigint, clientLegalEntityId: bigint, receiverEconomicActivityCode: string, confirmedById: bigint|null } }} [options]
+ */
+async function reserveStockForOrder(orderId, auth, req = null, options = {}) {
+  const { updatedOrder, fiscalApprovalId } = /** @type {any} */ (await inventoryRepository.transaction(async (tx) => {
     const scope = authScope(auth);
     const order = /** @type {any} */ (await inventoryRepository.findOrderForCompany(
       orderId,
@@ -742,6 +758,49 @@ async function reserveStockForOrder(orderId, auth, req = null) {
     }
     if (order.status === 'CANCELLED' || order.status === 'DELIVERED') {
       throw createHttpError(409, 'El pedido no se puede aprobar en su estado actual', 'conflict');
+    }
+
+    // ── RFR-TASK-302: Fiscal approval validation (inside tx for race-condition safety) ──
+    // Re-validates the selected activity WITHIN the transaction to protect against:
+    //   - Activity removed between preview and approval
+    //   - ClientLegalEntity association changed
+    //   - Cross-company activity injection attempt
+    let createdFiscalApprovalId = null;
+    if (options.fiscalApprovalData) {
+      const fad = options.fiscalApprovalData;
+      // OQ-010 race-condition re-validation: re-check eligibility inside the transaction.
+      // If the activity became inactive (haciendaStatus changed from 'A' to 'I') OR was
+      // removed (isCurrentlyReturned=false) between preview and this commit, reject it.
+      // Uses HACIENDA_ACTIVE_STATUS from receiver-fiscal-readiness.service.js (single source).
+      const activity = await tx.clientEconomicActivity.findFirst({
+        where: {
+          clientLegalEntityId: fad.clientLegalEntityId,
+          code: fad.receiverEconomicActivityCode,
+          companyId: fad.companyId,
+          isCurrentlyReturned: true,
+          haciendaStatus: HACIENDA_ACTIVE_STATUS,
+        },
+      });
+      if (!activity) {
+        // Activity became unavailable after preview — stale modal or race condition
+        throw createHttpError(
+          409,
+          'La actividad económica seleccionada ya no está disponible. Recargue y seleccione de nuevo.',
+          'RECEIVER_ACTIVITY_NOT_ELIGIBLE',
+        );
+      }
+      // Create OrderFiscalApproval atomically — unique constraint on orderId prevents duplicates.
+      // Capture the committed record ID for inclusion in the post-tx audit event.
+      const approvalRecord = await tx.orderFiscalApproval.create({
+        data: {
+          companyId: fad.companyId,
+          orderId,
+          clientLegalEntityId: fad.clientLegalEntityId,
+          receiverEconomicActivityCode: fad.receiverEconomicActivityCode,
+          confirmedById: fad.confirmedById || null,
+        },
+      });
+      createdFiscalApprovalId = approvalRecord.id;
     }
 
     const { inventoryItems } = splitOrderItemsByInventoryApplicability(order);
@@ -806,12 +865,15 @@ async function reserveStockForOrder(orderId, auth, req = null) {
       });
     }
 
-    return inventoryRepository.updateOrderById(orderId, {
+    const approvedOrder = await inventoryRepository.updateOrderById(orderId, {
       approved: true,
       approvedAt: new Date(),
       approvedById: scope.userId,
       status: 'APPROVED',
     }, { client: true, user: true, approvedBy: true, warehouse: true, items: { include: { product: true } } }, tx);
+    // Return composite so the committed fiscal approval ID can reach the post-tx audit call.
+    // If the transaction rolls back the updatedOrder is never returned, and the audit is never called.
+    return { updatedOrder: approvedOrder, fiscalApprovalId: createdFiscalApprovalId };
   }));
 
   await audit.recordAuditEventIfAvailable({
@@ -826,6 +888,13 @@ async function reserveStockForOrder(orderId, auth, req = null) {
       approved: updatedOrder.approved,
       approvedById: updatedOrder.approvedById,
       warehouseId: updatedOrder.warehouseId,
+      // Fiscal confirmation evidence — only present when OrderFiscalApproval was atomically committed.
+      // Absent when billing is disabled (preserves existing audit shape for non-fiscal approvals).
+      ...(fiscalApprovalId != null ? {
+        fiscalApprovalId: fiscalApprovalId.toString(),
+        clientLegalEntityId: options.fiscalApprovalData.clientLegalEntityId.toString(),
+        receiverEconomicActivityCode: options.fiscalApprovalData.receiverEconomicActivityCode,
+      } : {}),
     },
   });
 
@@ -1104,6 +1173,10 @@ async function dispatchOrder(orderId, auth, transportPayload = null, req = null)
         approvedBy: true,
         warehouse: true,
         items: { include: { product: true } },
+        // RFR-TASK-401: load fiscal approval so snapshot builder can read the frozen
+        // receiver activity selection made at approval time (new-flow orders only).
+        // Legacy orders (no OrderFiscalApproval) will have fiscalApproval = null here.
+        fiscalApproval: { select: { receiverEconomicActivityCode: true, clientLegalEntityId: true } },
       },
       tx,
     ));

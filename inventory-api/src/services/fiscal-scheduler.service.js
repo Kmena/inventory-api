@@ -344,6 +344,8 @@ class FiscalScheduler {
 
   /**
    * Finds up to `limit` PENDING/ERROR_RETRYABLE intent IDs eligible for the worker.
+   * Intents with an existing Billing fiscal document are excluded: they must
+   * reconcile/resume the existing fiscal identity, never create a replacement.
    * Uses the compound index: (company_id, status, next_attempt_at).
    */
   async _findEligibleWorkerIds(limit) {
@@ -352,6 +354,7 @@ class FiscalScheduler {
       where: {
         ...this._companyScopeWhere(),
         status: { in: ['PENDING', 'ERROR_RETRYABLE'] },
+        billingFiscalDocumentId: null,
         OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
       },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],

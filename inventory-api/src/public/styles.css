@@ -451,6 +451,13 @@ code { background: #eef2ff; padding: 2px 6px; border-radius: 6px; }
 .billing-balance-bar__fill--danger  { background:var(--danger, #DC2626); }
 .billing-invoice-payments { background:#f8fafc; border-top:1px dashed var(--border); padding:10px 16px 14px; }
 .billing-row--overdue { background:#fff5f5; }
+/* Wave 7 — TASK-011: billing detail dialog a11y + responsive hardening */
+/* Artifact download links: min touch target, flex alignment */
+.billing-artifact-link { display: inline-flex; align-items: center; min-height: 36px; }
+/* Artifact retry button: min touch target */
+.billing-artifact-retry-btn { min-height: 36px; }
+/* Ensure table-wrapper inside detail dialog scrolls horizontally on narrow viewports */
+#billing-detail-dialog .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .dashboard-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
 .dashboard-tile { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: #f8fafc; display: grid; gap: 8px; }
 .dashboard-tile span { color: var(--muted); font-size: 0.9rem; }
@@ -5374,6 +5381,9 @@ dialog.root-dialog::backdrop {
 
 /* ── Fiscal Settings Wave 8 — layout / responsive / accessibility ── */
 .fiscal-settings-page { display: grid; gap: 20px; }
+.fiscal-credentials-form { display: grid; gap: 12px; margin-top: 16px; max-width: 520px; }
+.fiscal-credentials-form label { display: grid; gap: 6px; font-weight: 600; }
+.fiscal-credentials-form input { min-height: 42px; }
 
 .fiscal-summary-grid {
   display: grid;
@@ -5468,4 +5478,39 @@ dialog.root-dialog::backdrop {
 @media (max-width: 480px) {
   .fiscal-activity-head { flex-direction: column; }
   .fiscal-activity-badges { margin-top: 4px; }
+}
+
+.products-cabys-control {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.products-cabys-selected {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.products-cabys-results {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.products-cabys-result {
+  display: grid;
+  gap: 0.25rem;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: #fff;
+  color: inherit;
+}
+
+.products-cabys-result:hover,
+.products-cabys-result:focus-visible {
+  border-color: rgba(37, 99, 235, 0.65);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
 }

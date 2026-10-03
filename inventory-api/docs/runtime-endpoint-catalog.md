@@ -100,6 +100,7 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 | GET | `/api/clients/document-types` | Sí | `authorize('admin', 'sales')` | Listar tipos de documento soportados | Catálogo estático/servicio |
 | POST | `/api/clients/company` | Sí | `authorize('admin', 'sales')` | Crear cliente de compañía | Validado por schema |
 | POST | `/api/clients/company/:clientId/stores` | Sí | `authorize('admin', 'sales')` | Crear tienda/sucursal de cliente | UI root/admin |
+| PATCH | `/api/clients/company/:clientId/stores/:storeId` | Sí | `authorize('admin', 'sales')` | Editar tienda/sucursal de cliente | UI root/admin; fuera de OpenAPI parcial actual |
 | POST | `/api/clients/:clientId/documents` | Sí | `authorize('admin', 'sales')` | Registrar documento privado de cliente | Descarga protegida asociada |
 | POST | `/api/clients/:clientId/references` | Sí | `authorize('admin', 'sales')` | Crear referencia comercial del cliente | UI root/admin |
 | GET | `/api/clients/:clientId/documents/:documentId/download` | Sí | `authorize('admin', 'sales')` | Descargar documento privado de cliente | No expone static public path |

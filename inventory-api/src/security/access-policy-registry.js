@@ -69,6 +69,12 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'tenant-fiscal-settings',
     transition: 'permission-governed',
   },
+  'fiscal-settings.credentials.manage': {
+    mode: 'permission',
+    permissions: ['fiscal.credentials.manage'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
   'user.list-global': {
     mode: 'role',
     roles: ['root'],
@@ -405,6 +411,21 @@ const ACCESS_POLICIES = Object.freeze({
   'client.store.credit.manage': {
     mode: 'permission',
     permissions: ['clients.credit.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  // RFR-TASK-203: receiver fiscal verification — OQ-008 resolved → reuse clients.edit (Option A)
+  // Rationale: verification modifies verificationStatus + activities, consistent with client data mgmt.
+  'client-legal-entity.verify': {
+    mode: 'permission',
+    permissions: ['clients.edit'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  // RFR-TASK-204: receiver activities read — same view permission as client.detail
+  'client-legal-entity.activities': {
+    mode: 'permission',
+    permissions: ['clients.view', 'clients.view.all'],
     boundary: 'tenant-operational',
     transition: 'permission-governed',
   },

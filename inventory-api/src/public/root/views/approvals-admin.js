@@ -29,6 +29,22 @@ function currency(amount) {
   return '₡' + Number(amount || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatQuantity(quantity) {
+  return Number(quantity || 0).toLocaleString('es-CR', { maximumFractionDigits: 3 });
+}
+
+function renderInventoryAvailabilityBadge(item) {
+  if (item.product?.controlsInventory === false) {
+    return '<span class="badge">No descuenta inventario</span>';
+  }
+  const quantity = item.product?.sellableInventoryQuantity;
+  const label = quantity == null
+    ? 'Inventario vendible: —'
+    : `Inventario vendible: ${formatQuantity(quantity)}`;
+  const badgeClass = Number(quantity || 0) > 0 ? 'badge badge-success' : 'badge badge-danger';
+  return `<span class="${badgeClass}" title="Unidades disponibles en bodegas vendibles">${escapeHtml(label)}</span>`;
+}
+
 function formatDate(iso) {
   if (!iso) return '—';
   try {
@@ -79,13 +95,11 @@ function renderOrderRow(order) {
   const orderKindBadge = hasInventoryLines && hasNonInventoryLines
     ? '<span class="badge badge-info" style="margin-left:6px;">Orden mixta</span>'
     : '';
-  const itemsSummary = (order.items || []).slice(0, 5).map((item) => {
-    const requiresInventory = item.product?.controlsInventory !== false;
-    return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:0.8rem;padding:2px 0;">
-      <span>${escapeHtml(item.product?.name || 'Producto')} <span class="badge">${requiresInventory ? 'Requiere inventario' : 'No requiere inventario'}</span></span>
+  const itemsSummary = (order.items || []).slice(0, 5).map((item) => `
+    <div style="display:flex;justify-content:space-between;gap:8px;font-size:0.8rem;padding:2px 0;">
+      <span>${escapeHtml(item.product?.name || 'Producto')} ${renderInventoryAvailabilityBadge(item)}</span>
       <span>${item.quantity} × ${currency(item.unitPrice)}</span>
-    </div>`;
-  }).join('');
+    </div>`).join('');
   const moreItems = itemCount > 5 ? `<div style="font-size:0.78rem;color:#64748b;">… y ${itemCount - 5} más</div>` : '';
 
   return `
@@ -272,18 +286,46 @@ async function render(session, _item) {
       });
     });
 
-    // Approve buttons
+    // Approve buttons — fiscal confirmation modal when billing is enabled (Wave 5)
     containerEl.querySelectorAll('.approvals-approve-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const orderId = btn.getAttribute('data-order-id');
+        if (btn.disabled) return; // double-click guard
         btn.disabled = true;
-        btn.textContent = 'Aprobando…';
+        btn.textContent = 'Verificando…';
         try {
-          await ordersApi.approveOrder(session, orderId);
+          // Always fetch preview first — determines whether fiscal modal is needed.
+          const preview = await ordersApi.getFiscalReadinessPreview(session, orderId);
+
+          if (!preview.fiscalBillingEnabled) {
+            // Billing disabled → existing commercial approval, no fiscal modal.
+            btn.textContent = 'Aprobando…';
+            await ordersApi.approveOrder(session, orderId);
+            showToast(containerEl, `Pedido #${orderId} aprobado correctamente.`, false);
+            await loadOrders();
+            renderView();
+            return;
+          }
+
+          // Billing enabled → open fiscal approval modal.
+          const fiscalModal = rootShell.require('views.fiscalApprovalModal');
+          const activityCode = await fiscalModal.openFiscalApprovalModal(preview);
+
+          if (activityCode === null) {
+            // User cancelled — restore button, do NOT approve.
+            btn.disabled = false;
+            btn.textContent = '✓ Aprobar';
+            return;
+          }
+
+          // User confirmed with an activity code → POST approval.
+          btn.textContent = 'Aprobando…';
+          await ordersApi.approveOrder(session, orderId, { receiverEconomicActivityCode: activityCode });
           showToast(containerEl, `Pedido #${orderId} aprobado correctamente.`, false);
           await loadOrders();
           renderView();
         } catch (err) {
+          // Handles: preview fetch failure, approval POST failure (incl. stale data 409).
           showToast(containerEl, err.message || 'Error al aprobar el pedido.', true);
           btn.disabled = false;
           btn.textContent = '✓ Aprobar';

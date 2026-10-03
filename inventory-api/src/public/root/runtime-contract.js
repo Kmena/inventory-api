@@ -563,11 +563,18 @@
       requiresScripts: ['/root/registry.js', '/root/clients-api.js'],
     },
     {
+      path: '/root/views/client-fiscal-verification.js',
+      category: 'view-provider',
+      registers: ['views.clientFiscalVerification'],
+      requiresModules: ['ui'],
+      requiresScripts: ['/root/registry.js', '/root/ui.js'],
+    },
+    {
       path: '/root/views/clients-admin.js',
       category: 'view-provider',
       registers: ['views.clientsAdmin'],
-      requiresModules: ['clientsApi', 'ui', 'views.clientsAdminHelpers', 'views.clientsAdminRenderers', 'views.clientsAdminState', 'views.clientsAdminStoreDialog'],
-      requiresScripts: ['/root/registry.js', '/root/clients-api.js', '/root/ui.js', '/root/views/clients-admin.helpers.js', '/root/views/clients-admin.renderers.js', '/root/views/clients-admin.state.js', '/root/views/clients-admin-store-dialog.js'],
+      requiresModules: ['clientsApi', 'ui', 'views.clientsAdminHelpers', 'views.clientsAdminRenderers', 'views.clientsAdminState', 'views.clientsAdminStoreDialog', 'views.clientFiscalVerification'],
+      requiresScripts: ['/root/registry.js', '/root/clients-api.js', '/root/ui.js', '/root/views/clients-admin.helpers.js', '/root/views/clients-admin.renderers.js', '/root/views/clients-admin.state.js', '/root/views/clients-admin-store-dialog.js', '/root/views/client-fiscal-verification.js'],
     },
     {
       path: '/root/views/routes-admin.helpers.js',
@@ -605,11 +612,18 @@
       requiresScripts: ['/shared/auth.js', '/root/registry.js'],
     },
     {
+      path: '/root/views/fiscal-approval-modal.js',
+      category: 'view-provider',
+      registers: ['views.fiscalApprovalModal'],
+      requiresModules: [],
+      requiresScripts: ['/root/registry.js'],
+    },
+    {
       path: '/root/views/approvals-admin.js',
       category: 'view-provider',
       registers: ['views.approvalsAdmin'],
-      requiresModules: ['ordersApi'],
-      requiresScripts: ['/root/registry.js', '/root/orders-api.js'],
+      requiresModules: ['ordersApi', 'views.fiscalApprovalModal'],
+      requiresScripts: ['/root/registry.js', '/root/orders-api.js', '/root/views/fiscal-approval-modal.js'],
     },
     {
       path: '/root/receipts-api.js',

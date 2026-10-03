@@ -5,7 +5,7 @@ const { authorizeAccessPolicy } = require('../security/access-policies');
 const validate = require('../middlewares/validate');
 const { parseBigIntId } = require('../lib/parse');
 const { parsePaginationQuery } = require('../lib/pagination');
-const { createOrderSchema, updateOrderSchema, rejectOrderSchema } = require('../schemas/order.schema');
+const { createOrderSchema, updateOrderSchema, rejectOrderSchema, approveOrderSchema } = require('../schemas/order.schema');
 const orderService = require('../services/order.service');
 
 const router = express.Router();
@@ -32,8 +32,14 @@ router.put('/:id', authorizeAccessPolicy('order.update'), validate(updateOrderSc
   try { return res.json(await orderService.updateOrder(parseBigIntId(req.params.id), req.body, req.auth, req)); } catch (error) { return next(error); }
 });
 
-router.post('/:id/approve', authorizeAccessPolicy('order.approve'), async (req, res, next) => {
-  try { return res.json(await orderService.approveOrder(parseBigIntId(req.params.id), req.auth, req)); } catch (error) { return next(error); }
+// RFR-TASK-301: GET fiscal-readiness-preview — pure DB read, no Hacienda, no mutations
+router.get('/:id/fiscal-readiness-preview', authorizeAccessPolicy('order.approve'), async (req, res, next) => {
+  try { return res.json(await orderService.getOrderFiscalReadinessPreview(parseBigIntId(req.params.id), req.auth)); } catch (error) { return next(error); }
+});
+
+// RFR-TASK-302: evolved approve — accepts optional receiverEconomicActivityCode when Billing enabled
+router.post('/:id/approve', authorizeAccessPolicy('order.approve'), validate(approveOrderSchema), async (req, res, next) => {
+  try { return res.json(await orderService.approveOrder(parseBigIntId(req.params.id), req.body, req.auth, req)); } catch (error) { return next(error); }
 });
 
 // Office rejects an agent's DRAFT order with a mandatory reason.

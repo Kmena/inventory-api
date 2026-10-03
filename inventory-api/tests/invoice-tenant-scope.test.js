@@ -49,8 +49,14 @@ test('listInvoices queries only invoices within the authenticated company', asyn
     () => invoiceService.listInvoices({ companyId: '12' }),
   );
 
+  // Core isolation assertion: the repository was called with the correct company.
   assert.equal(receivedCompanyId, 12n);
-  assert.deepEqual(invoices, [{ id: 1n, number: 'F-001' }]);
+  // Wave 1: listInvoices now applies serializeInvoiceForList, so the shape
+  // has invoiceNumber (from number) and fiscal: null (no fiscalIntent in stub).
+  assert.equal(invoices.length, 1);
+  assert.equal(invoices[0].id, 1n);
+  assert.equal(invoices[0].invoiceNumber, 'F-001');
+  assert.equal(invoices[0].fiscal, null);
 });
 
 test('getInvoice returns not found when invoice belongs to another tenant', async () => {
@@ -84,8 +90,17 @@ test('getInvoice scopes detail lookup using the authenticated company', async ()
     () => invoiceService.getInvoice(7n, { companyId: '90' }),
   );
 
+  // Core isolation assertion: the repository was called with the correct IDs.
   assert.deepEqual(receivedLookup, { invoiceId: 7n, companyId: 90n });
-  assert.deepEqual(invoice, { id: 7n, number: 'F-777' });
+  // Wave 1: getInvoice now applies serializeInvoiceForDetail.
+  assert.equal(invoice.id, 7n);
+  assert.equal(invoice.invoiceNumber, 'F-777');
+  assert.equal(invoice.fiscal, null);
+  // Ensure internal FiscalIntent fields are absent.
+  assert.equal(invoice.failureMessage, undefined);
+  assert.equal(invoice.idempotencyKey, undefined);
+  assert.equal(invoice.billingFiscalDocumentId, undefined);
+  assert.equal(invoice.metadata, undefined);
 });
 
 test('createInvoice rejects a client from another tenant', async () => {

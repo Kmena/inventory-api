@@ -353,6 +353,8 @@ describe('TASK-015B scheduler: discovery query safety', () => {
     await scheduler._findEligibleWorkerIds(10);
     assert.equal(queries.length, 1);
     assert.deepEqual(queries[0].status, { in: ['PENDING', 'ERROR_RETRYABLE'] });
+    assert.equal(queries[0].billingFiscalDocumentId, null,
+      'Worker must only target intents WITHOUT an existing Billing fiscal identity');
     // Must NOT include PROCESSING, ACCEPTED, REJECTED, ERROR_FINAL
     assert.ok(!JSON.stringify(queries[0].status.in).includes('PROCESSING'), 'Worker must not target PROCESSING');
   });

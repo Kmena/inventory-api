@@ -21,6 +21,12 @@ const productEntitlementKindSchema = z.enum([
 const productValidityUnitSchema = z.enum(['DAY', 'MONTH', 'YEAR']);
 const productBillingIntervalSchema = z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']);
 
+const cabysCodeSchema = z.union([
+  z.literal(''),
+  z.null(),
+  z.string().regex(/^\d{13}$/, 'El código CAByS debe contener exactamente 13 dígitos'),
+]);
+
 /** Units that correspond to the VOLUME presentation type. */
 const VOLUME_UNITS = ['ML', 'L'];
 /** Units that correspond to the MASS presentation type. */
@@ -65,7 +71,7 @@ const productFieldsSchema = z.object({
   productType: z.string().max(50).optional(),
   sellableKind: z.string().max(50).optional(),
   unit: z.string().max(30).optional(),
-  cabysCode: z.string().max(50).optional(),
+  cabysCode: cabysCodeSchema.optional(),
   currency: z.string().max(10).optional(),
   price: z.number().min(0).optional(),
   quantity: z.number().min(0).optional(),
@@ -439,7 +445,7 @@ const importProductRowSchema = z.object({
   productType: z.string().max(50).optional().nullable(),
   sellableKind: z.string().max(50).optional().nullable(),
   unit: z.string().max(30).optional().nullable(),
-  cabysCode: z.string().max(50).optional().nullable(),
+  cabysCode: cabysCodeSchema.optional(),
   currency: z.string().max(10).optional().nullable(),
   price: z.coerce.number().min(0).optional().nullable(),
   quantity: z.coerce.number().min(0).optional().nullable(),
