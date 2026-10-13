@@ -37,6 +37,9 @@ router.get('/ready', async (_req, res) => {
   // Never exposes API keys, secret references or fiscal payload data.
   const schedulerStatus = fiscalSchedulerService.getApplicationSchedulerStatus();
   checks.fiscalScheduler = schedulerStatus.running ? 'running' : 'stopped';
+  if (Object.prototype.hasOwnProperty.call(schedulerStatus, 'identityRecoveryEnabled')) {
+    checks.fiscalIdentityRecovery = schedulerStatus.identityRecoveryEnabled ? 'enabled' : 'disabled';
+  }
 
   return res.status(isReady ? 200 : 503).json({
     ok: isReady,

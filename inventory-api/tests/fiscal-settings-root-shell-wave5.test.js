@@ -205,7 +205,7 @@ test('Wave 5 checklist renders authoritative backend activities safely and no ma
   assert.equal(container.contentElement.controls[0].checked, true);
   assert.equal(container.contentElement.controls[1].checked, false);
   assert.equal(container.contentElement.controls[2].disabled, true);
-  assert.doesNotMatch(html, /Agregar actividad|Crear actividad|codigo de actividad|código de actividad libre|type="text"/i);
+  assert.doesNotMatch(html, /Agregar actividad|Crear actividad|codigo de actividad|código de actividad libre/i);
   assert.doesNotMatch(html, /billing-company-secret-ish|tenant-nope|secret\/ref\/nope|raw-api-key-nope|activity-billing-company-hidden/);
   assert.doesNotMatch(html, /Listo para facturar|readyToIssue|reasonCodes|certificate readiness|credential readiness/i);
 });

@@ -476,7 +476,7 @@ test('Wave 9 #J1: fiscal-settings-api.js uses InventoryAuth.fetchJson for every 
   assert.equal(source.includes('bk_test'), false, 'must not include hardcoded Billing API key');
 });
 
-test('Wave 9 #J2: fiscal-settings-api.js registers exactly the 5 approved API functions in RootShell', () => {
+test('Wave 9 #J2: fiscal-settings-api.js registers only the approved fiscal administration functions', () => {
   const rootPublicPath = path.join(__dirname, '..', 'src', 'public', 'root');
   const { browserWindow, context } = (() => {
     const bw = {};
@@ -491,12 +491,36 @@ test('Wave 9 #J2: fiscal-settings-api.js registers exactly the 5 approved API fu
   run('registry.js');
   run('fiscal-settings-api.js');
   const api = browserWindow.RootShell.require('fiscalSettingsApi');
-  assert.equal(typeof api.getFiscalSettings, 'function');
-  assert.equal(typeof api.refreshActivities, 'function');
-  assert.equal(typeof api.setDefaultActivity, 'function');
-  assert.equal(typeof api.updateActivityBillingEnabled, 'function');
-  assert.equal(typeof api.getFiscalReadiness, 'function');
-  assert.equal(Object.keys(api).length, 5, 'exactly 5 API functions, no extras');
+  const approvedFunctions = [
+    'getFiscalSettings',
+    'getFiscalTestInvoiceStatus',
+    'refreshActivities',
+    'setDefaultActivity',
+    'updateActivityBillingEnabled',
+    'configureHaciendaCredentials',
+    'validateHaciendaCredentials',
+    'disableHaciendaConnection',
+    'getFiscalReadiness',
+    'getIssuerAdministration',
+    'getFiscalSecurityConfiguration',
+    'uploadSigningCertificate',
+    'provisionIssuer',
+    'updateIssuerAdministration',
+    'getIssuanceAdministration',
+    'initiateFiscalTestInvoice',
+    'upsertFiscalBranch',
+    'setFiscalBranchActive',
+    'upsertFiscalTerminal',
+    'setFiscalTerminalActive',
+    'selectDefaultIssuancePoint',
+    'readFiscalSequence',
+    'configureInitialFiscalSequence',
+  ];
+
+  assert.deepEqual(Object.keys(api).sort(), approvedFunctions.sort(), 'only approved Wave 2–7 API functions');
+  for (const functionName of approvedFunctions) {
+    assert.equal(typeof api[functionName], 'function', `${functionName} must be a function`);
+  }
 });
 
 // ── PART K — Runtime contract manifest completeness ───────────────────────────
@@ -543,7 +567,7 @@ test('Wave 9 #L2: fiscal-settings-admin.js frontend never assigns readyToIssue',
     path.join(__dirname, '..', 'src', 'public', 'root', 'views', 'fiscal-settings-admin.js'),
     'utf8',
   );
-  assert.equal(/readyToIssue\s*=/.test(frontendSource), false, 'frontend must not assign readyToIssue');
+  assert.equal(/(?:^|[^.?])\breadyToIssue\s*=(?!=)/m.test(frontendSource), false, 'frontend must not assign readyToIssue');
   assert.equal(frontendSource.includes('reasonCodes.push'), false, 'frontend must not build reasonCodes');
 });
 

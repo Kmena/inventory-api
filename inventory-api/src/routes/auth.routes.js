@@ -41,6 +41,7 @@ router.post('/login', enforceLoginThrottle, validate(loginSchema), async (req, r
 });
 
 router.get('/me', authenticate, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   if (req.authMethod === 'cookie-session') {
     setBrowserSessionCookies(res, req, req.browserSessionId, req.browserSessionExpiresAt, req.browserSessionUser);
   }

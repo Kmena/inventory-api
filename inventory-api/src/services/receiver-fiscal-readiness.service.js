@@ -43,7 +43,7 @@ const HACIENDA_ACTIVE_STATUS = 'A';
  *
  * @param {object|null} entity — ClientLegalEntity or null
  * @param {Array<object>} activities — ClientEconomicActivity[]
- * @returns {{ state: string, eligibleActivities: Array<object> }}
+ * @returns {{ state: string, eligibleActivities: Array<object>, blockingReasons: Array<object> }}
  */
 function resolveReceiverFiscalReadiness(entity, activities) {
   // Identity check first — null entity or missing required fields
@@ -210,7 +210,7 @@ function selectOrderReceiverLegalEntity(order) {
  * @param {object} order — order with client.legalEntity + clientStore.legalEntity
  * @param {bigint} companyId
  * @param {object} [db]
- * @returns {Promise<{ state: string, entity: object|null, eligibleActivities: Array<object>, allActivities: Array<object> }>}
+ * @returns {Promise<{ state: string, entity: object|null, eligibleActivities: Array<object>, allActivities: Array<object>, blockingReasons: Array<object> }> }
  */
 async function resolveOrderReceiverFiscalData(order, companyId, db = prisma) {
   const selected = selectOrderReceiverLegalEntity(order);

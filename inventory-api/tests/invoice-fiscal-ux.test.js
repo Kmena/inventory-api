@@ -182,12 +182,11 @@ test('[W7-KEYBOARD-13] artifact retry is a <button> element', () => {
   assert.match(html, /<button[^>]+billing-artifact-retry-btn/, 'retry must be a native <button>');
 });
 
-test('[W7-KEYBOARD-14] artifact download actions are <a download> elements', () => {
+test('[W7-KEYBOARD-14] artifact download actions are native buttons for authenticated fetches', () => {
   const rs   = createHarness();
   const rnd  = rs.require('views.billingAdminRenderers');
   const html  = rnd.renderArtifactActions('1623', ALL_ARTIFACTS, 'INV-963');
-  // <a href="..." download ...> — download attribute confirms these are <a> anchor elements
-  assert.match(html, /<a\s[^>]*download/, 'artifact download must be an <a download> element');
+  assert.match(html, /<button[^>]+billing-artifact-download-btn/, 'artifact download must use a native authenticated-fetch button');
 });
 
 test('[W7-KEYBOARD-15] no clickable div/span for critical invoice controls', () => {
@@ -355,11 +354,11 @@ test('[W7-IDENT-32] long clave has word-break:break-all to wrap without layout o
 
 // ─── W7-ARTIFACTS: Artifact actions ───────────────────────────────────────────
 
-test('[W7-ART-33] no artifact → no misleading download links, informative message shown', () => {
+test('[W7-ART-33] no artifact → no misleading download actions, informative message shown', () => {
   const rs  = createHarness();
   const rnd = rs.require('views.billingAdminRenderers');
   const html = rnd.renderArtifactActions('1623', [], 'INV-963');
-  assert.doesNotMatch(html, /<a [^>]+download/, 'empty artifact list must not render download links');
+  assert.doesNotMatch(html, /billing-artifact-download-btn/, 'empty artifact list must not render download actions');
   assert.match(html, /estar\u00E1n disponibles/, 'must show informative unavailability message');
 });
 
@@ -392,12 +391,12 @@ test('[W7-ART-36b] aria-label includes invoice number for uniqueness', () => {
   assert.match(html, /INV-963/, 'aria-label must include the invoice number');
 });
 
-test('[W7-ART-37] one-artifact layout: single link rendered correctly', () => {
+test('[W7-ART-37] one-artifact layout: single authenticated download button rendered correctly', () => {
   const rs  = createHarness();
   const rnd = rs.require('views.billingAdminRenderers');
   const html = rnd.renderArtifactActions('1623', [makeArtifact('pdf')], 'INV-963');
-  const links = (html.match(/<a [^>]+download/g) || []).length;
-  assert.equal(links, 1, 'one artifact must render exactly one download link');
+  const buttons = (html.match(/billing-artifact-download-btn/g) || []).length;
+  assert.equal(buttons, 1, 'one artifact must render exactly one download button');
 });
 
 test('[W7-ART-38] multiple artifact layout: flex-wrap container present', () => {
@@ -408,15 +407,15 @@ test('[W7-ART-38] multiple artifact layout: flex-wrap container present', () => 
   assert.match(html, /display:flex/, 'artifact actions container must have display:flex');
 });
 
-test('[W7-ART-39] all-artifact layout: three distinct download links rendered', () => {
+test('[W7-ART-39] all-artifact layout: three distinct download buttons rendered', () => {
   const rs  = createHarness();
   const rnd = rs.require('views.billingAdminRenderers');
   const html = rnd.renderArtifactActions('1623', ALL_ARTIFACTS, 'INV-963');
   assert.match(html, /fiscal-artifacts\/pdf/, 'PDF link must be present');
   assert.match(html, /fiscal-artifacts\/signed-xml/, 'signed-xml link must be present');
   assert.match(html, /fiscal-artifacts\/hacienda-response/, 'hacienda-response link must be present');
-  const links = (html.match(/<a [^>]+download/g) || []).length;
-  assert.equal(links, 3, 'all three artifact links must be present');
+  const buttons = (html.match(/billing-artifact-download-btn/g) || []).length;
+  assert.equal(buttons, 3, 'all three artifact download buttons must be present');
 });
 
 test('[W7-ART-40] artifact actions derive from authoritative items array (not inferred from status)', () => {
@@ -427,7 +426,7 @@ test('[W7-ART-40] artifact actions derive from authoritative items array (not in
     makeFiscal({ status: 'ACCEPTED' }),
     { invoiceId: '1623', invoiceNumber: 'INV-963', items: null, failed: false },
   );
-  assert.doesNotMatch(html, /<a [^>]+download/, 'null items must not produce download links even for ACCEPTED status');
+  assert.doesNotMatch(html, /billing-artifact-download-btn/, 'null items must not produce download actions even for ACCEPTED status');
   assert.match(html, /estar\u00E1n disponibles|Comprobante/, 'must show message or section without fake links');
 });
 

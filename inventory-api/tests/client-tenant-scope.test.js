@@ -61,7 +61,13 @@ test('createCompanyClient forces companyId from authenticated context', async ()
         return { id: 1n, ...payload, _count: { stores: 0 } };
       },
     },
-    () => clientService.createCompanyClient({ companyId: 999n, name: 'Cliente creado' }, { companyId: '21' }),
+    () => clientService.createCompanyClient({
+      companyId: 999n,
+      name: 'Cliente creado',
+      legalId: '3101123456',
+      documentType: 'JURIDICA',
+      emailBilling: 'facturas@example.test',
+    }, { companyId: '21' }),
   );
 
   assert.equal(createdPayload.companyId, 21n);
@@ -91,6 +97,9 @@ test('legacy client schemas ignore arbitrary companyId from payload', () => {
   const createResult = createCompanyClientSchema.safeParse({
     companyId: '999',
     name: 'Cliente nuevo',
+    legalId: '3101123456',
+    documentType: 'JURIDICA',
+    emailBilling: 'facturas@example.test',
   });
   assert.equal(createResult.success, true);
   assert.equal('companyId' in createResult.data, false);
@@ -111,7 +120,14 @@ test('updateClient scopes writes to the authenticated company', async () => {
     {
       findCompanyClientById: async (clientId, companyId) => {
         receivedLookup = { clientId, companyId };
-        return { id: clientId, companyId };
+        return {
+          id: clientId,
+          companyId,
+          name: 'Cliente existente',
+          legalId: '3101123456',
+          documentType: 'JURIDICA',
+          emailBilling: 'facturas@example.test',
+        };
       },
       updateCompanyClient: async (clientId, companyId, payload) => {
         receivedUpdate = { clientId, companyId, payload };

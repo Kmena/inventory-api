@@ -119,6 +119,45 @@ test('getFiscalSettings maps Billing status to canonical Fiscal Settings DTO', a
   assert.equal(result.activities[0].id, undefined);
 });
 
+test('getFiscalSettings prefers granular v1 reads and never requires the legacy fiscal-onboarding scope', async () => {
+  const calls = [];
+  const billingClient = {
+    async getFiscalOnboardingStatus() {
+      throw new Error('legacy fiscal-onboarding/status must not be called');
+    },
+    async getFiscalProfileV1(args) {
+      calls.push(['profile', args]);
+      return { defaultEconomicActivityId: 'activity-1' };
+    },
+    async getFiscalOnboardingActivities(args) {
+      calls.push(['activities', args]);
+      return clone(activeDefaultStatus.activities);
+    },
+    async getFiscalReadinessV1(args) {
+      calls.push(['readiness', args]);
+      return {
+        readyToIssue: true,
+        dimensions: {
+          issuer: { metadata: { verificationStatus: 'VERIFIED' } },
+          activity: { metadata: { defaultActivityId: 'activity-1' } },
+        },
+      };
+    },
+  };
+
+  const result = await fiscalSettingsService.getFiscalSettings(
+    auth,
+    { correlationId: 'corr-v1-scope' },
+    options({ billingClient }),
+  );
+
+  assert.deepEqual(calls.map(([name]) => name).sort(), ['activities', 'profile', 'readiness']);
+  assert.equal(calls.every(([, args]) => args.environment === 'SANDBOX'), true);
+  assert.equal(calls.every(([, args]) => args.correlationId === 'corr-v1-scope'), true);
+  assert.equal(result.defaultActivityCode, '620100');
+  assert.equal(result.taxpayer.verificationStatus, 'VERIFIED');
+});
+
 test('default derivation handles no default and unresolved default ID without inventing a code', async () => {
   const noDefault = clone(activeDefaultStatus);
   noDefault.defaultEconomicActivityId = null;

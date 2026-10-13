@@ -202,18 +202,60 @@ function validateHaciendaConnectionResponse(response, correlationId) {
   return response;
 }
 
-function validateFiscalReadinessResponse(response, correlationId) {
+const FISCAL_READINESS_DIMENSIONS_V1 = Object.freeze([
+  'issuer',
+  'profile',
+  'activity',
+  'hacienda',
+  'certificate',
+  'issuancePoint',
+  'sequence',
+  'operational',
+]);
+
+const FISCAL_READINESS_METADATA_KEYS_V1 = new Set([
+  'companyActive', 'verificationStatus', 'configured', 'count', 'defaultActivityId',
+  'status', 'lastValidatedAt', 'id', 'fingerprintSha256', 'validFrom', 'validTo',
+  'environment', 'branchCode', 'terminalCode', 'branchId', 'terminalId', 'name',
+  'active', 'isDefault', 'configuredTypes', 'automaticInitialization', 'database',
+]);
+
+function validateFiscalReadinessV1Response(response, correlationId, expected = {}) {
   const isValidDateString = (v) => typeof v === 'string' && v.trim().length > 0 && !isNaN(Date.parse(v));
+  const isNullableDateString = (v) => v === null || isValidDateString(v);
   const isStringArray = (v) => Array.isArray(v) && v.every((item) => typeof item === 'string');
+  const isPlainObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
+  const allowedDimensionStates = new Set(['READY', 'NOT_READY', 'WARNING', 'UNKNOWN']);
+  const dimensions = response?.dimensions;
+  const dimensionsValid = isPlainObject(dimensions)
+    && FISCAL_READINESS_DIMENSIONS_V1.every((name) => isPlainObject(dimensions[name]))
+    && Object.values(dimensions).every((dimension) => (
+      allowedDimensionStates.has(dimension.state)
+      && isStringArray(dimension.blockers)
+      && isPlainObject(dimension.metadata)
+      && Object.keys(dimension.metadata).every((key) => FISCAL_READINESS_METADATA_KEYS_V1.has(key))
+      && (!hasOwnProperty(dimension.metadata, 'lastValidatedAt') || isNullableDateString(dimension.metadata.lastValidatedAt))
+      && (!hasOwnProperty(dimension.metadata, 'validFrom') || isValidDateString(dimension.metadata.validFrom))
+      && (!hasOwnProperty(dimension.metadata, 'validTo') || isValidDateString(dimension.metadata.validTo))
+    ));
+  const serialized = JSON.stringify(response || {});
 
   const hasRequiredShape = response
     && typeof response === 'object'
+    && response.contractVersion === '1.0'
+    && response.profileVersion === 'inventori-fiscal-v1'
     && isString(response.companyId)
-    && isString(response.environment)
+    && ['SANDBOX', 'PRODUCTION'].includes(response.environment)
+    && ['READY', 'NOT_READY', 'UNKNOWN'].includes(response.status)
     && typeof response.readyToIssue === 'boolean'
-    && isStringArray(response.reasonCodes)
+    && response.readyToIssue === (response.status === 'READY')
+    && isStringArray(response.blockers)
     && isStringArray(response.warnings)
-    && isValidDateString(response.checkedAt);
+    && isValidDateString(response.checkedAt)
+    && dimensionsValid
+    && (!expected.companyId || response.companyId === expected.companyId)
+    && (!expected.environment || response.environment === expected.environment)
+    && !/secretReference|password|privateKey|certificateBytes|"pin"/i.test(serialized);
 
   if (!hasRequiredShape) {
     throw new BillingClientError('Billing returned malformed fiscal readiness response', {
@@ -223,6 +265,203 @@ function validateFiscalReadinessResponse(response, correlationId) {
     });
   }
 
+  return response;
+}
+
+function validateFiscalTestInvoiceV1Response(response, correlationId, expected = {}) {
+  const valid = response
+    && typeof response === 'object'
+    && response.contractVersion === '1.0'
+    && response.profileVersion === 'inventori-fiscal-v1'
+    && isString(response.executionId)
+    && isString(response.documentId)
+    && response.environment === 'SANDBOX'
+    && response.mode === 'HACIENDA_SANDBOX_SUBMISSION'
+    && response.disclosure?.consumesSandboxConsecutive === true
+    && response.disclosure?.billingRequestAcceptedIsNotHaciendaAcceptance === true
+    && response.document && isString(response.document.status)
+    && Array.isArray(response.artifacts)
+    && Array.isArray(response.deliveries)
+    && (!expected.executionId || response.executionId === expected.executionId)
+    && !/secretReference|password|privateKey|certificateBytes|"pin"|storageKey/i.test(JSON.stringify(response));
+  if (!valid) {
+    throw new BillingClientError('Billing returned malformed fiscal test invoice response', {
+      code: 'BILLING_MALFORMED_FISCAL_TEST_INVOICE', retryable: false, correlationId,
+    });
+  }
+  return response;
+}
+
+function validateLegacyFiscalReadinessResponse(response, correlationId) {
+  const validDate = typeof response?.checkedAt === 'string' && !isNaN(Date.parse(response.checkedAt));
+  const stringArray = (value) => Array.isArray(value) && value.every((item) => typeof item === 'string');
+  if (!response || !isString(response.companyId) || !isString(response.environment)
+    || typeof response.readyToIssue !== 'boolean' || !stringArray(response.reasonCodes)
+    || !stringArray(response.warnings) || !validDate) {
+    throw new BillingClientError('Billing returned malformed fiscal readiness response', {
+      code: 'BILLING_MALFORMED_FISCAL_READINESS', retryable: false, correlationId,
+    });
+  }
+  return response;
+}
+
+function validateAssociation(response, correlationId) {
+  const issuer = response?.company;
+  if (!response || !isString(response.associationId) || !isString(response.externalCompanyKey)
+    || response.profileVersion !== 'inventori-fiscal-v1' || !issuer || !isString(issuer.id)
+    || !isString(issuer.tenantId) || !isString(issuer.legalName)
+    || !isString(issuer.identificationType) || !isString(issuer.identificationNumber)) {
+    throw new BillingClientError('Billing returned malformed fiscal association', {
+      code: 'BILLING_MALFORMED_FISCAL_ASSOCIATION', retryable: false, correlationId,
+    });
+  }
+  return response;
+}
+
+function validateBootstrapResponse(response, correlationId) {
+  validateAssociation(response?.association, correlationId);
+  const credential = response?.credential;
+  if (!credential || !isString(credential.apiKeyId) || !isString(credential.keyPrefix)
+    || !isString(credential.secret) || credential.profileVersion !== 'inventori-fiscal-v1'
+    || credential.returnedOnce !== true || !['TEST', 'LIVE'].includes(credential.environment)) {
+    throw new BillingClientError('Billing returned malformed bootstrap credential handoff', {
+      code: 'BILLING_MALFORMED_BOOTSTRAP_HANDOFF', retryable: false, correlationId,
+    });
+  }
+  return response;
+}
+
+function validateFiscalProfileV1(response, correlationId) {
+  if (!response || !isString(response.id) || !isString(response.companyId)
+    || !isString(response.economicActivityCode) || !isString(response.province)
+    || !isString(response.canton) || !isString(response.district)
+    || !isString(response.otrasSenas) || !isString(response.email)) {
+    throw new BillingClientError('Billing returned malformed fiscal profile', {
+      code: 'BILLING_MALFORMED_FISCAL_PROFILE', retryable: false, correlationId,
+    });
+  }
+  return response;
+}
+
+function validateCertificateMetadata(response, correlationId) {
+  const allowedStatuses = new Set(['ACTIVE', 'INACTIVE', 'REVOKED', 'EXPIRED']);
+  const hasRequiredShape = response
+    && typeof response === 'object'
+    && isString(response.id)
+    && isString(response.companyId)
+    && ['SANDBOX', 'PRODUCTION'].includes(response.environment)
+    && allowedStatuses.has(response.status)
+    && isString(response.createdAt)
+    && isString(response.updatedAt);
+  const serialized = JSON.stringify(response || {});
+  if (!hasRequiredShape || /certificateSecretReference|passwordSecretReference|privateKey|"pin"/i.test(serialized)) {
+    throw new BillingClientError('Billing returned malformed certificate metadata', {
+      code: 'BILLING_MALFORMED_CERTIFICATE_METADATA', retryable: false, correlationId,
+    });
+  }
+  return response;
+}
+
+function malformedFiscalAdministrationResponse(message, code, correlationId) {
+  throw new BillingClientError(message, {
+    code,
+    retryable: false,
+    correlationId,
+  });
+}
+
+function validateFiscalTerminal(response, correlationId) {
+  const valid = response
+    && typeof response === 'object'
+    && isString(response.id)
+    && isString(response.companyId)
+    && isString(response.branchId)
+    && ['SANDBOX', 'PRODUCTION'].includes(response.environment)
+    && /^\d{5}$/.test(response.code)
+    && isString(response.name)
+    && typeof response.active === 'boolean';
+  if (!valid) {
+    malformedFiscalAdministrationResponse(
+      'Billing returned malformed fiscal terminal',
+      'BILLING_MALFORMED_FISCAL_TERMINAL',
+      correlationId,
+    );
+  }
+  return response;
+}
+
+function validateFiscalBranch(response, correlationId) {
+  const valid = response
+    && typeof response === 'object'
+    && isString(response.id)
+    && isString(response.companyId)
+    && ['SANDBOX', 'PRODUCTION'].includes(response.environment)
+    && /^\d{3}$/.test(response.code)
+    && isString(response.name)
+    && typeof response.active === 'boolean'
+    && (!hasOwnProperty(response, 'terminals') || Array.isArray(response.terminals));
+  if (!valid) {
+    malformedFiscalAdministrationResponse(
+      'Billing returned malformed fiscal branch',
+      'BILLING_MALFORMED_FISCAL_BRANCH',
+      correlationId,
+    );
+  }
+  if (Array.isArray(response.terminals)) {
+    response.terminals.forEach((terminal) => validateFiscalTerminal(terminal, correlationId));
+  }
+  return response;
+}
+
+function validateFiscalBranches(response, correlationId) {
+  if (!Array.isArray(response)) {
+    malformedFiscalAdministrationResponse(
+      'Billing returned malformed fiscal branch list',
+      'BILLING_MALFORMED_FISCAL_BRANCH_LIST',
+      correlationId,
+    );
+  }
+  return response.map((branch) => validateFiscalBranch(branch, correlationId));
+}
+
+function validateIssuancePoint(response, correlationId, { nullable = false } = {}) {
+  if (nullable && response == null) return null;
+  const valid = response
+    && typeof response === 'object'
+    && isString(response.branchId)
+    && isString(response.terminalId)
+    && ['SANDBOX', 'PRODUCTION'].includes(response.environment)
+    && /^\d{3}$/.test(response.branchCode)
+    && /^\d{5}$/.test(response.terminalCode)
+    && isString(response.name)
+    && typeof response.active === 'boolean'
+    && typeof response.isDefault === 'boolean';
+  if (!valid) {
+    malformedFiscalAdministrationResponse(
+      'Billing returned malformed fiscal issuance point',
+      'BILLING_MALFORMED_ISSUANCE_POINT',
+      correlationId,
+    );
+  }
+  return response;
+}
+
+function validateFiscalSequence(response, correlationId) {
+  const valid = response
+    && typeof response === 'object'
+    && ['SANDBOX', 'PRODUCTION'].includes(response.environment)
+    && /^\d{3}$/.test(response.branchCode)
+    && /^\d{5}$/.test(response.terminalCode)
+    && ['INVOICE', 'TICKET'].includes(response.documentType)
+    && /^\d+$/.test(response.nextValue)
+    && (response.lastAssigned === null || /^\d+$/.test(response.lastAssigned));
+  if (!valid) {
+    malformedFiscalAdministrationResponse(
+      'Billing returned malformed fiscal sequence',
+      'BILLING_MALFORMED_FISCAL_SEQUENCE',
+      correlationId,
+    );
+  }
   return response;
 }
 
@@ -246,7 +485,7 @@ class BillingApiClient {
     this.fetchImpl = fetchImpl;
   }
 
-  async request({ method, path, secretReference, idempotencyKey = null, correlationId = null, body = null }) {
+  async request({ method, path, secretReference, idempotencyKey = null, correlationId = null, body = null, formData = null }) {
     const apiKey = this.credentialResolver.resolveApiKey(secretReference);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -256,12 +495,12 @@ class BillingApiClient {
         method,
         signal: controller.signal,
         headers: {
-          'Content-Type': 'application/json',
+          ...(formData ? {} : { 'Content-Type': 'application/json' }),
           'X-API-Key': apiKey,
           ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
           ...(correlationId ? { 'X-Correlation-Id': correlationId } : {}),
         },
-        ...(body == null ? {} : { body: JSON.stringify(body) }),
+        ...(formData ? { body: formData } : (body == null ? {} : { body: JSON.stringify(body) })),
       });
 
       const parsedBody = await parseJsonSafely(response);
@@ -306,30 +545,30 @@ class BillingApiClient {
     return validateFiscalOnboardingStatusResponse(response, correlationId);
   }
 
-  async getFiscalOnboardingActivities({ billingCompanyId, secretReference, correlationId }) {
+  async getFiscalOnboardingActivities({ billingCompanyId, environment = 'SANDBOX', secretReference, correlationId }) {
     const response = await this.request({
       method: 'GET',
-      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/activities`,
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/activities`,
       secretReference,
       correlationId,
     });
     return validateFiscalOnboardingActivitiesResponse(response, correlationId);
   }
 
-  async verifyFiscalOnboarding({ billingCompanyId, secretReference, correlationId }) {
+  async verifyFiscalOnboarding({ billingCompanyId, environment = 'SANDBOX', secretReference, correlationId }) {
     const response = await this.request({
       method: 'POST',
-      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/verify`,
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/activities/refresh`,
       secretReference,
       correlationId,
     });
     return validateFiscalOnboardingVerificationResponse(response, correlationId);
   }
 
-  async updateFiscalOnboardingActivity({ billingCompanyId, code, billingEnabled, secretReference, correlationId }) {
+  async updateFiscalOnboardingActivity({ billingCompanyId, environment = 'SANDBOX', code, billingEnabled, secretReference, correlationId }) {
     const response = await this.request({
       method: 'PATCH',
-      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/activities/${encodeURIComponent(code)}`,
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/activities/${encodeURIComponent(code)}`,
       secretReference,
       correlationId,
       body: { billingEnabled },
@@ -337,10 +576,10 @@ class BillingApiClient {
     return validateFiscalOnboardingActivity(response, correlationId);
   }
 
-  async setDefaultFiscalOnboardingActivity({ billingCompanyId, code, secretReference, correlationId }) {
+  async setDefaultFiscalOnboardingActivity({ billingCompanyId, environment = 'SANDBOX', code, secretReference, correlationId }) {
     const response = await this.request({
       method: 'PUT',
-      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/default-activity`,
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/activities/default`,
       secretReference,
       correlationId,
       body: { code },
@@ -369,14 +608,266 @@ class BillingApiClient {
     return validateHaciendaConnectionResponse(response, correlationId);
   }
 
-  async getFiscalReadiness({ billingCompanyId, environment, secretReference, correlationId }) {
+  async getFiscalReadiness({ billingCompanyId, environment, secretReference, correlationId, contractVersion = null }) {
+    if (contractVersion === '1.0') {
+      return this.getFiscalReadinessV1({ billingCompanyId, environment, secretReference, correlationId });
+    }
     const response = await this.request({
       method: 'GET',
       path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/${encodeURIComponent(environment)}/readiness`,
       secretReference,
       correlationId,
     });
-    return validateFiscalReadinessResponse(response, correlationId);
+    return validateLegacyFiscalReadinessResponse(response, correlationId);
+  }
+
+  async getFiscalReadinessV1({ billingCompanyId, environment, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/readiness`,
+      secretReference,
+      correlationId,
+    });
+    return validateFiscalReadinessV1Response(response, correlationId, {
+      companyId: billingCompanyId,
+      environment,
+    });
+  }
+
+  async initiateFiscalTestInvoiceV1({ billingCompanyId, environment, secretReference, correlationId, idempotencyKey, payload }) {
+    const response = await this.request({
+      method: 'POST',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/test-invoices`,
+      secretReference,
+      correlationId,
+      idempotencyKey,
+      body: payload,
+    });
+    return validateFiscalTestInvoiceV1Response(response, correlationId);
+  }
+
+  async getFiscalTestInvoiceV1({ billingCompanyId, environment, secretReference, correlationId, executionId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/test-invoices/${encodeURIComponent(executionId)}`,
+      secretReference,
+      correlationId,
+    });
+    return validateFiscalTestInvoiceV1Response(response, correlationId, { executionId });
+  }
+
+  async bootstrapFiscalIssuer({ secretReference, correlationId, payload }) {
+    const response = await this.request({
+      method: 'POST',
+      path: '/api/v1/fiscal-onboarding/v1/bootstrap',
+      secretReference,
+      correlationId,
+      body: payload,
+    });
+    return validateBootstrapResponse(response, correlationId);
+  }
+
+  async getFiscalIssuerV1({ billingCompanyId, environment, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/issuer`,
+      secretReference,
+      correlationId,
+    });
+    return validateAssociation(response, correlationId);
+  }
+
+  async updateFiscalIssuerV1({ billingCompanyId, environment, secretReference, correlationId, payload }) {
+    return this.request({
+      method: 'PATCH',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/issuer`,
+      secretReference,
+      correlationId,
+      body: payload,
+    });
+  }
+
+  async getFiscalProfileV1({ billingCompanyId, environment, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/profile`,
+      secretReference,
+      correlationId,
+    });
+    return validateFiscalProfileV1(response, correlationId);
+  }
+
+  async upsertFiscalProfileV1({ billingCompanyId, environment, secretReference, correlationId, payload }) {
+    const response = await this.request({
+      method: 'PUT',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/profile`,
+      secretReference,
+      correlationId,
+      body: payload,
+    });
+    return validateFiscalProfileV1(response, correlationId);
+  }
+
+  async getHaciendaConnectionV1({ billingCompanyId, environment, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/hacienda-connection`,
+      secretReference,
+      correlationId,
+    });
+    return validateHaciendaConnectionResponse(response, correlationId);
+  }
+
+  async replaceHaciendaCredentialsV1({ billingCompanyId, environment, username, password, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'PUT',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/hacienda-connection`,
+      secretReference,
+      correlationId,
+      body: { username, password },
+    });
+    return validateHaciendaConnectionResponse(response, correlationId);
+  }
+
+  async validateHaciendaConnectionV1({ billingCompanyId, environment, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'POST',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/hacienda-connection/validate`,
+      secretReference,
+      correlationId,
+    });
+    return validateHaciendaConnectionResponse(response, correlationId);
+  }
+
+  async disableHaciendaConnectionV1({ billingCompanyId, environment, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'POST',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/hacienda-connection/disable`,
+      secretReference,
+      correlationId,
+      body: {},
+    });
+    return validateHaciendaConnectionResponse(response, correlationId);
+  }
+
+  async getSigningCertificateMetadata({ billingCompanyId, environment, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/certificate`,
+      secretReference,
+      correlationId,
+    });
+    return validateCertificateMetadata(response, correlationId);
+  }
+
+  async writeSigningCertificate({ billingCompanyId, environment, certificateBytes, pin, replace, secretReference, correlationId }) {
+    const formData = new globalThis.FormData();
+    formData.append('certificate', new globalThis.Blob([certificateBytes], { type: 'application/x-pkcs12' }), 'certificate.p12');
+    formData.append('pin', pin);
+    const response = await this.request({
+      method: replace ? 'PUT' : 'POST',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/certificate`,
+      secretReference,
+      correlationId,
+      formData,
+    });
+    return validateCertificateMetadata(response, correlationId);
+  }
+
+  async listFiscalBranchesV1({ billingCompanyId, environment, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/branches`,
+      secretReference,
+      correlationId,
+    });
+    return validateFiscalBranches(response, correlationId);
+  }
+
+  async upsertFiscalBranchV1({ billingCompanyId, environment, payload, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'POST',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/branches`,
+      secretReference,
+      correlationId,
+      body: payload,
+    });
+    return validateFiscalBranch(response, correlationId);
+  }
+
+  async setFiscalBranchActiveV1({ billingCompanyId, environment, branchId, active, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'PATCH',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/branches/${encodeURIComponent(branchId)}`,
+      secretReference,
+      correlationId,
+      body: { active },
+    });
+    return validateFiscalBranch(response, correlationId);
+  }
+
+  async upsertFiscalTerminalV1({ billingCompanyId, environment, branchId, payload, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'POST',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/branches/${encodeURIComponent(branchId)}/terminals`,
+      secretReference,
+      correlationId,
+      body: payload,
+    });
+    return validateFiscalTerminal(response, correlationId);
+  }
+
+  async setFiscalTerminalActiveV1({ billingCompanyId, environment, terminalId, active, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'PATCH',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/terminals/${encodeURIComponent(terminalId)}`,
+      secretReference,
+      correlationId,
+      body: { active },
+    });
+    return validateFiscalTerminal(response, correlationId);
+  }
+
+  async getDefaultIssuancePointV1({ billingCompanyId, environment, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/issuance-points/default`,
+      secretReference,
+      correlationId,
+    });
+    return validateIssuancePoint(response, correlationId, { nullable: true });
+  }
+
+  async selectDefaultIssuancePointV1({ billingCompanyId, environment, terminalId, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'PUT',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/issuance-points/default`,
+      secretReference,
+      correlationId,
+      body: { terminalId },
+    });
+    return validateIssuancePoint(response, correlationId);
+  }
+
+  async getFiscalSequenceV1({ billingCompanyId, environment, terminalId, documentType, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'GET',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/terminals/${encodeURIComponent(terminalId)}/sequences/${encodeURIComponent(documentType)}`,
+      secretReference,
+      correlationId,
+    });
+    return validateFiscalSequence(response, correlationId);
+  }
+
+  async configureInitialSequenceV1({ billingCompanyId, environment, terminalId, documentType, nextValue, secretReference, correlationId }) {
+    const response = await this.request({
+      method: 'PUT',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-onboarding/v1/${encodeURIComponent(environment)}/terminals/${encodeURIComponent(terminalId)}/sequences/${encodeURIComponent(documentType)}/initial`,
+      secretReference,
+      correlationId,
+      body: { nextValue },
+    });
+    return validateFiscalSequence(response, correlationId);
   }
 
   createFiscalDocument({ billingCompanyId, environment, secretReference, idempotencyKey, correlationId, payload }) {
@@ -390,6 +881,20 @@ class BillingApiClient {
     });
   }
 
+  lookupFiscalIdentityByIdempotency({ billingCompanyId, environment, secretReference, idempotencyKey, requestHash, correlationId }) {
+    const query = new URLSearchParams({ idempotencyKey: String(idempotencyKey), operation: 'fiscal-document.create.invoice', requestHash: String(requestHash) });
+    return this.request({ method: 'GET', path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-documents/${encodeURIComponent(environment)}/identity-by-idempotency?${query.toString()}`, secretReference, correlationId });
+  }
+
+  lookupFiscalIdentityByEvidence({ billingCompanyId, environment, secretReference, idempotencyKey, operation, equivalenceContractVersion, fiscalPayload, correlationId }) {
+    return this.request({
+      method: 'POST',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-documents/${encodeURIComponent(environment)}/identity-by-fiscal-evidence`,
+      secretReference,
+      correlationId,
+      body: { idempotencyKey, operation, equivalenceContractVersion, fiscalPayload },
+    });
+  }
   prepareFiscalDocumentXml({ billingFiscalDocumentId, secretReference, correlationId }) {
     return this.request({
       method: 'POST',
@@ -403,6 +908,15 @@ class BillingApiClient {
     return this.request({
       method: 'POST',
       path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-documents/${encodeURIComponent(environment)}/invoices/${encodeURIComponent(billingFiscalDocumentId)}/submit`,
+      secretReference,
+      correlationId,
+    });
+  }
+
+requestAcceptedPackageResend({ billingCompanyId, environment, billingFiscalDocumentId, secretReference, correlationId }) {
+    return this.request({
+      method: 'POST',
+      path: `/api/v1/companies/${encodeURIComponent(billingCompanyId)}/fiscal-documents/${encodeURIComponent(environment)}/invoices/${encodeURIComponent(billingFiscalDocumentId)}/accepted-package-resend`,
       secretReference,
       correlationId,
     });

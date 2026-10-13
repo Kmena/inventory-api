@@ -38,7 +38,7 @@ test('listOrders preserves the legacy array contract when pagination params are 
     () => orderService.listOrders({ companyId: '7', sub: '10', role: 'sales' }),
   );
 
-  assert.deepEqual(orders, [{ id: 2n, status: 'DRAFT' }]);
+  assert.deepEqual(orders, [{ id: 2n, status: 'DRAFT', items: [] }]);
 });
 
 test('getOrder returns not_found when the order is outside the authenticated tenant scope', async () => {

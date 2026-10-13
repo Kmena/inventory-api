@@ -168,6 +168,25 @@ test('Wave 6B initial page load performs zero refresh POST', async () => {
   assert.equal(refreshCalls.length, 0, 'zero refresh POST on initial load');
 });
 
+test('post-deployment UI ends readiness loading when fiscal.readiness.view is absent', async () => {
+  let readinessCalls = 0;
+  const container = await mount({
+    session: createSession(['fiscal.settings.view']),
+    api: {
+      getFiscalSettings: () => Promise.resolve(settings()),
+      getFiscalReadiness: () => { readinessCalls += 1; return Promise.resolve(readiness()); },
+      refreshActivities: () => Promise.reject(new Error('not expected')),
+      setDefaultActivity: () => Promise.reject(new Error('not expected')),
+      updateActivityBillingEnabled: () => Promise.reject(new Error('not expected')),
+    },
+  });
+
+  assert.equal(readinessCalls, 0);
+  assert.match(container.readinessElement.innerHTML, /Permiso de consulta requerido/);
+  assert.match(container.readinessElement.innerHTML, /fiscal\.readiness\.view/);
+  assert.doesNotMatch(container.readinessElement.innerHTML, /Comprobando preparación fiscal/);
+});
+
 // ── Test 36: readyToIssue=true renders READY ────────────────────────────────
 
 test('Wave 6B readyToIssue=true renders "Listo para facturar electrónicamente"', async () => {
@@ -512,7 +531,7 @@ test('Wave 6B failed Wave 6A default change preserves readiness state', async ()
 test('Wave 6B fiscal-settings-admin.js contains no local readyToIssue calculation logic', () => {
   const src = fs.readFileSync(path.join(rootPublicPath, 'views', 'fiscal-settings-admin.js'), 'utf8');
   // The view must not derive readyToIssue from local state
-  assert.doesNotMatch(src, /readyToIssue\s*=\s*(?!readiness)/,
+  assert.doesNotMatch(src, /\breadyToIssue\s*=(?!=)/,
     'readyToIssue must only be consumed from Billing response, not locally set');
 });
 

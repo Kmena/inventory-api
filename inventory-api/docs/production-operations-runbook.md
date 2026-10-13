@@ -153,3 +153,85 @@ docker compose -f docker-compose.prod.yml exec -T db sh -lc 'psql -U "$POSTGRES_
 - no hay agregación externa de logs ni observabilidad SaaS versionada
 - restore readiness y operational readiness usan contratos públicos versionados bajo `docs/`
 - este runbook eleva la madurez operativa por encima del baseline mínimo, pero no equivale a una plataforma enterprise completa
+
+## Wave 9 — checklist fiscal de despliegue controlado
+
+Este checklist prepara una futura ejecución; no autoriza ni ejecuta despliegues, migraciones, rotaciones, Hacienda, SMTP ni AFPR.
+
+| Gate | Responsable | Evidencia obligatoria |
+| --- | --- | --- |
+| Ventana y go/no-go | Product owner + operador | ventana aprobada, revisión de impacto y decisión registrada |
+| Migraciones | DBA | `prisma migrate status`, preflight de duplicados y checksum/historial preservados; nunca reescribir migraciones aplicadas |
+| Base de datos | DBA | backup verificable, restore rehearsal aislado y SHA-256 del backup |
+| Artefactos fiscales | Operador Billing | backup/restore verificado, marcador de volumen durable y SHA-256 de objeto sintético |
+| Bootstrap M2M | Security owner | identidad `inventori-bootstrap-v1` separada, tenants permitidos y entrega una sola vez |
+| Operación M2M | Security owner | `inventori-fiscal-v1`, vínculo tenant/company/environment y plan de solapamiento/revocación |
+| Secretos Inventori | Security owner | `BILLING_MANAGED_CREDENTIAL_KEY` desde secret manager y directorio dentro del volumen durable; ningún valor en imagen o logs |
+| Hacienda | Fiscal owner | ambiente, certificado/PIN, expiración, actividad, sucursal, terminal y secuencia verificados; SANDBOX requiere autorización separada |
+| SMTP | Delivery owner | proveedor y remitente aprobados; recuperación permanece desactivada hasta autorizar watermark |
+| Observabilidad | Operador | `/health/ready`, scheduler, identity recovery, storage, delivery/recovery, expiración de certificado, migraciones y correlation IDs visibles sin secretos |
+
+### Orden de despliegue futuro
+
+1. Congelar revisión y registrar revisiones/digests de ambos candidatos, lockfiles, SBOM y escaneo de dependencias.
+2. Verificar backups de PostgreSQL y artefactos antes de cualquier cambio.
+3. Ejecutar preflight de migraciones y duplicados; el DBA autoriza la cadena forward-only.
+4. Desplegar primero storage/secret provider y dependencias de Billing; después Billing API/worker y sus health checks.
+5. Desplegar Inventori con el scheduler y la recuperación de identidad desactivados; validar API, Redis, base y comunicación M2M.
+6. Activar `FISCAL_SCHEDULER_ENABLED` sólo con credenciales y bindings verificados.
+7. Activar `FISCAL_IDENTITY_RECOVERY_ENABLED` sólo con `FISCAL_IDENTITY_RECOVERY_START_AT` UTC aprobado. El máximo de edad, lote y backoff deben quedar acotados.
+8. Verificar que `/health/ready` reporte `fiscalScheduler` y `fiscalIdentityRecovery`, y correlacionar una operación sintética autorizada sin datos reales.
+
+### Alertas mínimas y respuesta
+
+- Alertar cuando el scheduler configurado no esté ejecutándose, cuando crezcan errores de worker/reconciliación/lookup, o cuando un lookup pase a revisión de operador.
+- Alertar por storage no listo, checksum inválido, cola estancada, delivery `MANUAL_REVIEW_REQUIRED`, certificado próximo a expirar y drift de migraciones.
+- Nunca incluir API keys, referencias secretas, PIN, certificado, XML ni payload fiscal en etiquetas o mensajes.
+- Rollback de aplicación sólo si el schema conserva compatibilidad. Las migraciones son forward-only; ante incompatibilidad se detiene el rollout y se aplica una reparación futura aprobada.
+
+## Wave 10 — secuencia ejecutable DEC-D10 (NO EJECUTADA)
+
+Esta secuencia es una lista de control para una ventana futura. Cada paso requiere evidencia firmada por el responsable indicado; ningún comando de esta sección fue autorizado ni ejecutado durante Wave 10.
+
+### 1. Autorización y congelamiento
+
+1. Product owner registra el go/no-go, la ventana y los operadores autorizados.
+2. Maintainers congelan revisiones limpias de Inventori y Billing y registran commit, digest OCI publicado, provenance/SBOM y resultado de dependencia. Un image ID local no sustituye un registry digest.
+3. Security owner aprueba la disposición de advisories, el secret manager, los tenants bootstrap permitidos y los responsables de rotación/revocación.
+4. DBA compara checksums e historial aplicado contra ambos repositorios y autoriza por escrito la cadena forward-only.
+
+### 2. Protección previa
+
+1. Pausar nueva emisión fiscal y confirmar que workers/colas no mantienen trabajos en transición.
+2. Crear y verificar backups de ambas bases y un restore point de artefactos; conservar SHA-256.
+3. Ejecutar preflight read-only de duplicados, asociaciones, identidades, reservaciones, secuencias, documentos y migraciones incompletas.
+4. Verificar los hashes de artefactos históricos antes del cambio.
+
+### 3. Infraestructura, secretos y migraciones
+
+1. Activar primero el filesystem durable compartido por Billing API/worker y validar marcador, permisos, backup/restore y health.
+2. Configurar secretos exclusivamente desde el secret manager: storage, bootstrap, operación M2M, Hacienda, certificado/PIN y SMTP. No imprimir valores.
+3. Rotar credenciales con solapamiento controlado: crear reemplazo, verificar el consumidor, cortar tráfico, revocar la anterior y conservar evidencia; rollback revoca la nueva, nunca reactiva una comprometida.
+4. Aplicar sólo migraciones DBA-aprobadas, con emisión pausada. No usar migrate resolve para ocultar divergencia ni reescribir historial.
+
+### 4. Despliegue ordenado
+
+1. Desplegar Billing API y worker desde el mismo digest publicado y con idéntico storage/secret provider.
+2. Validar health, cola, reconciliador, storage y lectura de artefactos antes de continuar.
+3. Desplegar Inventori desde su digest publicado con scheduler y recovery desactivados.
+4. Validar health, Redis, base, autenticación M2M, binding tenant/company/environment y lectura canónica.
+5. Activar scheduler y recovery sólo con watermark UTC, lote, edad máxima y backoff aprobados.
+
+### 5. Validación controlada
+
+1. Recalcular y comparar hashes de artefactos históricos; cualquier diferencia fuerza no-go.
+2. Ejecutar una validación Hacienda SANDBOX únicamente con autorización fiscal separada y confirmar que PRODUCTION permanece bloqueado.
+3. Ejecutar una validación SMTP controlada únicamente con autorización del delivery owner; registrar aceptación sin prometer entrega exactly-once.
+4. Confirmar dashboards/alertas externos para health, workers, recovery, colas, storage, expiración de certificado, migraciones y correlation IDs sin secretos.
+
+### 6. Cierre, rollback y forward repair
+
+1. Product, Fiscal, Security, Operations y DBA registran el go/no-go final con toda la evidencia anterior.
+2. Si falla código compatible con el schema, revertir a los digests previos.
+3. Si una migración ya fue aplicada, detener el rollout y ejecutar únicamente una reparación forward aprobada; no bajar ni alterar historia aplicada.
+4. Reanudar emisión sólo cuando health, bindings, artefactos, secuencias, colas y observabilidad estén confirmados.

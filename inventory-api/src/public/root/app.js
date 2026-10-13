@@ -381,7 +381,7 @@ function bindSidebarInteractions() {
         return;
       }
 
-      if (shellElement.dataset.sidebarState === 'collapsed' && window.matchMedia('(min-width: 768px)').matches) {
+      if (shellElement.dataset.sidebarState === 'collapsed' && window.matchMedia('(min-width: 1024px)').matches) {
         sidebarState.collapsed = false;
         sidebarState.openGroups.add(groupId);
         syncSidebarState();
@@ -405,7 +405,7 @@ function bindSidebarInteractions() {
     }
 
     activeSidebarEntryId = navLink.getAttribute('data-sidebar-entry-id');
-    if (window.matchMedia('(max-width: 767px)').matches) {
+    if (window.matchMedia('(max-width: 1023px)').matches) {
       closeDrawer({ restoreFocus: false });
     }
 

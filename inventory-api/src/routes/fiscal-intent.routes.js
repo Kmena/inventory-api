@@ -16,7 +16,7 @@ router.post(
   validate(recoverFinalFiscalIntentSchema),
   async (req, res, next) => {
     try {
-      const result = await fiscalIntentOperatorRecoveryService.recoverFinalIntentAfterOperatorRepair(
+      const result = await fiscalIntentOperatorRecoveryService.recoverVerifiedIdentityAfterOperatorRequest(
         parseBigIntId(req.params.id, 'id'),
         {
           reason: req.body.reason,

@@ -8,28 +8,15 @@
 const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
+const {
+  configureFiscalDisposableDatabase,
+  verifyFiscalDisposableDatabase,
+} = require('./helpers/fiscal-disposable-database-guard');
 
 // ── Bootstrap ────────────────────────────────────────────────────────────────
-function parseEnvFile(fp) {
-  const r = {};
-  if (!fs.existsSync(fp)) return r;
-  for (const line of fs.readFileSync(fp, 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Za-z_]\w*)\s*=\s*(.*)\s*$/);
-    if (m) r[m[1]] = m[2].replace(/^['"]|['"]$/g, '');
-  }
-  return r;
-}
-function resolveDbUrl() {
-  if (process.env.INVENTORI_BILLING_DATABASE_URL) return process.env.INVENTORI_BILLING_DATABASE_URL;
-  const env = parseEnvFile(path.join(__dirname, '..', '.env'));
-  const keys = ['POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DB', 'POSTGRES_PORT'];
-  if (keys.some((k) => !env[k])) return null;
-  return `postgresql://${env.POSTGRES_USER}:${env.POSTGRES_PASSWORD}@localhost:${env.POSTGRES_PORT}/${env.POSTGRES_DB}?schema=public`;
-}
-const dbUrl = resolveDbUrl();
-if (dbUrl) process.env.DATABASE_URL = dbUrl;
+const disposableDatabaseConfig = configureFiscalDisposableDatabase();
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
-const SKIP = process.env.INVENTORI_BILLING_POSTGRES_TEST !== '1' || !dbUrl;
+const SKIP = !disposableDatabaseConfig;
 const runOpts = { skip: SKIP };
 
 // ── Service imports ──────────────────────────────────────────────────────────
@@ -44,6 +31,17 @@ const { buildFiscalDto, buildFiscalDtoDetail, serializeInvoiceForList, serialize
   require('../src/services/invoice.service');
 const rootPublicPath = path.join(__dirname, '..', 'src', 'public', 'root');
 const routesPath     = path.join(__dirname, '..', 'src', 'routes');
+
+before(async () => {
+  if (!SKIP) {
+    await prisma.$connect();
+    await verifyFiscalDisposableDatabase(prisma, disposableDatabaseConfig);
+  }
+});
+
+after(async () => {
+  if (!SKIP) await prisma.$disconnect();
+});
 
 // ── Fake Billing client (no real HTTP) ───────────────────────────────────────
 class FakeW8BillingClient {

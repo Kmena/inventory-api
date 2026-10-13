@@ -185,7 +185,7 @@ test('Wave 6A renders current default and eligibility without exposing secrets o
   assert.equal(container.contentElement.defaultControls[1].disabled, false);
   assert.equal(container.contentElement.defaultControls[2].disabled, true);
   assert.equal(container.contentElement.defaultControls[3].disabled, true);
-  assert.doesNotMatch(html, /type="text"|Agregar actividad|Crear actividad/i);
+  assert.doesNotMatch(html, /Agregar actividad|Crear actividad/i);
   assert.doesNotMatch(html, /billing-id-nope|tenant-nope|secret-nope|api-key-nope/);
   assert.doesNotMatch(html, /readyToIssue|Listo para facturar|preparaci[oó]n fiscal completa|reasonCodes/i);
 });

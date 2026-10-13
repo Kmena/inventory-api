@@ -1,6 +1,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const { PrismaClient } = require('@prisma/client');
+const {
+  assertDisposableDatabaseUrl,
+  resolveFiscalDisposableDatabaseConfig,
+  verifyFiscalDisposableDatabase,
+} = require('../tests/helpers/fiscal-disposable-database-guard');
 
 const testsRoot = path.join(__dirname, '..', 'tests');
 const preferredTestOrder = [
@@ -88,8 +94,9 @@ function listTestFiles(directory) {
 function getAggregateTestEnvironment(baseEnv = process.env) {
   return {
     ...baseEnv,
-    NODE_ENV: baseEnv.NODE_ENV || 'test',
-    BROWSER_SESSION_STORE_MODE: baseEnv.BROWSER_SESSION_STORE_MODE || 'memory',
+    NODE_ENV: 'test',
+    BROWSER_SESSION_STORE_MODE: 'memory',
+    REDIS_URL: '',
   };
 }
 
@@ -109,6 +116,22 @@ function validateAggregateTestEnvironment(environment) {
     );
   }
 
+  if (String(environment.REDIS_URL || '').trim()) {
+    failures.push('Aggregate tests require an empty REDIS_URL; Redis behavior is exercised by the isolated fake-Redis lane.');
+  }
+
+  try {
+    const config = resolveFiscalDisposableDatabaseConfig(environment);
+    if (!config) {
+      failures.push('Aggregate tests require the verified disposable PostgreSQL runner.');
+    } else {
+      assertDisposableDatabaseUrl(environment.P2_AUDIT_DATABASE_URL, 'P2_AUDIT_DATABASE_URL', config);
+      assertDisposableDatabaseUrl(environment.P2_CONSTRAINTS_DATABASE_URL, 'P2_CONSTRAINTS_DATABASE_URL', config);
+    }
+  } catch (error) {
+    failures.push(`${error.code || 'DISPOSABLE_DATABASE_REJECTED'}: ${error.message}`);
+  }
+
   return failures;
 }
 
@@ -117,13 +140,24 @@ function formatAggregateTestEnvironmentGuidance(environment) {
 
   return [
     `Aggregate runner defaults: NODE_ENV=${environment.NODE_ENV}, BROWSER_SESSION_STORE_MODE=${sessionStoreMode}.`,
-    'Use `npm run test` for the default broad suite in memory mode.',
+    'Use `npm run test`; it provisions and verifies runner-owned PostgreSQL before this aggregate runner starts.',
     'Use `npm run test:redis-path` for the dedicated Redis-backed browser-session lane.',
-    'Database-backed optional suites remain environment-gated and require dedicated variables such as P2_AUDIT_DATABASE_URL or P2_CONSTRAINTS_DATABASE_URL.',
+    'P2_AUDIT_DATABASE_URL and P2_CONSTRAINTS_DATABASE_URL must exactly match the verified disposable database.',
   ].join('\n');
 }
 
-function run() {
+async function verifyAggregateTestDatabase(environment) {
+  const config = resolveFiscalDisposableDatabaseConfig(environment);
+  const prisma = new PrismaClient({ datasources: { db: { url: config.url } } });
+  try {
+    await prisma.$connect();
+    return await verifyFiscalDisposableDatabase(prisma, config);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+async function run() {
   const testFiles = listTestFiles(testsRoot);
 
   if (testFiles.length === 0) {
@@ -137,6 +171,9 @@ function run() {
   if (environmentFailures.length > 0) {
     throw new Error(`${environmentFailures.join('\n')}\n${formatAggregateTestEnvironmentGuidance(environment)}`);
   }
+
+  const identity = await verifyAggregateTestDatabase(environment);
+  process.stdout.write(`${JSON.stringify({ aggregateDisposableDatabase: identity.databaseName, instanceId: identity.instanceId })}\n`);
 
   const child = spawn(process.execPath, ['--test', ...forwardedArguments, ...testFiles], {
     stdio: 'inherit',
@@ -155,7 +192,10 @@ function run() {
 }
 
 if (require.main === module) {
-  run();
+  run().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
 }
 
 module.exports = {
@@ -167,4 +207,5 @@ module.exports = {
   supportedBrowserSessionStoreModes,
   toPosixPath,
   validateAggregateTestEnvironment,
+  verifyAggregateTestDatabase,
 };

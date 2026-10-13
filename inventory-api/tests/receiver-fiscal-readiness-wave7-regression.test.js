@@ -53,6 +53,7 @@ function makeEntity(overrides = {}) {
   return {
     id: 100n, companyId: 42n, legalName: 'Demo S.A.',
     identificationType: 'JURIDICA', identificationNumber: '3101000001',
+    email: 'fiscal@demo.test',
     verificationStatus: 'VERIFIED', lastVerifiedAt: new Date('2025-06-01'),
     taxpayerName: 'Demo S.A.', ...overrides,
   };

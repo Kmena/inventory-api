@@ -387,7 +387,7 @@ async function processClaimedFiscalIntent(intent, dependencies, options = {}) {
   }
 
   const integrationConfig = intent.integrationConfig;
-  if (!integrationConfig?.enabled) {
+  if (!integrationConfig?.enabled || integrationConfig?.associationStatus === 'HISTORICAL_ONLY') {
     return persistFailure(intent, {
       kind: 'FINAL',
       status: 'ERROR_FINAL',

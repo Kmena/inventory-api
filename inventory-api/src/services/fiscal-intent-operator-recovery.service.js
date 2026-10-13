@@ -3,6 +3,9 @@
 const prisma = require('../lib/prisma');
 const audit = require('../lib/audit');
 const { createHttpError } = require('../lib/errors');
+const { BillingApiClient } = require('./billing-api-client.service');
+const { createBillingCredentialResolver } = require('./billing-credential-resolver.service');
+const { recoverFiscalIntentIdentity } = require('./fiscal-identity-recovery.service');
 
 const OPERATOR_RECOVERABLE_FAILURE_CODES = Object.freeze([
   'FISCAL_SIGNING_CERTIFICATE_INVALID_SECRET',
@@ -214,6 +217,25 @@ async function recoverFinalIntentAfterOperatorRepair(intentId, input = {}, optio
   return result;
 }
 
+
+async function recoverVerifiedIdentityAfterOperatorRequest(intentId, input = {}, options = {}) {
+  const db = options.db || prisma;
+  const intent = await db.invoiceFiscalIntent.findUnique({ where: { id: intentId }, select: { id: true, companyId: true } });
+  if (!intent || (input.auth?.companyId && BigInt(input.auth.companyId) !== BigInt(intent.companyId))) {
+    throw createHttpError(404, 'FiscalIntent not found for current company', 'fiscal_intent_not_found');
+  }
+  const billingClient = options.billingClient || new BillingApiClient({
+    baseUrl: process.env.BILLING_BASE_URL || 'http://localhost:4000',
+    credentialResolver: createBillingCredentialResolver(),
+    timeoutMs: Number(process.env.BILLING_TIMEOUT_MS) || 10000,
+  });
+  const result = await recoverFiscalIntentIdentity(intentId, { billingClient }, { db, req: input.req, now: options.now, operatorReason: input.reason });
+  if (!result.recovered) {
+    const resultDetails = /** @type {{ outcome?: string, code?: string, reason?: string }} */ (result);
+    throw createHttpError(resultDetails.outcome === 'RETRYABLE_DISCOVERY' ? 503 : 409, 'Verified fiscal identity recovery could not be completed', resultDetails.code || resultDetails.reason || 'fiscal_recovery_not_completed');
+  }
+  return result;
+}
 module.exports = {
   NON_RECOVERABLE_FAILURE_EXAMPLES,
   OPERATOR_RECOVERABLE_FAILURE_CODES,
@@ -221,4 +243,5 @@ module.exports = {
   RECOVERY_RECONCILIATION_TARGET_STATUS,
   resolveRecoveryTargetStatus,
   recoverFinalIntentAfterOperatorRepair,
+  recoverVerifiedIdentityAfterOperatorRequest,
 };

@@ -261,7 +261,7 @@ app.use('/api/warehouse-orders', ...mediumPayloadParsers, require('./routes/ware
 app.use('/api/regions', ...mediumPayloadParsers, regionRouter);
 app.use('/api/sales-routes', ...mediumPayloadParsers, salesRouteRouter);
 app.use('/api/agent', ...mediumPayloadParsers, agentRouter);
-app.use('/api/taxpayer', ...smallPayloadParsers, taxpayerRouter);
+app.use('/api/taxpayers', ...smallPayloadParsers, taxpayerRouter);
 app.use('/api/cabys', ...smallPayloadParsers, cabysRouter);
 app.use('/api/client-legal-entities', ...mediumPayloadParsers, clientLegalEntityRouter);
 app.use('/api/geocoding', ...smallPayloadParsers, geocodingRouter);

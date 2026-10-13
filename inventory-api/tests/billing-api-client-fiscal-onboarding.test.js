@@ -142,7 +142,7 @@ describe('BillingApiClient fiscal-onboarding Wave 1 adapter', () => {
     assert.equal(response[0].id, 'activity-id-1');
     assertSingleRequest(calls, {
       method: 'GET',
-      path: `/api/v1/companies/${BILLING_COMPANY_ID}/fiscal-onboarding/activities`,
+      path: `/api/v1/companies/${BILLING_COMPANY_ID}/fiscal-onboarding/v1/SANDBOX/activities`,
     });
   });
 
@@ -158,7 +158,7 @@ describe('BillingApiClient fiscal-onboarding Wave 1 adapter', () => {
     assert.equal(response.haciendaVerificationStatus, 'VERIFIED');
     assertSingleRequest(calls, {
       method: 'POST',
-      path: `/api/v1/companies/${BILLING_COMPANY_ID}/fiscal-onboarding/verify`,
+      path: `/api/v1/companies/${BILLING_COMPANY_ID}/fiscal-onboarding/v1/SANDBOX/activities/refresh`,
     });
   });
 
@@ -176,7 +176,7 @@ describe('BillingApiClient fiscal-onboarding Wave 1 adapter', () => {
     assert.equal(response.billingEnabled, true);
     assertSingleRequest(calls, {
       method: 'PATCH',
-      path: `/api/v1/companies/${BILLING_COMPANY_ID}/fiscal-onboarding/activities/6202%2F00%20%2B%20services`,
+      path: `/api/v1/companies/${BILLING_COMPANY_ID}/fiscal-onboarding/v1/SANDBOX/activities/6202%2F00%20%2B%20services`,
       body: { billingEnabled: true },
     });
   });
@@ -195,7 +195,7 @@ describe('BillingApiClient fiscal-onboarding Wave 1 adapter', () => {
     assert.equal(response.billingEnabled, false);
     assertSingleRequest(calls, {
       method: 'PATCH',
-      path: `/api/v1/companies/${BILLING_COMPANY_ID}/fiscal-onboarding/activities/620200`,
+      path: `/api/v1/companies/${BILLING_COMPANY_ID}/fiscal-onboarding/v1/SANDBOX/activities/620200`,
       body: { billingEnabled: false },
     });
   });
@@ -213,7 +213,7 @@ describe('BillingApiClient fiscal-onboarding Wave 1 adapter', () => {
     assert.equal(response.defaultEconomicActivityId, 'activity-id-1');
     assertSingleRequest(calls, {
       method: 'PUT',
-      path: `/api/v1/companies/${BILLING_COMPANY_ID}/fiscal-onboarding/default-activity`,
+      path: `/api/v1/companies/${BILLING_COMPANY_ID}/fiscal-onboarding/v1/SANDBOX/activities/default`,
       body: { code: '620200' },
     });
   });

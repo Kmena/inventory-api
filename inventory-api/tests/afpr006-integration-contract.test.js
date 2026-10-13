@@ -1,0 +1,4 @@
+'use strict';
+const test=require('node:test'); const assert=require('node:assert/strict'); const fs=require('node:fs'); const path=require('node:path');
+const root=path.join(__dirname,'..','src'); const read=(p)=>fs.readFileSync(path.join(root,p),'utf8');
+test('AFPR integration contract preserves Billing delivery ownership and no fiscal mutation',()=>{const route=read('routes/invoice.routes.js'),service=read('services/fiscal-package-resend.service.js'),client=read('services/billing-api-client.service.js'),ui=read('public/root/billing-api.js')+read('public/root/views/billing-admin.js');assert.match(route,/fiscal-documents\/resend/);assert.match(service,/requestAcceptedPackageResend/);assert.match(client,/accepted-package-resend/);assert.match(ui,/fiscal-documents\/resend/);assert.doesNotMatch(service,/createFiscalDocument|submitFiscalDocument/);assert.doesNotMatch(ui,/X-API-Key|billingCompanyId|billingFiscalDocumentId|secretReference/);});

@@ -181,6 +181,7 @@ test('cookie-authenticated GET /api/auth/me returns the browser auth context and
       const setCookieHeaders = response.headers.getSetCookie();
 
       assert.equal(response.status, 200);
+      assert.match(response.headers.get('cache-control') || '', /no-store/i);
       assert.equal(body.username, 'admin-demo');
       assert.equal(body.companyId, '9');
       assert.deepEqual(body.permissions, ['users.manage']);

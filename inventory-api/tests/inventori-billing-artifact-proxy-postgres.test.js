@@ -16,45 +16,35 @@
 
 'use strict';
 
-const { describe, test, after } = require('node:test');
+const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
-const fs = require('node:fs');
-const path = require('node:path');
+const {
+  configureFiscalDisposableDatabase,
+  verifyFiscalDisposableDatabase,
+} = require('./helpers/fiscal-disposable-database-guard');
 
 // ---------------------------------------------------------------------------
 // Environment bootstrap (mirrors existing PostgreSQL test harness pattern)
 // ---------------------------------------------------------------------------
 
-function parseEnvFile(filePath) {
-  const result = {};
-  if (!fs.existsSync(filePath)) return result;
-  for (const line of fs.readFileSync(filePath, 'utf8').split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
-    if (match) result[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
-  }
-  return result;
-}
-
-function resolvePostgresDatabaseUrl() {
-  if (process.env.INVENTORI_BILLING_DATABASE_URL) return process.env.INVENTORI_BILLING_DATABASE_URL;
-  const env = parseEnvFile(path.join(__dirname, '..', '.env'));
-  const requiredKeys = ['POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DB', 'POSTGRES_PORT'];
-  if (requiredKeys.some((k) => !env[k])) return null;
-  return `postgresql://${env.POSTGRES_USER}:${env.POSTGRES_PASSWORD}@localhost:${env.POSTGRES_PORT}/${env.POSTGRES_DB}?schema=public`;
-}
-
-const postgresDatabaseUrl = resolvePostgresDatabaseUrl();
-if (postgresDatabaseUrl) process.env.DATABASE_URL = postgresDatabaseUrl;
+const disposableDatabaseConfig = configureFiscalDisposableDatabase();
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
 const prisma = require('../src/lib/prisma');
 const { BillingClientError } = require('../src/services/billing-api-client.service');
 const { getFiscalArtifact } = require('../src/services/fiscal-artifact-proxy.service');
 
-const runOptions = { skip: process.env.INVENTORI_BILLING_POSTGRES_TEST !== '1' || !postgresDatabaseUrl };
+const runOptions = { skip: !disposableDatabaseConfig };
 
 const createdCompanyIds = [];
+
+before(async () => {
+  if (!runOptions.skip) {
+    await prisma.$connect();
+    await verifyFiscalDisposableDatabase(prisma, disposableDatabaseConfig);
+  }
+});
 
 function uniqueSuffix() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

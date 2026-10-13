@@ -87,5 +87,13 @@ module.exports = {
     reconcilerBatchSize: getNumber(process.env.FISCAL_RECONCILER_BATCH_SIZE, 10),
     maxConcurrency: getNumber(process.env.FISCAL_MAX_CONCURRENCY, 3),
     staleThresholdMs: getNumber(process.env.FISCAL_STALE_THRESHOLD_MS, 15 * 60 * 1000),
+    identityRecovery: {
+      // Fail closed: enabling automatic lookup requires an explicit activation watermark.
+      enabled: process.env.FISCAL_IDENTITY_RECOVERY_ENABLED === 'true',
+      startAt: process.env.FISCAL_IDENTITY_RECOVERY_START_AT || null,
+      maxAgeMs: getNumber(process.env.FISCAL_IDENTITY_RECOVERY_MAX_AGE_MS, 72 * 60 * 60 * 1000),
+      batchSize: getNumber(process.env.FISCAL_IDENTITY_RECOVERY_BATCH_SIZE, 10),
+      backoffMs: getNumber(process.env.FISCAL_IDENTITY_RECOVERY_BACKOFF_MS, 5 * 60 * 1000),
+    },
   },
 };

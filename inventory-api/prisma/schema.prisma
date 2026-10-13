@@ -274,6 +274,11 @@ enum BillingEnvironment {
   PRODUCTION
 }
 
+enum BillingAssociationStatus {
+  ACTIVE
+  HISTORICAL_ONLY
+}
+
 enum FiscalIssuanceStatus {
   PENDING
   PROCESSING
@@ -1782,6 +1787,7 @@ model CompanyBillingIntegrationConfig {
   billingEnvironment         BillingEnvironment @default(SANDBOX) @map("billing_environment")
   billingCredentialSecretRef String             @map("billing_credential_secret_ref")
   enabled                    Boolean            @default(false)
+  associationStatus          BillingAssociationStatus @default(ACTIVE) @map("association_status")
   readinessStatus            String             @default("UNKNOWN") @map("readiness_status")
   readinessCheckedAt         DateTime?          @map("readiness_checked_at")
   lastErrorCode              String?            @map("last_error_code")
@@ -1793,6 +1799,8 @@ model CompanyBillingIntegrationConfig {
   fiscalIntents              InvoiceFiscalIntent[]
 
   @@index([companyId, enabled])
+  // The database migration owns the partial unique index for effective active
+  // associations. Prisma cannot express a predicate-based unique index.
   @@map("company_billing_integration_configs")
 }
 
@@ -1847,6 +1855,7 @@ model InvoiceFiscalIntent {
   integrationConfig          CompanyBillingIntegrationConfig @relation(fields: [billingIntegrationConfigId], references: [id])
 
   @@index([companyId, status, nextAttemptAt])
+  @@unique([billingIntegrationConfigId, billingFiscalDocumentId], name: "invoice_fiscal_intents_config_document_unique")
   @@map("invoice_fiscal_intents")
 }
 

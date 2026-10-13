@@ -67,11 +67,13 @@
   }
 
   async function fetchJson(session, url, options = {}) {
+    const isMultipartBody = typeof globalScope.FormData === 'function'
+      && options.body instanceof globalScope.FormData;
     const response = await globalScope.fetch(resolveSameOriginUrl(url), {
       ...options,
       credentials: options.credentials || 'same-origin',
       headers: buildHeaders(session, {
-        includeJsonContentType: Boolean(options.body),
+        includeJsonContentType: Boolean(options.body) && !isMultipartBody,
         headers: options.headers,
       }),
     });
@@ -82,7 +84,12 @@
         handleUnauthorized(options.storageKey);
       }
 
-      throw new Error(buildErrorMessage(data, options.fallbackMessage || 'No se pudo completar la operacion'));
+      const requestError = /** @type {Error & { code?: string | null, statusCode?: number }} */ (
+        new Error(buildErrorMessage(data, options.fallbackMessage || 'No se pudo completar la operacion'))
+      );
+      requestError.code = data?.error || data?.code || null;
+      requestError.statusCode = response.status;
+      throw requestError;
     }
 
     return data;
@@ -117,6 +124,7 @@
   async function bootstrapSession(options = {}) {
     const response = await globalScope.fetch(resolveSameOriginUrl('/api/auth/me'), {
       credentials: 'same-origin',
+      cache: 'no-store',
       headers: options.headers || {},
     });
 

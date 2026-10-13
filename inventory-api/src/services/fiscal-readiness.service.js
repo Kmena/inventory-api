@@ -25,7 +25,7 @@ function resolvePaymentMethod(paymentCondition) {
 
 function resolveTaxMetadata(product) {
   const taxRate = toNumber(product?.taxRate);
-  if (taxRate < 0) return null;
+  if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100) return null;
   if (product?.taxExempt || taxRate === 0) {
     return { taxCode: '01', taxRateCode: '01', taxRate: 0 };
   }
@@ -58,7 +58,7 @@ async function getBillingIntegrationConfig(companyId, db) {
 function validateOrderFiscalReadiness(order, config) {
   const failures = [];
 
-  if (!config?.enabled) {
+  if (!config?.enabled || config?.associationStatus === 'HISTORICAL_ONLY') {
     return { enabled: false, ok: true, failures, config: config || null };
   }
 
@@ -69,6 +69,20 @@ function validateOrderFiscalReadiness(order, config) {
   const receiverResult = resolveFiscalReceiver(order);
   if (!receiverResult.ok) {
     failures.push({ code: receiverResult.code, field: 'receiver', reason: receiverResult.reason });
+  } else {
+    const receiver = receiverResult.receiver;
+    const identificationType = String(receiver.identificationType || '').trim().toUpperCase();
+    const identificationNumber = String(receiver.identificationNumber || '').trim();
+    const email = String(receiver.email || '').trim();
+    if (!['01', '02', '03', '04', 'FISICA', 'JURIDICA', 'DIMEX', 'NITE'].includes(identificationType)) {
+      failures.push({ code: 'UNSUPPORTED_RECEIVER_IDENTIFICATION_TYPE', field: 'receiver.identificationType' });
+    }
+    if (!/^\d{1,12}$/.test(identificationNumber)) {
+      failures.push({ code: 'INVALID_RECEIVER_IDENTIFICATION_NUMBER', field: 'receiver.identificationNumber' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      failures.push({ code: 'INVALID_RECEIVER_EMAIL', field: 'receiver.email' });
+    }
   }
 
   const currency = getOrderCurrency(order).toUpperCase();
@@ -84,6 +98,8 @@ function validateOrderFiscalReadiness(order, config) {
     const product = item.product || {};
     if (!product.cabysCode) {
       failures.push({ code: 'CABYS_MISSING', field: 'product.cabysCode', productId: item.productId });
+    } else if (!/^\d{13}$/.test(String(product.cabysCode).trim())) {
+      failures.push({ code: 'INVALID_CABYS_CODE', field: 'product.cabysCode', productId: item.productId });
     }
 
     const fiscalUnit = mapInventoriUnitToBillingUnit(product.unit, product);
@@ -110,6 +126,7 @@ function validateOrderFiscalReadiness(order, config) {
     config,
     receiver: receiverResult.receiver || null,
     currency,
+    documentType: 'INVOICE',
   };
 }
 

@@ -24,6 +24,7 @@ function serializeBillingIntegrationConfig(config) {
     billingCompanyId: config.billingCompanyId,
     billingEnvironment: config.billingEnvironment,
     enabled: config.enabled,
+    associationStatus: config.associationStatus || 'ACTIVE',
     hasCredentialSecret: Boolean(config.billingCredentialSecretRef),
     readinessStatus: config.readinessStatus,
     readinessCheckedAt: config.readinessCheckedAt,
@@ -73,6 +74,14 @@ async function upsertCompanyBillingIntegrationConfig(payload, auth) {
   const companyId = getAuthenticatedCompanyId(auth);
   const data = normalizeConfigPayload(payload);
   validateConfigPayload(data);
+  const existing = await billingIntegrationConfigRepository.findByCompanyId(companyId);
+  if (existing?.associationStatus === 'HISTORICAL_ONLY' && data.enabled) {
+    throw createHttpError(
+      409,
+      'La asociacion fiscal es historica y no puede reactivarse mediante la configuracion normal',
+      'BILLING_ASSOCIATION_HISTORICAL_ONLY',
+    );
+  }
   const config = await billingIntegrationConfigRepository.upsertForCompany(companyId, data);
   return serializeBillingIntegrationConfig(config);
 }

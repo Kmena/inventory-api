@@ -57,6 +57,18 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'tenant-fiscal-settings',
     transition: 'permission-governed',
   },
+  'fiscal-settings.test-invoices.view': {
+    mode: 'permission',
+    permissions: ['fiscal.settings.view'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.test-invoices.create': {
+    mode: 'permission',
+    permissions: ['fiscal.credentials.manage'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
   'fiscal-settings.activities.manage': {
     mode: 'permission',
     permissions: ['fiscal.activities.manage'],
@@ -70,6 +82,24 @@ const ACCESS_POLICIES = Object.freeze({
     transition: 'permission-governed',
   },
   'fiscal-settings.credentials.manage': {
+    mode: 'permission',
+    permissions: ['fiscal.credentials.manage'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.issuer.view': {
+    mode: 'permission',
+    permissions: ['fiscal.settings.view'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.issuer.provision': {
+    mode: 'permission',
+    permissions: ['fiscal.credentials.manage'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.issuer.manage': {
     mode: 'permission',
     permissions: ['fiscal.credentials.manage'],
     boundary: 'tenant-fiscal-settings',

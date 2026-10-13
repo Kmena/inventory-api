@@ -102,18 +102,22 @@ test('public auth helper clears shared browser session on unauthorized default r
 });
 
 test('public auth helper bootstraps session state from /api/auth/me without exposing credentials to storage', async () => {
-  const { authHelper, storage } = createHarness(async () => ({
-    ok: true,
-    status: 200,
-    json: async () => ({
-      id: '7',
-      fullName: 'Admin Demo',
-      username: 'admin-demo',
-      role: { code: 'admin' },
-      permissions: ['users.manage'],
-      companyId: 'cmp-7',
-    }),
-  }));
+  let bootstrapRequest = null;
+  const { authHelper, storage } = createHarness(async (url, options) => {
+    bootstrapRequest = { url, options };
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: '7',
+        fullName: 'Admin Demo',
+        username: 'admin-demo',
+        role: { code: 'admin' },
+        permissions: ['users.manage'],
+        companyId: 'cmp-7',
+      }),
+    };
+  });
 
   const session = await authHelper.bootstrapSession();
 
@@ -129,5 +133,8 @@ test('public auth helper bootstraps session state from /api/auth/me without expo
       landing: null,
     },
   });
+  assert.equal(bootstrapRequest.url, '/api/auth/me');
+  assert.equal(bootstrapRequest.options.cache, 'no-store');
+  assert.equal(bootstrapRequest.options.credentials, 'same-origin');
   assert.equal(storage.size, 0);
 });

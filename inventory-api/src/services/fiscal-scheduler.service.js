@@ -46,6 +46,12 @@
 const prisma = require('../lib/prisma');
 const { processFiscalIntentById, recoverStaleProcessingIntents } = require('./fiscal-billing-worker.service');
 const { reconcileFiscalIntentById } = require('./fiscal-reconciliation.service');
+const {
+  AMBIGUOUS_CREATE_FAILURE_CODES,
+  findEligibleAutomaticRecoveryIds,
+  recoverAmbiguousFiscalIntent,
+  validateAutomaticRecoveryOptions,
+} = require('./fiscal-identity-recovery-worker.service');
 
 // ---------------------------------------------------------------------------
 // Defaults (overridable via constructor / env)
@@ -88,6 +94,8 @@ class FiscalScheduler {
    * @param {number}    [options.reconcilerBatchSize]          max reconciler intents per poll (default 10)
    * @param {number}    [options.maxConcurrency]               max concurrent ops per batch chunk (default 3)
    * @param {number}    [options.staleThresholdMs]             stale PROCESSING threshold ms (default 15 min)
+   * @param {{enabled?: boolean, startAt?: string|Date|null, maxAgeMs?: number, batchSize?: number, backoffMs?: number}} [options.identityRecovery]
+   *                                                           bounded, explicitly activated identity lookup settings
    * @param {bigint[]}  [options.companyIds]                   restrict discovery to these company IDs only
    *                                                           (production: null/undefined = all companies;
    *                                                            tests: pass fixture company IDs to isolate)
@@ -100,6 +108,13 @@ class FiscalScheduler {
     this._reconcilerBatchSize = Number(options.reconcilerBatchSize ?? DEFAULT_RECONCILER_BATCH_SIZE);
     this._maxConcurrency = Math.max(1, Number(options.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY));
     this._staleThresholdMs = Number(options.staleThresholdMs ?? DEFAULT_STALE_THRESHOLD_MS);
+    this._identityRecovery = {
+      enabled: options.identityRecovery?.enabled === true,
+      startAt: options.identityRecovery?.startAt || null,
+      maxAgeMs: Number(options.identityRecovery?.maxAgeMs ?? 72 * 60 * 60 * 1000),
+      batchSize: Number(options.identityRecovery?.batchSize ?? 10),
+      backoffMs: Number(options.identityRecovery?.backoffMs ?? 5 * 60 * 1000),
+    };
     // Optional company scope filter — null means process all companies (production default)
     this._companyIds = Array.isArray(options.companyIds) && options.companyIds.length > 0
       ? options.companyIds
@@ -121,6 +136,9 @@ class FiscalScheduler {
       totalReconcilerProcessed: 0,
       totalWorkerErrors: 0,
       totalReconcilerErrors: 0,
+      totalIdentityRecoveryProcessed: 0,
+      totalIdentityRecoveryRecovered: 0,
+      totalIdentityRecoveryErrors: 0,
       startedAt: null,
       stoppedAt: null,
     };
@@ -140,6 +158,9 @@ class FiscalScheduler {
     if (!this._billingClient) {
       throw new Error('FiscalScheduler: billingClient is required before calling start()');
     }
+    if (this._identityRecovery.enabled) {
+      validateAutomaticRecoveryOptions({ ...this._identityRecovery, now: new Date() });
+    }
     this._running = true;
     this._stopping = false;
     this._metrics.startedAt = new Date().toISOString();
@@ -150,6 +171,7 @@ class FiscalScheduler {
       reconcilerBatchSize: this._reconcilerBatchSize,
       maxConcurrency: this._maxConcurrency,
       staleThresholdMs: this._staleThresholdMs,
+      identityRecoveryEnabled: this._identityRecovery.enabled,
     });
     this._scheduleNextPoll(0); // Immediate first poll
   }
@@ -209,6 +231,10 @@ class FiscalScheduler {
       totalReconcilerProcessed: this._metrics.totalReconcilerProcessed,
       totalWorkerErrors: this._metrics.totalWorkerErrors,
       totalReconcilerErrors: this._metrics.totalReconcilerErrors,
+      identityRecoveryEnabled: this._identityRecovery.enabled,
+      totalIdentityRecoveryProcessed: this._metrics.totalIdentityRecoveryProcessed,
+      totalIdentityRecoveryRecovered: this._metrics.totalIdentityRecoveryRecovered,
+      totalIdentityRecoveryErrors: this._metrics.totalIdentityRecoveryErrors,
       startedAt: this._metrics.startedAt,
       stoppedAt: this._metrics.stoppedAt,
     };
@@ -272,7 +298,38 @@ class FiscalScheduler {
     }
 
     // -----------------------------------------------------------------------
-    // Step 2: Worker batch — PENDING + ERROR_RETRYABLE → TASK-012 create/submit
+    // Step 2: Resolve ambiguous CREATE outcomes through versioned Billing lookup
+    // before any same-key replay. Activation is explicit, watermarked and bounded.
+    // -----------------------------------------------------------------------
+    let identityRecoveryIds = [];
+    if (this._identityRecovery.enabled) {
+      identityRecoveryIds = await findEligibleAutomaticRecoveryIds({
+        db: this._db,
+        companyIds: this._companyIds,
+        ...this._identityRecovery,
+        now: new Date(),
+      });
+      await this._processWithBoundedConcurrency(identityRecoveryIds, async (id) => {
+        try {
+          const result = await recoverAmbiguousFiscalIntent(id, { billingClient: this._billingClient }, {
+            db: this._db,
+            ...this._identityRecovery,
+            now: new Date(),
+          });
+          this._metrics.totalIdentityRecoveryProcessed++;
+          if (result.recovered) this._metrics.totalIdentityRecoveryRecovered++;
+        } catch (err) {
+          this._metrics.totalIdentityRecoveryErrors++;
+          _log('warn', 'scheduler-identity-recovery-error', {
+            fiscalIntentId: String(id),
+            error: String(err?.message || '').slice(0, 200),
+          });
+        }
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 3: Worker batch — PENDING + non-ambiguous ERROR_RETRYABLE
     // -----------------------------------------------------------------------
     const workerIds = await this._findEligibleWorkerIds(this._workerBatchSize);
     if (workerIds.length > 0) {
@@ -298,7 +355,7 @@ class FiscalScheduler {
     });
 
     // -----------------------------------------------------------------------
-    // Step 3: Reconciler batch — PROCESSING + billingFiscalDocumentId → TASK-013 status poll
+    // Step 4: Reconciler batch — PROCESSING + billingFiscalDocumentId → TASK-013 status poll
     //         CRITICAL INVARIANT: these intents already have a billingFiscalDocumentId.
     //         They MUST NOT go back through CREATE. This query filters correctly.
     // -----------------------------------------------------------------------
@@ -325,6 +382,7 @@ class FiscalScheduler {
       pollCount: this._metrics.pollCount,
       workerEligible: workerIds.length,
       reconcilerEligible: reconcilerIds.length,
+      identityRecoveryEligible: identityRecoveryIds.length,
     });
   }
 
@@ -356,6 +414,9 @@ class FiscalScheduler {
         status: { in: ['PENDING', 'ERROR_RETRYABLE'] },
         billingFiscalDocumentId: null,
         OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+        ...(this._identityRecovery.enabled ? {
+          AND: [{ OR: [{ failureCode: null }, { failureCode: { notIn: AMBIGUOUS_CREATE_FAILURE_CODES } }] }],
+        } : {}),
       },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: limit,
@@ -459,6 +520,7 @@ function startApplicationScheduler() {
       reconcilerBatchSize: config.fiscalScheduler.reconcilerBatchSize,
       maxConcurrency: config.fiscalScheduler.maxConcurrency,
       staleThresholdMs: config.fiscalScheduler.staleThresholdMs,
+      identityRecovery: config.fiscalScheduler.identityRecovery,
     });
 
     _applicationScheduler.start();
@@ -490,11 +552,19 @@ function getApplicationSchedulerStatus() {
   const config = require('../config');
 
   if (!config.fiscalScheduler.enabled) {
-    return { enabled: false, running: false };
+    return {
+      enabled: false,
+      running: false,
+      identityRecoveryEnabled: config.fiscalScheduler.identityRecovery.enabled,
+    };
   }
 
   if (!_applicationScheduler) {
-    return { enabled: true, running: false };
+    return {
+      enabled: true,
+      running: false,
+      identityRecoveryEnabled: config.fiscalScheduler.identityRecovery.enabled,
+    };
   }
 
   return { enabled: true, ..._applicationScheduler.getStatus() };

@@ -10,3 +10,10 @@ storage
 back_end
 front_end
 specs
+backups
+test-output
+.e2e-token.txt
+tmp_debug.txt
+*.dump
+*.backup
+*.sql

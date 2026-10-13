@@ -160,7 +160,7 @@ test('listOrders preserves the legacy array response when pagination is not requ
     () => orderService.listOrders({ companyId: '9', sub: '4', role: 'sales' }),
   );
 
-  assert.deepEqual(result, [{ id: 81n, status: 'DRAFT' }]);
+  assert.deepEqual(result, [{ id: 81n, status: 'DRAFT', items: [] }]);
 });
 
 test('listOrders returns paginated metadata only when pagination is requested', async () => {
@@ -178,7 +178,7 @@ test('listOrders returns paginated metadata only when pagination is requested', 
   );
 
   assert.deepEqual(result, {
-    items: [{ id: 82n, status: 'APPROVED' }],
+    items: [{ id: 82n, status: 'APPROVED', items: [] }],
     pagination: {
       page: 2,
       pageSize: 1,

@@ -1,28 +1,11 @@
 const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
+const {
+  configureFiscalDisposableDatabase,
+  verifyFiscalDisposableDatabase,
+} = require('./helpers/fiscal-disposable-database-guard');
 
-function parseEnvFile(filePath) {
-  const result = {};
-  if (!fs.existsSync(filePath)) return result;
-  for (const line of fs.readFileSync(filePath, 'utf8').split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
-    if (match) result[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
-  }
-  return result;
-}
-
-function resolvePostgresDatabaseUrl() {
-  if (process.env.INVENTORI_BILLING_DATABASE_URL) return process.env.INVENTORI_BILLING_DATABASE_URL;
-  const env = parseEnvFile(path.join(__dirname, '..', '.env'));
-  const requiredKeys = ['POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DB', 'POSTGRES_PORT'];
-  if (requiredKeys.some((key) => !env[key])) return null;
-  return `postgresql://${env.POSTGRES_USER}:${env.POSTGRES_PASSWORD}@localhost:${env.POSTGRES_PORT}/${env.POSTGRES_DB}?schema=public`;
-}
-
-const postgresDatabaseUrl = resolvePostgresDatabaseUrl();
-if (postgresDatabaseUrl) process.env.DATABASE_URL = postgresDatabaseUrl;
+const disposableDatabaseConfig = configureFiscalDisposableDatabase();
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
 const prisma = require('../src/lib/prisma');
@@ -35,7 +18,7 @@ const {
   recoverStaleProcessingIntents,
 } = require('../src/services/fiscal-billing-worker.service');
 
-const runOptions = { skip: process.env.INVENTORI_BILLING_POSTGRES_TEST !== '1' || !postgresDatabaseUrl };
+const runOptions = { skip: !disposableDatabaseConfig };
 const createdCompanyIds = [];
 
 function uniqueSuffix() {
@@ -263,7 +246,10 @@ class FakeBillingClient {
 }
 
 before(async () => {
-  if (!runOptions.skip) await prisma.$connect();
+  if (!runOptions.skip) {
+    await prisma.$connect();
+    await verifyFiscalDisposableDatabase(prisma, disposableDatabaseConfig);
+  }
 });
 
 after(async () => {
@@ -329,13 +315,15 @@ describe('Inventori Billing worker PostgreSQL integration', runOptions, () => {
       delete process.env.IBW_SENTINEL_KEY;
     }
 
-    assert.equal(fetchCalls.length, 2);
+    assert.equal(fetchCalls.length, 3);
     assert.equal(fetchCalls[0].options.headers['X-API-Key'], sentinelSecret);
     assert.equal(fetchCalls[0].options.headers.Authorization, undefined);
     assert.equal(fetchCalls[0].options.headers['Idempotency-Key'], fixture.intent.idempotencyKey);
     assert.equal(fetchCalls[0].body.receiver.name, 'Snapshot Receiver SA');
     assert.equal(fetchCalls[0].body.lines[0].description, 'Snapshot Product');
     assert.equal(fetchCalls[0].body.lines[0].cabysCode, '1234567890123');
+    assert.match(fetchCalls[1].url, /\/prepare-xml$/);
+    assert.match(fetchCalls[2].url, /\/submit$/);
 
     const persistedIntent = await prisma.invoiceFiscalIntent.findUnique({ where: { id: fixture.intent.id }, include: { invoice: true } });
     const persistedSnapshot = await prisma.invoiceFiscalSnapshot.findUnique({ where: { invoiceId: fixture.invoice.id } });

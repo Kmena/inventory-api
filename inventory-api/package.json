@@ -19,11 +19,13 @@
     "validate:restore-readiness": "node scripts/validate-restore-readiness.js",
     "validate:operational-readiness": "node scripts/validate-operational-readiness.js",
     "playwright:install": "playwright install chromium",
-    "test:e2e:browser": "node --test tests/browser-e2e.e2e.js tests/root-shell-layout.e2e.js tests/root-shell-commercial-views.e2e.js",
-    "test:e2e:root-layout": "node --test tests/root-shell-layout.e2e.js",
-    "test:redis-path": "node --test tests/browser-session-redis-store.test.js",
+    "test:e2e:browser": "node scripts/run-db-free-tests.js tests/browser-e2e.e2e.js tests/root-shell-layout.e2e.js tests/root-shell-commercial-views.e2e.js",
+    "test:e2e:root-layout": "node scripts/run-db-free-tests.js tests/root-shell-layout.e2e.js",
+    "test:redis-path": "node scripts/run-db-free-tests.js tests/browser-session-redis-store.test.js",
     "verify": "npm run lint && npm run typecheck && npm run lint:public-runtime && npm run validate:public-runtime && npm run validate:workflow-baseline && npm run validate:restore-readiness && npm run validate:operational-readiness && npm run build && npm run test",
-    "test": "node scripts/run-tests.js",
+    "test": "node scripts/run-fiscal-postgres-tests-disposable.js --aggregate",
+    "test:fiscal:postgres:disposable": "node scripts/run-fiscal-postgres-tests-disposable.js",
+    "test:disposable": "node scripts/run-fiscal-postgres-tests-disposable.js --aggregate",
     "map:local": "node scripts/generate-local-project-map.js",
     "validate:agent-workspace": "node scripts/validate-agent-workspace.js",
     "validate:production-baseline": "node scripts/validate-production-baseline.js",
@@ -55,7 +57,8 @@
   },
   "overrides": {
     "body-parser": "1.20.6",
-    "brace-expansion": "1.1.18"
+    "brace-expansion": "1.1.18",
+    "proxy-addr": "2.0.8"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

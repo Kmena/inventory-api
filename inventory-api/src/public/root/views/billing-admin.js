@@ -357,6 +357,44 @@
     /** @type {((() => void)|null)} */
     let _detailCloseHandler = null;
 
+    function triggerFiscalArtifactDownload(fileBlob, fileName) {
+      const objectUrl = globalScope.URL.createObjectURL(fileBlob);
+      const link = globalScope.document.createElement('a');
+      try {
+        link.href = objectUrl;
+        link.download = fileName;
+        link.style.display = 'none';
+        globalScope.document.body.appendChild(link);
+        link.click();
+      } finally {
+        link.remove();
+        globalScope.URL.revokeObjectURL(objectUrl);
+      }
+    }
+
+    function bindArtifactDownloadButtons(panel, sess) {
+      panel.querySelectorAll('.billing-artifact-download-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+          if (button.disabled) return;
+          const invoiceId = button.getAttribute('data-invoice-id') || '';
+          const artifactType = button.getAttribute('data-artifact-type') || '';
+          const originalLabel = button.textContent || 'Descargar';
+          button.disabled = true;
+          button.textContent = 'Descargando…';
+          try {
+            const { blob, fileName } = await billingApi.downloadFiscalArtifact(sess, invoiceId, artifactType);
+            triggerFiscalArtifactDownload(blob, fileName);
+            showToast(containerEl, 'Descarga iniciada en el navegador.', 'success');
+          } catch (error) {
+            showToast(containerEl, error.message || 'No se pudo descargar el documento fiscal.', 'error');
+          } finally {
+            button.disabled = false;
+            button.textContent = originalLabel;
+          }
+        });
+      });
+    }
+
     function openInvoiceDetail(sess, invoiceId, invoiceNumber) {
       const dialog  = /** @type {HTMLDialogElement|null} */ (containerEl.querySelector('#billing-detail-dialog'));
       const titleEl = containerEl.querySelector('#billing-detail-dialog-title');
@@ -404,6 +442,14 @@
           if (!dialog.open) return;
           bodyEl.innerHTML = renderers.renderInvoiceDetailContent(invoice, artifactCtx);
           bindArtifactRetryButton(bodyEl, sess);
+          bindArtifactDownloadButtons(bodyEl, sess);
+          bodyEl.querySelectorAll('.billing-fiscal-resend-btn').forEach((btn) => btn.addEventListener('click', async () => {
+            if (!globalScope.confirm('¿Reenviar los documentos fiscales? Se volverán a enviar al destinatario los documentos fiscales ya aceptados. No se generará una nueva factura ni se realizará un nuevo envío a Hacienda.')) return;
+            if (btn.disabled) return; btn.disabled = true; const label = btn.textContent; btn.textContent = 'Solicitando...';
+            try { await billingApi.requestFiscalResend(sess, btn.getAttribute('data-invoice-id')); showToast(containerEl, 'Reenvío solicitado. Billing procesará nuevamente el envío al destinatario.', 'success'); }
+            catch (err) { showToast(containerEl, err.message || 'No se pudo solicitar el reenvío.', 'error'); }
+            finally { btn.disabled = false; btn.textContent = label; }
+          }));
         })
         .catch((err) => {
           if (!dialog.open) return;

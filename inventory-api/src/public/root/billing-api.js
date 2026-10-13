@@ -49,29 +49,12 @@
     return data;
   }
 
-  /**
-   * Fetch a single invoice by ID (Wave 2 — prepares the API boundary for Wave 3 detail panel).
-   * Returns the full DETAIL_FISCAL_DTO including fiscal.clave, fiscal.consecutive, fiscal.acceptedAt.
-   * @param {any} session
-   * @param {string|number} invoiceId
-   * @returns {Promise<any>}
-   */
   async function fetchInvoiceDetail(session, invoiceId) {
     return inventoryAuth.fetchJson(session, `${BASE_INVOICES}/${encodeURIComponent(invoiceId)}`, {
       fallbackMessage: 'No se pudo cargar el detalle de la factura.',
     });
   }
 
-  /**
-   * Lists available fiscal artifacts for an invoice (Wave 5).
-   * Returns an array of ArtifactListItem from Inventori's ownership boundary.
-   * Each item: { id, type, inventoriType, contentType, sha256, sizeBytes, createdAt }.
-   * Authorization: invoice.fiscal-artifact policy enforced by backend.
-   * The browser NEVER calls Billing directly — Inventori proxies the artifact metadata.
-   * @param {any} session
-   * @param {string|number} invoiceId
-   * @returns {Promise<Array<{ id: string, type: string, inventoriType: string, contentType: string|null, sha256: string|null, sizeBytes: number|null, createdAt: string|null }>>}
-   */
   async function listFiscalArtifacts(session, invoiceId) {
     return inventoryAuth.fetchJson(
       session,
@@ -79,25 +62,66 @@
       { fallbackMessage: 'No se pudieron cargar los documentos fiscales.' },
     );
   }
+  const FISCAL_ARTIFACT_FALLBACKS = Object.freeze({
+    pdf: 'factura',
+    'signed-xml': 'factura',
+    'hacienda-response': 'respuesta-hacienda',
+  });
 
-  /**
-   * Returns the Inventori proxy URL for a fiscal artifact download (Wave 5).
-   * The browser navigates to this same-origin URL — no M2M token or Billing URL is exposed.
-   * Artifact type MUST be one of: 'pdf' | 'signed-xml' | 'hacienda-response'
-   * The backend allowlist rejects unknown types before any Billing call.
-   * @param {string|number} invoiceId
-   * @param {string} artifactType  Inventori URL-safe artifact type
-   * @returns {string}
-   */
-  function downloadFiscalArtifact(invoiceId, artifactType) {
+  function fiscalArtifactUrl(invoiceId, artifactType) {
     return `${BASE_INVOICES}/${encodeURIComponent(String(invoiceId))}/fiscal-artifacts/${encodeURIComponent(String(artifactType))}`;
   }
 
+  function getFiscalArtifactFallbackFileName(invoiceId, artifactType) {
+    const prefix = FISCAL_ARTIFACT_FALLBACKS[artifactType] || 'fiscal';
+    const safeInvoiceId = String(invoiceId || '').replace(/[^0-9]/g, '').slice(0, 20) || 'unknown';
+    const extension = artifactType === 'pdf' ? 'pdf' : 'xml';
+    return `${prefix}-inv-${safeInvoiceId}.${extension}`;
+  }
+
+  function getSafeContentDispositionFileName(value, fallbackFileName) {
+    const match = /filename\s*=\s*(?:"([^"\r\n]+)"|([^;\r\n\s]+))/i.exec(String(value || ''));
+    const candidate = (match?.[1] || match?.[2] || '').trim();
+    if (!candidate) return fallbackFileName;
+    // eslint-disable-next-line no-control-regex
+    const safeName = candidate.replace(/[\\/\x00-\x1f\x7f]/g, '').slice(-180);
+    return safeName || fallbackFileName;
+  }
+
+  /** Fetches a fiscal artifact through the authenticated Inventori proxy. */
+  function downloadFiscalArtifact(session, invoiceId, artifactType) {
+    if (artifactType === undefined) return fiscalArtifactUrl(session, invoiceId);
+    const url = fiscalArtifactUrl(invoiceId, artifactType);
+    return (async () => {
+    const response = await globalScope.fetch(url, {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: inventoryAuth.buildHeaders(session),
+    });
+
+    if (!response.ok) {
+      const data = await parseJsonSafely(response);
+      if (response.status === 401) inventoryAuth.handleUnauthorized();
+      throw buildApiError(data, 'No se pudo descargar el documento fiscal.', response.status);
+    }
+
+    const fallbackFileName = getFiscalArtifactFallbackFileName(invoiceId, artifactType);
+    return {
+      blob: await response.blob(),
+      fileName: getSafeContentDispositionFileName(response.headers?.get('content-disposition'), fallbackFileName),
+      mimeType: response.headers?.get('content-type') || 'application/octet-stream',
+    };
+    })();
+  }
   /**
    * Fetch invoices with PENDING or PARTIAL status (accounts receivable).
    * @param {any} session
    * @returns {Promise<any>}
    */
+  async function requestFiscalResend(session, invoiceId) {
+    return sendJson(session, BASE_INVOICES + '/' + encodeURIComponent(String(invoiceId)) + '/fiscal-documents/resend', { method: 'POST', fallbackMessage: 'No se pudo solicitar el reenvío.' });
+  }
+
   async function fetchReceivables(session) {
     return inventoryAuth.fetchJson(session, `${BASE_INVOICES}?status=PENDING,PARTIAL`, {
       fallbackMessage: 'No se pudieron cargar las cuentas por cobrar.',
@@ -202,6 +226,7 @@
     fetchPendingPayments,
     fetchReceivables,
     listFiscalArtifacts,
+    requestFiscalResend,
     rejectPayment,
   });
 }(window));

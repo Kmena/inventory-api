@@ -8,6 +8,7 @@ const { parsePaginationQuery } = require('../lib/pagination');
 const { createInvoiceSchema, updateInvoiceSchema } = require('../schemas/invoice.schema');
 const invoiceService = require('../services/invoice.service');
 const fiscalArtifactProxyService = require('../services/fiscal-artifact-proxy.service');
+const fiscalPackageResendService = require('../services/fiscal-package-resend.service');
 
 const router = express.Router();
 router.use(authenticate);
@@ -37,6 +38,14 @@ router.post('/', authorizeAccessPolicy('invoice.create'), validate(createInvoice
 
 router.put('/:id', authorizeAccessPolicy('invoice.update'), validate(updateInvoiceSchema), async (req, res, next) => {
   try { return res.json(await invoiceService.updateInvoice(parseBigIntId(req.params.id), req.body, req.auth, req)); } catch (error) { return next(error); }
+});
+
+router.post('/:id/fiscal-documents/resend', authorizeAccessPolicy('invoice.fiscal-artifact'), async (req, res, next) => {
+  try {
+    if (!req.auth?.companyId) return next(Object.assign(new Error('Empresa requerida'), { statusCode: 403, code: 'forbidden' }));
+    const result = await fiscalPackageResendService.requestAcceptedPackageResend(parseBigIntId(req.params.id), BigInt(req.auth.companyId));
+    return res.status(202).json({ ...result, message: 'Reenvío solicitado' });
+  } catch (error) { return next(error); }
 });
 
 router.delete('/:id', authorizeAccessPolicy('invoice.delete'), async (req, res, next) => {

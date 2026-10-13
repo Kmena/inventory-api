@@ -52,7 +52,7 @@ function createBillingHarness(options = {}) {
 
   browserWindow.InventoryAuth = {
     fetchJson: options.fetchJson || (async () => ({})),
-    buildHeaders: () => ({}),
+    buildHeaders: options.buildHeaders || (() => ({})),
     handleUnauthorized: () => {},
   };
   browserWindow.fetch = options.fetch || (async () => ({ ok: true, status: 200, json: async () => ({}) }));
@@ -177,7 +177,7 @@ test('[W5-URL-01] (test-item-9) PDF available → PDF download link points to In
 
   const html = renderers.renderArtifactActions(1623, [makeArtifact('pdf')]);
 
-  assert.match(html, /\/api\/invoices\/1623\/fiscal-artifacts\/pdf/,
+  assert.match(html, /data-download-url="\/api\/invoices\/1623\/fiscal-artifacts\/pdf"/,
     'PDF download href must use Inventori proxy URL');
   assert.doesNotMatch(html, /billing\./i, 'PDF link must not point to Billing');
   assert.match(html, /Descargar PDF/, 'PDF download label must appear');
@@ -189,7 +189,7 @@ test('[W5-URL-02] (test-item-10) signed XML available → XML download link poin
 
   const html = renderers.renderArtifactActions(1623, [makeArtifact('signed-xml')]);
 
-  assert.match(html, /\/api\/invoices\/1623\/fiscal-artifacts\/signed-xml/,
+  assert.match(html, /data-download-url="\/api\/invoices\/1623\/fiscal-artifacts\/signed-xml"/,
     'signed XML href must use Inventori proxy URL with "signed-xml"');
   assert.match(html, /Descargar XML firmado/, 'signed XML download label must appear');
 });
@@ -200,7 +200,7 @@ test('[W5-URL-03] (test-item-11) Hacienda response available → response link p
 
   const html = renderers.renderArtifactActions(1623, [makeArtifact('hacienda-response')]);
 
-  assert.match(html, /\/api\/invoices\/1623\/fiscal-artifacts\/hacienda-response/,
+  assert.match(html, /data-download-url="\/api\/invoices\/1623\/fiscal-artifacts\/hacienda-response"/,
     'Hacienda response href must use Inventori proxy URL');
   assert.match(html, /Respuesta Hacienda/, 'Hacienda response download label must appear');
 });
@@ -213,18 +213,21 @@ test('[W5-RENDER-ACCEPT-01] all three artifact download links rendered when all 
 
   const html = renderers.renderArtifactActions(1623, ALL_ARTIFACTS);
 
-  assert.match(html, /fiscal-artifacts\/pdf/,               'PDF link must appear');
-  assert.match(html, /fiscal-artifacts\/signed-xml/,        'signed-xml link must appear');
-  assert.match(html, /fiscal-artifacts\/hacienda-response/, 'hacienda-response link must appear');
+  assert.match(html, /data-artifact-type="pdf"/,               'PDF link must appear');
+  assert.match(html, /data-artifact-type="signed-xml"/,        'signed-xml link must appear');
+  assert.match(html, /data-artifact-type="hacienda-response"/, 'hacienda-response link must appear');
 });
 
-test('[W5-RENDER-ACCEPT-02] artifact links use download attribute for browser download behavior', () => {
+test('[W5-RENDER-ACCEPT-02] artifact actions use a button contract instead of native navigation', () => {
   const rootShell = createBillingHarness();
   const renderers = rootShell.require('views.billingAdminRenderers');
 
   const html = renderers.renderArtifactActions(1623, [makeArtifact('pdf')]);
 
-  assert.match(html, /download/, 'artifact link must have download attribute for browser save behavior');
+  assert.match(html, /<button/, 'artifact action must be a button');
+  assert.match(html, /data-invoice-id="1623"/, 'artifact action must identify the invoice');
+  assert.match(html, /data-artifact-type="pdf"/, 'artifact action must identify the type');
+  assert.doesNotMatch(html, /href=/, 'artifact action must not navigate to the artifact endpoint');
 });
 
 test('[W5-RENDER-ACCEPT-03] (test-item-18) ACCEPTED status alone does NOT create artifact links — availability drives UI', () => {
@@ -237,7 +240,7 @@ test('[W5-RENDER-ACCEPT-03] (test-item-18) ACCEPTED status alone does NOT create
     { invoiceId: '1623', items: [], failed: false },
   );
 
-  assert.doesNotMatch(html, /fiscal-artifacts\/pdf/,
+  assert.doesNotMatch(html, /data-artifact-type="pdf"/,
     'ACCEPTED status with empty artifact list must NOT show PDF download link');
   assert.match(html, /Los documentos fiscales estar/,
     'informative message must appear when ACCEPTED but artifacts list is empty');
@@ -256,9 +259,9 @@ test('[W5-RENDER-ACCEPT-04] ACCEPTED with all artifacts renders download section
   assert.match(html, /Aceptada por Hacienda/, 'fiscal status badge must still appear');
   assert.match(html, /Clave:/, 'clave field must still appear');
   // Artifact links present
-  assert.match(html, /fiscal-artifacts\/pdf/, 'PDF download link must appear');
-  assert.match(html, /fiscal-artifacts\/signed-xml/, 'signed-xml download link must appear');
-  assert.match(html, /fiscal-artifacts\/hacienda-response/, 'hacienda-response link must appear');
+  assert.match(html, /data-artifact-type="pdf"/, 'PDF download link must appear');
+  assert.match(html, /data-artifact-type="signed-xml"/, 'signed-xml download link must appear');
+  assert.match(html, /data-artifact-type="hacienda-response"/, 'hacienda-response link must appear');
 });
 
 test('[W5-RENDER-ACCEPT-05] artifact links for all three types in renderInvoiceDetailContent', () => {
@@ -270,9 +273,9 @@ test('[W5-RENDER-ACCEPT-05] artifact links for all three types in renderInvoiceD
     { items: ALL_ARTIFACTS, failed: false },
   );
 
-  assert.match(html, /fiscal-artifacts\/pdf/,               'PDF link in full invoice detail');
-  assert.match(html, /fiscal-artifacts\/signed-xml/,        'signed-xml link in full invoice detail');
-  assert.match(html, /fiscal-artifacts\/hacienda-response/, 'hacienda-response link in full invoice detail');
+  assert.match(html, /data-artifact-type="pdf"/,               'PDF link in full invoice detail');
+  assert.match(html, /data-artifact-type="signed-xml"/,        'signed-xml link in full invoice detail');
+  assert.match(html, /data-artifact-type="hacienda-response"/, 'hacienda-response link in full invoice detail');
 });
 
 // ─── W5-RENDER-EMPTY: empty/null artifact list ────────────────────────────────
@@ -285,7 +288,7 @@ test('[W5-RENDER-EMPTY-01] (test-item-12) null items → informative message, no
 
   assert.match(html, /Los documentos fiscales estar/,
     'informative message must appear when items is null');
-  assert.doesNotMatch(html, /fiscal-artifacts\/pdf/, 'no PDF link must appear for null items');
+  assert.doesNotMatch(html, /data-artifact-type="pdf"/, 'no PDF link must appear for null items');
 });
 
 test('[W5-RENDER-EMPTY-02] (test-item-13) empty array → informative message, no signed-xml link', () => {
@@ -296,7 +299,7 @@ test('[W5-RENDER-EMPTY-02] (test-item-13) empty array → informative message, n
 
   assert.match(html, /Los documentos fiscales estar/,
     'informative message must appear for empty artifact list');
-  assert.doesNotMatch(html, /fiscal-artifacts\/signed-xml/, 'no signed-xml link must appear');
+  assert.doesNotMatch(html, /data-artifact-type="signed-xml"/, 'no signed-xml link must appear');
 });
 
 test('[W5-RENDER-EMPTY-03] (test-item-14) unknown inventoriType is filtered, does not render link', () => {
@@ -338,7 +341,7 @@ test('[W5-RENDER-STATUS-02] (test-item-16) PENDING: informative message shown, n
 
   assert.match(html, /Los documentos fiscales estar/,
     'PENDING must show artifact informative message');
-  assert.doesNotMatch(html, /fiscal-artifacts\/pdf/,
+  assert.doesNotMatch(html, /data-artifact-type="pdf"/,
     'PENDING must not show any download links');
 });
 
@@ -365,7 +368,7 @@ test('[W5-RENDER-STATUS-04] (test-item-19) REJECTED: informative message, no dow
     { invoiceId: '1623', items: null, failed: false },
   );
 
-  assert.doesNotMatch(html, /fiscal-artifacts\/pdf/, 'REJECTED must not show PDF download link');
+  assert.doesNotMatch(html, /data-artifact-type="pdf"/, 'REJECTED must not show PDF download link');
 });
 
 test('[W5-RENDER-STATUS-05] (test-item-20) ERROR_RETRYABLE: informative message, no download links', () => {
@@ -637,7 +640,7 @@ test('[W5-INTEGRITY-01] (test-item-28) signed XML action uses "signed-xml" — n
 
   const html = renderers.renderArtifactActions(1623, [makeArtifact('signed-xml')]);
 
-  assert.match(html, /fiscal-artifacts\/signed-xml/, '"signed-xml" must be used for the signed XML link');
+  assert.match(html, /data-artifact-type="signed-xml"/, '"signed-xml" must be used for the signed XML link');
   assert.doesNotMatch(html, /fiscal-artifacts\/unsigned-xml/, '"unsigned-xml" must never appear');
   assert.doesNotMatch(html, /fiscal-artifacts\/xml[^-]/, 'bare "xml" must not be used for signed XML');
 });
@@ -648,9 +651,9 @@ test('[W5-INTEGRITY-02] (test-item-29) Hacienda response action uses "hacienda-r
 
   const html = renderers.renderArtifactActions(1623, [makeArtifact('hacienda-response')]);
 
-  assert.match(html, /fiscal-artifacts\/hacienda-response/,
+  assert.match(html, /data-artifact-type="hacienda-response"/,
     '"hacienda-response" must be used for the Hacienda response link');
-  assert.doesNotMatch(html, /fiscal-artifacts\/signed-xml/,
+  assert.doesNotMatch(html, /data-artifact-type="signed-xml"/,
     'Hacienda response link must not use "signed-xml"');
 });
 
@@ -762,14 +765,13 @@ test('[W5-SRC-04] billing-admin.js has bindArtifactRetryButton for error recover
     'retry button class must be referenced in binding code');
 });
 
-test('[W5-SRC-05] no fiscal submission or mutation controls added by Wave 5', () => {
-  const source = readRootFile('views/billing-admin.js') +
-                 readRootFile('views/billing-admin.renderers.js');
-
-  assert.doesNotMatch(source, /Reenviar|Reemitir|Emitir.*comprobante/i,
-    'no fiscal re-emit buttons must appear in Wave 5 source');
-  assert.doesNotMatch(source, /Enviar a Hacienda.*button|button.*Enviar a Hacienda/i,
-    'no "send to Hacienda" button in Wave 5 source');
+test('[W5-SRC-05] preserves immutable fiscal controls while allowing accepted-package delivery resend', () => {
+  const source = readRootFile('billing-api.js') + readRootFile('views/billing-admin.js') + readRootFile('views/billing-admin.renderers.js');
+  assert.match(source, /Reenviar documentos/, 'the one safe delivery action is present');
+  assert.match(source, /status === 'ACCEPTED'/, 'resend is limited to accepted fiscal documents');
+  assert.match(source, /fiscal-documents\/resend/, 'browser targets the Inventori resend endpoint');
+  assert.doesNotMatch(source, /Enviar a Hacienda.*button|button.*Enviar a Hacienda/i, 'no Hacienda submit action');
+  assert.doesNotMatch(source, /Reemitir|Regenerar XML|Reintentar Hacienda|Nueva identidad fiscal/i, 'no reissue, XML regeneration, fiscal retry, or new identity control');
 });
 
 test('[W5-SRC-06] no artifact bytes stored or cached in browser source', () => {
@@ -777,7 +779,7 @@ test('[W5-SRC-06] no artifact bytes stored or cached in browser source', () => {
                    readRootFile('views/billing-admin.renderers.js') +
                    readRootFile('views/billing-admin.js');
 
-  assert.doesNotMatch(combined, /new Uint8Array|new ArrayBuffer|createObjectURL/,
+  assert.doesNotMatch(combined, /new Uint8Array|new ArrayBuffer/,
     'artifact bytes must not be buffered or cached in browser source');
 });
 
@@ -798,7 +800,7 @@ test('[W5-REG-01] (test-item-41) Wave 4 fiscal status still renders correctly al
   assert.match(html, /Consecutivo:/, 'Wave 4 consecutive field must remain');
   assert.match(html, /Aceptada:/, 'Wave 4 acceptedAt field must remain');
   // Wave 5 content also present
-  assert.match(html, /fiscal-artifacts\/pdf/, 'Wave 5 PDF link must be present');
+  assert.match(html, /data-artifact-type="pdf"/, 'Wave 5 PDF link must be present');
 });
 
 test('[W5-REG-02] (test-item-42) Wave 3 commercial detail sections unchanged after Wave 5', () => {
@@ -840,4 +842,28 @@ test('[W5-REG-04] (test-item-44) Wave 1 DTO contract: listFiscalArtifacts does n
   // Must NOT call the invoice detail DTO endpoint
   assert.ok(!calls.some((u) => u.endsWith('/1623') && !u.includes('fiscal-artifacts')),
     'listFiscalArtifacts must not call the invoice detail DTO endpoint');
+});
+
+test('[W5-DOWNLOAD] all artifact types preserve MIME and Content-Disposition filename after authenticated fetch', async () => {
+  for (const fixture of [['pdf', 'application/pdf', 'factura-506.pdf'], ['signed-xml', 'application/xml', 'factura-506.xml'], ['hacienda-response', 'application/xml', 'respuesta-hacienda-506.xml']]) {
+    const artifactType = fixture[0]; const mimeType = fixture[1]; const fileName = fixture[2]; const blob = { mimeType, artifactType };
+    const rootShell = createBillingHarness({ buildHeaders: () => ({ Authorization: 'Bearer session-token' }), fetch: async (_url, _options) => ({ ok: true, status: 200, headers: { get: (name) => name === 'content-type' ? mimeType : 'attachment; filename="' + fileName + '"' }, blob: async () => blob }) });
+    const result = await rootShell.require('billingApi').downloadFiscalArtifact({ token: 'session-token' }, 1623, artifactType);
+    assert.equal(result.blob, blob); assert.equal(result.mimeType, mimeType); assert.equal(result.fileName, fileName);
+  }
+});
+
+test('[W5-DOWNLOAD] non-2xx JSON responses never read a Blob', async () => {
+  for (const status of [401, 403, 404, 422, 500]) {
+    let blobCalled = false;
+    const rootShell = createBillingHarness({ fetch: async () => ({ ok: false, status, json: async () => ({ message: 'Error seguro de Inventori' }), blob: async () => { blobCalled = true; } }) });
+    await assert.rejects(() => rootShell.require('billingApi').downloadFiscalArtifact({ token: 't' }, 1623, 'pdf'), /Error seguro de Inventori/);
+    assert.equal(blobCalled, false);
+  }
+});
+
+test('[W5-DOWNLOAD] billing admin binds Blob/ObjectURL cleanup and never uses page navigation', () => {
+  const source = readRootFile('views/billing-admin.js');
+  assert.match(source, /URL\.createObjectURL/); assert.match(source, /URL\.revokeObjectURL/); assert.match(source, /billingApi\.downloadFiscalArtifact/);
+  assert.doesNotMatch(source, /window\.location/);
 });

@@ -698,15 +698,22 @@ test('[W4-SRC-01] (test-item-36 reg) renderFiscalStatusSection is exported from 
     'renderFiscalStatusSection must be exported from views.billingAdminRenderers');
 });
 
-test('[W4-SRC-02] (Wave 5 updated) no fiscal submission or re-emission controls in renderer source', () => {
-  const source = readRootFile('views/billing-admin.renderers.js');
+test('[W4-SRC-02] accepted-package delivery resend is the only allowed fiscal action', () => {
+  const rootShell = createBillingHarness();
+  const renderers = rootShell.require('views.billingAdminRenderers');
+  const rendererSource = readRootFile('views/billing-admin.renderers.js');
+  const adminSource = readRootFile('views/billing-admin.js');
+  const apiSource = readRootFile('billing-api.js');
 
-  // Fiscal re-emission/re-send controls are forbidden.
-  // Note: "Reintentar" is allowed in Wave 5+ as an artifact-load retry (not a fiscal mutation).
-  assert.doesNotMatch(source, /Reenviar|Emitir|Reemitir|Reiniciar.*fiscal/i,
-    'no fiscal re-emit or re-send action buttons must appear in renderer');
-  assert.doesNotMatch(source, /Enviar a Hacienda.*button|button.*Enviar a Hacienda/i,
-    'no "send to Hacienda" action button must appear in renderer');
+  const accepted = renderers.renderFiscalStatusSection(makeFiscal(), { invoiceId: '1623' });
+  const pending = renderers.renderFiscalStatusSection(makeFiscal({ status: 'PENDING' }), { invoiceId: '1623' });
+  assert.match(accepted, /Reenviar documentos/, 'an existing ACCEPTED fiscal document may request delivery resend');
+  assert.doesNotMatch(pending, /Reenviar documentos/, 'non-ACCEPTED fiscal documents cannot expose delivery resend');
+  assert.match(apiSource, /fiscal-documents\/resend/, 'resend targets only the Inventori endpoint');
+  assert.match(apiSource, /method: 'POST'/, 'resend uses POST through the same-origin Inventori API client');
+  assert.doesNotMatch(rendererSource + adminSource + apiSource, /https?:\/\/.*billing|billingDirectUrl|billingApiUrl/i, 'browser never invokes Billing directly');
+  assert.doesNotMatch(rendererSource + adminSource, /Enviar a Hacienda.*button|button.*Enviar a Hacienda|Reintentar Hacienda|Resubmit/i, 'no Hacienda resubmit/retry control exists');
+  assert.doesNotMatch(rendererSource + adminSource, /Regenerar XML|Generar XML|Reemitir|Reemplazar comprobante|Nueva identidad fiscal/i, 'no XML regeneration, reissue, replacement, or new fiscal identity control exists');
 });
 
 test('[W4-SRC-03] (test-item-29) no direct Billing communication introduced in Wave 4', () => {

@@ -449,29 +449,14 @@ test('Prisma schema companyId present on OrderFiscalApproval (tenant isolation)'
 // existing rows observe the DEFAULT value immediately — NOT NULL — without a
 // physical table rewrite. SQL-visible result for pre-existing rows = 'UNVERIFIED'.
 
-function parseEnvFile(filePath) {
-  const result = {};
-  if (!fs.existsSync(filePath)) return result;
-  for (const line of fs.readFileSync(filePath, 'utf8').split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
-    if (match) result[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
-  }
-  return result;
-}
+const {
+  configureFiscalDisposableDatabase,
+  verifyFiscalDisposableDatabase,
+} = require('./helpers/fiscal-disposable-database-guard');
 
-function resolvePostgresDatabaseUrl() {
-  if (process.env.INVENTORI_BILLING_DATABASE_URL) return process.env.INVENTORI_BILLING_DATABASE_URL;
-  const env = parseEnvFile(path.join(__dirname, '..', '.env'));
-  const required = ['POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DB', 'POSTGRES_PORT'];
-  if (required.some((k) => !env[k])) return null;
-  return `postgresql://${env.POSTGRES_USER}:${env.POSTGRES_PASSWORD}@localhost:${env.POSTGRES_PORT}/${env.POSTGRES_DB}?schema=public`;
-}
-
-const pgUrl = resolvePostgresDatabaseUrl();
-const runDbTests = process.env.INVENTORI_BILLING_POSTGRES_TEST === '1' && pgUrl != null;
+const disposableDatabaseConfig = configureFiscalDisposableDatabase();
+const runDbTests = disposableDatabaseConfig != null;
 const dbRunOptions = { skip: !runDbTests };
-
-if (pgUrl) process.env.DATABASE_URL = pgUrl;
 
 const { describe, before: dbBefore, after: dbAfter } = require('node:test');
 
@@ -486,6 +471,7 @@ describe('DB verification: verification_status PostgreSQL DEFAULT semantics', db
   dbBefore(async () => {
     prisma = require('../src/lib/prisma');
     await prisma.$connect();
+    await verifyFiscalDisposableDatabase(prisma, disposableDatabaseConfig);
   });
 
   dbAfter(async () => {

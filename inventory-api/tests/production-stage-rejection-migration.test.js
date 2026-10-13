@@ -12,6 +12,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { PrismaClient } = require('@prisma/client');
+const {
+  assertDisposableDatabaseUrl,
+  resolveFiscalDisposableDatabaseConfig,
+  verifyFiscalDisposableDatabase,
+} = require('./helpers/fiscal-disposable-database-guard');
 
 const databaseUrl = process.env.P2_CONSTRAINTS_DATABASE_URL;
 
@@ -20,7 +25,19 @@ if (!databaseUrl) {
   return;
 }
 
+const disposableDatabaseConfig = resolveFiscalDisposableDatabaseConfig(process.env);
+assertDisposableDatabaseUrl(databaseUrl, 'P2_CONSTRAINTS_DATABASE_URL', disposableDatabaseConfig);
+
 const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+
+test.before(async () => {
+  await prisma.$connect();
+  await verifyFiscalDisposableDatabase(prisma, disposableDatabaseConfig);
+});
+
+test.after(async () => {
+  await prisma.$disconnect();
+});
 
 test('production_stage_executions has status column with default COMPLETED', async () => {
   const result = await prisma.$queryRaw`

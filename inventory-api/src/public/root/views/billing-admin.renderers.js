@@ -260,8 +260,9 @@
         const label     = ARTIFACT_LABELS[a.inventoriType];
         const baseAria  = ARTIFACT_ARIA_LABELS[a.inventoriType] || label;
         const ariaLabel = bh.escapeHtml(baseAria + numSuffix);
-        const url       = `/api/invoices/${safeId}/fiscal-artifacts/${bh.escapeHtml(String(a.inventoriType))}`;
-        return `<a href="${url}" download class="secondary-button billing-artifact-link" aria-label="${ariaLabel}" style="font-size:0.85rem;padding:6px 12px;">${bh.escapeHtml(label)}</a>`;
+        const type      = bh.escapeHtml(String(a.inventoriType));
+        const url       = `/api/invoices/${safeId}/fiscal-artifacts/${type}`;
+        return `<button type="button" class="secondary-button billing-artifact-link billing-artifact-download-btn" data-invoice-id="${safeId}" data-artifact-type="${type}" data-download-url="${url}" aria-label="${ariaLabel}" style="font-size:0.85rem;padding:6px 12px;">${bh.escapeHtml(label)}</button>`;
       });
 
     if (links.length === 0) {
@@ -367,6 +368,7 @@
         <span class="${badgeClass}">${label}</span>
         <p class="muted" style="margin:8px 0 0;font-size:0.88rem;">${description}</p>
         ${acceptedBlock}
+        ${status === 'ACCEPTED' && fiscal.clave ? `<button type="button" class="billing-fiscal-resend-btn" data-invoice-id="${bh.escapeHtml(String(safeOpts.invoiceId || ''))}">Reenviar documentos</button>` : ''}
         ${artifactArea}
       </section>`;
   }
