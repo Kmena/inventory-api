@@ -311,18 +311,14 @@ test('[CONTRACT-03] Inventori → Billing: receiver.economicActivity field confi
 
 // ─── [WAVE8] Wave 8 Handoff Invariants (Billing XML gap confirmed, NOT fixed) ─
 
-test('[WAVE8-01] Billing XML serializer does NOT currently emit CodigoActividadReceptor (gap confirmed)', () => {
-  // Wave 7 confirms this gap remains — it is NOT fixed here.
-  // Inventori already sends receiver.economicActivity; Billing must add XML emission in Wave 8.
-  // This test documents the gap by confirming it has NOT been implemented.
+test('[WAVE8-01] Inventori hands off economicActivity without owning Billing XML serialization', () => {
+  // Inventori sends the receiver activity to Billing but must not couple itself to
+  // Billing's XML element names or serializer implementation.
   const inventorySrc = src('src/services/fiscal-billing-worker.service.js');
-  // Worker sends the field; XML emission is a Billing-side concern not visible here
   assert.match(inventorySrc, /economicActivity/,
     'worker MUST send economicActivity field to Billing (Inventori side done)');
-  // Wave 8 work note preserved in spec — confirmed NOT implementing here
-  const specTasks = fs.readFileSync(path.join(__dirname, '..', 'specs/inventori-receiver-fiscal-readiness/tasks.md'), 'utf8');
-  assert.match(specTasks, /Wave 8.*Billing XML|RFR-TASK-801/s,
-    'Wave 8 Billing XML task MUST still be recorded in tasks.md (not yet done)');
+  assert.doesNotMatch(inventorySrc, /CodigoActividadReceptor/,
+    'Billing XML element names must remain a Billing-side concern');
 });
 
 test('[WAVE8-02] CodigoActividadReceptor handoff: Inventori source field confirmed', () => {

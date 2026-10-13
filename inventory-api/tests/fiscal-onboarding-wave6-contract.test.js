@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const billingContracts = path.resolve(__dirname, '..', '..', '..', 'Billing', 'docs', 'contracts');
+const billingContracts = path.resolve(__dirname, 'fixtures', 'billing-fiscal-onboarding');
 const openapiPath = path.join(billingContracts, 'fiscal-onboarding.v1.openapi.yaml');
 const catalogPath = path.join(billingContracts, 'fixtures', 'fiscal-onboarding.v1', 'operation-catalog.json');
 

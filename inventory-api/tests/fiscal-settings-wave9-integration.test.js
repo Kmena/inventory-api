@@ -209,43 +209,37 @@ test('Wave 9 #B5: Billing 503 retryable → Inventori 503', async () => {
 });
 
 test('Wave 9 #B6: sanitizeBillingFailure converts non-BillingClientError to 502 createHttpError', async () => {
-  // The sanitisation happens inside the service layer (loadCanonicalSettings), not in the route.
-  // We verify the service's own catch path, not a route stub.
-  const billingIntegrationConfigRepository = require('../src/repositories/billing-integration-config.repository');
   const fakeConfig = { enabled: true, billingCompanyId: 'co', billingTenantId: 't', billingEnvironment: 'SANDBOX', billingCredentialSecretRef: 'ref' };
-  const origFind = billingIntegrationConfigRepository.findByCompanyId;
-  billingIntegrationConfigRepository.findByCompanyId = async () => fakeConfig;
-  const origMethod = BillingApiClient.prototype.getFiscalOnboardingStatus;
-  BillingApiClient.prototype.getFiscalOnboardingStatus = async () => { throw new Error('network blew up'); };
-  try {
-    await assert.rejects(
-      () => fiscalSettingsService.getFiscalSettings({ companyId: '77' }, {}),
-      (e) => { assert.equal(e.statusCode, 502); assert.equal(e.code, 'BILLING_UNAVAILABLE'); return true; },
-    );
-  } finally {
-    billingIntegrationConfigRepository.findByCompanyId = origFind;
-    BillingApiClient.prototype.getFiscalOnboardingStatus = origMethod;
-  }
+  const billingClient = {
+    getFiscalProfileV1: async () => { throw new Error('network blew up'); },
+    getFiscalOnboardingActivities: async () => [],
+    getFiscalReadinessV1: async () => ({}),
+  };
+  await assert.rejects(
+    () => fiscalSettingsService.getFiscalSettings({ companyId: '77' }, {}, {
+      billingIntegrationConfigRepository: { findByCompanyId: async () => fakeConfig },
+      billingClient,
+    }),
+    (e) => { assert.equal(e.statusCode, 502); assert.equal(e.code, 'BILLING_UNAVAILABLE'); return true; },
+  );
 });
 
 test('Wave 9 #B7: sanitizeBillingFailure maps BillingClientError retryable=true, no statusCode → 503', async () => {
-  const billingIntegrationConfigRepository = require('../src/repositories/billing-integration-config.repository');
   const fakeConfig = { enabled: true, billingCompanyId: 'co', billingTenantId: 't', billingEnvironment: 'SANDBOX', billingCredentialSecretRef: 'ref' };
-  const origFind = billingIntegrationConfigRepository.findByCompanyId;
-  billingIntegrationConfigRepository.findByCompanyId = async () => fakeConfig;
-  const origMethod = BillingApiClient.prototype.getFiscalOnboardingStatus;
-  BillingApiClient.prototype.getFiscalOnboardingStatus = async () => {
-    throw new BillingClientError('Billing request timed out', { code: 'BILLING_TIMEOUT', retryable: true });
+  const billingClient = {
+    getFiscalProfileV1: async () => {
+      throw new BillingClientError('Billing request timed out', { code: 'BILLING_TIMEOUT', retryable: true });
+    },
+    getFiscalOnboardingActivities: async () => [],
+    getFiscalReadinessV1: async () => ({}),
   };
-  try {
-    await assert.rejects(
-      () => fiscalSettingsService.getFiscalSettings({ companyId: '77' }, {}),
-      (e) => { assert.equal(e.statusCode, 503); assert.equal(e.code, 'BILLING_TIMEOUT'); return true; },
-    );
-  } finally {
-    billingIntegrationConfigRepository.findByCompanyId = origFind;
-    BillingApiClient.prototype.getFiscalOnboardingStatus = origMethod;
-  }
+  await assert.rejects(
+    () => fiscalSettingsService.getFiscalSettings({ companyId: '77' }, {}, {
+      billingIntegrationConfigRepository: { findByCompanyId: async () => fakeConfig },
+      billingClient,
+    }),
+    (e) => { assert.equal(e.statusCode, 503); assert.equal(e.code, 'BILLING_TIMEOUT'); return true; },
+  );
 });
 
 // ── PART C — BillingApiClient malformed-payload rejection ─────────────────────

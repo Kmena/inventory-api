@@ -277,7 +277,7 @@ async function stubClientsRuntime(page, baseUrl, user) {
       classification: { id: 1, name: 'Preferente' },
       phone: '555-0201',
       legalId: '1234567-8',
-      documentType: 'NIT',
+      documentType: '02',
       emailBilling: 'clientes@norte.test',
       paymentType: 'CREDIT',
       paymentDays: 15,
@@ -323,6 +323,14 @@ async function stubClientsRuntime(page, baseUrl, user) {
 
   await page.route('**/api/clients/document-types', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(cloneJson(documentTypes)) });
+  });
+
+  await page.route('**/api/economic-activities*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ code: '6201', description: 'Servicios administrados' }]),
+    });
   });
 
   await page.route('**/api/regions/company', async (route) => {

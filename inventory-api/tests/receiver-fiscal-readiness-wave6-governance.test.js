@@ -232,15 +232,16 @@ test('[S-01] OQ-009: staleness threshold semantics — 89 days not stale, 91 day
   // Uses the same formula as client-fiscal-verification.js _isStale():
   //   (Date.now() - ts.getTime()) > STALE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000
   // The OQ-009 approved threshold is exactly 90 days (> means strictly greater than).
+  const now = Date.now();
   const isStale = (dt) => {
     if (!dt) return false;
     const ts = new Date(dt);
     if (isNaN(ts.getTime())) return false;
-    return (Date.now() - ts.getTime()) > STALE_DAYS * DAY_MS;
+    return (now - ts.getTime()) > STALE_DAYS * DAY_MS;
   };
-  const ts89 = new Date(Date.now() - 89 * DAY_MS).toISOString();
-  const ts90 = new Date(Date.now() - 90 * DAY_MS).toISOString();
-  const ts91 = new Date(Date.now() - 91 * DAY_MS).toISOString();
+  const ts89 = new Date(now - 89 * DAY_MS).toISOString();
+  const ts90 = new Date(now - 90 * DAY_MS).toISOString();
+  const ts91 = new Date(now - 91 * DAY_MS).toISOString();
   assert.strictEqual(isStale(ts89), false, '89 days → NOT stale (< 90 day threshold)');
   assert.strictEqual(isStale(ts90), false, 'exactly 90 days → NOT stale (threshold is STRICTLY greater than)');
   assert.strictEqual(isStale(ts91), true, '91 days → stale (> 90 day threshold)');

@@ -32,9 +32,10 @@ function sameTuple(row) {
 }
 
 async function assertDatabaseBoundary(mode) {
-  const rows = await prisma.$queryRawUnsafe(
-    "SELECT current_database() AS database_name, coalesce(shobj_description((SELECT oid FROM pg_database WHERE datname=current_database()), 'pg_database'),'') AS marker",
-  );
+  const rows = await prisma.$queryRaw`
+    SELECT current_database() AS database_name,
+      coalesce(shobj_description((SELECT oid FROM pg_database WHERE datname=current_database()), 'pg_database'),'') AS marker
+  `;
   const databaseName = rows[0]?.database_name;
   if (mode === 'REHEARSAL') {
     if (databaseName === 'tracksys') throw new Error('Rehearsal refuses normal tracksys');
@@ -67,12 +68,12 @@ async function loadState(db = prisma) {
 }
 
 async function verifyHistoricalIdentity() {
-  const rows = await prisma.$queryRawUnsafe(`
+  const rows = await prisma.$queryRaw`
     SELECT id::text, status::text, clave
     FROM invoice_fiscal_intents
     WHERE company_id = 1 AND status = 'ACCEPTED'
     ORDER BY id
-  `);
+  `;
   if (rows.length !== 2 || rows.some((row) => !String(row.clave || '').includes(EXPECTED.identificationNumber))) {
     throw new Error('Company 1 accepted fiscal identity evidence does not match target taxpayer');
   }
@@ -91,9 +92,9 @@ async function recordAudit(tx, action, companyId, resourceId, beforeState, after
 
 async function markSourceHistorical() {
   return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(
-      "SELECT pg_advisory_xact_lock(hashtextextended('company1-final-fiscal-activation:inventori', 0))",
-    );
+    await tx.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtextextended('company1-final-fiscal-activation:inventori', 0))
+    `;
     const { source, target } = await loadState(tx);
     if (source.associationStatus === 'HISTORICAL_ONLY' && source.enabled === false) return false;
     if (source.associationStatus !== 'ACTIVE' || source.enabled !== true
@@ -168,9 +169,9 @@ async function bootstrapAndVerify() {
 
 async function activateTarget(credential) {
   return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(
-      "SELECT pg_advisory_xact_lock(hashtextextended('company1-final-fiscal-activation:inventori', 0))",
-    );
+    await tx.$executeRaw`
+      SELECT pg_advisory_xact_lock(hashtextextended('company1-final-fiscal-activation:inventori', 0))
+    `;
     const { source, target, targetCompany } = await loadState(tx);
     if (source.associationStatus !== 'HISTORICAL_ONLY' || source.enabled !== false) {
       throw new Error('Source association is not safely historical');

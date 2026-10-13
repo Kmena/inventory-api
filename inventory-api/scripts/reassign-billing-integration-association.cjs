@@ -22,13 +22,13 @@ function required(name) {
 }
 
 async function assertDatabaseBoundary(prisma, mode) {
-  const rows = await prisma.$queryRawUnsafe('SELECT current_database() AS database_name');
+  const rows = await prisma.$queryRaw`SELECT current_database() AS database_name`;
   const databaseName = rows[0]?.database_name;
   if (mode === 'REHEARSAL') {
     if (databaseName === 'billing_dev') throw new Error('Rehearsal refuses normal billing_dev');
-    const marker = await prisma.$queryRawUnsafe(
-      "SELECT to_regclass('billing_test_safety.marker')::text AS marker_table",
-    );
+    const marker = await prisma.$queryRaw`
+      SELECT to_regclass('billing_test_safety.marker')::text AS marker_table
+    `;
     if (marker[0]?.marker_table !== 'billing_test_safety.marker') {
       throw new Error('Disposable Billing database marker is missing');
     }
@@ -49,9 +49,9 @@ async function main() {
   try {
     const databaseName = await assertDatabaseBoundary(prisma, mode);
     const result = await prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(
-        "SELECT pg_advisory_xact_lock(hashtextextended('company1-final-fiscal-activation:billing', 0))",
-      );
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(hashtextextended('company1-final-fiscal-activation:billing', 0))
+      `;
       const association = await tx.fiscalIntegrationAssociation.findUnique({
         where: { id: EXPECTED.associationId },
       });
