@@ -25,9 +25,9 @@ No se aceptan rutas montadas sin clasificar.
 
 ### Current contract summary
 Option B satisfied for the minimum critical contract surface.
-- Operaciones montadas en routers descubiertas desde `src/app.js` + `src/routes/*.routes.js`: `156`
+- Operaciones montadas en routers descubiertas desde `src/app.js` + `src/routes/*.routes.js`: `157`
 - Operaciones cubiertas por OpenAPI parcial: `113`
-- Operaciones excluidas explícitamente del OpenAPI parcial: `43`
+- Operaciones excluidas explícitamente del OpenAPI parcial: `44`
 - Superficie runtime adicional intencionalmente fuera de OpenAPI: `express.static(src/public)`
 
 ### Intentionally excluded OpenAPI operations
@@ -35,7 +35,8 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 - aliases o formas legacy compatibles preservadas;
 - superficies root/global fuera del recorte contractual actual;
 - mutaciones o subrecursos profundos de lifecycle aún no formalizados en OpenAPI parcial;
-- integraciones auxiliares o superficies runtime gobernadas por otras pruebas/documentos.
+- integraciones auxiliares o superficies runtime gobernadas por otras pruebas/documentos;
+- operaciones fiscal-operator gobernadas por specs/inventori-billing-integration.
 
 ## Scope and evidence rules
 - Solo se documentan endpoints verificables en `src/routes/` y montados en `src/app.js`.
@@ -99,6 +100,7 @@ Las exclusiones actuales viven en `docs/runtime-contract-manifest.json`. Option 
 | GET | `/api/clients/document-types` | Sí | `authorize('admin', 'sales')` | Listar tipos de documento soportados | Catálogo estático/servicio |
 | POST | `/api/clients/company` | Sí | `authorize('admin', 'sales')` | Crear cliente de compañía | Validado por schema |
 | POST | `/api/clients/company/:clientId/stores` | Sí | `authorize('admin', 'sales')` | Crear tienda/sucursal de cliente | UI root/admin |
+| PATCH | `/api/clients/company/:clientId/stores/:storeId` | Sí | `authorize('admin', 'sales')` | Editar tienda/sucursal de cliente | UI root/admin; fuera de OpenAPI parcial actual |
 | POST | `/api/clients/:clientId/documents` | Sí | `authorize('admin', 'sales')` | Registrar documento privado de cliente | Descarga protegida asociada |
 | POST | `/api/clients/:clientId/references` | Sí | `authorize('admin', 'sales')` | Crear referencia comercial del cliente | UI root/admin |
 | GET | `/api/clients/:clientId/documents/:documentId/download` | Sí | `authorize('admin', 'sales')` | Descargar documento privado de cliente | No expone static public path |

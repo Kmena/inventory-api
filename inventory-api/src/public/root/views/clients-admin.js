@@ -94,10 +94,10 @@
               <label class="root-form-grid__full"><span>Nombre *</span><input name="name" type="text" required minlength="2" maxlength="255" /></label>
               <label><span>Codigo</span><input name="code" type="text" maxlength="50" /></label>
               <label><span>Clasificacion</span><select id="clients-create-classification" name="clientClassificationId"></select></label>
-              <label><span>Identificacion</span><input name="legalId" type="text" maxlength="100" /></label>
+              <label><span>Identificación *</span><input name="legalId" type="text" maxlength="100" required /></label>
               <label>
-                <span>Tipo de identificación</span>
-                <select name="documentType">
+                <span>Tipo de identificación *</span>
+                <select name="documentType" required>
                   <option value="">Selecciona</option>
                   <option value="01">01 — Cédula Física</option>
                   <option value="02">02 — Cédula Jurídica</option>
@@ -106,7 +106,7 @@
                 </select>
               </label>
               <label><span>Telefono</span><input name="phone" type="text" maxlength="50" /></label>
-              <label><span>Correo electrónico para facturas (PDF y XML)</span><input name="emailBilling" type="email" maxlength="255" /></label>
+              <label><span>Correo electrónico para facturas (PDF y XML) *</span><input name="emailBilling" type="email" maxlength="255" required /></label>
               <label><span>Tipo de pago</span><select name="paymentType"><option value="">Selecciona</option><option value="CASH">Contado</option><option value="CREDIT">Credito</option><option value="TRANSFER">Transferencia</option><option value="CARD">Tarjeta</option></select></label>
               <label><span>Dias de pago</span><input name="paymentDays" type="number" min="0" /></label>
               <label class="root-form-grid__full">
@@ -314,6 +314,8 @@
     let selectedClientId = null;
     let clientDetailsById = {};
     let entitlementsByClientId = {};
+    /** @type {Record<string, { legalEntity: any, activities: any[] }>} Wave 6 fiscal state cache (entity ID → state) */
+    const clientFiscalStateById = {};
     let isDocumentFileProcessing = false;
     /** @type {boolean} Flag para el form de edición — evita re-consultar tras éxito */
     let editLookupDone = false;
@@ -344,6 +346,36 @@
       return clientsState.getSelectedClient(clients, clientDetailsById, selectedClientId);
     }
 
+    /**
+     * Wave 6 — mount fiscal verification section from cache.
+     * Called after every renderCurrentState() so the section survives filter/search re-renders.
+     * If no cached state exists yet (first load), this is a no-op; loadClientDetail provides the initial cache.
+     */
+    function tryMountFiscalSection() {
+      if (!rootShell.has('views.clientFiscalVerification')) return;
+      const selectedClient = getSelectedClient();
+      const entityId = selectedClient && selectedClient.legalEntity && selectedClient.legalEntity.id
+        ? String(selectedClient.legalEntity.id) : null;
+      if (!entityId) return;
+      const fiscalBody = /** @type {HTMLElement | null} */ (detailRegion.querySelector('#client-fiscal-body'));
+      if (!fiscalBody) return;
+      const cached = clientFiscalStateById[entityId];
+      if (!cached) return; // first load — will be populated by loadClientDetail after API fetch
+      const clientFiscalVerification = rootShell.require('views.clientFiscalVerification');
+      clientFiscalVerification.mountFiscalSection(
+        fiscalBody, session, cached.legalEntity, cached.activities, canEditClient,
+        function onVerified(updatedEntity, updatedActivities) {
+          clientFiscalStateById[entityId] = { legalEntity: updatedEntity, activities: updatedActivities };
+          if (selectedClientId) {
+            clientDetailsById[String(selectedClientId)] = {
+              ...clientDetailsById[String(selectedClientId)],
+              legalEntity: updatedEntity,
+            };
+          }
+        },
+      );
+    }
+
     function renderCurrentState() {
       const filteredClients = getFilteredClients();
       if (!selectedClientId && filteredClients[0]) {
@@ -363,6 +395,7 @@
         canManageEntitlements: canManageEntitlements,
         canManuallyActivateEntitlements: canManuallyActivateEntitlements,
       }, economicActivities);
+      tryMountFiscalSection(); // Wave 6 — re-mount fiscal section from cache after every re-render
     }
 
     async function loadClients() {
@@ -437,6 +470,17 @@
           if (editLookupBtn && editLegalIdInput) {
             editLookupBtn.disabled = !isCedulaLongEnough(editLegalIdInput.value);
           }
+        }
+        // Wave 6: load + cache fiscal activities, then mount the verification section
+        if (rootShell.has('views.clientFiscalVerification') && detail.legalEntity && detail.legalEntity.id) {
+          const legalEntityId = detail.legalEntity.id;
+          let activities = [];
+          try {
+            const activitiesResult = await clientsApi.getClientLegalEntityActivities(session, legalEntityId);
+            activities = Array.isArray(activitiesResult.activities) ? activitiesResult.activities : [];
+          } catch (_e) { /* network unavailable — fiscal section shows empty activities */ }
+          clientFiscalStateById[String(legalEntityId)] = { legalEntity: detail.legalEntity, activities };
+          tryMountFiscalSection();
         }
         setShellStatus('Sesion lista.');
       } catch (error) {
@@ -611,6 +655,36 @@
         } catch (error) {
           detailMessage.innerHTML = rootShellUi.renderInlineMessage(error.message || 'No se pudo renovar el acceso.', 'error');
         }
+        return;
+      }
+
+      const editStoreButton = target.closest('[data-store-edit]');
+      if (editStoreButton instanceof globalScope.HTMLElement) {
+        if (!canEditClient) return;
+        const client = getSelectedClient();
+        const storeId = editStoreButton.getAttribute('data-store-edit') || '';
+        const store = (client?.stores || []).find((item) => String(item.id) === String(storeId));
+        if (!client || !store) return;
+        clientsAdminStoreDialog.open(
+          client.id,
+          client.name || '',
+          session,
+          zoneOptions,
+          async () => {
+            await loadClientDetail(client.id);
+            detailMessage.innerHTML = rootShellUi.renderInlineMessage('Tienda actualizada correctamente.');
+            setShellStatus('Tienda actualizada correctamente.');
+          },
+          async () => {
+            const zonesResponse = await clientsApi.listZones(session);
+            zoneOptions = clientsState.flattenZoneOptions(zonesResponse);
+            return zoneOptions;
+          },
+          client,
+          documentTypes,
+          canLookupTaxpayer,
+          store,
+        );
         return;
       }
 
@@ -908,6 +982,10 @@
 
         if (form.id === 'clients-update-form') {
           if (!canEditClient) return;
+          if (!form.reportValidity()) {
+            detailMessage.innerHTML = rootShellUi.renderInlineMessage('Complete los datos fiscales obligatorios antes de guardar.', 'error');
+            return;
+          }
           await clientsApi.updateClient(session, clientId, clientsHelpers.buildClientPayload(formData));
           await loadClients();
           await loadClientDetail(clientId);
@@ -970,6 +1048,17 @@
     });
 
     await loadClients();
+
+    // Wave 6 — bootstrap fiscal section for the auto-selected client on initial mount.
+    // loadClients() renders the first client's form but never calls loadClientDetail,
+    // so #client-fiscal-body stays at "Cargando datos de facturación…" permanently
+    // until the user manually clicks the client.
+    // Only fire when the detail cache is empty (initial mount, not after save/reload
+    // where clientDetailsById is already populated and the save handler explicitly
+    // calls loadClientDetail).
+    if (selectedClientId && !clientDetailsById[String(selectedClientId)]) {
+      loadClientDetail(selectedClientId).catch(() => {});
+    }
   }
 
   rootShell.register('views.clientsAdmin', {

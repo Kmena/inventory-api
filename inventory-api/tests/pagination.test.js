@@ -141,7 +141,12 @@ test('listInvoices returns paginated responses without changing legacy tenant sc
     totalItems: 5,
     totalPages: 3,
   });
-  assert.deepEqual(result.items, [{ id: 11n, number: 'F-001' }]);
+  // Wave 1: items are now serialized via serializeInvoiceForList.
+  // invoiceNumber replaces number; fiscal is null when no fiscalIntent in stub.
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].id, 11n);
+  assert.equal(result.items[0].invoiceNumber, 'F-001');
+  assert.equal(result.items[0].fiscal, null);
 });
 
 test('listOrders preserves the legacy array response when pagination is not requested', async () => {
@@ -155,7 +160,7 @@ test('listOrders preserves the legacy array response when pagination is not requ
     () => orderService.listOrders({ companyId: '9', sub: '4', role: 'sales' }),
   );
 
-  assert.deepEqual(result, [{ id: 81n, status: 'DRAFT' }]);
+  assert.deepEqual(result, [{ id: 81n, status: 'DRAFT', items: [] }]);
 });
 
 test('listOrders returns paginated metadata only when pagination is requested', async () => {
@@ -173,7 +178,7 @@ test('listOrders returns paginated metadata only when pagination is requested', 
   );
 
   assert.deepEqual(result, {
-    items: [{ id: 82n, status: 'APPROVED' }],
+    items: [{ id: 82n, status: 'APPROVED', items: [] }],
     pagination: {
       page: 2,
       pageSize: 1,

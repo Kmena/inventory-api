@@ -538,7 +538,9 @@ function findFirstSellableWarehouse(companyId, db = prisma) {
       isVirtual: false,
       isSellableSource: true,
     },
-    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    // Operational defaults must not depend on editable display names.
+    // Prefer the oldest configured sellable source for deterministic auto-assignment.
+    orderBy: { id: 'asc' },
   });
 }
 

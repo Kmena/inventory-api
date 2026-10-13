@@ -34,6 +34,10 @@ internal-docs/cache/**
 
 # Temporary test artifacts.
 tests/tmp-prisma-lock-*/
+backups/
+test-output/
+.e2e-token.txt
+tmp_debug.txt
 
 # Local planning / cleanup scratch files.
 commit-plan-*.md

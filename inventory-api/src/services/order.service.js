@@ -4,6 +4,8 @@ const { createHttpError } = require('../lib/errors');
 const { buildPaginatedResponse } = require('../lib/pagination');
 const audit = require('../lib/audit');
 const { assertLifecycleStatusAllowed } = require('./approval-baseline.service');
+const { getBillingIntegrationConfig } = require('./fiscal-readiness.service');
+const receiverFiscalReadiness = require('./receiver-fiscal-readiness.service');
 const {
   scope,
   validateOrderScope,
@@ -14,15 +16,56 @@ const {
   toOrderItemsCreate,
 } = require('./order-access-policy.service');
 
+function uniqueInventoryProductIds(orders) {
+  const ids = new Map();
+  for (const order of orders || []) {
+    for (const item of order.items || []) {
+      if (item.product?.controlsInventory === false || !item.productId) continue;
+      ids.set(item.productId.toString(), item.productId);
+    }
+  }
+  return [...ids.values()];
+}
+
+async function buildSellableInventoryByProductId(companyId, orders) {
+  const rows = await orderRepository.findSellableLotStocksByProductIds(companyId, uniqueInventoryProductIds(orders));
+  const totals = new Map();
+  for (const row of rows) {
+    if (!inventoryService.deriveLotUsability(row.lot).sellable) continue;
+    const available = Math.max(0, Number(row.quantity || 0) - Number(row.reservedQuantity || 0));
+    if (available <= 0.000001) continue;
+    const key = row.productId.toString();
+    totals.set(key, (totals.get(key) || 0) + available);
+  }
+  return totals;
+}
+
+async function attachSellableInventoryToOrders(companyId, orders) {
+  const totals = await buildSellableInventoryByProductId(companyId, orders);
+  return (orders || []).map((order) => ({
+    ...order,
+    items: (order.items || []).map((item) => ({
+      ...item,
+      product: item.product ? {
+        ...item.product,
+        sellableInventoryQuantity: item.product.controlsInventory === false
+          ? null
+          : Number((totals.get(item.productId.toString()) || 0).toFixed(3)),
+      } : item.product,
+    })),
+  }));
+}
+
 async function listOrders(auth, pagination = null) {
   const { companyId } = scope(auth);
   const orders = await orderRepository.findAllOrders(companyId, pagination);
   if (!pagination) {
-    return orders;
+    return attachSellableInventoryToOrders(companyId, orders);
   }
 
   const paginatedOrders = /** @type {{ items: Array<any>, totalItems: number }} */ (orders);
-  return buildPaginatedResponse(paginatedOrders.items, pagination, paginatedOrders.totalItems);
+  const items = await attachSellableInventoryToOrders(companyId, paginatedOrders.items);
+  return buildPaginatedResponse(items, pagination, paginatedOrders.totalItems);
 }
 
 async function getOrder(id, auth) {
@@ -121,10 +164,92 @@ async function updateOrder(id, payload, auth, req = null) {
   return updatedOrder;
 }
 
-async function approveOrder(id, auth, req = null) {
+/**
+ * Approve an order.
+ * When Billing integration is enabled: validates receiver fiscal readiness,
+ * selected economic activity, and atomically creates OrderFiscalApproval.
+ * When Billing is disabled: preserves existing commercial approval behavior.
+ *
+ * @param {bigint} id — order ID
+ * @param {object|null} body — { receiverEconomicActivityCode? } from request
+ * @param {object} auth — authenticated actor
+ * @param {object|null} req — for audit
+ */
+async function approveOrder(id, body, auth, req = null) {
   const order = await getOrder(id, auth);
   assertLifecycleStatusAllowed(order.status, ['DRAFT'], 'Solo se pueden aprobar pedidos en borrador');
+
+  const { companyId, userId } = scope(auth);
+  const config = await getBillingIntegrationConfig(companyId);
+
+  if (config?.enabled) {
+    // ── Fiscal path: Billing integration enabled ──────────────────────────
+    // Load order with legal-entity context (separate query — avoid bloating standard order load)
+    const orderWithFiscal = await receiverFiscalReadiness.loadOrderWithLegalEntities(id, companyId);
+    if (!orderWithFiscal) throw createHttpError(404, 'Pedido no encontrado', 'not_found');
+
+    const fiscalData = await receiverFiscalReadiness.resolveOrderReceiverFiscalData(orderWithFiscal, companyId);
+
+    if (fiscalData.state !== 'READY') {
+      const msgMap = {
+        IDENTITY_INCOMPLETE: 'El receptor no tiene identidad fiscal completa para facturación',
+        IDENTITY_INVALID:    'La identificación del receptor es inválida para facturación fiscal',
+        UNVERIFIED:          'El receptor no ha sido verificado con Hacienda. Verifique los datos fiscales del cliente.',
+        NOT_FOUND:           'El receptor no fue encontrado en Hacienda. Actualice los datos fiscales del cliente.',
+        VERIFICATION_UNAVAILABLE: 'La verificación fiscal del receptor no está disponible. Vuelva a intentarlo.',
+        ACTIVITIES_MISSING:  'El receptor no tiene actividades económicas vigentes. Verifique los datos fiscales del cliente.',
+      };
+      const msg = msgMap[fiscalData.state] || 'El receptor no está listo para facturación fiscal';
+      throw createHttpError(409, msg, fiscalData.state);
+    }
+
+    // Activity selection validation (pre-tx check — will be re-validated inside tx)
+    const { receiverEconomicActivityCode } = body || {};
+    if (!receiverEconomicActivityCode) {
+      throw createHttpError(400, 'Se requiere seleccionar una actividad económica del receptor', 'RECEIVER_ACTIVITY_REQUIRED');
+    }
+
+    const selectedActivity = fiscalData.eligibleActivities.find((a) => a.code === receiverEconomicActivityCode);
+    if (!selectedActivity) {
+      throw createHttpError(409, 'La actividad económica seleccionada no es válida para este receptor', 'RECEIVER_ACTIVITY_NOT_ELIGIBLE');
+    }
+
+    // Delegate to inventory service — creates OrderFiscalApproval atomically inside the DB transaction
+    return inventoryService.reserveStockForOrder(id, auth, req, {
+      fiscalApprovalData: {
+        companyId,
+        clientLegalEntityId: fiscalData.entity.id,
+        receiverEconomicActivityCode,
+        confirmedById: userId ? BigInt(userId) : null,
+      },
+    });
+  }
+
+  // ── Commercial path: Billing disabled — existing behavior unchanged ──────────
+  // No fiscal check, no activity selection, no OrderFiscalApproval created.
   return inventoryService.reserveStockForOrder(id, auth, req);
+}
+
+/**
+ * GET /api/orders/:id/fiscal-readiness-preview
+ * Pure DB read — no Hacienda, no Billing, no mutations.
+ */
+async function getOrderFiscalReadinessPreview(id, auth) {
+  await getOrder(id, auth); // 404-guard: throws if order not found or not in company scope
+  const { companyId } = scope(auth);
+  const config = await getBillingIntegrationConfig(companyId);
+
+  if (!config?.enabled) {
+    return receiverFiscalReadiness.buildBillingDisabledPreviewDto(id);
+  }
+
+  const orderWithFiscal = await receiverFiscalReadiness.loadOrderWithLegalEntities(id, companyId);
+  // orderWithFiscal may be null only if order was deleted between the two queries (race) — safe fallback
+  const fiscalData = orderWithFiscal
+    ? await receiverFiscalReadiness.resolveOrderReceiverFiscalData(orderWithFiscal, companyId)
+    : { state: 'IDENTITY_INCOMPLETE', entity: null, eligibleActivities: [], allActivities: [] };
+
+  return receiverFiscalReadiness.buildFiscalReadinessPreviewDto(id, fiscalData);
 }
 
 async function rejectOrder(id, payload, auth, req = null) {
@@ -322,6 +447,7 @@ module.exports = {
   updateOrder,
   updateOrderAsAgent,
   approveOrder,
+  getOrderFiscalReadinessPreview,
   rejectOrder,
   resubmitOrder,
   cancelOrder,

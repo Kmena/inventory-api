@@ -23,6 +23,7 @@ const restoreDbFreeAuthSeams = enableDbFreeAuthSeams();
 process.on('exit', restoreDbFreeAuthSeams);
 
 const DESKTOP_VIEWPORT = { width: 1366, height: 900 };
+const TABLET_VIEWPORT = { width: 768, height: 1024 };
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
 const GEOMETRY_TOLERANCE_PX = 2;
 const OVERFLOW_TOLERANCE_PX = 8;
@@ -354,6 +355,24 @@ test('root shell layout: company-admin mobile drawer opens and closes with stabl
   assert.equal(geometry.drawerState, 'false');
   assert.equal(geometry.overlayHidden, true);
   assert.ok(geometry.sidebarRect.right <= OVERFLOW_TOLERANCE_PX, `Closed drawer should return off-canvas (sidebar.right=${geometry.sidebarRect.right}).`);
+});
+
+test('root shell layout: company-admin tablet uses the drawer and preserves the content lane', async (t) => {
+  const { server, sockets, baseUrl } = await startServer();
+  t.after(() => stopServer(server, sockets));
+
+  const page = await createBrowserPage(t, TABLET_VIEWPORT);
+  const adminUser = createBrowserSessionUser({ id: '77', roleCode: 'admin', companyId: '77', fullName: 'Admin Demo', username: 'admin-demo' });
+
+  await stubAuthMe(page, baseUrl, adminUser);
+  await seedBrowserSession(page, baseUrl, adminUser);
+  await openRootShell(page, baseUrl, '#admin_home');
+
+  const geometry = await readShellGeometry(page);
+  assert.equal(geometry.drawerState, 'false');
+  assert.equal(geometry.drawerButtonHidden, false);
+  assert.ok(geometry.sidebarRect.right <= OVERFLOW_TOLERANCE_PX, `Tablet drawer should stay off-canvas when closed (sidebar.right=${geometry.sidebarRect.right}).`);
+  assert.ok(geometry.mainRect.width >= TABLET_VIEWPORT.width - 64, `Tablet content should retain the viewport lane (main.width=${geometry.mainRect.width}).`);
 });
 
 test('root shell layout: root-global desktop keeps top navigation active without sidebar offset leakage', async (t) => {

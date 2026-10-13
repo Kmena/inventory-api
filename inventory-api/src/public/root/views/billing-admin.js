@@ -120,6 +120,21 @@
               <span>Referencia *</span>
               <input type="text" id="billing-pay-reference" maxlength="255" placeholder="Número de referencia o comprobante" style="font-size:16px;" />
             </label>
+            <label class="root-form-grid__full" id="billing-pay-bank-label">
+              <span>Banco de origen</span>
+              <input type="text" id="billing-pay-bank" maxlength="100" placeholder="Ej: BAC, Banco Nacional, BCR…" style="font-size:16px;" />
+            </label>
+            <label class="root-form-grid__full" id="billing-pay-card-type-label">
+              <span>Tipo de tarjeta</span>
+              <select id="billing-pay-card-type" style="font-size:16px;">
+                <option value="">Seleccione tipo…</option>
+                <option value="VISA">Visa</option>
+                <option value="MASTERCARD">Mastercard</option>
+                <option value="AMEX">American Express</option>
+                <option value="DINERS">Diners Club</option>
+                <option value="OTHER">Otro</option>
+              </select>
+            </label>
             <label class="root-form-grid__full">
               <span>Nota (opcional)</span>
               <textarea id="billing-pay-note" rows="2" maxlength="500" style="font-size:16px;"></textarea>
@@ -134,6 +149,16 @@
             <button type="button" id="billing-pay-cancel" class="secondary-button">Cancelar</button>
           </div>
         </form>
+      </dialog>
+
+      <dialog id="billing-detail-dialog" class="modal-card" aria-modal="true" aria-labelledby="billing-detail-dialog-title">
+        <div class="page-header">
+          <div>
+            <h3 id="billing-detail-dialog-title" tabindex="-1">Detalle de factura</h3>
+          </div>
+          <button type="button" id="billing-detail-dialog-close" class="secondary-button" aria-label="Cerrar detalle de factura">Cerrar</button>
+        </div>
+        <div id="billing-detail-dialog-body" style="max-height:70vh;overflow-y:auto;padding-bottom:8px;"></div>
       </dialog>`;
   }
 
@@ -176,6 +201,7 @@
         const invoices = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
         panel.innerHTML = renderers.renderReceivablesTable(invoices);
         bindRegisterPaymentButtons(panel, session);
+        bindDetailButtons(panel, session);
       } catch (err) {
         panel.innerHTML = `<p class="muted" style="color:#DC2626;padding:16px;">${helpers.escapeHtml(err.message || 'Error al cargar facturas.')}</p>`;
       }
@@ -194,37 +220,57 @@
 
     // ── Payment dialog (FR-016, DEC-010) ──
     function openPayDialog(sess, invoiceId, invoiceNumber, pendingAmount) {
-      const dialog   = /** @type {HTMLDialogElement|null} */ (containerEl.querySelector('#billing-pay-dialog'));
-      const subtitle = containerEl.querySelector('#billing-pay-dialog-subtitle');
-      const maxHint  = containerEl.querySelector('#billing-pay-max-hint');
-      const msgEl    = containerEl.querySelector('#billing-pay-dialog-message');
-      const errEl    = containerEl.querySelector('#billing-pay-error');
-      const methodSel = /** @type {HTMLSelectElement|null} */ (containerEl.querySelector('#billing-pay-method'));
-      const amountIn  = /** @type {HTMLInputElement|null} */ (containerEl.querySelector('#billing-pay-amount'));
-      const refIn     = /** @type {HTMLInputElement|null} */ (containerEl.querySelector('#billing-pay-reference'));
-      const refLabel  = containerEl.querySelector('#billing-pay-reference-label');
-      const noteIn    = /** @type {HTMLTextAreaElement|null} */ (containerEl.querySelector('#billing-pay-note'));
-      const submitBtn = /** @type {HTMLButtonElement|null} */ (containerEl.querySelector('#billing-pay-submit'));
+      const dialog       = /** @type {HTMLDialogElement|null} */ (containerEl.querySelector('#billing-pay-dialog'));
+      const subtitle     = containerEl.querySelector('#billing-pay-dialog-subtitle');
+      const maxHint      = containerEl.querySelector('#billing-pay-max-hint');
+      const msgEl        = containerEl.querySelector('#billing-pay-dialog-message');
+      const errEl        = containerEl.querySelector('#billing-pay-error');
+      const methodSel    = /** @type {HTMLSelectElement|null} */ (containerEl.querySelector('#billing-pay-method'));
+      const amountIn     = /** @type {HTMLInputElement|null} */ (containerEl.querySelector('#billing-pay-amount'));
+      const refIn        = /** @type {HTMLInputElement|null} */ (containerEl.querySelector('#billing-pay-reference'));
+      const refLabel     = containerEl.querySelector('#billing-pay-reference-label');
+      const bankIn       = /** @type {HTMLInputElement|null} */ (containerEl.querySelector('#billing-pay-bank'));
+      const bankLabel    = containerEl.querySelector('#billing-pay-bank-label');
+      const cardTypeSel  = /** @type {HTMLSelectElement|null} */ (containerEl.querySelector('#billing-pay-card-type'));
+      const cardLabel    = containerEl.querySelector('#billing-pay-card-type-label');
+      const noteIn       = /** @type {HTMLTextAreaElement|null} */ (containerEl.querySelector('#billing-pay-note'));
+      const submitBtn    = /** @type {HTMLButtonElement|null} */ (containerEl.querySelector('#billing-pay-submit'));
 
       if (!dialog) return;
 
       // Reset form state
-      if (subtitle)  subtitle.textContent = `Factura ${invoiceNumber || '—'} · Pendiente: ${helpers.formatCurrency(pendingAmount)}`;
-      if (maxHint)   maxHint.textContent  = `Máximo: ${helpers.formatCurrency(pendingAmount)}`;
-      if (msgEl)     msgEl.innerHTML = '';
-      if (errEl)   { errEl.hidden = true; errEl.textContent = ''; }
-      if (methodSel) methodSel.value = 'CASH';
-      if (amountIn)  amountIn.value  = '';
-      if (refIn)     refIn.value     = '';
-      if (noteIn)    noteIn.value    = '';
-      if (refLabel)  refLabel.hidden = true;   // default: CASH → reference not shown
+      if (subtitle)    subtitle.textContent = `Factura ${invoiceNumber || '—'} · Pendiente: ${helpers.formatCurrency(pendingAmount)}`;
+      if (maxHint)     maxHint.textContent  = `Máximo: ${helpers.formatCurrency(pendingAmount)}`;
+      if (msgEl)       msgEl.innerHTML = '';
+      if (errEl)     { errEl.hidden = true; errEl.textContent = ''; }
+      if (methodSel)   methodSel.value = 'CASH';
+      if (amountIn)    amountIn.value  = '';
+      if (refIn)       refIn.value     = '';
+      if (bankIn)      bankIn.value    = '';
+      if (cardTypeSel) cardTypeSel.value = '';
+      if (noteIn)      noteIn.value    = '';
+      // default: CASH → all conditional fields hidden
+      if (refLabel)   refLabel.hidden  = true;
+      if (bankLabel)  bankLabel.hidden = true;
+      if (cardLabel)  cardLabel.hidden = true;
       if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Registrar pago'; }
 
-      // Method change handler — show reference only for TRANSFER
+      // Method change handler — show/hide fields per payment method:
+      //   TRANSFER → reference (required) + bank name
+      //   CARD     → card type
+      //   CASH     → nothing extra
       function handleMethodChange() {
         const val = methodSel?.value;
-        if (refLabel) refLabel.hidden = (val !== 'TRANSFER');
-        if (refIn)    refIn.required  = (val === 'TRANSFER');
+        const isTransfer = val === 'TRANSFER';
+        const isCard     = val === 'CARD';
+        if (refLabel)   refLabel.hidden  = !isTransfer;
+        if (refIn)      refIn.required   = isTransfer;
+        if (bankLabel)  bankLabel.hidden = !isTransfer;
+        if (cardLabel)  cardLabel.hidden = !isCard;
+        // clear hidden fields so stale values don't sneak into the payload
+        if (!isTransfer && refIn)      refIn.value = '';
+        if (!isTransfer && bankIn)     bankIn.value = '';
+        if (!isCard     && cardTypeSel) cardTypeSel.value = '';
       }
 
       if (methodSel) {
@@ -241,8 +287,10 @@
 
         const method    = methodSel?.value || 'CASH';
         const amount    = parseFloat(amountIn?.value || '0');
-        const reference = refIn?.value?.trim() || '';
-        const note      = noteIn?.value?.trim() || '';
+        const reference = refIn?.value?.trim()       || '';
+        const bankName  = bankIn?.value?.trim()       || '';
+        const cardType  = cardTypeSel?.value          || '';
+        const note      = noteIn?.value?.trim()       || '';
 
         // Validate
         if (!amount || amount <= 0) {
@@ -263,7 +311,9 @@
             paymentMethod: method,
             amount,
             reference: reference || null,
-            note: note || null,
+            bankName:  bankName  || null,
+            cardType:  cardType  || null,
+            note:      note      || null,
           });
 
           // Step 2: approve immediately (DEC-010 — office payments go directly to APPROVED)
@@ -296,6 +346,144 @@
     const payDialog  = /** @type {HTMLDialogElement|null} */ (containerEl.querySelector('#billing-pay-dialog'));
     if (closeBtn && payDialog) closeBtn.addEventListener('click', () => payDialog.close());
     if (cancelBtn && payDialog) cancelBtn.addEventListener('click', () => payDialog.close());
+
+    // ── Invoice detail dialog ───────────────────────────────────────────────
+    const detailDialogEl = /** @type {HTMLDialogElement|null} */ (containerEl.querySelector('#billing-detail-dialog'));
+    const detailCloseBtn = containerEl.querySelector('#billing-detail-dialog-close');
+    if (detailCloseBtn && detailDialogEl) {
+      detailCloseBtn.addEventListener('click', () => detailDialogEl.close());
+    }
+
+    /** @type {((() => void)|null)} */
+    let _detailCloseHandler = null;
+
+    function triggerFiscalArtifactDownload(fileBlob, fileName) {
+      const objectUrl = globalScope.URL.createObjectURL(fileBlob);
+      const link = globalScope.document.createElement('a');
+      try {
+        link.href = objectUrl;
+        link.download = fileName;
+        link.style.display = 'none';
+        globalScope.document.body.appendChild(link);
+        link.click();
+      } finally {
+        link.remove();
+        globalScope.URL.revokeObjectURL(objectUrl);
+      }
+    }
+
+    function bindArtifactDownloadButtons(panel, sess) {
+      panel.querySelectorAll('.billing-artifact-download-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+          if (button.disabled) return;
+          const invoiceId = button.getAttribute('data-invoice-id') || '';
+          const artifactType = button.getAttribute('data-artifact-type') || '';
+          const originalLabel = button.textContent || 'Descargar';
+          button.disabled = true;
+          button.textContent = 'Descargando…';
+          try {
+            const { blob, fileName } = await billingApi.downloadFiscalArtifact(sess, invoiceId, artifactType);
+            triggerFiscalArtifactDownload(blob, fileName);
+            showToast(containerEl, 'Descarga iniciada en el navegador.', 'success');
+          } catch (error) {
+            showToast(containerEl, error.message || 'No se pudo descargar el documento fiscal.', 'error');
+          } finally {
+            button.disabled = false;
+            button.textContent = originalLabel;
+          }
+        });
+      });
+    }
+
+    function openInvoiceDetail(sess, invoiceId, invoiceNumber) {
+      const dialog  = /** @type {HTMLDialogElement|null} */ (containerEl.querySelector('#billing-detail-dialog'));
+      const titleEl = containerEl.querySelector('#billing-detail-dialog-title');
+      const bodyEl  = containerEl.querySelector('#billing-detail-dialog-body');
+      if (!dialog || !bodyEl) return;
+
+      // Capture trigger element for focus restoration on close
+      const triggerEl = /** @type {HTMLElement|null} */ (globalScope.document?.activeElement ?? null);
+
+      if (_detailCloseHandler) {
+        dialog.removeEventListener('close', _detailCloseHandler);
+        _detailCloseHandler = null;
+      }
+
+      if (titleEl) titleEl.textContent = `Factura ${invoiceNumber || '\u2014'}`;
+      bodyEl.innerHTML = renderers.renderInvoiceDetailLoading();
+      dialog.showModal();
+      // Wave 7: explicit initial focus to dialog heading for consistent focus placement.
+      // The heading has tabindex=-1 so it is programmatically focusable but not in tab order.
+      if (titleEl?.focus) titleEl.focus();
+
+      _detailCloseHandler = () => {
+        dialog.removeEventListener('close', /** @type {any} */ (_detailCloseHandler));
+        _detailCloseHandler = null;
+        if (triggerEl?.focus) triggerEl.focus();
+      };
+      dialog.addEventListener('close', _detailCloseHandler);
+
+      billingApi.fetchInvoiceDetail(sess, invoiceId)
+        .then(async (invoice) => {
+          if (!dialog.open) return;
+
+          // Wave 5: for ACCEPTED invoices, load artifact list before final render.
+          // Non-ACCEPTED invoices: artifactCtx remains null → fiscal section shows informative message.
+          let artifactCtx = null;
+          if (invoice?.fiscal?.status === 'ACCEPTED') {
+            try {
+              const resp = await billingApi.listFiscalArtifacts(sess, String(invoice.id));
+              artifactCtx = { items: Array.isArray(resp) ? resp : [], failed: false };
+            } catch (_artifactErr) {
+              artifactCtx = { items: null, failed: true };
+            }
+          }
+
+          if (!dialog.open) return;
+          bodyEl.innerHTML = renderers.renderInvoiceDetailContent(invoice, artifactCtx);
+          bindArtifactRetryButton(bodyEl, sess);
+          bindArtifactDownloadButtons(bodyEl, sess);
+          bodyEl.querySelectorAll('.billing-fiscal-resend-btn').forEach((btn) => btn.addEventListener('click', async () => {
+            if (!globalScope.confirm('¿Reenviar los documentos fiscales? Se volverán a enviar al destinatario los documentos fiscales ya aceptados. No se generará una nueva factura ni se realizará un nuevo envío a Hacienda.')) return;
+            if (btn.disabled) return; btn.disabled = true; const label = btn.textContent; btn.textContent = 'Solicitando...';
+            try { await billingApi.requestFiscalResend(sess, btn.getAttribute('data-invoice-id')); showToast(containerEl, 'Reenvío solicitado. Billing procesará nuevamente el envío al destinatario.', 'success'); }
+            catch (err) { showToast(containerEl, err.message || 'No se pudo solicitar el reenvío.', 'error'); }
+            finally { btn.disabled = false; btn.textContent = label; }
+          }));
+        })
+        .catch((err) => {
+          if (!dialog.open) return;
+          const isNotFound = /404|no encontr/i.test(err.message || '');
+          bodyEl.innerHTML = isNotFound
+            ? renderers.renderInvoiceDetailNotFound()
+            : renderers.renderInvoiceDetailError();
+        });
+    }
+
+    function bindDetailButtons(panel, sess) {
+      panel.querySelectorAll('.billing-detail-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const invoiceId     = btn.getAttribute('data-invoice-id');
+          const invoiceNumber = btn.getAttribute('data-invoice-number');
+          openInvoiceDetail(sess, invoiceId, invoiceNumber);
+        });
+      });
+    }
+
+    /**
+     * Binds the artifact retry button (rendered when artifact list fails to load).
+     * Retry re-opens the full detail dialog, which re-fetches both the invoice and artifacts.
+     * Wave 5 — artifact error recovery.
+     */
+    function bindArtifactRetryButton(container, sess) {
+      container.querySelectorAll('.billing-artifact-retry-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const iid  = btn.getAttribute('data-invoice-id');
+          const inum = btn.getAttribute('data-invoice-number') || '';
+          if (iid) openInvoiceDetail(sess, iid, inum);
+        });
+      });
+    }
 
     // ── Pending payments tab ──
     async function loadPendingPayments() {

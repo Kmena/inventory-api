@@ -291,6 +291,7 @@ function openProductDrawer(productId) {
   elements.drawerSummaryTab.innerHTML = `
     <div class="product-detail-list">
       <div><span>Código</span><strong>${escapeHtml(product.code || '—')}</strong></div>
+      <div><span>Código CABYS</span><strong>${escapeHtml(product.cabysCode || '—')}</strong></div>
       <div><span>Unidad</span><strong>${escapeHtml(product.unit || '—')}</strong></div>
       <div><span>Tipo</span><strong>${escapeHtml(productTypeLabel(product.productType))}</strong></div>
       <div><span>Precio</span><strong>${escapeHtml(formatMoney(product.price, product.currency))}</strong></div>

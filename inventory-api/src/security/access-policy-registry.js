@@ -39,6 +39,72 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'tenant-admin-legacy',
     transition: 'documented-legacy-role',
   },
+  'fiscal-settings.view': {
+    mode: 'permission',
+    permissions: ['fiscal.settings.view'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.activities.refresh': {
+    mode: 'permission',
+    permissions: ['fiscal.activities.refresh'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.readiness': {
+    mode: 'permission',
+    permissions: ['fiscal.readiness.view'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.test-invoices.view': {
+    mode: 'permission',
+    permissions: ['fiscal.settings.view'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.test-invoices.create': {
+    mode: 'permission',
+    permissions: ['fiscal.credentials.manage'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.activities.manage': {
+    mode: 'permission',
+    permissions: ['fiscal.activities.manage'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.activities.default.update': {
+    mode: 'permission',
+    permissions: ['fiscal.activities.default.update'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.credentials.manage': {
+    mode: 'permission',
+    permissions: ['fiscal.credentials.manage'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.issuer.view': {
+    mode: 'permission',
+    permissions: ['fiscal.settings.view'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.issuer.provision': {
+    mode: 'permission',
+    permissions: ['fiscal.credentials.manage'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
+  'fiscal-settings.issuer.manage': {
+    mode: 'permission',
+    permissions: ['fiscal.credentials.manage'],
+    boundary: 'tenant-fiscal-settings',
+    transition: 'permission-governed',
+  },
   'user.list-global': {
     mode: 'role',
     roles: ['root'],
@@ -222,6 +288,18 @@ const ACCESS_POLICIES = Object.freeze({
     boundary: 'tenant-admin-legacy',
     transition: 'documented-legacy-role',
   },
+  /**
+   * TASK-014: Fiscal artifact proxy.
+   * Intentionally separate from invoice.detail to allow future granular control
+   * (e.g., restricting fiscal PDF/XML download to a narrower role set without
+   * changing invoice detail visibility). For P0, same roles as invoice.detail.
+   */
+  'invoice.fiscal-artifact': {
+    mode: 'role',
+    roles: ['admin', 'sales'],
+    boundary: 'tenant-operational',
+    transition: 'documented-legacy-role',
+  },
   'payment.list': {
     mode: 'permission',
     permissions: ['sales.manage', 'collections.view.all', 'collections.manage.own', 'collections.payments.approve', 'collections.payments.reverse'],
@@ -363,6 +441,21 @@ const ACCESS_POLICIES = Object.freeze({
   'client.store.credit.manage': {
     mode: 'permission',
     permissions: ['clients.credit.manage'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  // RFR-TASK-203: receiver fiscal verification — OQ-008 resolved → reuse clients.edit (Option A)
+  // Rationale: verification modifies verificationStatus + activities, consistent with client data mgmt.
+  'client-legal-entity.verify': {
+    mode: 'permission',
+    permissions: ['clients.edit'],
+    boundary: 'tenant-operational',
+    transition: 'permission-governed',
+  },
+  // RFR-TASK-204: receiver activities read — same view permission as client.detail
+  'client-legal-entity.activities': {
+    mode: 'permission',
+    permissions: ['clients.view', 'clients.view.all'],
     boundary: 'tenant-operational',
     transition: 'permission-governed',
   },

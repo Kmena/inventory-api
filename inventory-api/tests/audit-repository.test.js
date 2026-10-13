@@ -3,8 +3,19 @@ const assert = require('node:assert/strict');
 const { PrismaClient } = require('@prisma/client');
 
 const { recordAuditEvent } = require('../src/lib/audit');
+const {
+  assertDisposableDatabaseUrl,
+  resolveFiscalDisposableDatabaseConfig,
+  verifyFiscalDisposableDatabase,
+} = require('./helpers/fiscal-disposable-database-guard');
 
 const auditDatabaseUrl = process.env.P2_AUDIT_DATABASE_URL;
+const disposableDatabaseConfig = auditDatabaseUrl
+  ? resolveFiscalDisposableDatabaseConfig(process.env)
+  : null;
+if (auditDatabaseUrl) {
+  assertDisposableDatabaseUrl(auditDatabaseUrl, 'P2_AUDIT_DATABASE_URL', disposableDatabaseConfig);
+}
 
 function uniqueValue(prefix) {
   return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
@@ -24,6 +35,8 @@ test('recordAuditEvent persists a minimal audit event and redacts sensitive meta
   let auditEventId = null;
 
   try {
+    await prisma.$connect();
+    await verifyFiscalDisposableDatabase(prisma, disposableDatabaseConfig);
     const company = await prisma.company.create({
       data: {
         name: uniqueValue('Audit Company'),

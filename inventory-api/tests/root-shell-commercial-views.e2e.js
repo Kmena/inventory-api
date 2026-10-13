@@ -277,7 +277,7 @@ async function stubClientsRuntime(page, baseUrl, user) {
       classification: { id: 1, name: 'Preferente' },
       phone: '555-0201',
       legalId: '1234567-8',
-      documentType: 'NIT',
+      documentType: '02',
       emailBilling: 'clientes@norte.test',
       paymentType: 'CREDIT',
       paymentDays: 15,
@@ -323,6 +323,14 @@ async function stubClientsRuntime(page, baseUrl, user) {
 
   await page.route('**/api/clients/document-types', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(cloneJson(documentTypes)) });
+  });
+
+  await page.route('**/api/economic-activities*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ code: '6201', description: 'Servicios administrados' }]),
+    });
   });
 
   await page.route('**/api/regions/company', async (route) => {
@@ -596,7 +604,10 @@ test('commercial views E2E: clients supports local filtering and update plus sto
   await page.waitForFunction(() => globalThis.document.querySelector('[data-client-select="301"]')?.classList.contains('active'));
   assert.equal(await page.getByText('Detalle contextual').isVisible(), true);
   assert.equal(await page.getByRole('button', { name: 'Desactivar cliente' }).isVisible(), true);
-  assert.equal(state.counters.loadDetail, 1);
+  // Wave 6 bootstrap: the initial mount auto-fires loadClientDetail for the first client
+  // (to populate the fiscal cache), so by the time the user explicitly clicks the client
+  // the counter is >= 1 (may be 1 from bootstrap or 2 from bootstrap + click).
+  assert.ok(state.counters.loadDetail >= 1, `expected >=1 detail load after click, got ${state.counters.loadDetail}`);
 
   await page.locator('#clients-update-form input[name="legalId"]').fill('3-101-123456');
   await page.getByRole('button', { name: 'Consultar identificacion' }).click();

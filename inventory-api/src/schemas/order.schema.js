@@ -57,4 +57,10 @@ const rejectOrderSchema = z.object({
   rejectionReason: z.string().trim().min(5, 'El motivo debe tener al menos 5 caracteres').max(500),
 });
 
-module.exports = { createOrderSchema, updateOrderSchema, rejectOrderSchema, transferMetadataSchema };
+// RFR-TASK-302: fiscal approval body — receiverEconomicActivityCode optional so Billing-disabled
+// approvals can still use an empty body without schema rejection.
+const approveOrderSchema = z.object({
+  receiverEconomicActivityCode: z.string().trim().min(1).max(50).optional().nullable(),
+});
+
+module.exports = { createOrderSchema, updateOrderSchema, rejectOrderSchema, transferMetadataSchema, approveOrderSchema };

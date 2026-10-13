@@ -50,6 +50,11 @@ plan/*
 */docs/*.txt
 /openspec/*
 /specs/*
+
+# Local encrypted fiscal credential custody. Never commit keys or encrypted payloads.
+/inventory-api/.secrets/
+/inventory-api/storage/billing-managed-credentials/
+
 /docs/*
 .codex/*
 CREDENCIALES-PRIVADAS.md

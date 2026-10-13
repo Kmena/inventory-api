@@ -25,6 +25,7 @@ const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   receiptRouter: 'src/routes/receipt.routes.js',
   orderRouter: 'src/routes/order.routes.js',
   invoiceRouter: 'src/routes/invoice.routes.js',
+  fiscalIntentRouter: 'src/routes/fiscal-intent.routes.js',
   paymentRouter: 'src/routes/payment.routes.js',
   // MASTER-007 / NPP-TASK-009 — CustomerEntitlement Wave 1 skeleton
   entitlementRouter: 'src/routes/entitlement.routes.js',
@@ -34,15 +35,20 @@ const ROUTER_FILE_BY_VARIABLE = Object.freeze({
   salesRouteRouter: 'src/routes/sales-route.routes.js',
   agentRouter: 'src/routes/agent.routes.js',
   taxpayerRouter: 'src/routes/taxpayer.routes.js',
+  cabysRouter: 'src/routes/cabys.routes.js',
   geocodingRouter: 'src/routes/geocoding.routes.js',
   economicActivityRouter: 'src/routes/economic-activity.routes.js',
   supplierRouter: 'src/routes/supplier.routes.js',
   // recepciones-fiscales-workspace: global fiscal references listing endpoint
   fiscalReferenceRouter: 'src/routes/fiscal-reference.routes.js',
+  // inventori-fiscal-settings-and-ux Wave 2 backend API
+  fiscalSettingsRouter: 'src/routes/fiscal-settings.routes.js',
   // in-app-feedback feature
   feedbackRouter: 'src/routes/feedback.routes.js',
   // users-account-self-service: PATCH /api/me/password
   meRouter: 'src/routes/me.routes.js',
+  // RFR-TASK-203/204: receiver fiscal verification + activities endpoints
+  clientLegalEntityRouter: 'src/routes/client-legal-entity.routes.js',
 });
 
 function read(filePath) {

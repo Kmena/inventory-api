@@ -9,7 +9,29 @@ const {
   validateGovernedBase64FilePayload,
 } = require('../lib/sensitive-file-governance');
 
-const createClientSchema = z.object({
+function requireBillingIdentityFields(value, ctx, options = {}) {
+  const labelByField = {
+    legalName: 'razón social',
+    legalId: 'identificación',
+    documentType: 'tipo de identificación',
+    emailBilling: 'correo electrónico para facturas',
+  };
+  const requiredFields = options.allowNameAsLegalName
+    ? ['legalId', 'documentType', 'emailBilling']
+    : ['legalName', 'legalId', 'documentType', 'emailBilling'];
+
+  for (const fieldName of requiredFields) {
+    if (!String(value?.[fieldName] || '').trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [fieldName],
+        message: `El cliente requiere ${labelByField[fieldName]} para facturar`,
+      });
+    }
+  }
+}
+
+const clientBaseSchema = z.object({
   companyId: z.coerce.bigint(),
   clientClassificationId: z.coerce.bigint().optional().nullable(),
   code: z.string().max(50).optional(),
@@ -31,8 +53,11 @@ const createClientSchema = z.object({
   paymentDays: z.number().int().min(0).optional(),
 });
 
-const createCompanyClientSchema = createClientSchema.omit({ companyId: true });
-const updateClientSchema = createCompanyClientSchema.partial();
+const createClientSchema = clientBaseSchema
+  .superRefine((value, ctx) => requireBillingIdentityFields(value, ctx, { allowNameAsLegalName: true }));
+const createCompanyClientSchema = clientBaseSchema.omit({ companyId: true })
+  .superRefine((value, ctx) => requireBillingIdentityFields(value, ctx, { allowNameAsLegalName: true }));
+const updateClientSchema = clientBaseSchema.omit({ companyId: true }).partial();
 
 // Per-store credit limit — creditBalance is system-managed, not user-editable
 const updateClientStoreCreditLimitSchema = z.object({
@@ -59,7 +84,9 @@ const createClientStoreRepresentativeSchema = z.object({
   isPrimaryContact: z.boolean().optional(),
 });
 
-const createClientStoreSchema = z.object({
+const storeBillingModeSchema = z.enum(['inherit', 'override']).optional();
+
+const clientStoreBaseSchema = z.object({
   subregionId: z.coerce.bigint(),
   code: z.string().trim().max(50).optional(),
   name: z.string().trim().min(2).max(255),
@@ -82,8 +109,20 @@ const createClientStoreSchema = z.object({
   economicActivityCode: z.string().trim().max(20).optional(),
   economicActivityName: z.string().trim().max(255).optional(),
   creditLimit: z.coerce.number().min(0).optional(),
+  billingMode: storeBillingModeSchema,
   representatives: z.array(createClientStoreRepresentativeSchema).max(20).optional(),
 });
+
+function requireStoreOverrideBillingIdentity(value, ctx) {
+  const hasFiscalOverride = ['legalName', 'legalId', 'documentType', 'emailBilling', 'economicActivityCode', 'economicActivityName']
+    .some((fieldName) => String(value?.[fieldName] || '').trim().length > 0);
+  if ((value.billingMode || (hasFiscalOverride ? 'override' : 'inherit')) === 'override') {
+    requireBillingIdentityFields(value, ctx);
+  }
+}
+
+const createClientStoreSchema = clientStoreBaseSchema.superRefine(requireStoreOverrideBillingIdentity);
+const updateClientStoreSchema = clientStoreBaseSchema.partial().superRefine(requireStoreOverrideBillingIdentity);
 
 const uploadClientDocumentSchema = z.object({
   documentType: z.enum(CLIENT_DOCUMENT_TYPES.map((type) => type.value)),
@@ -143,6 +182,7 @@ module.exports = {
   updateClientSchema,
   createCompanyClientSchema,
   createClientStoreSchema,
+  updateClientStoreSchema,
   uploadClientDocumentSchema,
   uploadClientStoreDocumentSchema,
   createClientReferenceSchema,

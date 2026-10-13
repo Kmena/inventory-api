@@ -68,6 +68,14 @@
             <div class="products-form-grid">
               <label class="products-field-wide"><span>Nombre *</span><input id="products-form-name" name="name" type="text" required minlength="2" maxlength="255" /></label>
               <label><span>Codigo</span><input name="code" type="text" maxlength="50" /></label>
+              <div class="products-cabys-control products-field-wide" data-cabys-control>
+                <label for="products-cabys-search"><span>Código CABYS</span></label>
+                <input id="products-cabys-search" name="cabysSearch" type="search" maxlength="120" autocomplete="off" placeholder="Buscar por código o descripción..." />
+                <input id="products-cabys-code" name="cabysCode" type="hidden" />
+                <div id="products-cabys-selected" class="products-cabys-selected muted" aria-live="polite">Sin CABYS</div>
+                <div id="products-cabys-status" class="products-field-hint" aria-live="polite">Busca en el catálogo oficial CAByS de Hacienda y selecciona un resultado.</div>
+                <div id="products-cabys-results" class="products-cabys-results" role="listbox" aria-label="Resultados CAByS"></div>
+              </div>
               <label class="products-field-subcategory-group">
                 <span>Subcategoria</span>
                 <div class="products-subcategory-input-row">
@@ -211,6 +219,11 @@
     const closeFormButton = container.querySelector('#products-close-form-button');
     const cancelFormButton = container.querySelector('#products-cancel-form-button');
     const formSubmitButton = container.querySelector('#products-form-submit-button');
+    const cabysSearchInput = container.querySelector('#products-cabys-search');
+    const cabysCodeInput = container.querySelector('#products-cabys-code');
+    const cabysSelectedRegion = container.querySelector('#products-cabys-selected');
+    const cabysStatusRegion = container.querySelector('#products-cabys-status');
+    const cabysResultsRegion = container.querySelector('#products-cabys-results');
     const deactivateDialog = container.querySelector('#products-deactivate-dialog');
     const deactivateMessage = container.querySelector('#products-deactivate-message');
     const deactivateSummary = container.querySelector('#products-deactivate-summary');
@@ -242,7 +255,7 @@
     const businessPresetSelect = container.querySelector('#products-form-business-preset');
     const businessPresetHelp = container.querySelector('#products-form-business-preset-help');
 
-    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !paginationRegion || !detailMessage || !detailRegion || !searchInput || !categoryFilter || !clearFiltersButton || !refreshButton || !openCreateButton || !openCategoriesButton || !formDialog || !form || !formTitle || !formMessage || !formSubcategoryInput || !formNameInput || !closeFormButton || !cancelFormButton || !formSubmitButton || !deactivateDialog || !deactivateMessage || !deactivateSummary || !closeDeactivateButton || !cancelDeactivateButton || !confirmDeactivateButton || !categoriesDialog || !categoriesForm || !categoriesMessage || !categoriesListRegion || !categoryNameInput || !createCategoryButton || !closeCategoriesButton || !cancelCategoriesButton) {
+    if (!metricsRegion || !pageMessage || !listSummary || !listRegion || !paginationRegion || !detailMessage || !detailRegion || !searchInput || !categoryFilter || !clearFiltersButton || !refreshButton || !openCreateButton || !openCategoriesButton || !formDialog || !form || !formTitle || !formMessage || !formSubcategoryInput || !formNameInput || !closeFormButton || !cancelFormButton || !formSubmitButton || !cabysSearchInput || !cabysCodeInput || !cabysSelectedRegion || !cabysStatusRegion || !cabysResultsRegion || !deactivateDialog || !deactivateMessage || !deactivateSummary || !closeDeactivateButton || !cancelDeactivateButton || !confirmDeactivateButton || !categoriesDialog || !categoriesForm || !categoriesMessage || !categoriesListRegion || !categoryNameInput || !createCategoryButton || !closeCategoriesButton || !cancelCategoriesButton) {
       return;
     }
 
@@ -266,6 +279,11 @@
     let lastDeactivateDialogTrigger = null;
     let lastCreatedSubcategoryId = null; // UX-001: persiste subcategoría creada para pre-selección
     let categoryWarning = '';
+    let cabysSearchTimer = null;
+    let cabysSearchRequestId = 0;
+    let selectedCabys = null;
+    let initialCabysCode = '';
+    let cabysInputDirty = false;
 
     // --- TASK-006: opciones de unidad por tipo de presentación ---
     // La clave '' muestra todas las unidades cuando no hay tipo definido.
@@ -512,10 +530,98 @@
       };
     }
 
+    function renderCabysSelection() {
+      const code = selectedCabys?.code || initialCabysCode || '';
+      cabysCodeInput.value = selectedCabys?.code || (cabysInputDirty ? '' : initialCabysCode);
+      if (!code) {
+        cabysSelectedRegion.textContent = 'Sin CABYS';
+        return;
+      }
+      if (selectedCabys) {
+        cabysSelectedRegion.innerHTML = `✓ <strong>${rootShellUi.escapeHtml(selectedCabys.code)}</strong> ${rootShellUi.escapeHtml(selectedCabys.description || '')} <span class="muted">Impuesto de referencia: ${rootShellUi.escapeHtml(String(selectedCabys.taxRate ?? '—'))}%</span> <button type="button" class="secondary-button compact-button" data-cabys-change>Cambiar</button>`;
+        return;
+      }
+      cabysSelectedRegion.innerHTML = `<strong>${rootShellUi.escapeHtml(code)}</strong> <span class="muted">Código existente. Busca para cambiarlo con una selección validada.</span>`;
+    }
+
+    function clearCabysResults() {
+      cabysResultsRegion.innerHTML = '';
+    }
+
+    function renderCabysResults(items) {
+      if (!items.length) {
+        cabysResultsRegion.innerHTML = `<p class="empty-state">No se encontraron códigos CAByS para esta búsqueda.</p>`;
+        return;
+      }
+      cabysResultsRegion.innerHTML = `
+        <p class="products-field-hint">Resultados: selecciona explícitamente el CAByS correcto.</p>
+        ${items.map((item, index) => `
+          <button type="button" class="products-cabys-result" role="option" data-cabys-index="${index}">
+            <span><strong>${rootShellUi.escapeHtml(item.code)}</strong> ${rootShellUi.escapeHtml(item.description || '')}</span>
+            <span class="muted">Impuesto de referencia: ${rootShellUi.escapeHtml(String(item.taxRate ?? '—'))}%</span>
+          </button>
+        `).join('')}
+      `;
+      cabysResultsRegion._cabysItems = items;
+    }
+
+    function resetCabysControl(code = '') {
+      if (cabysSearchTimer) clearTimeout(cabysSearchTimer);
+      cabysSearchRequestId += 1;
+      selectedCabys = null;
+      initialCabysCode = code || '';
+      cabysInputDirty = false;
+      cabysSearchInput.value = code || '';
+      cabysStatusRegion.textContent = code ? 'Código CAByS existente. Busca para cambiarlo con Hacienda.' : 'Sin CABYS. Busca por código o descripción para asignar CAByS.';
+      clearCabysResults();
+      renderCabysSelection();
+    }
+
+    async function runCabysSearch(query, requestId) {
+      cabysStatusRegion.textContent = 'Consultando catálogo CAByS de Hacienda...';
+      try {
+        const response = await productsApi.searchCabys(session, query);
+        if (requestId !== cabysSearchRequestId) return;
+        const items = Array.isArray(response?.items) ? response.items : [];
+        if (/^\d{13}$/.test(query) && items.length === 0) {
+          cabysStatusRegion.textContent = 'No se encontró este código CAByS en el catálogo de Hacienda.';
+          clearCabysResults();
+          return;
+        }
+        cabysStatusRegion.textContent = items.length ? 'Selecciona un resultado para validar el Código CAByS.' : 'No se encontraron códigos CAByS para esta búsqueda.';
+        renderCabysResults(items);
+      } catch (_error) {
+        if (requestId !== cabysSearchRequestId) return;
+        cabysStatusRegion.textContent = 'No fue posible consultar el catálogo CAByS en este momento.';
+        clearCabysResults();
+      }
+    }
+
+    function scheduleCabysSearch() {
+      const query = cabysSearchInput.value.trim();
+      cabysInputDirty = true;
+      selectedCabys = null;
+      renderCabysSelection();
+      clearCabysResults();
+      cabysSearchRequestId += 1;
+      if (cabysSearchTimer) clearTimeout(cabysSearchTimer);
+      if (!query) {
+        cabysStatusRegion.textContent = 'Sin CABYS. Busca por código o descripción para asignar CAByS.';
+        return;
+      }
+      if (!/^\d{13}$/.test(query) && query.length < 3) {
+        cabysStatusRegion.textContent = 'Ingrese al menos 3 caracteres para buscar CAByS.';
+        return;
+      }
+      const requestId = cabysSearchRequestId;
+      cabysSearchTimer = setTimeout(() => runCabysSearch(query, requestId), 400);
+    }
+
     function resetFormDialog() {
       form.reset();
       formMessage.innerHTML = '';
       editingProductId = null;
+      resetCabysControl('');
       formTitle.textContent = 'Nuevo producto';
       formSubmitButton.textContent = 'Guardar producto';
       if (formSubcategoryInput) formSubcategoryInput.value = '';
@@ -549,6 +655,7 @@
         formSubmitButton.textContent = 'Actualizar producto';
         form.elements.name.value = product.name || '';
         form.elements.code.value = product.code || '';
+        resetCabysControl(product.cabysCode || '');
         form.elements.description.value = product.description || '';
         if (form.elements.subcategoryId) {
           form.elements.subcategoryId.value = product.subcategoryId ? String(product.subcategoryId) : '';
@@ -870,6 +977,31 @@
     closeCategoriesButton.addEventListener('click', closeCategoriesDialog);
     cancelCategoriesButton.addEventListener('click', closeCategoriesDialog);
 
+    cabysSearchInput.addEventListener('input', scheduleCabysSearch);
+    cabysSelectedRegion.addEventListener('click', (event) => {
+      const trigger = event.target instanceof globalScope.HTMLElement ? event.target.closest('[data-cabys-change]') : null;
+      if (trigger) {
+        selectedCabys = null;
+        cabysInputDirty = true;
+        cabysSearchInput.focus();
+        renderCabysSelection();
+      }
+    });
+    cabysResultsRegion.addEventListener('click', (event) => {
+      const trigger = event.target instanceof globalScope.HTMLElement ? event.target.closest('[data-cabys-index]') : null;
+      if (!trigger) return;
+      const items = Array.isArray(cabysResultsRegion._cabysItems) ? cabysResultsRegion._cabysItems : [];
+      const item = items[Number(trigger.getAttribute('data-cabys-index'))];
+      if (!item?.code) return;
+      selectedCabys = item;
+      initialCabysCode = '';
+      cabysInputDirty = false;
+      cabysSearchInput.value = item.code;
+      cabysStatusRegion.textContent = 'Código CAByS seleccionado y validado desde Hacienda.';
+      clearCabysResults();
+      renderCabysSelection();
+    });
+
     // UX-002: abrir el dialog de categorías desde dentro del formulario de producto
     if (addSubcategoryButton) {
       addSubcategoryButton.addEventListener('click', (event) => {
@@ -882,6 +1014,12 @@
       formMessage.innerHTML = '';
       if (!form.reportValidity()) {
         formMessage.innerHTML = rootShellUi.renderInlineMessage('Revisa los campos obligatorios antes de continuar.', 'error');
+        return;
+      }
+
+      if (cabysInputDirty && cabysSearchInput.value.trim() && !selectedCabys) {
+        formMessage.innerHTML = rootShellUi.renderInlineMessage('Selecciona un resultado oficial CAByS antes de guardar, o limpia la búsqueda.', 'error');
+        cabysSearchInput.focus();
         return;
       }
 

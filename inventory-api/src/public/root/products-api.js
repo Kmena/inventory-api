@@ -58,6 +58,12 @@
     });
   }
 
+  async function searchCabys(session, query) {
+    return inventoryAuth.fetchJson(session, `/api/cabys/search${buildQueryString({ query })}`, {
+      fallbackMessage: 'No fue posible consultar el catálogo CAByS en este momento.',
+    });
+  }
+
   async function assignRecipeToProduct(session, productId, recipeId) {
     return updateProduct(session, productId, { recipeId });
   }
@@ -76,6 +82,7 @@
     getProduct,
     getProductInventorySummary,
     listProducts,
+    searchCabys,
     updateProduct,
     updateProductInventoryConfig,
   });

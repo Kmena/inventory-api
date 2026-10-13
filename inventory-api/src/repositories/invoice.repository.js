@@ -14,7 +14,13 @@ function findCompanyInvoices(companyId, pagination = null, filters = {}, db = pr
     ...(filters.orderId ? { orderId: BigInt(filters.orderId) } : {}),
   };
   const orderBy = /** @type {InvoiceOrderByWithRelationInput} */ ({ id: 'asc' });
-  const include = { client: true, order: true, payments: true };
+  // fiscalIntent: select status only — list projection, no internals exposed
+  const include = {
+    client: true,
+    order: true,
+    payments: true,
+    fiscalIntent: { select: { status: true } },
+  };
 
   if (!pagination) {
     return db.invoice.findMany({
@@ -42,7 +48,23 @@ function findCompanyInvoiceById(id, companyId, db = prisma) {
       id,
       client: { companyId },
     },
-    include: { client: true, order: true, payments: true },
+    include: {
+      client: true,
+      // Include clientStore so serializeInvoiceForDetail can populate clientStoreName
+      order: { include: { clientStore: true } },
+      payments: true,
+      // fiscalIntent: only the fields needed for the browser-safe detail DTO.
+      // Internal fields (idempotencyKey, billingFiscalDocumentId, failureCode,
+      // failureMessage, attemptCount, etc.) are excluded here at query time.
+      fiscalIntent: {
+        select: {
+          status: true,
+          clave: true,
+          consecutive: true,
+          metadata: true,  // needed to extract billingAcceptedAt
+        },
+      },
+    },
   });
 }
 

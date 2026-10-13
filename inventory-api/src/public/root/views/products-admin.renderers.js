@@ -162,6 +162,7 @@
           <article class="detail-item"><span>Subcategoria</span><strong>${rootShellUi.escapeHtml(product?.subcategory?.name || 'Sin subcategoria')}</strong></article>
           <article class="detail-item"><span>Contenido neto</span><strong>${rootShellUi.escapeHtml(netContentLabel)}</strong></article>
           <article class="detail-item"><span>Unidad</span><strong>${rootShellUi.escapeHtml(product?.netContentUnit || product?.unit || 'Sin unidad visible')}</strong></article>
+          <article class="detail-item"><span>Código CABYS</span><strong>${rootShellUi.escapeHtml(product?.cabysCode || 'Sin CABYS')}</strong></article>
           <article class="detail-item"><span>Precio principal</span><strong>${rootShellUi.escapeHtml(productsHelpers.formatCurrency(product?.price, product?.currency || 'CRC'))}</strong></article>
         </div>
         ${product?.description ? `<article class="detail-item"><span>Descripcion</span><strong>${rootShellUi.escapeHtml(product.description)}</strong></article>` : ''}

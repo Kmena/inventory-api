@@ -9,7 +9,9 @@ const {
   createRootCompanySchema,
   updateRootCompanyStatusSchema,
 } = require('../schemas/company.schema');
+const { billingIntegrationConfigSchema } = require('../schemas/billing-integration-config.schema');
 const companyService = require('../services/company.service');
+const billingIntegrationConfigService = require('../services/billing-integration-config.service');
 
 const router = express.Router();
 router.use(authenticate);
@@ -43,6 +45,29 @@ async function handleExecutiveDashboard(req, res, next) {
 
 router.get('/root/dashboard', authorizeAccessPolicy('company.dashboard'), handleExecutiveDashboard);
 router.get('/company/dashboard', authorizeAccessPolicy('company.dashboard'), handleExecutiveDashboard);
+
+router.get('/company/billing-integration', authorizeAccessPolicy('company.dashboard'), async (req, res, next) => {
+  try {
+    const config = await billingIntegrationConfigService.getCompanyBillingIntegrationConfig(req.auth);
+    return res.json(config);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.put(
+  '/company/billing-integration',
+  authorizeAccessPolicy('company.dashboard'),
+  validate(billingIntegrationConfigSchema),
+  async (req, res, next) => {
+    try {
+      const config = await billingIntegrationConfigService.upsertCompanyBillingIntegrationConfig(req.body, req.auth);
+      return res.json(config);
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
 
 router.patch(
   '/root/companies/:companyId/status',

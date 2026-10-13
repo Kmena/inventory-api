@@ -29,11 +29,26 @@ function normalizeTaxpayer(data, identification, documentType) {
     return null;
   }
 
-  const activity = Array.isArray(taxpayer?.actividades)
-    ? taxpayer.actividades[0]
+  // RFR-TASK-201: extract ALL activities from actividades[]
+  // Backward compat: economicActivityCode / economicActivityName still point to the first activity.
+  // activities[] is the authoritative P1 array — code preserved as returned (no numeric-only
+  // normalization, no decimal removal). pickFirst trims whitespace only — see ACTIVITY CODE RULE.
+  const rawActividades = Array.isArray(taxpayer?.actividades)
+    ? taxpayer.actividades
     : Array.isArray(data?.actividades)
-      ? data.actividades[0]
-      : null;
+      ? data.actividades
+      : [];
+
+  const activities = rawActividades
+    .map((act) => ({
+      code: pickFirst(act?.codigo, act?.code) || null,
+      description: pickFirst(act?.descripcion, act?.description, act?.nombre) || null,
+      haciendaStatus: pickFirst(act?.estado, act?.status) || null,
+      haciendaType: pickFirst(act?.tipo, act?.type) || null,
+    }))
+    .filter((act) => Boolean(act.code));
+
+  const firstActivity = activities[0] || null;
 
   return {
     identification,
@@ -42,8 +57,11 @@ function normalizeTaxpayer(data, identification, documentType) {
     email: pickFirst(taxpayer?.correo, taxpayer?.email, data?.correo, data?.email),
     phone: pickFirst(taxpayer?.telefono, taxpayer?.phone, data?.telefono, data?.phone),
     address: pickFirst(taxpayer?.direccion, taxpayer?.address, data?.direccion, data?.address),
-    economicActivityCode: pickFirst(activity?.codigo, activity?.code),
-    economicActivityName: pickFirst(activity?.descripcion, activity?.description, activity?.nombre),
+    // backward-compat scalars: first activity only — legacy consumers unchanged
+    economicActivityCode: firstActivity?.code || null,
+    economicActivityName: firstActivity?.description || null,
+    // P1 authoritative full list
+    activities,
     raw: data,
   };
 }

@@ -20,15 +20,37 @@ async function listOrders(session, pagination) {
 }
 
 /**
- * POST /api/orders/:id/approve
+ * GET /api/orders/:id/fiscal-readiness-preview
+ * Returns the fiscal readiness state for the modal without touching Hacienda or Billing.
  * @param {any} session
  * @param {string|number} orderId
  */
-async function approveOrder(session, orderId) {
-  return inventoryAuth.fetchJson(session, `${BASE}/${encodeURIComponent(orderId)}/approve`, {
+async function getFiscalReadinessPreview(session, orderId) {
+  return inventoryAuth.fetchJson(
+    session,
+    `${BASE}/${encodeURIComponent(orderId)}/fiscal-readiness-preview`,
+    { credentials: 'same-origin' },
+  );
+}
+
+/**
+ * POST /api/orders/:id/approve
+ * When fiscal billing is enabled the body must include receiverEconomicActivityCode.
+ * When billing is disabled the body is omitted (backward-compatible).
+ * @param {any} session
+ * @param {string|number} orderId
+ * @param {{ receiverEconomicActivityCode?: string } | undefined} [body]
+ */
+async function approveOrder(session, orderId, body) {
+  const options = /** @type {RequestInit & { credentials: string }} */ ({
     method: 'POST',
     credentials: 'same-origin',
   });
+  if (body && typeof body === 'object') {
+    options.headers = { 'Content-Type': 'application/json' };
+    options.body = JSON.stringify(body);
+  }
+  return inventoryAuth.fetchJson(session, `${BASE}/${encodeURIComponent(orderId)}/approve`, options);
 }
 
 /**
@@ -80,6 +102,7 @@ async function listDispatchedOrders(session) {
 
 rootShell.register('ordersApi', {
   listOrders,
+  getFiscalReadinessPreview,
   approveOrder,
   cancelOrder,
   rejectOrder,

@@ -74,4 +74,26 @@ module.exports = {
     process.env.HACIENDA_TAXPAYER_LOOKUP_URL || 'https://api.hacienda.go.cr/fe/ae?identificacion={identification}',
   geocodingSearchUrl: process.env.GEOCODING_SEARCH_URL || 'https://nominatim.openstreetmap.org/search',
   parseTrustProxy,
+  // TASK-015B: Billing HTTP client timeout (shared by scheduler and artifact proxy)
+  billingTimeoutMs: getNumber(process.env.BILLING_TIMEOUT_MS, 10_000),
+  // TASK-015B: Fiscal scheduler configuration
+  // Disabled by default — must set FISCAL_SCHEDULER_ENABLED=true in production deployment.
+  // Tests inject FakeBillingServer directly into FiscalScheduler; they do not use the
+  // application singleton and do not require this to be enabled.
+  fiscalScheduler: {
+    enabled: process.env.FISCAL_SCHEDULER_ENABLED === 'true',
+    pollIntervalMs: getNumber(process.env.FISCAL_POLL_INTERVAL_MS, 15_000),
+    workerBatchSize: getNumber(process.env.FISCAL_WORKER_BATCH_SIZE, 10),
+    reconcilerBatchSize: getNumber(process.env.FISCAL_RECONCILER_BATCH_SIZE, 10),
+    maxConcurrency: getNumber(process.env.FISCAL_MAX_CONCURRENCY, 3),
+    staleThresholdMs: getNumber(process.env.FISCAL_STALE_THRESHOLD_MS, 15 * 60 * 1000),
+    identityRecovery: {
+      // Fail closed: enabling automatic lookup requires an explicit activation watermark.
+      enabled: process.env.FISCAL_IDENTITY_RECOVERY_ENABLED === 'true',
+      startAt: process.env.FISCAL_IDENTITY_RECOVERY_START_AT || null,
+      maxAgeMs: getNumber(process.env.FISCAL_IDENTITY_RECOVERY_MAX_AGE_MS, 72 * 60 * 60 * 1000),
+      batchSize: getNumber(process.env.FISCAL_IDENTITY_RECOVERY_BATCH_SIZE, 10),
+      backoffMs: getNumber(process.env.FISCAL_IDENTITY_RECOVERY_BACKOFF_MS, 5 * 60 * 1000),
+    },
+  },
 };

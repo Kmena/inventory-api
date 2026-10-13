@@ -21,6 +21,33 @@
   ],
   "excludedOperations": [
     {
+      "method": "GET",
+      "mountPath": "/api/companies",
+      "expressPath": "/company/billing-integration",
+      "routeFile": "src/routes/company.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-billing-foundation-config-outside-current-openapi-baseline",
+      "reason": "La configuracion fundacional Inventori->Billing queda gobernada por la especificacion inventori-billing-integration y pruebas de aislamiento/no exposicion de secretos; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/companies",
+      "expressPath": "/company/billing-integration",
+      "routeFile": "src/routes/company.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-billing-foundation-config-outside-current-openapi-baseline",
+      "reason": "La configuracion fundacional Inventori->Billing queda gobernada por la especificacion inventori-billing-integration y pruebas de aislamiento/no exposicion de secretos; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/fiscal-intents",
+      "expressPath": "/:id/recover-after-operator-repair",
+      "routeFile": "src/routes/fiscal-intent.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-billing-operator-recovery-outside-current-openapi-baseline",
+      "reason": "La recuperacion operator-only de intents fiscales ERROR_FINAL allowlisted esta gobernada por specs/inventori-billing-integration TASK-017 y pruebas de seguridad/idempotencia; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
       "method": "DELETE",
       "mountPath": "/api/invoices",
       "expressPath": "/:id",
@@ -46,6 +73,15 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "product-delete-compatibility-outside-current-openapi-baseline",
       "reason": "La eliminación compatibilizada de productos sigue gobernada por pruebas de semántica delete, pero permanece fuera del OpenAPI parcial para evitar ampliar el contrato sin documentar toda la compatibilidad histórica."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/cabys",
+      "expressPath": "/search",
+      "routeFile": "src/routes/cabys.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "cabys-catalog-lookup-outside-current-openapi-baseline",
+      "reason": "La búsqueda CAByS es un proxy acotado Inventori→Hacienda para edición de producto y queda gobernada por pruebas específicas de seguridad/normalización; el OpenAPI parcial se actualizará cuando se amplíe formalmente el contrato público de catálogo fiscal."
     },
     {
       "method": "DELETE",
@@ -112,6 +148,15 @@
       "reason": "El ledger de facturación por cliente es una superficie nueva del feature client-payment-ledger. Está soportada en runtime y gobernada por pruebas, pero no se incluye todavía en el baseline OpenAPI parcial actual."
     },
     {
+      "method": "PATCH",
+      "mountPath": "/api/clients",
+      "expressPath": "/company/:clientId/stores/:storeId",
+      "routeFile": "src/routes/client.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "client-store-edit-outside-current-openapi-baseline",
+      "reason": "La edición de tiendas/sucursales desde la UI root queda soportada en runtime y cubierta por pruebas focalizadas, pero no amplía todavía el OpenAPI parcial de clientes."
+    },
+    {
       "method": "GET",
       "mountPath": "/api/economic-activities",
       "expressPath": "/",
@@ -128,6 +173,33 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "invoice-detail-lifecycle-outside-current-openapi-baseline",
       "reason": "El OpenAPI parcial cubre listado, creación e inconsistencias de facturas, pero no promete todavía el detalle completo ni sus mutaciones posteriores."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/invoices",
+      "expressPath": "/:id/fiscal-documents/resend",
+      "routeFile": "src/routes/invoice.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-billing-accepted-package-resend-outside-current-openapi-baseline",
+      "reason": "AFPR-TASK-006: Inventori solicita a Billing el reenvío de artefactos ACCEPTED inmutables. La operación está protegida por tenant scope, resuelve identificadores internamente y se gobierna mediante pruebas AFPR; permanece fuera del baseline OpenAPI parcial hasta una ampliación contractual fiscal."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/invoices",
+      "expressPath": "/:id/fiscal-artifacts",
+      "routeFile": "src/routes/invoice.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-billing-fiscal-artifact-proxy-outside-current-openapi-baseline",
+      "reason": "El listado de metadatos de artefactos fiscales Billing (PDF, SIGNED_XML, HACIENDA_RESPONSE_XML) está gobernado por la especificación inventori-billing-integration (TASK-014/TASK-016) y sus pruebas de aislamiento, invariante de solo lectura y no exposición de secretos. El contrato OpenAPI parcial se actualizará en una tarea contractual posterior."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/invoices",
+      "expressPath": "/:id/fiscal-artifacts/:artifactType",
+      "routeFile": "src/routes/invoice.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-billing-fiscal-artifact-proxy-outside-current-openapi-baseline",
+      "reason": "El proxy de artefactos fiscales Billing (PDF, SIGNED_XML, HACIENDA_RESPONSE_XML) está gobernado por la especificación inventori-billing-integration (TASK-014) y sus pruebas de aislamiento, invariante de solo lectura y no exposición de secretos. El contrato OpenAPI parcial se actualizará en una tarea contractual posterior."
     },
     {
       "method": "GET",
@@ -281,6 +353,15 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "fb6-company-user-role-assignment-outside-current-openapi-baseline",
       "reason": "Endpoint company-scoped para cambio de rol de usuario creado para la migración FB6; permanece protegido por users.assign-role, tenant scope y prevención de escalamiento de roles.manage, pero queda fuera del OpenAPI parcial hasta refresco contractual completo."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/orders",
+      "expressPath": "/:id/fiscal-readiness-preview",
+      "routeFile": "src/routes/order.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "rfr-wave3-fiscal-readiness-preview-outside-current-openapi-baseline",
+      "reason": "Endpoint Wave 3 de preview de preparación fiscal del receptor para el modal de aprobación. Gobernado por specs/inventori-receiver-fiscal-readiness. El OpenAPI parcial se actualizará en una tarea contractual posterior cuando Wave 5 (frontend modal) esté completo."
     },
     {
       "method": "POST",
@@ -722,6 +803,249 @@
       "contractStatus": "intentionally-excluded",
       "reasonCode": "inventory-requests-outside-current-openapi-baseline",
       "reason": "inventory-requests spec: Confirmación de entrega física (TRANSFER: IN_PROGRESS→DELIVERED). Ruta activa protegida por inventory.requests.execute. Excluida del contrato OpenAPI parcial."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/readiness",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-wave6b-readiness-outside-current-openapi-baseline",
+      "reason": "Wave 6B: Consulta de preparación fiscal M2M Billing gobernada por specs/inventori-fiscal-settings-and-ux; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/security",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave5-outside-current-openapi-baseline",
+      "reason": "Wave 5: lectura segura del estado de certificado y conexion Hacienda; gobernada por el SDD inventori-billing-fiscal-onboarding y contratos Billing fiscal-onboarding v1."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/certificate",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave5-outside-current-openapi-baseline",
+      "reason": "Wave 5: carga servidor-a-servidor del certificado fiscal sin exponer secretos al navegador; gobernada por el SDD y pruebas de contrato/servicio/ruta."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/certificate",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave5-outside-current-openapi-baseline",
+      "reason": "Wave 5: reemplazo controlado del certificado fiscal mediante Billing M2M; gobernada por el SDD y pruebas de contrato/servicio/ruta."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/issuance-points",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave6-outside-current-openapi-baseline",
+      "reason": "Wave 6: lectura canonica de sucursales, terminales y punto de emision predeterminado de Billing; gobernada por el SDD y el contrato fiscal-onboarding v1."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/branches",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave6-outside-current-openapi-baseline",
+      "reason": "Wave 6: alta o actualizacion idempotente de sucursal fiscal mediante Billing M2M, con ambito de compania y ambiente derivado en servidor."
+    },
+    {
+      "method": "PATCH",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/branches/:branchId/status",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave6-outside-current-openapi-baseline",
+      "reason": "Wave 6: activacion o desactivacion idempotente de sucursal fiscal, sujeta a las invariantes de Billing."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/branches/:branchId/terminals",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave6-outside-current-openapi-baseline",
+      "reason": "Wave 6: alta o actualizacion idempotente de terminal fiscal dentro de una sucursal canonica de Billing."
+    },
+    {
+      "method": "PATCH",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/terminals/:terminalId/status",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave6-outside-current-openapi-baseline",
+      "reason": "Wave 6: activacion o desactivacion idempotente de terminal fiscal, sin permitir desactivar el punto predeterminado."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/issuance-points/default",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave6-outside-current-openapi-baseline",
+      "reason": "Wave 6: seleccion serializable del unico punto de emision predeterminado canonico en Billing."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/sequences/read",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave6-outside-current-openapi-baseline",
+      "reason": "Wave 6: lectura canonica de secuencia fiscal por terminal y tipo documental, con identificadores validados contra Billing."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/sequences/initial",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave6-outside-current-openapi-baseline",
+      "reason": "Wave 6: configuracion inicial confirmada y no reiniciable de secuencia fiscal mediante Billing M2M."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/hacienda-credentials/disable",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave5-outside-current-openapi-baseline",
+      "reason": "Wave 5: deshabilitacion idempotente de conexion Hacienda preservando historial y artefactos; gobernada por el SDD y el contrato Billing v1."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-wave2-outside-current-openapi-baseline",
+      "reason": "La API backend Wave 2 de Fiscal Settings esta gobernada por specs/inventori-fiscal-settings-and-ux y pruebas de servicio/ruta; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/hacienda-credentials",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-hacienda-credentials-outside-current-openapi-baseline",
+      "reason": "Gestion segura de credenciales Hacienda via Billing M2M; gobernada por pruebas de servicio/ruta y excluida del OpenAPI parcial hasta la actualizacion contractual fiscal-settings."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/hacienda-credentials/validate",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-hacienda-credentials-outside-current-openapi-baseline",
+      "reason": "Validacion segura de credenciales Hacienda via Billing M2M; gobernada por pruebas de servicio/ruta y excluida del OpenAPI parcial hasta la actualizacion contractual fiscal-settings."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/activities/refresh",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-wave2-outside-current-openapi-baseline",
+      "reason": "La API backend Wave 2 de Fiscal Settings esta gobernada por specs/inventori-fiscal-settings-and-ux y pruebas de servicio/ruta; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "PATCH",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/activities/:code",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-wave2-outside-current-openapi-baseline",
+      "reason": "La API backend Wave 2 de Fiscal Settings esta gobernada por specs/inventori-fiscal-settings-and-ux y pruebas de servicio/ruta; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/activities/default",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-settings-wave2-outside-current-openapi-baseline",
+      "reason": "La API backend Wave 2 de Fiscal Settings esta gobernada por specs/inventori-fiscal-settings-and-ux y pruebas de servicio/ruta; el OpenAPI parcial se actualizara en una tarea contractual posterior."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/issuer",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave4-outside-current-openapi-baseline",
+      "reason": "Wave 4: lectura canonica segura del emisor y perfil Billing; gobernada por el SDD inventori-billing-fiscal-onboarding y pruebas de contrato/servicio/ruta."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/issuer/provision",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave4-outside-current-openapi-baseline",
+      "reason": "Wave 4: asociacion idempotente servidor-a-servidor sin credenciales en navegador; gobernada por el SDD y el contrato Billing fiscal-onboarding v1."
+    },
+    {
+      "method": "PUT",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/issuer",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave4-outside-current-openapi-baseline",
+      "reason": "Wave 4: actualizacion validada de identidad y perfil con read-back canonico e identity lock de Billing."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/test-invoices",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave7-outside-current-openapi-baseline",
+      "reason": "Wave 7: inicia una factura fiscal controlada exclusivamente en SANDBOX; gobernada por el SDD y pruebas de ruta, servicio y contrato."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/test-invoices/:executionId",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave7-outside-current-openapi-baseline",
+      "reason": "Wave 7: consulta canonica del estado de la factura fiscal controlada SANDBOX."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/company",
+      "expressPath": "/fiscal-settings/test-invoices/:executionId/artifacts/:artifactType",
+      "routeFile": "src/routes/fiscal-settings.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "inventori-fiscal-onboarding-wave7-outside-current-openapi-baseline",
+      "reason": "Wave 7: proxy autenticado y acotado de artefactos de la factura fiscal controlada SANDBOX."
+    },
+    {
+      "method": "POST",
+      "mountPath": "/api/client-legal-entities",
+      "expressPath": "/:id/verify",
+      "routeFile": "src/routes/client-legal-entity.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "rfr-wave2-receiver-verification-outside-current-openapi-baseline",
+      "reason": "Endpoint Wave 2 de verificacion fiscal de receptores gobernado por specs/inventori-receiver-fiscal-readiness. El OpenAPI parcial se actualizara en una tarea contractual posterior cuando el flujo completo de aprobacion de ordenes (Wave 3+) este implementado."
+    },
+    {
+      "method": "GET",
+      "mountPath": "/api/client-legal-entities",
+      "expressPath": "/:id/activities",
+      "routeFile": "src/routes/client-legal-entity.routes.js",
+      "contractStatus": "intentionally-excluded",
+      "reasonCode": "rfr-wave2-receiver-activities-outside-current-openapi-baseline",
+      "reason": "Endpoint Wave 2 de lectura de actividades economicas de receptores gobernado por specs/inventori-receiver-fiscal-readiness. El OpenAPI parcial se actualizara en la misma tarea contractual posterior."
     }
   ]
 }

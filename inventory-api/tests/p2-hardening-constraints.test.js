@@ -1,6 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { PrismaClient, Prisma } = require('@prisma/client');
+const {
+  assertDisposableDatabaseUrl,
+  resolveFiscalDisposableDatabaseConfig,
+  verifyFiscalDisposableDatabase,
+} = require('./helpers/fiscal-disposable-database-guard');
 
 const databaseUrl = process.env.P2_CONSTRAINTS_DATABASE_URL;
 
@@ -8,6 +13,9 @@ if (!databaseUrl) {
   test('P2 hardening constraints integration tests require P2_CONSTRAINTS_DATABASE_URL', { skip: true }, () => {});
   return;
 }
+
+const disposableDatabaseConfig = resolveFiscalDisposableDatabaseConfig(process.env);
+assertDisposableDatabaseUrl(databaseUrl, 'P2_CONSTRAINTS_DATABASE_URL', disposableDatabaseConfig);
 
 const prisma = new PrismaClient({
   datasources: {
@@ -22,6 +30,8 @@ const fixtureState = {
   userId: null,
   clientId: null,
   inventoryId: null,
+  categoryId: null,
+  warehouseId: null,
   productId: null,
   invoiceId: null,
 };
@@ -48,49 +58,55 @@ async function ensureConstraintFixtures() {
     return fixtureState;
   }
 
-  const { id: companyId } = await requireSingleRow(Prisma.sql`SELECT id FROM companies ORDER BY id LIMIT 1`);
-  const { id: userId } = await requireSingleRow(Prisma.sql`SELECT id FROM users WHERE company_id IS NOT NULL ORDER BY id LIMIT 1`);
-  const { id: clientId } = await requireSingleRow(Prisma.sql`SELECT id FROM clients ORDER BY id LIMIT 1`);
-  const { id: inventoryId } = await requireSingleRow(Prisma.sql`SELECT id FROM inventories ORDER BY id LIMIT 1`);
-  const { id: categoryId } = await requireSingleRow(Prisma.sql`SELECT id FROM categories ORDER BY id LIMIT 1`);
+  const suffix = `${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
+  const company = await prisma.company.create({ data: { name: `P2 Constraint ${suffix}` } });
+  const user = await prisma.user.create({
+    data: {
+      companyId: company.id,
+      fullName: 'P2 Constraint Actor',
+      username: `p2_constraint_${suffix}`,
+      passwordHash: 'not-a-real-password',
+      status: 'ACTIVE',
+    },
+  });
+  const client = await prisma.client.create({
+    data: { companyId: company.id, code: `P2-${suffix}`, name: 'P2 Constraint Client' },
+  });
+  const inventory = await prisma.inventory.create({ data: { companyId: company.id } });
+  const category = await prisma.category.create({
+    data: { inventoryId: inventory.id, name: `P2 Constraint ${suffix}` },
+  });
+  const warehouse = await prisma.warehouse.create({
+    data: { companyId: company.id, code: `P2-${suffix}`, name: `P2 Constraint ${suffix}` },
+  });
+  const product = await prisma.product.create({
+    data: {
+      companyId: company.id,
+      categoryId: category.id,
+      createdByUserId: user.id,
+      code: `P2-${suffix}`,
+      name: 'P2 Constraint Product',
+    },
+  });
+  const invoice = await prisma.invoice.create({
+    data: { clientId: client.id, number: `P2-CONSTRAINT-${suffix}`, amount: 0 },
+  });
 
-  const { id: productId } = await requireSingleRow(Prisma.sql`
-    INSERT INTO products (
-      company_id,
-      category_id,
-      created_by_user_id,
-      code,
-      name,
-      quantity,
-      reserved_quantity,
-      created_at,
-      updated_at
-    )
-    VALUES (${companyId}, ${categoryId}, ${userId}, 'P2-CONSTRAINT-FIXTURE', 'P2 Constraint Fixture Product', 0, 0, NOW(), NOW())
-    ON CONFLICT (company_id, code)
-    DO UPDATE SET
-      category_id = EXCLUDED.category_id,
-      created_by_user_id = EXCLUDED.created_by_user_id,
-      name = EXCLUDED.name,
-      updated_at = NOW()
-    RETURNING id
-  `);
-
-  const { id: invoiceId } = await requireSingleRow(Prisma.sql`
-    INSERT INTO invoices (client_id, number, amount, created_at, updated_at)
-    VALUES (${clientId}, 'P2-CONSTRAINT-FIXTURE-INVOICE', 0, NOW(), NOW())
-    ON CONFLICT (number)
-    DO UPDATE SET
-      client_id = EXCLUDED.client_id,
-      amount = EXCLUDED.amount,
-      updated_at = NOW()
-    RETURNING id
-  `);
+  const companyId = company.id;
+  const userId = user.id;
+  const clientId = client.id;
+  const inventoryId = inventory.id;
+  const categoryId = category.id;
+  const warehouseId = warehouse.id;
+  const productId = product.id;
+  const invoiceId = invoice.id;
 
   fixtureState.companyId = companyId;
   fixtureState.userId = userId;
   fixtureState.clientId = clientId;
   fixtureState.inventoryId = inventoryId;
+  fixtureState.categoryId = categoryId;
+  fixtureState.warehouseId = warehouseId;
   fixtureState.productId = productId;
   fixtureState.invoiceId = invoiceId;
 
@@ -98,10 +114,20 @@ async function ensureConstraintFixtures() {
 }
 
 test.before(async () => {
+  await prisma.$connect();
+  await verifyFiscalDisposableDatabase(prisma, disposableDatabaseConfig);
   await ensureConstraintFixtures();
 });
 
 test.after(async () => {
+  if (fixtureState.invoiceId) await prisma.invoice.deleteMany({ where: { id: fixtureState.invoiceId } });
+  if (fixtureState.productId) await prisma.product.deleteMany({ where: { id: fixtureState.productId } });
+  if (fixtureState.categoryId) await prisma.category.deleteMany({ where: { id: fixtureState.categoryId } });
+  if (fixtureState.warehouseId) await prisma.warehouse.deleteMany({ where: { id: fixtureState.warehouseId } });
+  if (fixtureState.clientId) await prisma.client.deleteMany({ where: { id: fixtureState.clientId } });
+  if (fixtureState.inventoryId) await prisma.inventory.deleteMany({ where: { id: fixtureState.inventoryId } });
+  if (fixtureState.userId) await prisma.user.deleteMany({ where: { id: fixtureState.userId } });
+  if (fixtureState.companyId) await prisma.company.deleteMany({ where: { id: fixtureState.companyId } });
   await prisma.$disconnect();
 });
 
@@ -214,7 +240,7 @@ test('rejects negative product quantities', async () => {
 
 test('rejects warehouse stock reservations above available quantity', async () => {
   const { inventoryId, productId } = await ensureConstraintFixtures();
-  const { id: warehouseId } = await requireSingleRow(Prisma.sql`SELECT id FROM warehouses ORDER BY id LIMIT 1`);
+  const { warehouseId } = fixtureState;
 
   await assertConstraintViolation(() => prisma.$executeRaw`
     INSERT INTO warehouse_stocks (

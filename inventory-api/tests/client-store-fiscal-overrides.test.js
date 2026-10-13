@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-const { createClientStoreSchema } = require('../src/schemas/client.schema');
+const { createCompanyClientSchema, createClientStoreSchema } = require('../src/schemas/client.schema');
 
 function loadClientServiceWithStubs({
   clientRepositoryOverrides = {},
@@ -25,6 +25,7 @@ function loadClientServiceWithStubs({
     findCompanyClientById: async () => ({ id: 15n, legalEntityId: 88n }),
     countClientStores: async () => 0,
     createClientStore: async (payload) => payload,
+    findOrCreateLegalEntity: async () => ({ id: 99n }),
     ...clientRepositoryOverrides,
   };
   const regionRepositoryStub = {
@@ -81,6 +82,18 @@ function loadClientServiceWithStubs({
     restore,
   };
 }
+
+test('createCompanyClientSchema requires fiscal fields needed for billing', () => {
+  assert.throws(() => {
+    createCompanyClientSchema.parse({ name: 'Cliente sin datos fiscales' });
+  }, (error) => {
+    assert.equal(error.name, 'ZodError');
+    assert.ok(error.issues.some((issue) => issue.path[0] === 'legalId'));
+    assert.ok(error.issues.some((issue) => issue.path[0] === 'documentType'));
+    assert.ok(error.issues.some((issue) => issue.path[0] === 'emailBilling'));
+    return true;
+  });
+});
 
 test('createClientStoreSchema accepts optional store fiscal override fields', () => {
   const parsed = createClientStoreSchema.parse({
@@ -149,6 +162,7 @@ test('createCompanyClientStore persists override fiscal fields when provided', a
     assert.equal(capturedPayloads[0].emailBilling, 'facturacion@sucursal.test');
     assert.equal(capturedPayloads[0].economicActivityCode, '6201');
     assert.equal(capturedPayloads[0].economicActivityName, 'Servicios');
+    assert.equal(capturedPayloads[0].legalEntityId, 99n);
   } finally {
     restore();
   }

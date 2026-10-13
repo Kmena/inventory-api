@@ -56,15 +56,17 @@ test('windows Prisma workflow stays dedicated to npm ci plus build on windows-la
   assert.doesNotMatch(workflowSource, /npm run verify/);
 });
 
-test('db constraints workflow provisions a dedicated mandatory database-backed gate for the focused P2 evidence', () => {
+test('db constraints workflow delegates all DB setup and cleanup to the verified disposable runner', () => {
   const workflowSource = readWorkflow('db-constraints-tests.yml');
 
   assert.match(workflowSource, /^\s{2}db-constraints-tests:\s*$/m);
-  assert.match(workflowSource, /^\s{6}postgres:\s*$/m);
-  assert.match(workflowSource, /P2_CONSTRAINTS_DATABASE_URL:\s+postgresql:\/\/postgres:postgres@127\.0\.0\.1:5432\/inventory_api_constraints\?schema=public/);
-  assert.match(workflowSource, /npm run prisma:apply-committed-migrations/);
-  assert.match(workflowSource, /npm run prisma:seed/);
-  assert.match(workflowSource, /node --test tests\/p2-hardening-constraints\.test\.js/);
+  assert.match(workflowSource, /# DATABASE_URL is created by the verified disposable runner/);
+  assert.match(workflowSource, /npm run test:disposable --/);
+  assert.match(workflowSource, /tests\/p2-hardening-constraints\.test\.js/);
+  assert.match(workflowSource, /tests\/production-stage-rejection-migration\.test\.js/);
+  assert.match(workflowSource, /tests\/audit-repository\.test\.js/);
+  assert.doesNotMatch(workflowSource, /P2_CONSTRAINTS_DATABASE_URL:\s+postgresql:/);
+  assert.doesNotMatch(workflowSource, /^\s{4}services:\s*$/m);
   assert.doesNotMatch(workflowSource, /run:\s+npm run test\s*$/m);
 });
 

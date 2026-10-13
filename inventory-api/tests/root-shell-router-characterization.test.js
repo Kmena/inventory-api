@@ -60,6 +60,7 @@ function createRouterHarness() {
   // recepciones-fiscales-workspace stubs
   browserWindow.RootShell.register('views.receiptsAdmin', createView('receipts-view'));
   browserWindow.RootShell.register('views.fiscalRefsAdmin', createView('fiscal-refs-view'));
+  browserWindow.RootShell.register('views.fiscalSettingsAdmin', createView('fiscal-settings-view'));
   // users-admin-view stub
   browserWindow.RootShell.register('views.usersAdmin', createView('users-view'));
   // in-app-feedback stub

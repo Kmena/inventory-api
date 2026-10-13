@@ -82,6 +82,29 @@ function serializeClientDocument(document) {
   };
 }
 
+function hasText(value) {
+  return String(value || '').trim().length > 0;
+}
+
+function assertCompleteBillingIdentity(payload, options = {}) {
+  const legalName = options.allowNameAsLegalName
+    ? (payload.legalName || payload.name)
+    : payload.legalName;
+  const missing = [];
+  if (!hasText(legalName)) missing.push('razón social');
+  if (!hasText(payload.documentType)) missing.push('tipo de identificación');
+  if (!hasText(payload.legalId)) missing.push('identificación');
+  if (!hasText(payload.emailBilling)) missing.push('correo electrónico para facturas');
+
+  if (missing.length > 0) {
+    throw createHttpError(
+      400,
+      `Complete los datos fiscales para facturar: falta ${missing.join(', ')}`,
+      'validation_error',
+    );
+  }
+}
+
 function serializeClient(client) {
   const serializedClient = {
     ...client,
@@ -172,6 +195,7 @@ async function createClient(payload) {
 
 async function createCompanyClient(payload, auth) {
   assertCompanyUser(auth);
+  assertCompleteBillingIdentity(payload, { allowNameAsLegalName: true });
   const companyId = BigInt(auth.companyId);
   const {
     legalName,
@@ -208,6 +232,74 @@ async function createCompanyClient(payload, auth) {
   return serializeClient(client);
 }
 
+const STORE_FISCAL_FIELD_NAMES = Object.freeze([
+  'legalName',
+  'commercialName',
+  'legalId',
+  'documentType',
+  'emailBilling',
+  'economicActivityCode',
+  'economicActivityName',
+]);
+
+function hasStoreFiscalOverride(payload) {
+  return STORE_FISCAL_FIELD_NAMES.some((fieldName) => String(payload?.[fieldName] || '').trim().length > 0);
+}
+
+async function resolveStoreLegalEntityId(client, payload, companyId) {
+  const billingMode = payload.billingMode || (hasStoreFiscalOverride(payload) ? 'override' : 'inherit');
+  if (billingMode !== 'override') {
+    return client.legalEntityId || null;
+  }
+
+  assertCompleteBillingIdentity({
+    legalName: payload.legalName,
+    legalId: payload.legalId,
+    documentType: payload.documentType,
+    emailBilling: payload.emailBilling,
+  });
+
+  const legalEntity = await clientRepository.findOrCreateLegalEntity(companyId, {
+    legalName: payload.legalName,
+    commercialName: payload.commercialName,
+    identificationType: payload.documentType,
+    identificationNumber: payload.legalId,
+    economicActivityCode: payload.economicActivityCode,
+    economicActivityName: payload.economicActivityName,
+    address: payload.address,
+    email: payload.emailBilling,
+    phone: payload.phone,
+    province: payload.province,
+    canton: payload.canton,
+    district: payload.district,
+  });
+
+  return legalEntity?.id || null;
+}
+
+async function buildStoreWriteData(client, payload, companyId, options = {}) {
+  const billingMode = payload.billingMode || (hasStoreFiscalOverride(payload) ? 'override' : 'inherit');
+  const legalEntityId = await resolveStoreLegalEntityId(client, payload, companyId);
+  const data = { ...payload, legalEntityId };
+  delete data.billingMode;
+
+  if (options.includeClientId) data.clientId = client.id;
+  if (options.includeLifecycle) {
+    data.isPrimary = options.isPrimary;
+    data.isActive = true;
+  }
+
+  if (payload.creditLimit != null) data.creditLimit = Number(payload.creditLimit);
+
+  if (billingMode === 'inherit' && options.clearInheritedFiscalFields) {
+    for (const fieldName of STORE_FISCAL_FIELD_NAMES) {
+      data[fieldName] = null;
+    }
+  }
+
+  return data;
+}
+
 async function createCompanyClientStore(clientId, payload, auth) {
   assertCompanyUser(auth);
 
@@ -220,41 +312,11 @@ async function createCompanyClientStore(clientId, payload, auth) {
 
   try {
     const existingStores = await clientRepository.countClientStores(clientId);
-    const storeData = {
-      ...payload,
-      clientId,
-      legalEntityId: client.legalEntityId,
+    const storeData = await buildStoreWriteData(client, payload, BigInt(auth.companyId), {
+      includeClientId: true,
+      includeLifecycle: true,
       isPrimary: existingStores === 0,
-      isActive: true,
-    };
-
-    if (payload.currency) {
-      storeData.currency = payload.currency;
-    }
-    if (payload.legalName) {
-      storeData.legalName = payload.legalName;
-    }
-    if (payload.commercialName) {
-      storeData.commercialName = payload.commercialName;
-    }
-    if (payload.legalId) {
-      storeData.legalId = payload.legalId;
-    }
-    if (payload.documentType) {
-      storeData.documentType = payload.documentType;
-    }
-    if (payload.emailBilling) {
-      storeData.emailBilling = payload.emailBilling;
-    }
-    if (payload.economicActivityCode) {
-      storeData.economicActivityCode = payload.economicActivityCode;
-    }
-    if (payload.economicActivityName) {
-      storeData.economicActivityName = payload.economicActivityName;
-    }
-    if (payload.creditLimit != null) {
-      storeData.creditLimit = Number(payload.creditLimit);
-    }
+    });
 
     return await clientRepository.createClientStore(storeData);
   } catch (error) {
@@ -427,7 +489,89 @@ async function updateClient(id, payload, auth) {
     throw createHttpError(404, 'Cliente no encontrado', 'not_found');
   }
 
-  const { companyId: _ignoredCompanyId, ...safePayload } = payload;
+  // legalName / commercialName belong to ClientLegalEntity, not the Client model —
+  // keep them out of the Prisma client.updateMany() call but use them for entity sync.
+  const {
+    companyId: _ignoredCompanyId,
+    legalName,
+    commercialName,
+    ...safePayload
+  } = payload;
+
+  if (safePayload.clientClassificationId) {
+    const classification = await clientRepository.findCompanyClassificationById(
+      safePayload.clientClassificationId,
+      companyId,
+    );
+    if (!classification) {
+      throw createHttpError(400, 'Seleccione una clasificacion de cliente valida', 'validation_error');
+    }
+  }
+
+  // Sync ClientLegalEntity whenever any fiscal-identification field changes.
+  //
+  // Strategy:
+  //   - legalId unchanged + existing entity → update entity IN PLACE by ID
+  //     (preserves verificationStatus / lastVerifiedAt / taxpayerName).
+  //   - legalId changed OR no existing entity → findOrCreateLegalEntity by
+  //     identificationNumber (may find different entity or create fresh UNVERIFIED one).
+  //
+  // This prevents a verified entity from being silently replaced by a new UNVERIFIED
+  // one when the user edits unrelated fields (address, phone, name…).
+  const LEGAL_ENTITY_FIELDS = ['legalId', 'documentType', 'economicActivityCode',
+    'economicActivityName', 'address', 'emailBilling', 'phone'];
+  const hasFiscalChanges = legalName !== undefined
+    || commercialName !== undefined
+    || LEGAL_ENTITY_FIELDS.some((f) => safePayload[f] !== undefined);
+  const resolvedLegalId = safePayload.legalId
+    ?? existingClient.legalId
+    ?? existingClient.legalEntity?.identificationNumber;
+  const resolvedFiscalIdentity = {
+    name: safePayload.name ?? existingClient.name,
+    legalName: legalName ?? existingClient.legalEntity?.legalName,
+    legalId: resolvedLegalId,
+    documentType: safePayload.documentType
+      ?? existingClient.documentType
+      ?? existingClient.legalEntity?.identificationType,
+    emailBilling: safePayload.emailBilling
+      ?? existingClient.emailBilling
+      ?? existingClient.legalEntity?.email,
+  };
+  assertCompleteBillingIdentity(resolvedFiscalIdentity, { allowNameAsLegalName: true });
+
+  if (hasFiscalChanges) {
+    // Detect whether the identification number itself is being changed.
+    const legalIdChanged = safePayload.legalId !== undefined
+      && safePayload.legalId !== existingClient.legalId;
+    const existingEntityId = existingClient.legalEntityId;
+
+    const entityPayload = {
+      legalName: legalName ?? existingClient.legalEntity?.legalName ?? existingClient.name,
+      commercialName: commercialName ?? existingClient.legalEntity?.commercialName,
+      identificationType: safePayload.documentType ?? existingClient.documentType,
+      economicActivityCode: safePayload.economicActivityCode ?? existingClient.economicActivityCode,
+      economicActivityName: safePayload.economicActivityName ?? existingClient.economicActivityName,
+      address: safePayload.address ?? existingClient.address,
+      email: safePayload.emailBilling ?? existingClient.emailBilling,
+      phone: safePayload.phone ?? existingClient.phone,
+    };
+
+    if (!legalIdChanged && existingEntityId) {
+      // legalId unchanged → update existing entity directly (preserves verificationStatus).
+      await clientRepository.updateLegalEntityInPlace(existingEntityId, companyId, entityPayload);
+      // legalEntityId on the client record stays the same — no update needed.
+    } else if (resolvedLegalId) {
+      // legalId changed OR no existing entity → find/create by identificationNumber.
+      const legalEntity = await clientRepository.findOrCreateLegalEntity(companyId, {
+        ...entityPayload,
+        identificationNumber: resolvedLegalId,
+      });
+      if (legalEntity) {
+        safePayload.legalEntityId = legalEntity.id;
+      }
+    }
+  }
+
   return clientRepository.updateCompanyClient(id, companyId, safePayload);
 }
 
@@ -464,6 +608,24 @@ async function getClientLedger(clientId, auth, options = {}) {
       appliedAmount: getAppliedAmount(invoice),
     })),
   };
+}
+
+async function updateCompanyClientStore(clientId, storeId, payload, auth) {
+  assertCompanyUser(auth);
+  const companyId = BigInt(auth.companyId);
+  const client = await assertClientInActorScope(clientId, auth);
+
+  if (payload.subregionId) {
+    const subregion = await regionRepository.findCompanySubregionById(payload.subregionId, companyId);
+    if (!subregion) {
+      throw createHttpError(400, 'La tienda debe estar ligada a una subzona valida de la empresa', 'validation_error');
+    }
+  }
+
+  const storeData = await buildStoreWriteData(client, payload, companyId, { clearInheritedFiscalFields: true });
+  const updatedStore = await clientRepository.updateCompanyClientStore(clientId, storeId, companyId, storeData);
+  if (!updatedStore) throw createHttpError(404, 'Tienda no encontrada', 'not_found');
+  return updatedStore;
 }
 
 async function updateCompanyClientStoreCreditLimit(clientId, storeId, payload, auth) {
@@ -504,6 +666,7 @@ module.exports = {
   createClient,
   createCompanyClient,
   createCompanyClientStore,
+  updateCompanyClientStore,
   createCompanyClientDocument,
   createCompanyClientStoreDocument,
   createCompanyClientReference,

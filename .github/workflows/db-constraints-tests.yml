@@ -16,29 +16,8 @@ jobs:
     defaults:
       run:
         working-directory: inventory-api
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/inventory_api_constraints?schema=public
-      P2_CONSTRAINTS_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/inventory_api_constraints?schema=public
-      SEED_ROOT_PASSWORD: ci-root-password
-      SEED_ADMIN_PASSWORD: ci-admin-password
-      SEED_SALES_PASSWORD: ci-sales-password
-      SEED_SALES_AGENT_PASSWORD: ci-sales-agent-password
-      SEED_SALES_SUPERVISOR_PASSWORD: ci-sales-supervisor-password
-      SEED_WAREHOUSE_PASSWORD: ci-warehouse-password
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: inventory_api_constraints
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d inventory_api_constraints"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    # DATABASE_URL is created by the verified disposable runner after checking
+    # its runner-owned PostgreSQL name, marker and current_database() identity.
 
     steps:
       - name: Check out repository
@@ -57,11 +36,5 @@ jobs:
       - name: Generate Prisma client
         run: npm run build
 
-      - name: Apply committed Prisma migrations
-        run: npm run prisma:apply-committed-migrations
-
-      - name: Seed CI constraints database
-        run: npm run prisma:seed
-
-      - name: Run focused DB constraints evidence
-        run: node --test tests/p2-hardening-constraints.test.js
+      - name: Run focused DB evidence on verified disposable PostgreSQL
+        run: npm run test:disposable -- tests/p2-hardening-constraints.test.js tests/production-stage-rejection-migration.test.js tests/audit-repository.test.js

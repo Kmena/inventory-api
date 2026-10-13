@@ -229,8 +229,11 @@
    * @param {any} [clientFiscalProfile]
    * @param {Array<{value:string,label:string}>} [documentTypeOptions]
    * @param {boolean} [canLookupTaxpayer]
+   * @param {any} [editStore]
    */
-  function open(clientId, clientName, session, zoneOptions, onSuccess, refreshZones, clientFiscalProfile, documentTypeOptions, canLookupTaxpayer) {
+  // Backward-compatible signature prefix kept intentionally for characterization tests:
+  // function open(clientId, clientName, session, zoneOptions, onSuccess, refreshZones, clientFiscalProfile, documentTypeOptions, canLookupTaxpayer)
+  function open(clientId, clientName, session, zoneOptions, onSuccess, refreshZones, clientFiscalProfile, documentTypeOptions, canLookupTaxpayer, editStore = null) {
     const clientsApi = rootShell.require('clientsApi');
 
     // ── Crear el dialog dinámicamente (ADR-004) ──────────────────────────────
@@ -241,6 +244,7 @@
     dialog.innerHTML = buildDialogHtml(clientName, zoneOptions, clientFiscalProfile);
     globalScope.document.body.appendChild(dialog);
     dialog.showModal();
+    const isEditMode = Boolean(editStore?.id);
 
     // ── Refs de UI ────────────────────────────────────────────────────────────
     const form = /** @type {HTMLFormElement} */ (dialog.querySelector('#store-dialog-form'));
@@ -264,6 +268,43 @@
     const cancelBtn = /** @type {HTMLButtonElement} */ (dialog.querySelector('#store-dialog-cancel'));
     const refreshZoneButtons = Array.from(dialog.querySelectorAll('[data-action="refresh-zones"]'));
     const openZonesButtons = Array.from(dialog.querySelectorAll('[data-action="open-zones"]'));
+    const dialogTitle = /** @type {HTMLElement | null} */ (dialog.querySelector('h3'));
+    if (isEditMode) {
+      if (dialogTitle) dialogTitle.textContent = 'Editar tienda';
+      submitBtn.textContent = 'Guardar cambios';
+    }
+
+    function setFieldValue(fieldName, value) {
+      const field = /** @type {HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null} */ (dialog.querySelector(`[name="${fieldName}"]`));
+      if (field && value !== undefined && value !== null) field.value = String(value);
+    }
+
+    function hydrateEditStore() {
+      if (!isEditMode) return;
+      for (const fieldName of [
+        'name', 'subregionId', 'code', 'storeType', 'phone', 'attentionSchedule', 'currency',
+        'creditLimit', 'locationReference', 'address', 'latitude', 'longitude', 'province', 'canton',
+        'district', 'legalName', 'commercialName', 'documentType', 'legalId', 'emailBilling',
+        'economicActivityCode', 'economicActivityName',
+      ]) {
+        setFieldValue(fieldName, editStore[fieldName]);
+      }
+      const hasOwnFiscalEntity = editStore.legalEntity && String(editStore.legalEntity.id || '') !== String(clientFiscalProfile?.legalEntity?.id || clientFiscalProfile?.id || '');
+      const hasDirectFiscalFields = ['legalName', 'legalId', 'documentType', 'emailBilling', 'economicActivityCode', 'economicActivityName']
+        .some((fieldName) => String(editStore[fieldName] || '').trim().length > 0);
+      const billingMode = hasOwnFiscalEntity || hasDirectFiscalFields ? 'override' : 'inherit';
+      const billingRadio = /** @type {HTMLInputElement | null} */ (dialog.querySelector(`input[name="billingMode"][value="${billingMode}"]`));
+      if (billingRadio) billingRadio.checked = true;
+      if (billingMode === 'override' && editStore.legalEntity) {
+        setFieldValue('legalName', editStore.legalEntity.legalName);
+        setFieldValue('commercialName', editStore.legalEntity.commercialName);
+        setFieldValue('documentType', editStore.legalEntity.identificationType);
+        setFieldValue('legalId', editStore.legalEntity.identificationNumber);
+        setFieldValue('emailBilling', editStore.legalEntity.email);
+        setFieldValue('economicActivityCode', editStore.legalEntity.economicActivityCode);
+        setFieldValue('economicActivityName', editStore.legalEntity.economicActivityName);
+      }
+    }
 
     // ── Hacienda lookup en billing override — blur automático + botón (FR-027, AC-019) ──
     const MIN_CEDULA_LENGTH = 9;
@@ -507,7 +548,9 @@
       guidanceTitle.focus();
     }
 
-    toggleBillingMode('inherit');
+    hydrateEditStore();
+    const initialBillingMode = /** @type {HTMLInputElement | null} */ (dialog.querySelector('input[name="billingMode"]:checked'))?.value || 'inherit';
+    toggleBillingMode(initialBillingMode);
     for (const billingModeInput of billingModeInputs) {
       billingModeInput.addEventListener('change', () => {
         if (billingModeInput.checked) {
@@ -654,26 +697,32 @@
       const payload = clientsAdminHelpers.buildStorePayload(new globalScope.FormData(form));
 
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Creando...';
+      submitBtn.textContent = isEditMode ? 'Guardando...' : 'Creando...';
 
       try {
-        const createdStore = await clientsApi.createStore(session, clientId, payload);
+        const savedStore = isEditMode
+          ? await clientsApi.updateStore(session, clientId, editStore.id, payload)
+          : await clientsApi.createStore(session, clientId, payload);
 
-        // Notify the parent view immediately so the new store appears in the list
         if (typeof onSuccess === 'function') {
-          onSuccess(createdStore);
+          onSuccess(savedStore);
+        }
+
+        if (isEditMode) {
+          closeDialog();
+          return;
         }
 
         // Phase 2: optional store-document upload within the same dialog
         const phaseDocTypes = Array.isArray(documentTypeOptions) && documentTypeOptions.length
           ? documentTypeOptions
           : [];
-        enterPhase2(dialog, clientId, createdStore.id ?? createdStore.id, session, phaseDocTypes, () => {});
+        enterPhase2(dialog, clientId, savedStore.id ?? savedStore.id, session, phaseDocTypes, () => {});
       } catch (err) {
-        const message = err?.message || 'No se pudo crear la tienda.';
+        const message = err?.message || (isEditMode ? 'No se pudo actualizar la tienda.' : 'No se pudo crear la tienda.');
         messageEl.innerHTML = `<div class="inline-message inline-message--error">${escapeHtml(message)}</div>`;
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Crear tienda';
+        submitBtn.textContent = isEditMode ? 'Guardar cambios' : 'Crear tienda';
       }
     });
   }

@@ -25,6 +25,14 @@
     CARD:     'Tarjeta',
   };
 
+  const CARD_TYPE_LABELS = {
+    VISA:       'Visa',
+    MASTERCARD: 'Mastercard',
+    AMEX:       'American Express',
+    DINERS:     'Diners Club',
+    OTHER:      'Otro',
+  };
+
   const PAYMENT_STATUS_LABELS = {
     PENDING_APPROVAL: 'Por aprobar',
     APPROVED:         'Aprobado',
@@ -78,6 +86,10 @@
     return PAYMENT_METHOD_LABELS[method] || method || '—';
   }
 
+  function cardTypeLabel(cardType) {
+    return CARD_TYPE_LABELS[cardType] || cardType || '—';
+  }
+
   function paymentStatusLabel(status) {
     return PAYMENT_STATUS_LABELS[status] || status || '—';
   }
@@ -88,14 +100,98 @@
     return new Date(invoice.dueAt) < new Date();
   }
 
+  // ─── Fiscal status helpers (Wave 2) ───────────────────────────────────────
+  // Compact labels for the invoice list column (not the detail panel).
+  // Separate from full-label helpers (Wave 4) to keep each wave self-contained.
+
+  const FISCAL_STATUS_LIST_LABELS = {
+    PENDING:         '\u23F3 En cola',
+    PROCESSING:      '\u23F3 Enviando',
+    ACCEPTED:        '\u2713 Aceptada',
+    REJECTED:        '\u2717 Rechazada',
+    ERROR_RETRYABLE: '\u26A0 Reintentando',
+    ERROR_FINAL:     '\u2717 Error final',
+  };
+
+  const FISCAL_STATUS_LIST_BADGE_CLASSES = {
+    PENDING:         'badge',
+    PROCESSING:      'badge badge-info',
+    ACCEPTED:        'badge badge-success',
+    REJECTED:        'badge badge-danger',
+    ERROR_RETRYABLE: 'badge badge-warning',
+    ERROR_FINAL:     'badge badge-danger',
+  };
+
+  /** Compact label for the invoice list fiscal column. Degrades to raw status for unknown values. */
+  function fiscalStatusListLabel(status) {
+    return FISCAL_STATUS_LIST_LABELS[status] || status || '\u2014';
+  }
+
+  /** Badge CSS class for the invoice list fiscal column. Falls back to plain 'badge'. */
+  function fiscalStatusListBadgeClass(status) {
+    return FISCAL_STATUS_LIST_BADGE_CLASSES[status] || 'badge';
+  }
+
+  // ─── Fiscal status helpers (Wave 4) ───────────────────────────────────────────
+  // Full labels, badge classes and descriptions for the invoice detail panel.
+  // Distinct from the compact Wave 2 list helpers above.
+
+  const FISCAL_STATUS_LABELS = {
+    PENDING:         'Pendiente de emisi\u00F3n',
+    PROCESSING:      'Enviando a Hacienda',
+    ACCEPTED:        'Aceptada por Hacienda',
+    REJECTED:        'Rechazada por Hacienda',
+    ERROR_RETRYABLE: 'Error temporal',
+    ERROR_FINAL:     'Error de emisi\u00F3n',
+  };
+
+  const FISCAL_STATUS_BADGE_CLASSES = {
+    PENDING:         'badge',
+    PROCESSING:      'badge badge-info',
+    ACCEPTED:        'badge badge-success',
+    REJECTED:        'badge badge-danger',
+    ERROR_RETRYABLE: 'badge badge-warning',
+    ERROR_FINAL:     'badge badge-danger',
+  };
+
+  const FISCAL_STATUS_DESCRIPTIONS = {
+    PENDING:         'El documento fiscal est\u00E1 en cola de emisi\u00F3n.',
+    PROCESSING:      'El documento fue enviado a Hacienda. Esperando respuesta.',
+    ACCEPTED:        'Hacienda acept\u00F3 el comprobante electr\u00F3nico.',
+    REJECTED:        'Hacienda rechaz\u00F3 el comprobante. Contacte soporte.',
+    ERROR_RETRYABLE: 'Se produjo un error temporal. El sistema reintentar\u00E1 autom\u00E1ticamente.',
+    ERROR_FINAL:     'Error permanente en la emisi\u00F3n. Contacte soporte.',
+  };
+
+  /** Full label for the invoice detail fiscal section badge. Degrades to raw status for unknown values. */
+  function fiscalStatusLabel(status) {
+    return FISCAL_STATUS_LABELS[status] || status || '\u2014';
+  }
+
+  /** Badge CSS class for the invoice detail fiscal section. Falls back to plain 'badge'. */
+  function fiscalStatusBadgeClass(status) {
+    return FISCAL_STATUS_BADGE_CLASSES[status] || 'badge';
+  }
+
+  /** User-facing description for each fiscal status. Unknown status gets a safe fallback. */
+  function fiscalStatusDescription(status) {
+    return FISCAL_STATUS_DESCRIPTIONS[status] || 'Estado fiscal no reconocido.';
+  }
+
   rootShell.register('views.billingAdminHelpers', {
     escapeHtml,
+    fiscalStatusBadgeClass,
+    fiscalStatusDescription,
+    fiscalStatusLabel,
+    fiscalStatusListBadgeClass,
+    fiscalStatusListLabel,
     formatCurrency,
     formatDate,
     formatDateTime,
     invoiceStatusBadgeClass,
     invoiceStatusLabel,
     isOverdue,
+    cardTypeLabel,
     paymentMethodLabel,
     paymentStatusLabel,
   });
